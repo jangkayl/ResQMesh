@@ -15,7 +15,8 @@ import kotlinx.coroutines.launch
 import org.json.JSONObject
 import java.util.UUID
 
-data class ScannedDevice(val endpointId: String, val name: String)
+// Change it to this:
+data class ScannedDevice(val endpointId: String, val name: String, val lastSeen: Long)
 
 class ChatViewModel(private val networkManager: MeshNetworkManager) : ViewModel() {
 
@@ -38,11 +39,17 @@ class ChatViewModel(private val networkManager: MeshNetworkManager) : ViewModel(
         startMeshGarbageCollector()
 
         networkManager.onDeviceScanned = { id, name ->
-            val notInRadar = scannedDevices.none { it.endpointId == id }
             val notConnected = connectedDevices.none { it.endpointId == id }
 
-            if (notInRadar && notConnected) {
-                scannedDevices.add(ScannedDevice(id, name))
+            if (notConnected) {
+                // If they are already in the radar, just update their timestamp
+                val index = scannedDevices.indexOfFirst { it.endpointId == id }
+                if (index != -1) {
+                    scannedDevices[index] = scannedDevices[index].copy(lastSeen = System.currentTimeMillis())
+                } else {
+                    // It's a new device, add them!
+                    scannedDevices.add(ScannedDevice(id, name, System.currentTimeMillis()))
+                }
             }
         }
 
