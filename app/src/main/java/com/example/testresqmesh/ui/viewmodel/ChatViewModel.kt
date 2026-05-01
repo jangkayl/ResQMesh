@@ -188,6 +188,8 @@ class ChatViewModel(private val networkManager: MeshNetworkManager) : ViewModel(
             while (true) {
                 if (isOnline) {
                     val now = System.currentTimeMillis()
+                    // ONLY clean dead public text-chat nodes here.
+                    // Leave the Radar UI to be managed by the native API callbacks!
                     val deadNodes = activeMeshNodes.filter { (now - it.value) > 15000 }.keys
                     deadNodes.forEach { activeMeshNodes.remove(it) }
                 }

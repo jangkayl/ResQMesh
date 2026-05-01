@@ -34,35 +34,33 @@ class MeshNetworkManager(private val context: Context) {
     private var scannerPulseRunnable: Runnable? = null
 
     private val connectedEndpointIds = mutableSetOf<String>()
+    // NEW: The Bouncer's Memory (Stores IDs of messages we already processed)
+    private val seenMessageIds = mutableSetOf<String>()
+
     private var activeServiceId = "com.example.testresqmesh.p2p.PUBLIC"
+
+    private val activeScannedEndpoints = mutableSetOf<String>()
 
     fun startMeshNode(teamKey: String) {
         val formattedKey = teamKey.trim().uppercase().ifEmpty { "PUBLIC" }
         activeServiceId = "com.example.testresqmesh.p2p.$formattedKey"
-
         val options = AdvertisingOptions.Builder().setStrategy(Strategy.P2P_CLUSTER).build()
 
         connectionsClient.startAdvertising(myDeviceName, activeServiceId, connectionLifecycleCallback, options)
             .addOnSuccessListener {
                 onStatusChanged?.invoke("Node Active [Room: $formattedKey]. Seeking peers...")
-                startAggressiveScanner()
+                startNativeScanner() // <--- UPDATE THIS LINE
                 startHeartbeat()
             }
             .addOnFailureListener { onStatusChanged?.invoke("Failed to start node.") }
     }
 
-    private fun startAggressiveScanner() {
+    // 1. DELETE startAggressiveScanner() and REPLACE with this smooth continuous native scanner:
+    private fun startNativeScanner() {
         val discoveryOptions = DiscoveryOptions.Builder().setStrategy(Strategy.P2P_CLUSTER).build()
-        scannerPulseRunnable = object : Runnable {
-            override fun run() {
-                connectionsClient.stopDiscovery()
-                Handler(Looper.getMainLooper()).postDelayed({
-                    connectionsClient.startDiscovery(activeServiceId, endpointDiscoveryCallback, discoveryOptions)
-                }, 1000)
-                scannerPulseHandler.postDelayed(this, 12000)
-            }
-        }
-        scannerPulseHandler.post(scannerPulseRunnable!!)
+        connectionsClient.startDiscovery(activeServiceId, endpointDiscoveryCallback, discoveryOptions)
+            .addOnSuccessListener { onStatusChanged?.invoke("Node Active. Seeking peers continuously...") }
+            .addOnFailureListener { onStatusChanged?.invoke("Scanner failed to start.") }
     }
 
     private fun startHeartbeat() {
@@ -95,6 +93,19 @@ class MeshNetworkManager(private val context: Context) {
     }
 
     fun broadcastPayload(jsonString: String, excludeEndpointId: String? = null) {
+        // --- THE SENDER FIX ---
+        // Add our OWN message ID to the memory cache before sending it out
+        try {
+            val jsonObject = JSONObject(jsonString)
+            if (jsonObject.has("id")) {
+                val msgId = jsonObject.getString("id")
+                seenMessageIds.add(msgId)
+            }
+        } catch (e: Exception) {
+            Log.e("MeshNetwork", "Failed to cache outbound message ID", e)
+        }
+        // ----------------------
+
         val targets = connectedEndpointIds.filter { it != excludeEndpointId }
         if (targets.isNotEmpty()) {
             val payload = Payload.fromBytes(jsonString.toByteArray(Charsets.UTF_8))
@@ -103,6 +114,18 @@ class MeshNetworkManager(private val context: Context) {
     }
 
     fun sendDirectPayload(targetId: String, jsonString: String) {
+        // --- THE SENDER FIX ---
+        try {
+            val jsonObject = JSONObject(jsonString)
+            if (jsonObject.has("id")) {
+                val msgId = jsonObject.getString("id")
+                seenMessageIds.add(msgId)
+            }
+        } catch (e: Exception) {
+            Log.e("MeshNetwork", "Failed to cache outbound message ID", e)
+        }
+        // ----------------------
+
         val payload = Payload.fromBytes(jsonString.toByteArray(Charsets.UTF_8))
         connectionsClient.sendPayload(targetId, payload)
     }
@@ -118,18 +141,56 @@ class MeshNetworkManager(private val context: Context) {
         onMessageReceived?.invoke("LOCAL", myDeviceName, "", false, true, null, null)
     }
 
-    // --- NEARBY CALLBACKS ---
     private val endpointDiscoveryCallback = object : EndpointDiscoveryCallback() {
         override fun onEndpointFound(endpointId: String, info: DiscoveredEndpointInfo) {
+            // Add them to our physical room tracker
+            activeScannedEndpoints.add(endpointId)
             onDeviceScanned?.invoke(endpointId, info.endpointName)
 
+            // Don't connect to yourself
             if (info.endpointName == myDeviceName) return
-            connectionsClient.requestConnection(myDeviceName, endpointId, connectionLifecycleCallback)
-                .addOnFailureListener { Log.d("MeshNetwork", "Collision handled safely.") }
+
+            // --- THE TIE-BREAKER FIX ---
+            // We compare the two names alphabetically.
+            // Only the "greater" name is allowed to initiate the connection!
+            if (myDeviceName.compareTo(info.endpointName) > 0) {
+                Log.d("MeshNetwork", "Tie-Breaker: I am initiating connection to ${info.endpointName}")
+                attemptConnection(endpointId, info.endpointName)
+            } else {
+                Log.d("MeshNetwork", "Tie-Breaker: Waiting for ${info.endpointName} to connect to me.")
+                // We intentionally do nothing here. We just wait for their request to arrive!
+            }
+            // ---------------------------
         }
+
         override fun onEndpointLost(endpointId: String) {
+            activeScannedEndpoints.remove(endpointId)
             onDeviceScanRemoved?.invoke(endpointId)
         }
+    }
+
+    // NEW: The Polite Auto-Retry Function
+    private fun attemptConnection(endpointId: String, endpointName: String) {
+        connectionsClient.requestConnection(myDeviceName, endpointId, connectionLifecycleCallback)
+            .addOnFailureListener {
+                Log.d("MeshNetwork", "Handshake failed with $endpointName. Retrying in 5 seconds...")
+
+                Handler(Looper.getMainLooper()).postDelayed({
+                    // ZOMBIE FIX: Are they still physically in the room?
+                    val stillInRoom = activeScannedEndpoints.contains(endpointId)
+
+                    // Are they NOT connected yet?
+                    val notConnected = !connectedEndpointIds.contains(endpointId)
+
+                    // Only fire the retry if BOTH are true!
+                    if (stillInRoom && notConnected) {
+                        Log.d("MeshNetwork", "Target still here. Retrying connection to $endpointName...")
+                        attemptConnection(endpointId, endpointName)
+                    } else {
+                        Log.d("MeshNetwork", "Target left or already connected. Canceling retry.")
+                    }
+                }, 5000)
+            }
     }
 
     private val connectionLifecycleCallback = object : ConnectionLifecycleCallback() {
@@ -160,6 +221,24 @@ class MeshNetworkManager(private val context: Context) {
                 val jsonString = String(payload.asBytes()!!, Charsets.UTF_8)
                 try {
                     val jsonObject = JSONObject(jsonString)
+
+                    // --- 1. THE BOUNCER LOGIC ---
+                    val msgId = jsonObject.getString("id")
+
+                    if (seenMessageIds.contains(msgId)) {
+                        // We already saw this exact message. Drop it so it doesn't spam!
+                        return
+                    }
+
+                    // It's a new message! Add it to memory.
+                    seenMessageIds.add(msgId)
+
+                    // Keep memory clean so the app doesn't crash after 500 messages
+                    if (seenMessageIds.size > 500) {
+                        seenMessageIds.remove(seenMessageIds.first())
+                    }
+                    // ----------------------------
+
                     val sender = jsonObject.getString("senderName")
                     val isSystem = jsonObject.optBoolean("isSystem", false)
 
