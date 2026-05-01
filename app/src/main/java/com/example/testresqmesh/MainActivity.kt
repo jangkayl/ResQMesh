@@ -14,6 +14,9 @@ import com.example.testresqmesh.network.MeshNetworkManager
 import com.example.testresqmesh.ui.screens.ChatScreen
 import com.example.testresqmesh.ui.viewmodel.ChatViewModel
 import com.example.testresqmesh.utils.MediaHelper
+import android.content.pm.PackageManager
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
 
 class MainActivity : ComponentActivity() {
 
@@ -36,6 +39,7 @@ class MainActivity : ComponentActivity() {
         mediaHelper = MediaHelper(applicationContext)
 
         requestRequiredPermissions()
+        checkNotificationPermission()
 
         setContent {
             // Pass the ViewModel and Helpers into the UI Layer
@@ -58,6 +62,18 @@ class MainActivity : ComponentActivity() {
             arrayOf(Manifest.permission.BLUETOOTH, Manifest.permission.BLUETOOTH_ADMIN, Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION, Manifest.permission.RECORD_AUDIO)
         }
         requestPermissionLauncher.launch(perms)
+    }
+
+    private fun checkNotificationPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) { // Android 13+
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+                ActivityCompat.requestPermissions(
+                    this,
+                    arrayOf(Manifest.permission.POST_NOTIFICATIONS),
+                    101 // Just a request code
+                )
+            }
+        }
     }
 
     override fun onDestroy() {

@@ -5,11 +5,14 @@ import android.os.Handler
 import android.os.Looper
 import android.util.Log
 import com.example.testresqmesh.data.models.ConnectedDevice
+import com.example.testresqmesh.utils.NotificationHelper
 import com.google.android.gms.nearby.Nearby
 import com.google.android.gms.nearby.connection.*
 import org.json.JSONObject
 
 class MeshNetworkManager(private val context: Context) {
+
+    private val notificationHelper = NotificationHelper(context)
 
     private val connectionsClient = Nearby.getConnectionsClient(context)
 
@@ -250,6 +253,12 @@ class MeshNetworkManager(private val context: Context) {
 
                     val text = jsonObject.getString("text")
                     val isPrivate = jsonObject.optBoolean("isPrivate", false)
+
+                    if (isPrivate) {
+                        // Fire the local notification alert!
+                        notificationHelper.showPrivateMessageNotification(sender, text)
+                    }
+
                     val imageBase64 = if (jsonObject.has("image")) jsonObject.getString("image") else null
                     val audioBase64 = if (jsonObject.has("audio")) jsonObject.getString("audio") else null
 
