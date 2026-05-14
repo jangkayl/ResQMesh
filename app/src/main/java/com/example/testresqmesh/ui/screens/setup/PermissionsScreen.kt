@@ -2,8 +2,10 @@ package com.example.testresqmesh.ui.screens.setup
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -15,19 +17,23 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.testresqmesh.ui.components.buttons.ResQButton
 import com.example.testresqmesh.ui.theme.Spacing
+import com.example.testresqmesh.ui.theme.TestResQMeshTheme
 
 @Composable
 fun PermissionsScreen(onAllGranted: () -> Unit) {
     val pinkBackground = Color(0xFFFEE2E2) // Light pink from mockup
+    val scrollState = rememberScrollState()
 
     Column(
         modifier = Modifier
             .fillMaxSize()
             .background(pinkBackground)
+            .verticalScroll(scrollState)
             .padding(Spacing.Large),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
@@ -88,7 +94,7 @@ fun PermissionsScreen(onAllGranted: () -> Unit) {
             iconColor = Color(0xFFF59E0B)
         )
 
-        Spacer(modifier = Modifier.weight(1f))
+        Spacer(modifier = Modifier.height(48.dp))
 
         Surface(
             modifier = Modifier.fillMaxWidth(),
@@ -181,5 +187,13 @@ fun PermissionCard(
             contentDescription = null,
             tint = Color.Black.copy(alpha = 0.2f)
         )
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+fun PermissionsScreenPreview() {
+    TestResQMeshTheme {
+        PermissionsScreen(onAllGranted = {})
     }
 }

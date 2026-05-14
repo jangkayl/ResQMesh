@@ -17,20 +17,37 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import androidx.compose.ui.tooling.preview.Preview
+import com.example.testresqmesh.ui.theme.TestResQMeshTheme
+import com.example.testresqmesh.ui.components.chat.InboxMessageItem
 import com.example.testresqmesh.ui.theme.Spacing
 import com.example.testresqmesh.ui.viewmodel.ChatViewModel
 import com.example.testresqmesh.utils.MediaHelper
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ChatContainerScreen(
     viewModel: ChatViewModel, 
     mediaHelper: MediaHelper,
     onChatSelected: (String) -> Unit
 ) {
-    var selectedTabIndex by remember { mutableIntStateOf(0) }
+    val selectedTabIndex = remember { mutableIntStateOf(0) }
 
+    ChatContainerScreenContent(
+        selectedTabIndex = selectedTabIndex.intValue,
+        onTabSelected = { selectedTabIndex.intValue = it },
+        privateTabContent = { PrivateChatTab(viewModel, mediaHelper, onChatSelected) },
+        publicTabContent = { PublicChatTab(viewModel, mediaHelper, onChatSelected) }
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ChatContainerScreenContent(
+    selectedTabIndex: Int,
+    onTabSelected: (Int) -> Unit,
+    privateTabContent: @Composable () -> Unit,
+    publicTabContent: @Composable () -> Unit
+) {
     Scaffold(
         topBar = {
             TopAppBar(
@@ -87,7 +104,7 @@ fun ChatContainerScreen(
                         icon = Icons.Outlined.Shield,
                         isSelected = selectedTabIndex == 0,
                         modifier = Modifier.weight(1f),
-                        onClick = { selectedTabIndex = 0 }
+                        onClick = { onTabSelected(0) }
                     )
                     // Broadcast Tab
                     SegmentedTabItem(
@@ -95,7 +112,7 @@ fun ChatContainerScreen(
                         icon = Icons.Outlined.SettingsInputAntenna,
                         isSelected = selectedTabIndex == 1,
                         modifier = Modifier.weight(1f),
-                        onClick = { selectedTabIndex = 1 }
+                        onClick = { onTabSelected(1) }
                     )
                 }
             }
@@ -105,8 +122,8 @@ fun ChatContainerScreen(
             // Content Area
             Box(modifier = Modifier.weight(1f)) {
                 when (selectedTabIndex) {
-                    0 -> PrivateChatTab(viewModel, mediaHelper, onChatSelected)
-                    1 -> PublicChatTab(viewModel, mediaHelper, onChatSelected)
+                    0 -> privateTabContent()
+                    1 -> publicTabContent()
                 }
             }
         }
@@ -148,5 +165,44 @@ fun SegmentedTabItem(
                 color = contentColor
             )
         }
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+fun ChatContainerScreenPreview() {
+    TestResQMeshTheme {
+        ChatContainerScreenContent(
+            selectedTabIndex = 0,
+            onTabSelected = {},
+            privateTabContent = {
+                Column {
+                    InboxMessageItem(
+                        name = "0x7f...a1",
+                        message = "Supplies located at sector 4. Bringing",
+                        timestamp = "2m ago",
+                        hops = "2 HOPS",
+                        hasNotification = true
+                    )
+                    InboxMessageItem(
+                        name = "Alpha-9",
+                        message = "Confirming your location. Stay at the",
+                        timestamp = "15m ago",
+                        hops = "DIRECT"
+                    )
+                }
+            },
+            publicTabContent = {
+                Column {
+                    InboxMessageItem(
+                        name = "GLOBAL_SOS",
+                        message = "Critical alert: Earthquake detected in Sector 7",
+                        timestamp = "1m ago",
+                        hops = "SATURATED",
+                        isEncrypted = false
+                    )
+                }
+            }
+        )
     }
 }

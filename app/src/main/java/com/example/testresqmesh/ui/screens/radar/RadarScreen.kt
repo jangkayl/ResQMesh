@@ -5,8 +5,8 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -23,14 +23,34 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.tooling.preview.Preview
+import com.example.testresqmesh.ui.theme.TestResQMeshTheme
 import com.example.testresqmesh.ui.theme.InboxBackground
 import com.example.testresqmesh.ui.theme.InboxAccentBlue
 import com.example.testresqmesh.ui.theme.Spacing
 import com.example.testresqmesh.ui.viewmodel.ChatViewModel
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun RadarScreen(viewModel: ChatViewModel) {
+    val mockNodes = listOf(
+        NodeItemData("Node_X77A", "120m • End Device"),
+        NodeItemData("Node_BK29", "250m • Active Relay", true),
+        NodeItemData("Node_L005", "410m • End Device"),
+        NodeItemData("Node_MN04", "680m • Active Relay", true),
+        NodeItemData("Node_PJ88", "910m • End Device")
+    )
+    RadarScreenContent(
+        activeNodesCount = 6,
+        nodes = mockNodes
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun RadarScreenContent(
+    activeNodesCount: Int,
+    nodes: List<NodeItemData>
+) {
     val infiniteTransition = rememberInfiniteTransition()
     val radarSweep by infiniteTransition.animateFloat(
         initialValue = 0f,
@@ -72,6 +92,7 @@ fun RadarScreen(viewModel: ChatViewModel) {
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
+                .verticalScroll(rememberScrollState())
         ) {
             // Radar Visualization Section
             Box(
@@ -92,7 +113,7 @@ fun RadarScreen(viewModel: ChatViewModel) {
                     ) {
                         Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(Color(0xFFF97316)))
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("6 ACTIVE NODES", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Black, color = Color.White)
+                        Text("$activeNodesCount ACTIVE NODES", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Black, color = Color.White)
                     }
                 }
 
@@ -160,7 +181,7 @@ fun RadarScreen(viewModel: ChatViewModel) {
                         }
                     }
                     
-                    Divider(modifier = Modifier.padding(vertical = 12.dp), color = Color.White.copy(alpha = 0.1f))
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), color = Color.White.copy(alpha = 0.1f))
                     
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                         StatusMetric("NODES", "06")
@@ -172,7 +193,7 @@ fun RadarScreen(viewModel: ChatViewModel) {
 
             Spacer(modifier = Modifier.height(Spacing.Large))
 
-            // Nearby Nodes List
+            // Nearby Nodes List Header
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -187,34 +208,37 @@ fun RadarScreen(viewModel: ChatViewModel) {
                 }
             }
 
-            LazyColumn(
+            Column(
                 modifier = Modifier
-                    .weight(1f)
                     .fillMaxWidth()
                     .padding(horizontal = Spacing.Medium),
                 verticalArrangement = Arrangement.spacedBy(Spacing.Small)
             ) {
-                val mockNodes = listOf(
-                    NodeItemData("Node_X77A", "120m • End Device"),
-                    NodeItemData("Node_BK29", "250m • Active Relay", true),
-                    NodeItemData("Node_L005", "410m • End Device"),
-                    NodeItemData("Node_MN04", "680m • Active Relay", true),
-                    NodeItemData("Node_PJ88", "910m • End Device")
-                )
-                
-                items(mockNodes) { node ->
+                nodes.forEach { node ->
                     NearbyNodeItem(node)
                 }
 
-                item {
-                    Spacer(modifier = Modifier.height(Spacing.Large))
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.SignalCellularAlt, contentDescription = null, tint = Color.White.copy(alpha = 0.2f), modifier = Modifier.size(14.dp))
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("AES-256 MESH-TUNNEL ESTABLISHED", style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.2f), fontSize = 8.sp)
-                    }
-                    Spacer(modifier = Modifier.height(Spacing.Large))
+                Spacer(modifier = Modifier.height(Spacing.Large))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        Icons.Default.SignalCellularAlt,
+                        contentDescription = null,
+                        tint = Color.White.copy(alpha = 0.2f),
+                        modifier = Modifier.size(14.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        "AES-256 MESH-TUNNEL ESTABLISHED",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Color.White.copy(alpha = 0.2f),
+                        fontSize = 8.sp
+                    )
                 }
+                Spacer(modifier = Modifier.height(Spacing.Large))
             }
         }
     }
@@ -279,3 +303,21 @@ fun NearbyNodeItem(node: NodeItemData) {
 }
 
 data class NodeItemData(val name: String, val status: String, val isActiveRelay: Boolean = false)
+
+@Preview(showBackground = true)
+@Composable
+fun RadarScreenPreview() {
+    val mockNodes = listOf(
+        NodeItemData("Node_X77A", "120m • End Device"),
+        NodeItemData("Node_BK29", "250m • Active Relay", true),
+        NodeItemData("Node_L005", "410m • End Device"),
+        NodeItemData("Node_MN04", "680m • Active Relay", true),
+        NodeItemData("Node_PJ88", "910m • End Device")
+    )
+    TestResQMeshTheme {
+        RadarScreenContent(
+            activeNodesCount = 6,
+            nodes = mockNodes
+        )
+    }
+}

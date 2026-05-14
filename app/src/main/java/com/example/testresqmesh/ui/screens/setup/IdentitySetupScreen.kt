@@ -2,8 +2,10 @@ package com.example.testresqmesh.ui.screens.setup
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material3.*
@@ -23,12 +25,22 @@ import com.example.testresqmesh.ui.theme.InboxAccentBlue
 import com.example.testresqmesh.ui.theme.Spacing
 import com.example.testresqmesh.ui.viewmodel.ChatViewModel
 
+import androidx.compose.ui.tooling.preview.Preview
+import com.example.testresqmesh.ui.theme.TestResQMeshTheme
+
 @Composable
 fun IdentitySetupScreen(viewModel: ChatViewModel, onIdentityGenerated: () -> Unit) {
+    IdentitySetupContent(onIdentityGenerated = onIdentityGenerated)
+}
+
+@Composable
+fun IdentitySetupContent(onIdentityGenerated: () -> Unit) {
+    val scrollState = rememberScrollState()
     Column(
         modifier = Modifier
             .fillMaxSize()
             .background(InboxBackground)
+            .verticalScroll(scrollState)
             .padding(Spacing.Large),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
@@ -156,7 +168,7 @@ fun IdentitySetupScreen(viewModel: ChatViewModel, onIdentityGenerated: () -> Uni
             )
         }
 
-        Spacer(modifier = Modifier.weight(1f))
+        Spacer(modifier = Modifier.height(48.dp))
 
         ResQButton(
             onClick = onIdentityGenerated,
@@ -174,6 +186,16 @@ fun IdentitySetupScreen(viewModel: ChatViewModel, onIdentityGenerated: () -> Uni
             textAlign = TextAlign.Center,
             color = Color.White.copy(alpha = 0.4f),
             letterSpacing = 0.5.sp
+        )
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+fun IdentitySetupScreenPreview() {
+    TestResQMeshTheme {
+        IdentitySetupContent(
+            onIdentityGenerated = {}
         )
     }
 }

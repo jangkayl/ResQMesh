@@ -22,6 +22,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.tooling.preview.Preview
+import com.example.testresqmesh.ui.theme.TestResQMeshTheme
 import com.example.testresqmesh.ui.theme.InboxBackground
 import com.example.testresqmesh.ui.theme.InboxAccentBlue
 import com.example.testresqmesh.ui.theme.Spacing
@@ -269,6 +271,17 @@ fun QuickReplyChip(text: String) {
             style = MaterialTheme.typography.labelMedium,
             fontWeight = FontWeight.Bold,
             color = Color.White
+        )
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+fun ActiveChatScreenPreview() {
+    TestResQMeshTheme {
+        ActiveChatScreen(
+            name = "Alpha-9",
+            onBack = {}
         )
     }
 }
