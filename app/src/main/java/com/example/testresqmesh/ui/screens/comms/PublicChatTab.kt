@@ -11,7 +11,11 @@ import com.example.testresqmesh.ui.viewmodel.ChatViewModel
 import com.example.testresqmesh.utils.MediaHelper
 
 @Composable
-fun PublicChatTab(viewModel: ChatViewModel, mediaHelper: MediaHelper) {
+fun PublicChatTab(
+    viewModel: ChatViewModel, 
+    mediaHelper: MediaHelper,
+    onChatSelected: (String) -> Unit
+) {
     // For the Broadcast tab, we'll show public channels or SOS alerts
     // For now, styling it identical to the mockup's list.
     
@@ -28,7 +32,8 @@ fun PublicChatTab(viewModel: ChatViewModel, mediaHelper: MediaHelper) {
                 message = item.message,
                 timestamp = item.timestamp,
                 hops = item.hops,
-                isEncrypted = false // Public broadcasts aren't encrypted for all
+                isEncrypted = false, // Public broadcasts aren't encrypted for all
+                onClick = { onChatSelected(item.name) }
             )
         }
 
@@ -38,7 +43,8 @@ fun PublicChatTab(viewModel: ChatViewModel, mediaHelper: MediaHelper) {
                 name = msg.senderName,
                 message = msg.text,
                 timestamp = "now",
-                hops = "MESH"
+                hops = "MESH",
+                onClick = { onChatSelected(msg.senderName) }
             )
         }
 

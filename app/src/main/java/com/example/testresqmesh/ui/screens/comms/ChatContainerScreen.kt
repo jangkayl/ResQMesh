@@ -24,7 +24,11 @@ import com.example.testresqmesh.utils.MediaHelper
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ChatContainerScreen(viewModel: ChatViewModel, mediaHelper: MediaHelper) {
+fun ChatContainerScreen(
+    viewModel: ChatViewModel, 
+    mediaHelper: MediaHelper,
+    onChatSelected: (String) -> Unit
+) {
     var selectedTabIndex by remember { mutableIntStateOf(0) }
 
     Scaffold(
@@ -101,8 +105,8 @@ fun ChatContainerScreen(viewModel: ChatViewModel, mediaHelper: MediaHelper) {
             // Content Area
             Box(modifier = Modifier.weight(1f)) {
                 when (selectedTabIndex) {
-                    0 -> PrivateChatTab(viewModel, mediaHelper)
-                    1 -> PublicChatTab(viewModel, mediaHelper)
+                    0 -> PrivateChatTab(viewModel, mediaHelper, onChatSelected)
+                    1 -> PublicChatTab(viewModel, mediaHelper, onChatSelected)
                 }
             }
         }

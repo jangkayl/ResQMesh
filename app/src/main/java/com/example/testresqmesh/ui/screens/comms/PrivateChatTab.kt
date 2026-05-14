@@ -11,7 +11,11 @@ import com.example.testresqmesh.ui.viewmodel.ChatViewModel
 import com.example.testresqmesh.utils.MediaHelper
 
 @Composable
-fun PrivateChatTab(viewModel: ChatViewModel, mediaHelper: MediaHelper) {
+fun PrivateChatTab(
+    viewModel: ChatViewModel, 
+    mediaHelper: MediaHelper,
+    onChatSelected: (String) -> Unit
+) {
     // For the mockup reproduction, we'll use a mix of real and mock data
     // to ensure it matches the image perfectly.
     
@@ -30,7 +34,8 @@ fun PrivateChatTab(viewModel: ChatViewModel, mediaHelper: MediaHelper) {
                 message = item.message,
                 timestamp = item.timestamp,
                 hops = item.hops,
-                hasNotification = item.hasNotification
+                hasNotification = item.hasNotification,
+                onClick = { onChatSelected(item.name) }
             )
         }
 
@@ -40,7 +45,8 @@ fun PrivateChatTab(viewModel: ChatViewModel, mediaHelper: MediaHelper) {
                 name = device.name,
                 message = "Tap to open private channel",
                 timestamp = "now",
-                hops = "DIRECT"
+                hops = "DIRECT",
+                onClick = { onChatSelected(device.name) }
             )
         }
 

@@ -95,7 +95,7 @@ fun MainContainerScreen(viewModel: ChatViewModel, mediaHelper: MediaHelper) {
         Box(modifier = Modifier.padding(innerPadding)) {
             when (currentItem) {
                 NavItem.Radar -> RadarScreen(viewModel) // Note: In a real app, clicking a node would set trackingNode
-                NavItem.Messages -> ChatContainerScreen(viewModel, mediaHelper) // Note: Clicking a message sets activeChatNode
+                NavItem.Messages -> ChatContainerScreen(viewModel, mediaHelper, onChatSelected = { activeChatNode = it }) 
                 NavItem.Settings -> ProfileScreen(viewModel)
                 else -> {}
             }
