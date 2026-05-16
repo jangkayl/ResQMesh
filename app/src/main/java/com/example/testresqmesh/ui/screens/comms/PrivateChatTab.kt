@@ -24,9 +24,15 @@ fun PrivateChatTab(
     // Group messages by sender for the inbox view
     val latestMessages = uiState.privateMessages.map { (id, messages) ->
         val lastMsg = messages.lastOrNull()
+        
+        // Prioritize connected device name, then look for a message not from "Me"
+        val peerName = uiState.connectedDevices.find { it.endpointId == id }?.name 
+            ?: messages.firstOrNull { it.senderName != "Me" }?.senderName 
+            ?: id
+
         InboxItemData(
             id = id,
-            name = lastMsg?.senderName ?: "Unknown",
+            name = peerName,
             message = lastMsg?.text ?: "Open channel",
             timestamp = "now",
             hops = "DIRECT",
