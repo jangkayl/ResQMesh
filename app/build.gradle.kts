@@ -60,5 +60,5 @@ dependencies {
     debugImplementation(libs.androidx.compose.ui.test.manifest)
     debugImplementation(libs.androidx.compose.ui.tooling)
 
-    implementation("com.google.android.gms:play-services-nearby:19.0.0") // Check for the latest version
+    implementation("com.google.android.gms:play-services-nearby:19.3.0") // Updated to latest stable version
 }

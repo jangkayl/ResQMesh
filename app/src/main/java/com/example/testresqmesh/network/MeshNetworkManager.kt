@@ -153,7 +153,7 @@ class MeshNetworkManager(private val context: Context) {
             // Don't connect to yourself
             if (info.endpointName == myDeviceName) return
 
-            // --- THE TIE-BREAKER FIX ---
+            // --- FASTER TIE-BREAKER ---
             // We compare the two names alphabetically.
             // Only the "greater" name is allowed to initiate the connection!
             if (myDeviceName.compareTo(info.endpointName) > 0) {
@@ -161,7 +161,13 @@ class MeshNetworkManager(private val context: Context) {
                 attemptConnection(endpointId, info.endpointName)
             } else {
                 Log.d("MeshNetwork", "Tie-Breaker: Waiting for ${info.endpointName} to connect to me.")
-                // We intentionally do nothing here. We just wait for their request to arrive!
+                // The Impatient Loser Fallback: Wait 2.5s, if not connected, initiate anyway!
+                Handler(Looper.getMainLooper()).postDelayed({
+                    if (!connectedEndpointIds.contains(endpointId) && activeScannedEndpoints.contains(endpointId)) {
+                        Log.d("MeshNetwork", "Tie-Breaker Fallback: They took too long. I am initiating!")
+                        attemptConnection(endpointId, info.endpointName)
+                    }
+                }, 2500)
             }
             // ---------------------------
         }
@@ -176,7 +182,7 @@ class MeshNetworkManager(private val context: Context) {
     private fun attemptConnection(endpointId: String, endpointName: String) {
         connectionsClient.requestConnection(myDeviceName, endpointId, connectionLifecycleCallback)
             .addOnFailureListener {
-                Log.d("MeshNetwork", "Handshake failed with $endpointName. Retrying in 5 seconds...")
+                Log.d("MeshNetwork", "Handshake failed with $endpointName. Retrying in 1 second...")
 
                 Handler(Looper.getMainLooper()).postDelayed({
                     // ZOMBIE FIX: Are they still physically in the room?
@@ -192,7 +198,7 @@ class MeshNetworkManager(private val context: Context) {
                     } else {
                         Log.d("MeshNetwork", "Target left or already connected. Canceling retry.")
                     }
-                }, 5000)
+                }, 1000)
             }
     }
 
