@@ -19,22 +19,29 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.testresqmesh.ui.components.buttons.ResQButton
-import com.example.testresqmesh.ui.theme.InboxBackground
-import com.example.testresqmesh.ui.theme.InboxAccentBlue
-import com.example.testresqmesh.ui.theme.Spacing
-import com.example.testresqmesh.ui.viewmodel.ChatViewModel
-
 import androidx.compose.ui.tooling.preview.Preview
-import com.example.testresqmesh.ui.theme.TestResQMeshTheme
+import com.example.testresqmesh.ui.components.buttons.ResQButton
+import com.example.testresqmesh.ui.theme.*
+import android.os.Build
+import androidx.compose.ui.platform.LocalContext
+import com.example.testresqmesh.viewmodel.SetupViewModel
 
 @Composable
-fun IdentitySetupScreen(viewModel: ChatViewModel, onIdentityGenerated: () -> Unit) {
-    IdentitySetupContent(onIdentityGenerated = onIdentityGenerated)
+fun IdentitySetupScreen(viewModel: SetupViewModel, onIdentityGenerated: () -> Unit) {
+    val context = LocalContext.current
+    val uiState by viewModel.uiState.collectAsState()
+    
+    IdentitySetupContent(
+        connectionStatus = uiState.connectionStatus,
+        onIdentityGenerated = {
+            viewModel.checkHardwareAndGoOnline(context, Build.MODEL, "NODE", "PUBLIC")
+            onIdentityGenerated()
+        }
+    )
 }
 
 @Composable
-fun IdentitySetupContent(onIdentityGenerated: () -> Unit) {
+fun IdentitySetupContent(connectionStatus: String, onIdentityGenerated: () -> Unit) {
     val scrollState = rememberScrollState()
     Column(
         modifier = Modifier
@@ -101,12 +108,12 @@ fun IdentitySetupContent(onIdentityGenerated: () -> Unit) {
         Spacer(modifier = Modifier.height(Spacing.Medium))
 
         Surface(
-            color = Color.Black.copy(alpha = 0.4f),
+            color = if (connectionStatus.contains("ERROR")) Color.Red.copy(alpha = 0.4f) else Color.Black.copy(alpha = 0.4f),
             shape = RoundedCornerShape(16.dp),
             border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.2f))
         ) {
             Text(
-                "READY TO SYNC",
+                if (connectionStatus.contains("ERROR")) "SYSTEM ERROR" else "READY TO SYNC",
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
                 style = MaterialTheme.typography.labelSmall,
                 fontWeight = FontWeight.Bold,
@@ -143,12 +150,12 @@ fun IdentitySetupContent(onIdentityGenerated: () -> Unit) {
                     }
                     Icon(Icons.Default.Lock, contentDescription = null, modifier = Modifier.size(14.dp), tint = Color.White.copy(alpha = 0.3f))
                 }
-                Divider(modifier = Modifier.padding(vertical = 8.dp), color = Color.White.copy(alpha = 0.1f))
+                HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = Color.White.copy(alpha = 0.1f))
                 Text(
-                    "Awaiting secure generation command...",
+                    text = connectionStatus,
                     style = MaterialTheme.typography.bodySmall,
                     fontFamily = FontFamily.Monospace,
-                    color = Color.White.copy(alpha = 0.5f)
+                    color = if (connectionStatus.contains("ERROR")) Color.Red.copy(alpha = 0.7f) else Color.White.copy(alpha = 0.5f)
                 )
             }
         }
@@ -195,6 +202,7 @@ fun IdentitySetupContent(onIdentityGenerated: () -> Unit) {
 fun IdentitySetupScreenPreview() {
     TestResQMeshTheme {
         IdentitySetupContent(
+            connectionStatus = "READY TO SYNC",
             onIdentityGenerated = {}
         )
     }

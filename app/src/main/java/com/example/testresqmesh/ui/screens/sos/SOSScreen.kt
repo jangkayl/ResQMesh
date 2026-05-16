@@ -20,11 +20,10 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.example.testresqmesh.ui.components.layout.ResQTopBar
 import com.example.testresqmesh.ui.theme.Spacing
-import com.example.testresqmesh.ui.viewmodel.ChatViewModel
-import kotlinx.coroutines.delay
+import com.example.testresqmesh.viewmodel.CommunicationViewModel
 
 @Composable
-fun SOSScreen(viewModel: ChatViewModel) {
+fun SOSScreen(viewModel: CommunicationViewModel) {
     var isBroadcasting by remember { mutableStateOf(false) }
     
     val infiniteTransition = rememberInfiniteTransition()

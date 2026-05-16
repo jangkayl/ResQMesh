@@ -13,3 +13,9 @@ data class ConnectedDevice(
     val endpointId: String,
     val name: String
 )
+
+data class ScannedDevice(
+    val endpointId: String,
+    val name: String,
+    val lastSeen: Long
+)

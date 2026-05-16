@@ -10,6 +10,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.TrendingUp
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.Shield
 import androidx.compose.material3.*
@@ -23,25 +24,30 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import java.util.Locale
 import androidx.compose.ui.tooling.preview.Preview
 import com.example.testresqmesh.ui.theme.TestResQMeshTheme
 import com.example.testresqmesh.ui.theme.InboxBackground
 import com.example.testresqmesh.ui.theme.InboxAccentBlue
 import com.example.testresqmesh.ui.theme.Spacing
-import com.example.testresqmesh.ui.viewmodel.ChatViewModel
+import com.example.testresqmesh.viewmodel.RadarViewModel
 
 @Composable
-fun RadarScreen(viewModel: ChatViewModel) {
-    val mockNodes = listOf(
-        NodeItemData("Node_X77A", "120m • End Device"),
-        NodeItemData("Node_BK29", "250m • Active Relay", true),
-        NodeItemData("Node_L005", "410m • End Device"),
-        NodeItemData("Node_MN04", "680m • Active Relay", true),
-        NodeItemData("Node_PJ88", "910m • End Device")
-    )
+fun RadarScreen(viewModel: RadarViewModel) {
+    val uiState by viewModel.uiState.collectAsState()
+    
+    val connectedNodes = uiState.connectedDevices.map { 
+        NodeItemData(it.name, "Connected • Mesh Peer", true)
+    }
+    
+    val scannedNodes = uiState.scannedDevices.map {
+        NodeItemData(it.name, "Nearby • Scanning...")
+    }
+
     RadarScreenContent(
-        activeNodesCount = 6,
-        nodes = mockNodes
+        activeNodesCount = uiState.connectedDevices.size + uiState.scannedDevices.size,
+        nodes = connectedNodes + scannedNodes,
+        onRefresh = { viewModel.rescan() }
     )
 }
 
@@ -49,7 +55,8 @@ fun RadarScreen(viewModel: ChatViewModel) {
 @Composable
 fun RadarScreenContent(
     activeNodesCount: Int,
-    nodes: List<NodeItemData>
+    nodes: List<NodeItemData>,
+    onRefresh: () -> Unit
 ) {
     val infiniteTransition = rememberInfiniteTransition()
     val radarSweep by infiniteTransition.animateFloat(
@@ -140,11 +147,22 @@ fun RadarScreenContent(
                         size = size
                     )
                     
-                    // Mock Nodes (the orange dots)
-                    drawCircle(color = Color(0xFFF97316), radius = 6.dp.toPx(), center = androidx.compose.ui.geometry.Offset(center.x + 80, center.y - 60))
-                    drawCircle(color = Color(0xFFF97316), radius = 5.dp.toPx(), center = androidx.compose.ui.geometry.Offset(center.x - 90, center.y + 70))
-                    drawCircle(color = Color(0xFFF97316), radius = 7.dp.toPx(), center = androidx.compose.ui.geometry.Offset(center.x + 40, center.y + 90))
-                    drawCircle(color = Color(0xFFF97316), radius = 4.dp.toPx(), center = androidx.compose.ui.geometry.Offset(center.x - 60, center.y - 100))
+                    // Dynamic Nodes (the orange dots)
+                    nodes.forEach { node ->
+                        // Deterministic position based on name
+                        val random = java.util.Random(node.name.hashCode().toLong())
+                        val angle = random.nextFloat() * 360f
+                        val distance = (0.3f + random.nextFloat() * 0.6f) * radius
+                        
+                        val x = center.x + distance * kotlin.math.cos(Math.toRadians(angle.toDouble())).toFloat()
+                        val y = center.y + distance * kotlin.math.sin(Math.toRadians(angle.toDouble())).toFloat()
+                        
+                        drawCircle(
+                            color = Color(0xFFF97316), 
+                            radius = 5.dp.toPx(), 
+                            center = androidx.compose.ui.geometry.Offset(x, y)
+                        )
+                    }
 
                     // Center point (Me)
                     drawCircle(color = Color.White, radius = 4.dp.toPx(), center = center)
@@ -170,7 +188,7 @@ fun RadarScreenContent(
             ) {
                 Column(modifier = Modifier.padding(Spacing.Medium)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.TrendingUp, contentDescription = null, tint = Color.White, modifier = Modifier.size(20.dp))
+                        Icon(Icons.AutoMirrored.Filled.TrendingUp, contentDescription = null, tint = Color.White, modifier = Modifier.size(20.dp))
                         Spacer(modifier = Modifier.width(12.dp))
                         Column(modifier = Modifier.weight(1f)) {
                             Text("Network Status", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = Color.White)
@@ -184,7 +202,7 @@ fun RadarScreenContent(
                     HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), color = Color.White.copy(alpha = 0.1f))
                     
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        StatusMetric("NODES", "06")
+                        StatusMetric("NODES", String.format(Locale.getDefault(), "%02d", activeNodesCount))
                         StatusMetric("DEPTH", "3 Hops")
                         StatusMetric("RANGE", "~800m")
                     }
@@ -202,7 +220,7 @@ fun RadarScreenContent(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text("NEARBY NODES", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Black, color = Color.White)
-                TextButton(onClick = {}) {
+                TextButton(onClick = onRefresh) {
                     Text("Refresh", color = InboxAccentBlue, style = MaterialTheme.typography.labelMedium)
                     Icon(Icons.Default.ChevronRight, contentDescription = null, tint = InboxAccentBlue, modifier = Modifier.size(16.dp))
                 }
@@ -216,6 +234,12 @@ fun RadarScreenContent(
             ) {
                 nodes.forEach { node ->
                     NearbyNodeItem(node)
+                }
+                
+                if (nodes.isEmpty()) {
+                    Box(modifier = Modifier.fillMaxWidth().height(100.dp), contentAlignment = Alignment.Center) {
+                        Text("No nodes detected nearby.", color = Color.White.copy(alpha = 0.4f), style = MaterialTheme.typography.bodyMedium)
+                    }
                 }
 
                 Spacer(modifier = Modifier.height(Spacing.Large))
@@ -317,7 +341,8 @@ fun RadarScreenPreview() {
     TestResQMeshTheme {
         RadarScreenContent(
             activeNodesCount = 6,
-            nodes = mockNodes
+            nodes = mockNodes,
+            onRefresh = {}
         )
     }
 }

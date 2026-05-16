@@ -8,28 +8,47 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.testresqmesh.data.repository.MeshRepository
 import com.example.testresqmesh.network.MeshNetworkManager
 import com.example.testresqmesh.ui.screens.MainContainerScreen
 import com.example.testresqmesh.ui.screens.setup.IdentitySetupScreen
 import com.example.testresqmesh.ui.screens.setup.PermissionsScreen
 import com.example.testresqmesh.ui.screens.setup.SplashScreen
 import com.example.testresqmesh.ui.theme.TestResQMeshTheme
-import com.example.testresqmesh.ui.viewmodel.ChatViewModel
+import com.example.testresqmesh.viewmodel.CommunicationViewModel
+import com.example.testresqmesh.viewmodel.RadarViewModel
+import com.example.testresqmesh.viewmodel.SetupViewModel
 import com.example.testresqmesh.utils.MediaHelper
 
 enum class AppState {
     Splash, Permissions, IdentitySetup, Main
 }
 
+class MeshViewModelFactory(private val repository: MeshRepository) : ViewModelProvider.Factory {
+    @Suppress("UNCHECKED_CAST")
+    override fun <T : ViewModel> create(modelClass: Class<T>): T {
+        return when {
+            modelClass.isAssignableFrom(SetupViewModel::class.java) -> SetupViewModel(repository) as T
+            modelClass.isAssignableFrom(RadarViewModel::class.java) -> RadarViewModel(repository) as T
+            modelClass.isAssignableFrom(CommunicationViewModel::class.java) -> CommunicationViewModel(repository) as T
+            else -> throw IllegalArgumentException("Unknown ViewModel class")
+        }
+    }
+}
+
 class MainActivity : ComponentActivity() {
 
     private lateinit var networkManager: MeshNetworkManager
-    private lateinit var viewModel: ChatViewModel
+    private lateinit var repository: MeshRepository
     private lateinit var mediaHelper: MediaHelper
 
     private val requestPermissionLauncher = registerForActivityResult(
@@ -40,16 +59,33 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
 
         networkManager = MeshNetworkManager(applicationContext)
-        viewModel = ChatViewModel(networkManager)
+        repository = MeshRepository(networkManager)
         mediaHelper = MediaHelper(applicationContext)
 
+        val factory = MeshViewModelFactory(repository)
+
         setContent {
+            val setupViewModel: SetupViewModel = viewModel(factory = factory)
+            val radarViewModel: RadarViewModel = viewModel(factory = factory)
+            val commsViewModel: CommunicationViewModel = viewModel(factory = factory)
+
             TestResQMeshTheme {
-                var currentStage by remember { 
-                    mutableStateOf(if (viewModel.isOnline) AppState.Main else AppState.Splash) 
+                val setupState by setupViewModel.uiState.collectAsState()
+                
+                // Track navigation stage - initialize with Splash to avoid black screen
+                var currentStage by remember { mutableStateOf(AppState.Splash) }
+
+                // Initial stage determination - if already online, skip to Main
+                LaunchedEffect(setupState.isOnline) {
+                    if (setupState.isOnline && currentStage != AppState.Main) {
+                        currentStage = AppState.Main
+                    }
                 }
 
-                Surface(modifier = Modifier.fillMaxSize()) {
+                Surface(
+                    modifier = Modifier.fillMaxSize(),
+                    color = MaterialTheme.colorScheme.background
+                ) {
                     when (currentStage) {
                         AppState.Splash -> SplashScreen {
                             currentStage = AppState.Permissions
@@ -59,12 +95,15 @@ class MainActivity : ComponentActivity() {
                             checkNotificationPermission()
                             currentStage = AppState.IdentitySetup
                         }
-                        AppState.IdentitySetup -> IdentitySetupScreen(viewModel) {
-                            // In a real app, this would generate keys
-                            viewModel.checkHardwareAndGoOnline(this, Build.MODEL, "NODE")
+                        AppState.IdentitySetup -> IdentitySetupScreen(setupViewModel) {
                             currentStage = AppState.Main
                         }
-                        AppState.Main -> MainContainerScreen(viewModel = viewModel, mediaHelper = mediaHelper)
+                        AppState.Main -> MainContainerScreen(
+                            setupViewModel = setupViewModel,
+                            radarViewModel = radarViewModel,
+                            commsViewModel = commsViewModel,
+                            mediaHelper = mediaHelper
+                        )
                     }
                 }
             }
@@ -92,6 +131,6 @@ class MainActivity : ComponentActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
-        viewModel.goOffline()
+        networkManager.stopMeshNode()
     }
 }

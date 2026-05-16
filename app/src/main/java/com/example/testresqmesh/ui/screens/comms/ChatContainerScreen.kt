@@ -21,12 +21,13 @@ import androidx.compose.ui.tooling.preview.Preview
 import com.example.testresqmesh.ui.theme.TestResQMeshTheme
 import com.example.testresqmesh.ui.components.chat.InboxMessageItem
 import com.example.testresqmesh.ui.theme.Spacing
-import com.example.testresqmesh.ui.viewmodel.ChatViewModel
 import com.example.testresqmesh.utils.MediaHelper
+
+import com.example.testresqmesh.viewmodel.CommunicationViewModel
 
 @Composable
 fun ChatContainerScreen(
-    viewModel: ChatViewModel, 
+    viewModel: CommunicationViewModel, 
     mediaHelper: MediaHelper,
     onChatSelected: (String) -> Unit
 ) {

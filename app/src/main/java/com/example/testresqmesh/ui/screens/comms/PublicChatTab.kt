@@ -7,44 +7,46 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import com.example.testresqmesh.ui.components.chat.EndOfMeshIndicator
 import com.example.testresqmesh.ui.components.chat.InboxMessageItem
-import com.example.testresqmesh.ui.viewmodel.ChatViewModel
 import com.example.testresqmesh.utils.MediaHelper
+
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import com.example.testresqmesh.viewmodel.CommunicationViewModel
 
 @Composable
 fun PublicChatTab(
-    viewModel: ChatViewModel, 
+    viewModel: CommunicationViewModel, 
     mediaHelper: MediaHelper,
     onChatSelected: (String) -> Unit
 ) {
-    // For the Broadcast tab, we'll show public channels or SOS alerts
-    // For now, styling it identical to the mockup's list.
+    val uiState by viewModel.uiState.collectAsState()
     
     val mockBroadcasts = listOf(
-        InboxItemData("GLOBAL_SOS", "Critical alert: Earthquake detected in Sector 7", "1m ago", "SATURATED"),
-        InboxItemData("RESCUE_TEAM_B", "Moving to extraction point Alpha", "10m ago", "2 HOPS"),
-        InboxItemData("WEATHER_NODE", "Severe storm warning for next 2 hours", "45m ago", "4 HOPS")
+        InboxItemData("mock1", "GLOBAL_SOS", "Critical alert: Earthquake detected in Sector 7", "1m ago", "SATURATED"),
+        InboxItemData("mock2", "RESCUE_TEAM_B", "Moving to extraction point Alpha", "10m ago", "2 HOPS"),
+        InboxItemData("mock3", "WEATHER_NODE", "Severe storm warning for next 2 hours", "45m ago", "4 HOPS")
     )
 
     LazyColumn(modifier = Modifier.fillMaxSize()) {
-        items(mockBroadcasts) { item ->
-            InboxMessageItem(
-                name = item.name,
-                message = item.message,
-                timestamp = item.timestamp,
-                hops = item.hops,
-                isEncrypted = false, // Public broadcasts aren't encrypted for all
-                onClick = { onChatSelected(item.name) }
-            )
-        }
-
-        // Real public messages if any
-        items(viewModel.publicMessages.reversed()) { msg ->
+        // Real public messages first
+        items(uiState.publicMessages.reversed()) { msg ->
             InboxMessageItem(
                 name = msg.senderName,
                 message = msg.text,
                 timestamp = "now",
                 hops = "MESH",
                 onClick = { onChatSelected(msg.senderName) }
+            )
+        }
+
+        items(mockBroadcasts) { item ->
+            InboxMessageItem(
+                name = item.name,
+                message = item.message,
+                timestamp = item.timestamp,
+                hops = item.hops,
+                isEncrypted = false,
+                onClick = { onChatSelected(item.name) }
             )
         }
 

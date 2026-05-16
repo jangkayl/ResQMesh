@@ -19,11 +19,13 @@ import androidx.compose.ui.unit.sp
 import com.example.testresqmesh.ui.theme.InboxBackground
 import com.example.testresqmesh.ui.theme.InboxAccentBlue
 import com.example.testresqmesh.ui.theme.Spacing
-import com.example.testresqmesh.ui.viewmodel.ChatViewModel
+import com.example.testresqmesh.viewmodel.SetupViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ProfileScreen(viewModel: ChatViewModel) {
+fun ProfileScreen(viewModel: SetupViewModel) {
+    val uiState by viewModel.uiState.collectAsState()
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -62,11 +64,11 @@ fun ProfileScreen(viewModel: ChatViewModel) {
                 Text("DATA & PRIVACY", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Black, color = Color.White.copy(alpha = 0.4f))
                 Spacer(modifier = Modifier.height(12.dp))
                 
-                PrivacyCard()
+                PrivacyCard(onGoOffline = { viewModel.goOffline() })
                 
                 Spacer(modifier = Modifier.height(24.dp))
                 
-                IdentityCard(viewModel.myNodeName)
+                IdentityCard(uiState.myNodeName)
                 
                 Spacer(modifier = Modifier.height(48.dp))
             }
@@ -102,7 +104,7 @@ fun PerformanceCard() {
                     Text("34", style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.Black, color = Color.White)
                     Text("Packets Relayed Today", style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.6f))
                 }
-                Divider(modifier = Modifier.height(60.dp).width(1.dp).align(Alignment.CenterVertically), color = Color.White.copy(alpha = 0.1f))
+                HorizontalDivider(modifier = Modifier.height(60.dp).width(1.dp).align(Alignment.CenterVertically), color = Color.White.copy(alpha = 0.1f))
                 Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.End) {
                     Text("112", style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.Black, color = Color.White)
                     Text("Hops Contributed", style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.6f))
@@ -135,9 +137,9 @@ fun HardwareSettings() {
     ) {
         Column {
             HardwareToggle(Icons.Default.Bluetooth, "Bluetooth LE", "Short-range discovery", true)
-            Divider(color = Color.White.copy(alpha = 0.05f))
+            HorizontalDivider(color = Color.White.copy(alpha = 0.05f))
             HardwareToggle(Icons.Default.Wifi, "WiFi Direct", "High-bandwidth relay", false)
-            Divider(color = Color.White.copy(alpha = 0.05f))
+            HorizontalDivider(color = Color.White.copy(alpha = 0.05f))
             HardwareToggle(Icons.Default.BatteryChargingFull, "Battery Optimizer", "Reduce ping frequency", true)
         }
     }
@@ -168,7 +170,7 @@ fun HardwareToggle(icon: androidx.compose.ui.graphics.vector.ImageVector, title:
 }
 
 @Composable
-fun PrivacyCard() {
+fun PrivacyCard(onGoOffline: () -> Unit) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
         color = Color.White.copy(alpha = 0.05f),
@@ -210,15 +212,15 @@ fun PrivacyCard() {
                     Text("Flush Cache", fontSize = 12.sp)
                 }
                 Button(
-                    onClick = {},
+                    onClick = onGoOffline,
                     modifier = Modifier.weight(1f),
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF4444).copy(alpha = 0.1f), contentColor = Color(0xFFEF4444)),
                     shape = RoundedCornerShape(8.dp),
                     border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFEF4444).copy(alpha = 0.3f))
                 ) {
-                    Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Icon(Icons.Default.PowerSettingsNew, contentDescription = null, modifier = Modifier.size(16.dp))
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("Wipe All", fontSize = 12.sp)
+                    Text("Go Offline", fontSize = 12.sp)
                 }
             }
         }

@@ -1,11 +1,13 @@
 package com.example.testresqmesh.ui.screens.comms
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.CheckCircle
@@ -13,7 +15,6 @@ import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.RadioButtonChecked
 import androidx.compose.material.icons.outlined.Wifi
 import androidx.compose.material3.*
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -23,10 +24,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.tooling.preview.Preview
+import com.example.testresqmesh.data.models.ConnectedDevice
 import com.example.testresqmesh.ui.theme.TestResQMeshTheme
 import com.example.testresqmesh.ui.theme.InboxBackground
 import com.example.testresqmesh.ui.theme.InboxAccentBlue
 import com.example.testresqmesh.ui.theme.Spacing
+import com.example.testresqmesh.viewmodel.CommunicationViewModel
 
 data class ChatMessageData(
     val text: String,
@@ -38,7 +41,15 @@ data class ChatMessageData(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ActiveChatScreen(name: String, onBack: () -> Unit) {
+fun ActiveChatScreen(name: String, viewModel: CommunicationViewModel, onBack: () -> Unit) {
+    val uiState by viewModel.uiState.collectAsState()
+    
+    // Messages for this specific target (name is treated as endpointId here)
+    val messages = uiState.privateMessages[name] ?: emptyList()
+    
+    // For the UI, we'll use the sender name if available
+    val displayName = messages.firstOrNull()?.senderName ?: name
+
     Scaffold(
         topBar = {
             Column(modifier = Modifier.background(InboxBackground)) {
@@ -50,7 +61,7 @@ fun ActiveChatScreen(name: String, onBack: () -> Unit) {
                     },
                     title = {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(name, fontWeight = FontWeight.Black, color = Color.White, fontSize = 20.sp)
+                            Text(displayName, fontWeight = FontWeight.Black, color = Color.White, fontSize = 20.sp)
                             Spacer(modifier = Modifier.width(12.dp))
                             Surface(
                                 color = Color.White.copy(alpha = 0.05f),
@@ -97,7 +108,9 @@ fun ActiveChatScreen(name: String, onBack: () -> Unit) {
         },
         containerColor = InboxBackground,
         bottomBar = {
-            ChatBottomInput()
+            ChatBottomInput(onSendMessage = { text ->
+                viewModel.sendPrivateMessage(ConnectedDevice(name, displayName), text)
+            })
         }
     ) { innerPadding ->
         LazyColumn(
@@ -123,15 +136,16 @@ fun ActiveChatScreen(name: String, onBack: () -> Unit) {
                 Spacer(modifier = Modifier.height(24.dp))
             }
 
-            val mockMessages = listOf(
-                ChatMessageData("Is the relay node near the bridge active? I'm getting low signal on the north side.", "14:02", "2 Hops", false),
-                ChatMessageData("Checking logs... Yes, Node-842 is relaying. It took 2 hops to reach you. I'll boost the beacon interval.", "14:03", "Direct", true),
-                ChatMessageData("Copy that. I'm moving towards the rally point. Keep the mesh open.", "14:05", "1 Hops", false),
-                ChatMessageData("Understood. Encrypted link is stable. See you at the marker.", "14:06", "Direct", true, isSent = true)
-            )
-
-            items(mockMessages) { msg ->
-                HighFidelityChatBubble(msg)
+            items(messages) { msg ->
+                HighFidelityChatBubble(
+                    ChatMessageData(
+                        text = msg.text,
+                        time = "now",
+                        hops = "Direct",
+                        isMine = msg.isMine,
+                        isSent = msg.isMine
+                    )
+                )
             }
         }
     }
@@ -199,7 +213,9 @@ fun DotSeparator() {
 }
 
 @Composable
-fun ChatBottomInput() {
+fun ChatBottomInput(onSendMessage: (String) -> Unit) {
+    var textState by remember { mutableStateOf("") }
+    
     Column(
         modifier = Modifier
             .background(InboxBackground)
@@ -224,8 +240,26 @@ fun ChatBottomInput() {
                 border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.15f))
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = 16.dp)) {
-                    Text("Secure Mesh Message...", color = Color.White.copy(alpha = 0.5f), style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
-                    Icon(Icons.Default.Send, contentDescription = "Send", tint = Color.White.copy(alpha = 0.3f), modifier = Modifier.size(20.dp))
+                    BasicTextField(
+                        value = textState,
+                        onValueChange = { textState = it },
+                        modifier = Modifier.weight(1f),
+                        textStyle = MaterialTheme.typography.bodyMedium.copy(color = Color.White),
+                        decorationBox = { innerTextField ->
+                            if (textState.isEmpty()) {
+                                Text("Secure Mesh Message...", color = Color.White.copy(alpha = 0.5f), style = MaterialTheme.typography.bodyMedium)
+                            }
+                            innerTextField()
+                        }
+                    )
+                    IconButton(onClick = {
+                        if (textState.isNotBlank()) {
+                            onSendMessage(textState)
+                            textState = ""
+                        }
+                    }) {
+                        Icon(Icons.Default.Send, contentDescription = "Send", tint = if (textState.isNotBlank()) InboxAccentBlue else Color.White.copy(alpha = 0.3f), modifier = Modifier.size(20.dp))
+                    }
                 }
             }
         }
@@ -236,10 +270,10 @@ fun ChatBottomInput() {
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            QuickReplyChip("Safe")
-            QuickReplyChip("Moving")
-            QuickReplyChip("SOS Needed")
-            QuickReplyChip("Received")
+            QuickReplyChip("Safe") { textState = it }
+            QuickReplyChip("Moving") { textState = it }
+            QuickReplyChip("SOS Needed") { textState = it }
+            QuickReplyChip("Received") { textState = it }
         }
     }
 }
@@ -259,8 +293,9 @@ fun UtilityButton(icon: androidx.compose.ui.graphics.vector.ImageVector) {
 }
 
 @Composable
-fun QuickReplyChip(text: String) {
+fun QuickReplyChip(text: String, onClick: (String) -> Unit) {
     Surface(
+        modifier = Modifier.clickable { onClick(text) },
         color = Color.Black.copy(alpha = 0.5f),
         shape = RoundedCornerShape(20.dp),
         border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.1f))
@@ -271,17 +306,6 @@ fun QuickReplyChip(text: String) {
             style = MaterialTheme.typography.labelMedium,
             fontWeight = FontWeight.Bold,
             color = Color.White
-        )
-    }
-}
-
-@Preview(showBackground = true)
-@Composable
-fun ActiveChatScreenPreview() {
-    TestResQMeshTheme {
-        ActiveChatScreen(
-            name = "Alpha-9",
-            onBack = {}
         )
     }
 }
