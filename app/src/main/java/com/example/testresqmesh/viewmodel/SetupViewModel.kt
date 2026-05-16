@@ -38,18 +38,13 @@ class SetupViewModel(private val repository: MeshRepository) : ViewModel() {
         val locationManager = context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
         val wifiManager = context.applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
 
-        val isBluetoothOn = bluetoothAdapter?.isEnabled == true
-        val isLocationOn = locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER) ||
-                locationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER)
-        val isWifiOn = wifiManager.isWifiEnabled
+        val missing = mutableListOf<String>()
+        if (bluetoothAdapter == null || !bluetoothAdapter.isEnabled) missing.add("Bluetooth")
+        if (!locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER)) missing.add("Location/GPS")
+        if (!wifiManager.isWifiEnabled) missing.add("Wi-Fi")
 
-        if (!isBluetoothOn || !isLocationOn || !isWifiOn) {
-            val missing = mutableListOf<String>()
-            if (!isBluetoothOn) missing.add("Bluetooth")
-            if (!isLocationOn) missing.add("Location")
-            if (!isWifiOn) missing.add("Wi-Fi")
-
-            val errorMsg = "ERROR: Please turn on ${missing.joinToString(", ")} to deploy Mesh Node."
+        if (missing.isNotEmpty()) {
+            val errorMsg = "HARDWARE ERROR: Please turn on ${missing.joinToString(", ")} to deploy Mesh Node."
             _uiState.update { it.copy(connectionStatus = errorMsg, isOnline = false) }
         } else {
             goOnline(customName, nodeTag, teamKey)

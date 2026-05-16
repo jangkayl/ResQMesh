@@ -9,7 +9,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -24,10 +24,44 @@ import com.example.testresqmesh.ui.components.buttons.ResQButton
 import com.example.testresqmesh.ui.theme.Spacing
 import com.example.testresqmesh.ui.theme.TestResQMeshTheme
 
+import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.compose.ui.platform.LocalLifecycleOwner
+
 @Composable
-fun PermissionsScreen(onAllGranted: () -> Unit) {
-    val pinkBackground = Color(0xFFFEE2E2) // Light pink from mockup
+fun PermissionsScreen(
+    onAllSet: () -> Unit,
+    hasPermissions: Boolean,
+    requestPermissions: () -> Unit,
+    checkHardware: () -> Boolean
+) {
+    val pinkBackground = Color(0xFFFEE2E2)
     val scrollState = rememberScrollState()
+    val lifecycleOwner = LocalLifecycleOwner.current
+
+    // Local state to track hardware status
+    var isHardwareOn by remember { mutableStateOf(checkHardware()) }
+
+    // Re-check hardware when the app is resumed (e.g. after user returns from settings)
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                isHardwareOn = checkHardware()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
+
+    // Auto-advance if everything is already granted and on
+    LaunchedEffect(hasPermissions, isHardwareOn) {
+        if (hasPermissions && isHardwareOn) {
+            onAllSet()
+        }
+    }
 
     Column(
         modifier = Modifier
@@ -39,7 +73,6 @@ fun PermissionsScreen(onAllGranted: () -> Unit) {
     ) {
         Spacer(modifier = Modifier.height(48.dp))
         
-        // Handle bar at the top (bottom sheet style)
         Box(
             modifier = Modifier
                 .width(40.dp)
@@ -51,7 +84,7 @@ fun PermissionsScreen(onAllGranted: () -> Unit) {
         Spacer(modifier = Modifier.height(32.dp))
 
         Text(
-            text = "No Signal? No Problem.",
+            text = if (!hasPermissions) "Grant Access" else "Hardware Check",
             style = MaterialTheme.typography.displaySmall,
             fontWeight = FontWeight.Black,
             textAlign = TextAlign.Center,
@@ -61,7 +94,9 @@ fun PermissionsScreen(onAllGranted: () -> Unit) {
         Spacer(modifier = Modifier.height(Spacing.Small))
 
         Text(
-            text = "ResQMesh needs hardware access to build your local mesh network.",
+            text = if (!hasPermissions) 
+                "ResQMesh needs hardware permissions to build your local mesh network." 
+                else "Permissions granted! Now please ensure your Bluetooth, GPS, and Wi-Fi are turned ON.",
             style = MaterialTheme.typography.bodyLarge,
             textAlign = TextAlign.Center,
             color = Color.Black.copy(alpha = 0.6f)
@@ -71,7 +106,7 @@ fun PermissionsScreen(onAllGranted: () -> Unit) {
 
         PermissionCard(
             title = "Bluetooth Radio",
-            description = "Discovers and connects to nearby ResQMesh nodes without needing internet or cell service.",
+            description = "Discovers and connects to nearby nodes.",
             icon = Icons.Default.Bluetooth,
             iconColor = Color(0xFF3B82F6)
         )
@@ -79,8 +114,8 @@ fun PermissionsScreen(onAllGranted: () -> Unit) {
         Spacer(modifier = Modifier.height(Spacing.Medium))
 
         PermissionCard(
-            title = "Location Services",
-            description = "Allows the Radar to plot your relative position to responders. GPS is used exclusively for mesh mapping.",
+            title = "Location & GPS",
+            description = "Plots relative positions on the Radar.",
             icon = Icons.Default.LocationOn,
             iconColor = Color(0xFF10B981)
         )
@@ -88,8 +123,8 @@ fun PermissionsScreen(onAllGranted: () -> Unit) {
         Spacer(modifier = Modifier.height(Spacing.Medium))
 
         PermissionCard(
-            title = "Local Network",
-            description = "Uses WiFi Direct to relay large packets and broadcasts between distant nodes in the network.",
+            title = "Wi-Fi Networking",
+            description = "Relays high-bandwidth mesh packets.",
             icon = Icons.Default.Wifi,
             iconColor = Color(0xFFF59E0B)
         )
@@ -109,7 +144,7 @@ fun PermissionsScreen(onAllGranted: () -> Unit) {
                 Icon(Icons.Default.Lock, contentDescription = null, modifier = Modifier.size(16.dp))
                 Spacer(modifier = Modifier.width(Spacing.Small))
                 Text(
-                    "End-to-end encrypted. Data stays local and never touches the cloud.",
+                    "Data stays local and never touches the cloud.",
                     style = MaterialTheme.typography.labelSmall,
                     fontSize = 10.sp
                 )
@@ -119,11 +154,37 @@ fun PermissionsScreen(onAllGranted: () -> Unit) {
         Spacer(modifier = Modifier.height(Spacing.Medium))
 
         ResQButton(
-            onClick = onAllGranted,
+            onClick = {
+                if (!hasPermissions) {
+                    requestPermissions()
+                } else {
+                    isHardwareOn = checkHardware()
+                    if (isHardwareOn) {
+                        onAllSet()
+                    } else {
+                        // Optional: can open system settings here
+                    }
+                }
+            },
             modifier = Modifier.fillMaxWidth(),
             contentPadding = PaddingValues(Spacing.Medium)
         ) {
-            Text("Grant Hardware Access")
+            Text(
+                text = if (!hasPermissions) "Grant Hardware Access" 
+                       else if (!isHardwareOn) "Check Hardware Again" 
+                       else "All Set! Continue",
+                fontWeight = FontWeight.Bold
+            )
+        }
+        
+        if (hasPermissions && !isHardwareOn) {
+            Text(
+                text = "Please enable Bluetooth, GPS, and Wi-Fi in your system settings to proceed.",
+                style = MaterialTheme.typography.bodySmall,
+                color = Color.Red.copy(alpha = 0.7f),
+                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(top = 8.dp)
+            )
         }
     }
 }
@@ -194,6 +255,11 @@ fun PermissionCard(
 @Composable
 fun PermissionsScreenPreview() {
     TestResQMeshTheme {
-        PermissionsScreen(onAllGranted = {})
+        PermissionsScreen(
+            onAllSet = {},
+            hasPermissions = false,
+            requestPermissions = {},
+            checkHardware = { false }
+        )
     }
 }

@@ -27,6 +27,11 @@ class CommunicationViewModel(private val repository: MeshRepository) : ViewModel
                 _uiState.update { it.copy(privateMessages = messagesMap) }
             }
         }
+        viewModelScope.launch {
+            repository.connectedDevices.collect { devices ->
+                _uiState.update { it.copy(connectedDevices = devices) }
+            }
+        }
     }
 
     fun sendPublicMessage(text: String, imageBase64: String? = null, audioBase64: String? = null) {

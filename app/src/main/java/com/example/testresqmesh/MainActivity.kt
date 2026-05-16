@@ -14,6 +14,9 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import androidx.compose.ui.graphics.Color
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -28,6 +31,13 @@ import com.example.testresqmesh.viewmodel.CommunicationViewModel
 import com.example.testresqmesh.viewmodel.RadarViewModel
 import com.example.testresqmesh.viewmodel.SetupViewModel
 import com.example.testresqmesh.utils.MediaHelper
+
+import android.bluetooth.BluetoothManager
+import android.content.Context
+import android.location.LocationManager
+import android.net.wifi.WifiManager
+import android.widget.Toast
+
 
 enum class AppState {
     Splash, Permissions, IdentitySetup, Main
@@ -51,9 +61,14 @@ class MainActivity : ComponentActivity() {
     private lateinit var repository: MeshRepository
     private lateinit var mediaHelper: MediaHelper
 
+    private var onPermissionsResult: ((Boolean) -> Unit)? = null
+
     private val requestPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
-    ) { _ -> }
+    ) { permissions ->
+        val allGranted = permissions.entries.all { it.value }
+        onPermissionsResult?.invoke(allGranted || hasRequiredPermissions())
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -88,15 +103,26 @@ class MainActivity : ComponentActivity() {
                 ) {
                     when (currentStage) {
                         AppState.Splash -> SplashScreen {
-                            currentStage = AppState.Permissions
+                            // If fully set up, go to Identity Setup, else go to Permissions
+                            currentStage = if (hasRequiredPermissions() && isHardwareEnabledSafe()) {
+                                AppState.IdentitySetup
+                            } else {
+                                AppState.Permissions
+                            }
                         }
-                        AppState.Permissions -> PermissionsScreen {
-                            requestRequiredPermissions()
-                            checkNotificationPermission()
-                            currentStage = AppState.IdentitySetup
-                        }
+                        AppState.Permissions -> PermissionsScreen(
+                            onAllSet = { currentStage = AppState.IdentitySetup },
+                            hasPermissions = hasRequiredPermissions(),
+                            requestPermissions = { requestPermissionLauncher.launch(getRequiredPermissions()) },
+                            checkHardware = { isHardwareEnabledSafe() }
+                        )
                         AppState.IdentitySetup -> IdentitySetupScreen(setupViewModel) {
-                            currentStage = AppState.Main
+                            if (isHardwareEnabledSafe()) {
+                                currentStage = AppState.Main
+                            } else {
+                                // Fallback to permissions if hardware turned off
+                                currentStage = AppState.Permissions
+                            }
                         }
                         AppState.Main -> MainContainerScreen(
                             setupViewModel = setupViewModel,
@@ -110,23 +136,40 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private fun requestRequiredPermissions() {
-        val perms = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            arrayOf(Manifest.permission.BLUETOOTH_SCAN, Manifest.permission.BLUETOOTH_ADVERTISE, Manifest.permission.BLUETOOTH_CONNECT, Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.NEARBY_WIFI_DEVICES, Manifest.permission.RECORD_AUDIO)
-        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            arrayOf(Manifest.permission.BLUETOOTH_SCAN, Manifest.permission.BLUETOOTH_ADVERTISE, Manifest.permission.BLUETOOTH_CONNECT, Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.RECORD_AUDIO)
-        } else {
-            arrayOf(Manifest.permission.BLUETOOTH, Manifest.permission.BLUETOOTH_ADMIN, Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION, Manifest.permission.RECORD_AUDIO)
+    private fun isHardwareEnabledSafe(): Boolean {
+        return try {
+            val bluetoothManager = getSystemService(Context.BLUETOOTH_SERVICE) as? android.bluetooth.BluetoothManager
+            val bluetoothAdapter = bluetoothManager?.adapter
+            val locationManager = getSystemService(Context.LOCATION_SERVICE) as? android.location.LocationManager
+            val wifiManager = applicationContext.getSystemService(Context.WIFI_SERVICE) as? android.net.wifi.WifiManager
+
+            val isBluetoothOn = try { bluetoothAdapter?.isEnabled == true } catch (e: SecurityException) { false }
+            val isLocationOn = locationManager?.isProviderEnabled(android.location.LocationManager.GPS_PROVIDER) == true ||
+                    locationManager?.isProviderEnabled(android.location.LocationManager.NETWORK_PROVIDER) == true
+            val isWifiOn = wifiManager?.isWifiEnabled == true
+
+            isBluetoothOn && isLocationOn && isWifiOn
+        } catch (e: Exception) {
+            false
         }
-        requestPermissionLauncher.launch(perms)
     }
 
-    private fun checkNotificationPermission() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
-                ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.POST_NOTIFICATIONS), 101)
-            }
+    private fun hasRequiredPermissions(): Boolean {
+        return getRequiredPermissions().all { 
+            ContextCompat.checkSelfPermission(this, it) == PackageManager.PERMISSION_GRANTED 
         }
+    }
+
+    private fun getRequiredPermissions(): Array<String> {
+        val perms = mutableListOf<String>()
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            perms.addAll(listOf(Manifest.permission.BLUETOOTH_SCAN, Manifest.permission.BLUETOOTH_ADVERTISE, Manifest.permission.BLUETOOTH_CONNECT, Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.NEARBY_WIFI_DEVICES, Manifest.permission.RECORD_AUDIO, Manifest.permission.POST_NOTIFICATIONS))
+        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            perms.addAll(listOf(Manifest.permission.BLUETOOTH_SCAN, Manifest.permission.BLUETOOTH_ADVERTISE, Manifest.permission.BLUETOOTH_CONNECT, Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.RECORD_AUDIO))
+        } else {
+            perms.addAll(listOf(Manifest.permission.BLUETOOTH, Manifest.permission.BLUETOOTH_ADMIN, Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION, Manifest.permission.RECORD_AUDIO))
+        }
+        return perms.toTypedArray()
     }
 
     override fun onDestroy() {

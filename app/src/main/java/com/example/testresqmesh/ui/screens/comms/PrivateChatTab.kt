@@ -34,6 +34,20 @@ fun PrivateChatTab(
         )
     }
 
+    // Real connected devices that don't have messages yet
+    val connectedWithoutMessages = uiState.connectedDevices.filter { device ->
+        uiState.privateMessages.keys.none { it == device.endpointId }
+    }.map { device ->
+        InboxItemData(
+            id = device.endpointId,
+            name = device.name,
+            message = "Tap to establish secure link",
+            timestamp = "now",
+            hops = "DIRECT",
+            hasNotification = false
+        )
+    }
+
     val mockItems = listOf(
         InboxItemData("mock1", "0x7f...a1", "Supplies located at sector 4. Bringing", "2m ago", "2 HOPS", hasNotification = true),
         InboxItemData("mock2", "Alpha-9", "Confirming your location. Stay at the", "15m ago", "DIRECT"),
@@ -42,7 +56,7 @@ fun PrivateChatTab(
     )
 
     LazyColumn(modifier = Modifier.fillMaxSize()) {
-        // Real messages first
+        // 1. Real conversations with messages
         items(latestMessages) { item ->
             InboxMessageItem(
                 name = item.name,
@@ -50,11 +64,23 @@ fun PrivateChatTab(
                 timestamp = item.timestamp,
                 hops = item.hops,
                 hasNotification = item.hasNotification,
-                onClick = { onChatSelected(item.id) } // Pass the ID for opening chat
+                onClick = { onChatSelected(item.id) }
             )
         }
 
-        // Mock items from the image
+        // 2. Real connected devices (no messages yet)
+        items(connectedWithoutMessages) { item ->
+            InboxMessageItem(
+                name = item.name,
+                message = item.message,
+                timestamp = item.timestamp,
+                hops = item.hops,
+                hasNotification = item.hasNotification,
+                onClick = { onChatSelected(item.id) }
+            )
+        }
+
+        // 3. Mock items
         items(mockItems) { item ->
             InboxMessageItem(
                 name = item.name,

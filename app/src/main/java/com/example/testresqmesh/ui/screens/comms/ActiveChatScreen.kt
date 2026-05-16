@@ -47,8 +47,10 @@ fun ActiveChatScreen(name: String, viewModel: CommunicationViewModel, onBack: ()
     // Messages for this specific target (name is treated as endpointId here)
     val messages = uiState.privateMessages[name] ?: emptyList()
     
-    // For the UI, we'll use the sender name if available
-    val displayName = messages.firstOrNull()?.senderName ?: name
+    // Fix: Prioritize connected device name, then look for the first message not sent by "Me"
+    val displayName = uiState.connectedDevices.find { it.endpointId == name }?.name 
+        ?: messages.firstOrNull { it.senderName != "Me" }?.senderName 
+        ?: name
 
     Scaffold(
         topBar = {

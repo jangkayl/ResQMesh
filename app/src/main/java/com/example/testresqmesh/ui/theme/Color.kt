@@ -3,7 +3,7 @@ package com.example.testresqmesh.ui.theme
 import androidx.compose.ui.graphics.Color
 
 // --- Neutral / Base (Mockup Inspired) ---
-val InboxBackground = Color(0xFF1A2228)
+val InboxBackground = Color(0xFF2A343B) // Lightened from 1A2228 to avoid "pure black" appearance
 val InboxSurface = Color(0xFF232E35)
 val InboxDivider = Color(0xFF2D3748)
 val InboxTextPrimary = Color(0xFFFFFFFF)
