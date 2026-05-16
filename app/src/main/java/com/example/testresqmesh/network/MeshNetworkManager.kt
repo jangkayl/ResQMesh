@@ -88,11 +88,12 @@ class MeshNetworkManager(private val context: Context) {
     fun rescan() {
         onStatusChanged?.invoke("Rescanning nearby area...")
         connectionsClient.stopDiscovery()
+        val jitter = kotlin.random.Random.nextLong(100, 600)
         Handler(Looper.getMainLooper()).postDelayed({
             val discoveryOptions = DiscoveryOptions.Builder().setStrategy(Strategy.P2P_CLUSTER).build()
             connectionsClient.startDiscovery(activeServiceId, endpointDiscoveryCallback, discoveryOptions)
                 .addOnSuccessListener { onStatusChanged?.invoke("Node Active. Seeking peers...") }
-        }, 1500)
+        }, 1500 + jitter)
     }
 
     fun broadcastPayload(jsonString: String, excludeEndpointId: String? = null) {
@@ -153,23 +154,19 @@ class MeshNetworkManager(private val context: Context) {
             // Don't connect to yourself
             if (info.endpointName == myDeviceName) return
 
-            // --- FASTER TIE-BREAKER ---
-            // We compare the two names alphabetically.
-            // Only the "greater" name is allowed to initiate the connection!
+            // --- PURE NEARBY COLLISION HANDLING ---
+            // Tie-Breaker: Only one device initiates to prevent thrashing
             if (myDeviceName.compareTo(info.endpointName) > 0) {
-                Log.d("MeshNetwork", "Tie-Breaker: I am initiating connection to ${info.endpointName}")
                 attemptConnection(endpointId, info.endpointName)
             } else {
-                Log.d("MeshNetwork", "Tie-Breaker: Waiting for ${info.endpointName} to connect to me.")
-                // The Impatient Loser Fallback: Wait 2.5s, if not connected, initiate anyway!
+                // Impatient Fallback with Jitter: If peer fails to initiate, take charge.
+                val jitter = kotlin.random.Random.nextLong(0, 500)
                 Handler(Looper.getMainLooper()).postDelayed({
                     if (!connectedEndpointIds.contains(endpointId) && activeScannedEndpoints.contains(endpointId)) {
-                        Log.d("MeshNetwork", "Tie-Breaker Fallback: They took too long. I am initiating!")
                         attemptConnection(endpointId, info.endpointName)
                     }
-                }, 2500)
+                }, 2500 + jitter)
             }
-            // ---------------------------
         }
 
         override fun onEndpointLost(endpointId: String) {
@@ -178,27 +175,17 @@ class MeshNetworkManager(private val context: Context) {
         }
     }
 
-    // NEW: The Polite Auto-Retry Function
     private fun attemptConnection(endpointId: String, endpointName: String) {
         connectionsClient.requestConnection(myDeviceName, endpointId, connectionLifecycleCallback)
-            .addOnFailureListener {
-                Log.d("MeshNetwork", "Handshake failed with $endpointName. Retrying in 1 second...")
-
+            .addOnFailureListener { e ->
+                if (connectedEndpointIds.contains(endpointId)) return@addOnFailureListener
+                
+                val jitter = kotlin.random.Random.nextLong(200, 800)
                 Handler(Looper.getMainLooper()).postDelayed({
-                    // ZOMBIE FIX: Are they still physically in the room?
-                    val stillInRoom = activeScannedEndpoints.contains(endpointId)
-
-                    // Are they NOT connected yet?
-                    val notConnected = !connectedEndpointIds.contains(endpointId)
-
-                    // Only fire the retry if BOTH are true!
-                    if (stillInRoom && notConnected) {
-                        Log.d("MeshNetwork", "Target still here. Retrying connection to $endpointName...")
+                    if (activeScannedEndpoints.contains(endpointId) && !connectedEndpointIds.contains(endpointId)) {
                         attemptConnection(endpointId, endpointName)
-                    } else {
-                        Log.d("MeshNetwork", "Target left or already connected. Canceling retry.")
                     }
-                }, 1000)
+                }, 1000 + jitter)
             }
     }
 
@@ -208,7 +195,7 @@ class MeshNetworkManager(private val context: Context) {
             pendingNames[endpointId] = info.endpointName
             connectionsClient.acceptConnection(endpointId, payloadCallback)
         }
-
+    
         override fun onConnectionResult(endpointId: String, result: ConnectionResolution) {
             if (result.status.statusCode == ConnectionsStatusCodes.STATUS_OK) {
                 val deviceName = pendingNames[endpointId] ?: "Unknown"
@@ -216,7 +203,6 @@ class MeshNetworkManager(private val context: Context) {
                 onDeviceConnected?.invoke(ConnectedDevice(endpointId, deviceName))
             }
         }
-
         override fun onDisconnected(endpointId: String) {
             onDeviceScanRemoved?.invoke(endpointId)
             connectedEndpointIds.remove(endpointId)
