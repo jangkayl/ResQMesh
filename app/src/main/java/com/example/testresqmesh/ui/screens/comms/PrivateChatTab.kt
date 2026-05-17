@@ -22,7 +22,7 @@ fun PrivateChatTab(
     val uiState by viewModel.uiState.collectAsState()
     
     // Group messages by sender for the inbox view
-    val latestMessages = uiState.privateMessages.map { (id, messages) ->
+    val conversationItems = uiState.privateMessages.map { (id, messages) ->
         val lastMsg = messages.lastOrNull()
         
         // Prioritize connected device name, then look for a message not from "Me"
@@ -34,7 +34,7 @@ fun PrivateChatTab(
             id = id,
             name = peerName,
             message = lastMsg?.text ?: "Open channel",
-            timestamp = "now",
+            timestamp = lastMsg?.timestamp ?: 0L,
             hops = "DIRECT",
             hasNotification = false
         )
@@ -48,53 +48,27 @@ fun PrivateChatTab(
             id = device.endpointId,
             name = device.name,
             message = "Tap to establish secure link",
-            timestamp = "now",
+            timestamp = 0L, // Newest connected but no messages yet
             hops = "DIRECT",
             hasNotification = false
         )
     }
 
-    val mockItems = listOf(
-        InboxItemData("mock1", "0x7f...a1", "Supplies located at sector 4. Bringing", "2m ago", "2 HOPS", hasNotification = true),
-        InboxItemData("mock2", "Alpha-9", "Confirming your location. Stay at the", "15m ago", "DIRECT"),
-        InboxItemData("mock3", "0x2d...e9", "Is the channel still clear of interference?", "1h ago", "3 HOPS"),
-        InboxItemData("mock4", "Nexus_Prime", "Relay established through substation 4.", "4h ago", "5 HOPS")
+    // Merge and sort: Newest messages (or newest connections) at top
+    val allItems = (conversationItems + connectedWithoutMessages).sortedWith(
+        compareByDescending<InboxItemData> { it.timestamp }
+            .thenByDescending { it.id } // Tie-break with ID if needed
     )
 
     LazyColumn(modifier = Modifier.fillMaxSize()) {
-        // 1. Real conversations with messages
-        items(latestMessages) { item ->
+        items(allItems) { item ->
             InboxMessageItem(
                 name = item.name,
                 message = item.message,
-                timestamp = item.timestamp,
+                timestamp = if (item.timestamp == 0L) "now" else formatTimestamp(item.timestamp),
                 hops = item.hops,
                 hasNotification = item.hasNotification,
                 onClick = { onChatSelected(item.id) }
-            )
-        }
-
-        // 2. Real connected devices (no messages yet)
-        items(connectedWithoutMessages) { item ->
-            InboxMessageItem(
-                name = item.name,
-                message = item.message,
-                timestamp = item.timestamp,
-                hops = item.hops,
-                hasNotification = item.hasNotification,
-                onClick = { onChatSelected(item.id) }
-            )
-        }
-
-        // 3. Mock items
-        items(mockItems) { item ->
-            InboxMessageItem(
-                name = item.name,
-                message = item.message,
-                timestamp = item.timestamp,
-                hops = item.hops,
-                hasNotification = item.hasNotification,
-                onClick = { onChatSelected(item.name) }
             )
         }
 
@@ -104,11 +78,26 @@ fun PrivateChatTab(
     }
 }
 
+private fun formatTimestamp(timestamp: Long): String {
+    val diff = System.currentTimeMillis() - timestamp
+    val seconds = diff / 1000
+    val minutes = seconds / 60
+    val hours = minutes / 60
+    val days = hours / 24
+
+    return when {
+        seconds < 60 -> "now"
+        minutes < 60 -> "${minutes}m ago"
+        hours < 24 -> "${hours}h ago"
+        else -> "${days}d ago"
+    }
+}
+
 data class InboxItemData(
     val id: String,
     val name: String,
     val message: String,
-    val timestamp: String,
+    val timestamp: Long,
     val hops: String,
     val hasNotification: Boolean = false
 )

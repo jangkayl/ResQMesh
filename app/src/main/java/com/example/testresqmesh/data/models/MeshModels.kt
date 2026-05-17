@@ -6,7 +6,8 @@ data class ChatMessage(
     val text: String,
     val imageBase64: String?,
     val audioBase64: String?,
-    val isMine: Boolean
+    val isMine: Boolean,
+    val timestamp: Long = System.currentTimeMillis()
 )
 
 data class ConnectedDevice(

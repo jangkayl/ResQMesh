@@ -36,7 +36,7 @@ fun MainContainerScreen(
     commsViewModel: CommunicationViewModel,
     mediaHelper: MediaHelper
 ) {
-    var currentItem by remember { mutableStateOf<NavItem>(NavItem.Messages) }
+    var currentItem by remember { mutableStateOf<NavItem>(NavItem.Radar) }
     
     // Sub-navigation state for prototype
     var activeChatNode by remember { mutableStateOf<String?>(null) }

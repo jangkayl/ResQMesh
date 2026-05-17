@@ -21,37 +21,37 @@ fun PublicChatTab(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     
-    val mockBroadcasts = listOf(
-        InboxItemData("mock1", "GLOBAL_SOS", "Critical alert: Earthquake detected in Sector 7", "1m ago", "SATURATED"),
-        InboxItemData("mock2", "RESCUE_TEAM_B", "Moving to extraction point Alpha", "10m ago", "2 HOPS"),
-        InboxItemData("mock3", "WEATHER_NODE", "Severe storm warning for next 2 hours", "45m ago", "4 HOPS")
-    )
+    // Sort messages by timestamp descending (newest first)
+    val sortedMessages = uiState.publicMessages.sortedByDescending { it.timestamp }
 
     LazyColumn(modifier = Modifier.fillMaxSize()) {
-        // Real public messages first
-        items(uiState.publicMessages.reversed()) { msg ->
+        items(sortedMessages) { msg ->
             InboxMessageItem(
                 name = msg.senderName,
                 message = msg.text,
-                timestamp = "now",
+                timestamp = formatTimestamp(msg.timestamp),
                 hops = "MESH",
                 onClick = { onChatSelected(msg.senderName) }
-            )
-        }
-
-        items(mockBroadcasts) { item ->
-            InboxMessageItem(
-                name = item.name,
-                message = item.message,
-                timestamp = item.timestamp,
-                hops = item.hops,
-                isEncrypted = false,
-                onClick = { onChatSelected(item.name) }
             )
         }
 
         item {
             EndOfMeshIndicator()
         }
+    }
+}
+
+private fun formatTimestamp(timestamp: Long): String {
+    val diff = System.currentTimeMillis() - timestamp
+    val seconds = diff / 1000
+    val minutes = seconds / 60
+    val hours = minutes / 60
+    val days = hours / 24
+
+    return when {
+        seconds < 60 -> "now"
+        minutes < 60 -> "${minutes}m ago"
+        hours < 24 -> "${hours}h ago"
+        else -> "${days}d ago"
     }
 }

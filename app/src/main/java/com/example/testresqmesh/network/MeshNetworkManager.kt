@@ -47,7 +47,12 @@ class MeshNetworkManager(private val context: Context) {
     fun startMeshNode(teamKey: String) {
         val formattedKey = teamKey.trim().uppercase().ifEmpty { "PUBLIC" }
         activeServiceId = "com.example.testresqmesh.p2p.$formattedKey"
-        val options = AdvertisingOptions.Builder().setStrategy(Strategy.P2P_CLUSTER).build()
+        
+        // OPTIMIZATION: High-power advertising for "Fast Pair" experience
+        val options = AdvertisingOptions.Builder()
+            .setStrategy(Strategy.P2P_CLUSTER)
+            .setLowPower(false) // Maximize radio frequency for faster discovery
+            .build()
 
         connectionsClient.startAdvertising(myDeviceName, activeServiceId, connectionLifecycleCallback, options)
             .addOnSuccessListener {
@@ -58,9 +63,12 @@ class MeshNetworkManager(private val context: Context) {
             .addOnFailureListener { onStatusChanged?.invoke("Failed to start node.") }
     }
 
-    // 1. DELETE startAggressiveScanner() and REPLACE with this smooth continuous native scanner:
+    // 1. Smooth continuous native scanner with high-power optimization:
     private fun startNativeScanner() {
-        val discoveryOptions = DiscoveryOptions.Builder().setStrategy(Strategy.P2P_CLUSTER).build()
+        val discoveryOptions = DiscoveryOptions.Builder()
+            .setStrategy(Strategy.P2P_CLUSTER)
+            .setLowPower(false) // High-power mode to find peers instantly
+            .build()
         connectionsClient.startDiscovery(activeServiceId, endpointDiscoveryCallback, discoveryOptions)
             .addOnSuccessListener { onStatusChanged?.invoke("Node Active. Seeking peers continuously...") }
             .addOnFailureListener { onStatusChanged?.invoke("Scanner failed to start.") }
@@ -90,7 +98,10 @@ class MeshNetworkManager(private val context: Context) {
         connectionsClient.stopDiscovery()
         val jitter = kotlin.random.Random.nextLong(100, 600)
         Handler(Looper.getMainLooper()).postDelayed({
-            val discoveryOptions = DiscoveryOptions.Builder().setStrategy(Strategy.P2P_CLUSTER).build()
+            val discoveryOptions = DiscoveryOptions.Builder()
+                .setStrategy(Strategy.P2P_CLUSTER)
+                .setLowPower(false)
+                .build()
             connectionsClient.startDiscovery(activeServiceId, endpointDiscoveryCallback, discoveryOptions)
                 .addOnSuccessListener { onStatusChanged?.invoke("Node Active. Seeking peers...") }
         }, 1500 + jitter)
@@ -154,18 +165,25 @@ class MeshNetworkManager(private val context: Context) {
             // Don't connect to yourself
             if (info.endpointName == myDeviceName) return
 
-            // --- PURE NEARBY COLLISION HANDLING ---
-            // Tie-Breaker: Only one device initiates to prevent thrashing
+            // --- SOLUTION 2: THE IMPATIENT FOLLOWER (Deterministic Tie-Breaker) ---
+            
             if (myDeviceName.compareTo(info.endpointName) > 0) {
+                // MASTER: We are alphabetically higher. Initiate connection IMMEDIATELY.
+                Log.d("MeshNetwork", "I am Master for $endpointId. Connecting now.")
                 attemptConnection(endpointId, info.endpointName)
             } else {
-                // Impatient Fallback with Jitter: If peer fails to initiate, take charge.
+                // FOLLOWER: We are alphabetically lower. Wait for them to call us.
+                // But we are "Impatient" - if they don't call in 1s (+ random jitter), we take over.
                 val jitter = kotlin.random.Random.nextLong(0, 500)
+                Log.d("MeshNetwork", "I am Follower for $endpointId. Waiting ${1000 + jitter}ms...")
+                
                 Handler(Looper.getMainLooper()).postDelayed({
+                    // Only initiate if we aren't already connected and the peer is still nearby
                     if (!connectedEndpointIds.contains(endpointId) && activeScannedEndpoints.contains(endpointId)) {
+                        Log.d("MeshNetwork", "Master for $endpointId failed to call. Impatient Follower taking over.")
                         attemptConnection(endpointId, info.endpointName)
                     }
-                }, 2500 + jitter)
+                }, 1000 + jitter)
             }
         }
 
@@ -201,6 +219,16 @@ class MeshNetworkManager(private val context: Context) {
                 val deviceName = pendingNames[endpointId] ?: "Unknown"
                 connectedEndpointIds.add(endpointId)
                 onDeviceConnected?.invoke(ConnectedDevice(endpointId, deviceName))
+
+                // TRIGGER BANDWIDTH UPGRADE: Sending a small dummy payload immediately 
+                // tells Google Nearby to switch from Bluetooth to high-speed Wi-Fi.
+                val triggerPayload = JSONObject().apply {
+                    put("id", java.util.UUID.randomUUID().toString())
+                    put("senderName", myDeviceName)
+                    put("isSystem", true)
+                    put("type", "bandwidth_upgrade_trigger")
+                }.toString()
+                connectionsClient.sendPayload(endpointId, Payload.fromBytes(triggerPayload.toByteArray()))
             }
         }
         override fun onDisconnected(endpointId: String) {

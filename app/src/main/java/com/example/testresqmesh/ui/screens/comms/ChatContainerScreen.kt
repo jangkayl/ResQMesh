@@ -19,7 +19,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.tooling.preview.Preview
 import com.example.testresqmesh.ui.theme.TestResQMeshTheme
-import com.example.testresqmesh.ui.components.chat.InboxMessageItem
 import com.example.testresqmesh.ui.theme.Spacing
 import com.example.testresqmesh.utils.MediaHelper
 
@@ -178,30 +177,12 @@ fun ChatContainerScreenPreview() {
             onTabSelected = {},
             privateTabContent = {
                 Column {
-                    InboxMessageItem(
-                        name = "0x7f...a1",
-                        message = "Supplies located at sector 4. Bringing",
-                        timestamp = "2m ago",
-                        hops = "2 HOPS",
-                        hasNotification = true
-                    )
-                    InboxMessageItem(
-                        name = "Alpha-9",
-                        message = "Confirming your location. Stay at the",
-                        timestamp = "15m ago",
-                        hops = "DIRECT"
-                    )
+                    // Previews updated to be empty (Production state)
                 }
             },
             publicTabContent = {
                 Column {
-                    InboxMessageItem(
-                        name = "GLOBAL_SOS",
-                        message = "Critical alert: Earthquake detected in Sector 7",
-                        timestamp = "1m ago",
-                        hops = "SATURATED",
-                        isEncrypted = false
-                    )
+                    // Previews updated to be empty (Production state)
                 }
             }
         )

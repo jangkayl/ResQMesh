@@ -74,7 +74,15 @@ class MeshRepository(private val networkManager: MeshNetworkManager) {
 
         networkManager.onMessageReceived = { endpointId, sender, text, isPrivate, isSystem, img, audio ->
             if (!isSystem) {
-                val message = ChatMessage(UUID.randomUUID().toString(), sender, text, img, audio, false)
+                val message = ChatMessage(
+                    id = UUID.randomUUID().toString(),
+                    senderName = sender,
+                    text = text,
+                    imageBase64 = img,
+                    audioBase64 = audio,
+                    isMine = false,
+                    timestamp = System.currentTimeMillis()
+                )
                 if (isPrivate) {
                     val currentMap = _privateMessages.value.toMutableMap()
                     val log = currentMap[endpointId] ?: emptyList()
@@ -109,8 +117,10 @@ class MeshRepository(private val networkManager: MeshNetworkManager) {
 
     fun sendPublicMessage(text: String, imageBase64: String?, audioBase64: String?) {
         val msgId = UUID.randomUUID().toString()
+        val timestamp = System.currentTimeMillis()
         val jsonString = JSONObject().apply {
             put("id", msgId)
+            put("timestamp", timestamp)
             put("senderName", myNodeName)
             put("text", text)
             put("isPrivate", false)
@@ -119,15 +129,17 @@ class MeshRepository(private val networkManager: MeshNetworkManager) {
             if (audioBase64 != null) put("audio", audioBase64)
         }.toString()
 
-        val message = ChatMessage(msgId, "Me", text, imageBase64, audioBase64, true)
+        val message = ChatMessage(msgId, "Me", text, imageBase64, audioBase64, true, timestamp)
         _publicMessages.value = _publicMessages.value + message
         networkManager.broadcastPayload(jsonString)
     }
 
     fun sendPrivateMessage(target: ConnectedDevice, text: String, imageBase64: String?, audioBase64: String?) {
         val msgId = UUID.randomUUID().toString()
+        val timestamp = System.currentTimeMillis()
         val jsonString = JSONObject().apply {
             put("id", msgId)
+            put("timestamp", timestamp)
             put("senderName", myNodeName)
             put("text", text)
             put("isPrivate", true)
@@ -136,7 +148,7 @@ class MeshRepository(private val networkManager: MeshNetworkManager) {
             if (audioBase64 != null) put("audio", audioBase64)
         }.toString()
 
-        val message = ChatMessage(msgId, "Me", text, imageBase64, audioBase64, true)
+        val message = ChatMessage(msgId, "Me", text, imageBase64, audioBase64, true, timestamp)
         val currentMap = _privateMessages.value.toMutableMap()
         val log = currentMap[target.endpointId] ?: emptyList()
         currentMap[target.endpointId] = log + message
