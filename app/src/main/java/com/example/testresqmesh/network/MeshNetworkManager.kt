@@ -13,10 +13,9 @@ import org.json.JSONObject
 class MeshNetworkManager(private val context: Context) {
 
     private val notificationHelper = NotificationHelper(context)
-
     private val connectionsClient = Nearby.getConnectionsClient(context)
-
     var myDeviceName: String = ""
+    private var myPowerScore: Int = 0
     private val pendingNames = mutableMapOf<String, String>()
 
     // Callbacks to communicate back to the ViewModel
@@ -48,19 +47,50 @@ class MeshNetworkManager(private val context: Context) {
         val formattedKey = teamKey.trim().uppercase().ifEmpty { "PUBLIC" }
         activeServiceId = "com.example.testresqmesh.p2p.$formattedKey"
         
+        // Calculate Power Score to determine who leads the connection
+        myPowerScore = calculatePowerScore()
+        val advertisingName = "$myPowerScore|$myDeviceName"
+
         // OPTIMIZATION: High-power advertising for "Fast Pair" experience
         val options = AdvertisingOptions.Builder()
             .setStrategy(Strategy.P2P_CLUSTER)
             .setLowPower(false) // Maximize radio frequency for faster discovery
             .build()
 
-        connectionsClient.startAdvertising(myDeviceName, activeServiceId, connectionLifecycleCallback, options)
+        connectionsClient.startAdvertising(advertisingName, activeServiceId, connectionLifecycleCallback, options)
             .addOnSuccessListener {
                 onStatusChanged?.invoke("Node Active [Room: $formattedKey]. Seeking peers...")
                 startNativeScanner() // <--- UPDATE THIS LINE
                 startHeartbeat()
             }
             .addOnFailureListener { onStatusChanged?.invoke("Failed to start node.") }
+    }
+
+    private fun calculatePowerScore(): Int {
+        var score = 10 // Base score
+        
+        // 1. API Level (Modern Android = Better P2P handling)
+        val apiLevel = android.os.Build.VERSION.SDK_INT
+        if (apiLevel >= 33) score += 40
+        else if (apiLevel >= 31) score += 30
+        else if (apiLevel >= 29) score += 20
+        
+        // 2. Bluetooth Capabilities
+        val bluetoothAdapter = (context.getSystemService(Context.BLUETOOTH_SERVICE) as? android.bluetooth.BluetoothManager)?.adapter
+        if (bluetoothAdapter != null) {
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                if (bluetoothAdapter.isLe2MPhySupported) score += 15
+                if (bluetoothAdapter.isLeExtendedAdvertisingSupported) score += 15
+            }
+        }
+        
+        // 3. Battery Level (Stable power = better hub)
+        val batteryManager = context.getSystemService(Context.BATTERY_SERVICE) as? android.os.BatteryManager
+        val batteryPct = batteryManager?.getIntProperty(android.os.BatteryManager.BATTERY_PROPERTY_CAPACITY) ?: 0
+        if (batteryPct > 50) score += 10
+        else if (batteryPct > 20) score += 5
+
+        return score
     }
 
     // 1. Smooth continuous native scanner with high-power optimization:
@@ -158,32 +188,43 @@ class MeshNetworkManager(private val context: Context) {
 
     private val endpointDiscoveryCallback = object : EndpointDiscoveryCallback() {
         override fun onEndpointFound(endpointId: String, info: DiscoveredEndpointInfo) {
+            // Parse the peer's power score and name
+            val rawName = info.endpointName
+            val parts = rawName.split("|", limit = 2)
+            val peerScore = parts.getOrNull(0)?.toIntOrNull() ?: 0
+            val cleanPeerName = parts.getOrNull(1) ?: rawName
+
             // Add them to our physical room tracker
             activeScannedEndpoints.add(endpointId)
-            onDeviceScanned?.invoke(endpointId, info.endpointName)
+            onDeviceScanned?.invoke(endpointId, cleanPeerName)
 
             // Don't connect to yourself
-            if (info.endpointName == myDeviceName) return
+            if (cleanPeerName == myDeviceName) return
 
-            // --- SOLUTION 2: THE IMPATIENT FOLLOWER (Deterministic Tie-Breaker) ---
-            
-            if (myDeviceName.compareTo(info.endpointName) > 0) {
-                // MASTER: We are alphabetically higher. Initiate connection IMMEDIATELY.
-                Log.d("MeshNetwork", "I am Master for $endpointId. Connecting now.")
-                attemptConnection(endpointId, info.endpointName)
+            // --- POWER SCORE TIE-BREAKER: The strongest phone leads ---
+            val shouldInitiate = if (myPowerScore != peerScore) {
+                myPowerScore > peerScore
             } else {
-                // FOLLOWER: We are alphabetically lower. Wait for them to call us.
-                // But we are "Impatient" - if they don't call in 1s (+ random jitter), we take over.
+                myDeviceName.compareTo(cleanPeerName) > 0
+            }
+
+            if (shouldInitiate) {
+                // PRIMARY (The Boss): We are stronger. 
+                Log.d("MeshNetwork", "I am Primary (Score $myPowerScore) for $cleanPeerName (Score $peerScore)")
+                connectionsClient.stopDiscovery()
+                attemptConnection(endpointId, cleanPeerName)
+            } else {
+                // BACKUP (Yielding): We are weaker. Wait for them to call us.
                 val jitter = kotlin.random.Random.nextLong(0, 500)
-                Log.d("MeshNetwork", "I am Follower for $endpointId. Waiting ${1000 + jitter}ms...")
+                Log.d("MeshNetwork", "I am Backup (Score $myPowerScore). Yielding to $cleanPeerName (Score $peerScore)...")
                 
                 Handler(Looper.getMainLooper()).postDelayed({
-                    // Only initiate if we aren't already connected and the peer is still nearby
                     if (!connectedEndpointIds.contains(endpointId) && activeScannedEndpoints.contains(endpointId)) {
-                        Log.d("MeshNetwork", "Master for $endpointId failed to call. Impatient Follower taking over.")
-                        attemptConnection(endpointId, info.endpointName)
+                        Log.d("MeshNetwork", "Primary failed. Backup taking over for $endpointId")
+                        connectionsClient.stopDiscovery()
+                        attemptConnection(endpointId, cleanPeerName)
                     }
-                }, 1000 + jitter)
+                }, 1200 + jitter)
             }
         }
 
@@ -210,7 +251,12 @@ class MeshNetworkManager(private val context: Context) {
     private val connectionLifecycleCallback = object : ConnectionLifecycleCallback() {
         override fun onConnectionInitiated(endpointId: String, info: ConnectionInfo) {
             onDeviceScanRemoved?.invoke(endpointId)
-            pendingNames[endpointId] = info.endpointName
+            
+            // Clean the score prefix from the stored name
+            val rawName = info.endpointName
+            val cleanName = if (rawName.contains("|")) rawName.split("|")[1] else rawName
+            
+            pendingNames[endpointId] = cleanName
             connectionsClient.acceptConnection(endpointId, payloadCallback)
         }
     
