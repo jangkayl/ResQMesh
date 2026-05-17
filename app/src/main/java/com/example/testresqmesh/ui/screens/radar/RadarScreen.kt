@@ -41,7 +41,11 @@ fun RadarScreen(viewModel: RadarViewModel) {
     }
     
     val scannedNodes = uiState.scannedDevices.map {
-        NodeItemData(it.name, "Nearby • Scanning...")
+        NodeItemData(
+            it.name, 
+            "Score: ${it.powerScore} • Role: ${it.myRole}",
+            it.myRole == "MASTER"
+        )
     }
 
     RadarScreenContent(
@@ -313,8 +317,15 @@ fun NearbyNodeItem(node: NodeItemData) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(node.name, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Black, color = Color.White)
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.Bolt, contentDescription = null, tint = Color.White.copy(alpha = 0.4f), modifier = Modifier.size(12.dp))
-                    Text(node.status, style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.4f))
+                    val statusColor = if (node.status.contains("MASTER")) InboxAccentBlue else Color.White.copy(alpha = 0.4f)
+                    Icon(
+                        if (node.status.contains("MASTER")) Icons.Default.Bolt else Icons.Default.Info, 
+                        contentDescription = null, 
+                        tint = statusColor, 
+                        modifier = Modifier.size(12.dp)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(node.status, style = MaterialTheme.typography.labelSmall, color = statusColor)
                 }
             }
 

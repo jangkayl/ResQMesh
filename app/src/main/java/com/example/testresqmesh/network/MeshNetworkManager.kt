@@ -26,7 +26,7 @@ class MeshNetworkManager(private val context: Context) {
     var onMessageReceived: ((String, String, String, Boolean, Boolean, String?, String?) -> Unit)? = null
 
     var onStatusChanged: ((String) -> Unit)? = null
-    var onDeviceScanned: ((String, String) -> Unit)? = null
+    var onDeviceScanned: ((String, String, Int, String) -> Unit)? = null // Added score and role
     var onDeviceScanRemoved: ((String) -> Unit)? = null
 
     // Heartbeat & Scanner Handlers
@@ -219,10 +219,6 @@ class MeshNetworkManager(private val context: Context) {
 
             // Add them to our physical room tracker
             activeScannedEndpoints.add(endpointId)
-            onDeviceScanned?.invoke(endpointId, cleanPeerName)
-
-            // Don't connect to yourself
-            if (cleanPeerName == myDeviceName) return
 
             // --- POWER SCORE TIE-BREAKER: The strongest phone leads ---
             val shouldInitiate = if (myPowerScore != peerScore) {
@@ -230,6 +226,12 @@ class MeshNetworkManager(private val context: Context) {
             } else {
                 myDeviceName.compareTo(cleanPeerName) > 0
             }
+            
+            val myRole = if (shouldInitiate) "MASTER" else "FOLLOWER"
+            onDeviceScanned?.invoke(endpointId, cleanPeerName, peerScore, myRole)
+
+            // Don't connect to yourself
+            if (cleanPeerName == myDeviceName) return
 
             if (shouldInitiate) {
                 // PRIMARY (The Boss): We are stronger. 

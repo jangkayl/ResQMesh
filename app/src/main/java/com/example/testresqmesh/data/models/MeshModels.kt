@@ -18,5 +18,7 @@ data class ConnectedDevice(
 data class ScannedDevice(
     val endpointId: String,
     val name: String,
-    val lastSeen: Long
+    val lastSeen: Long,
+    val powerScore: Int = 0,
+    val myRole: String = "IDLE"
 )

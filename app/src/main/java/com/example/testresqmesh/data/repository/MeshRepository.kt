@@ -52,7 +52,7 @@ class MeshRepository(private val networkManager: MeshNetworkManager) {
             _connectedDevices.value = _connectedDevices.value.filter { it.endpointId != endpointId }
         }
 
-        networkManager.onDeviceScanned = { id, name ->
+        networkManager.onDeviceScanned = { id, name, score, role ->
             val currentScanned = _scannedDevices.value
             val isNotConnected = _connectedDevices.value.none { it.endpointId == id }
             
@@ -60,10 +60,14 @@ class MeshRepository(private val networkManager: MeshNetworkManager) {
                 val index = currentScanned.indexOfFirst { it.endpointId == id }
                 if (index != -1) {
                     val updated = currentScanned.toMutableList()
-                    updated[index] = updated[index].copy(lastSeen = System.currentTimeMillis())
+                    updated[index] = updated[index].copy(
+                        lastSeen = System.currentTimeMillis(),
+                        powerScore = score,
+                        myRole = role
+                    )
                     _scannedDevices.value = updated
                 } else {
-                    _scannedDevices.value = currentScanned + ScannedDevice(id, name, System.currentTimeMillis())
+                    _scannedDevices.value = currentScanned + ScannedDevice(id, name, System.currentTimeMillis(), score, role)
                 }
             }
         }
