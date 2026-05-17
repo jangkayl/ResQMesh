@@ -36,20 +36,26 @@ import com.example.testresqmesh.viewmodel.RadarViewModel
 fun RadarScreen(viewModel: RadarViewModel) {
     val uiState by viewModel.uiState.collectAsState()
     
+    // Create a set of names that are already connected for visual filtering
+    val connectedNames = uiState.connectedDevices.map { it.name }.toSet()
+
     val connectedNodes = uiState.connectedDevices.map { 
         NodeItemData(it.name, "Connected • Mesh Peer", true)
     }
     
-    val scannedNodes = uiState.scannedDevices.map {
-        NodeItemData(
-            it.name, 
-            "Score: ${it.powerScore} • Role: ${it.myRole}",
-            it.myRole == "MASTER"
-        )
-    }
+    // VISUAL-ONLY FILTER: Hide any scanned node that has the same name as a connected one
+    val scannedNodes = uiState.scannedDevices
+        .filter { it.name !in connectedNames }
+        .map {
+            NodeItemData(
+                it.name, 
+                "Score: ${it.powerScore} • Role: ${it.myRole}",
+                it.myRole == "MASTER"
+            )
+        }
 
     RadarScreenContent(
-        activeNodesCount = uiState.connectedDevices.size + uiState.scannedDevices.size,
+        activeNodesCount = uiState.connectedDevices.size + scannedNodes.size,
         nodes = connectedNodes + scannedNodes,
         onRefresh = { viewModel.rescan() }
     )
