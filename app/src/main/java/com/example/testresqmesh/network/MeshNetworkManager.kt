@@ -44,6 +44,12 @@ class MeshNetworkManager(private val context: Context) {
     private val activeScannedEndpoints = mutableSetOf<String>()
 
     fun startMeshNode(teamKey: String) {
+        // --- THE "DOUBLE-START JOLT" FIX ---
+        // Manually resetting the client before starting ensures a fresh radio state (Fixes "Stale Cache")
+        connectionsClient.stopAdvertising()
+        connectionsClient.stopDiscovery()
+        // ------------------------------------
+
         val formattedKey = teamKey.trim().uppercase().ifEmpty { "PUBLIC" }
         activeServiceId = "com.example.testresqmesh.p2p.$formattedKey"
         
@@ -60,10 +66,27 @@ class MeshNetworkManager(private val context: Context) {
         connectionsClient.startAdvertising(advertisingName, activeServiceId, connectionLifecycleCallback, options)
             .addOnSuccessListener {
                 onStatusChanged?.invoke("Node Active [Room: $formattedKey]. Seeking peers...")
-                startNativeScanner() // <--- UPDATE THIS LINE
+                startNativeScanner()
                 startHeartbeat()
+                startScannerPulse() // NEW: Start the periodic pulse
             }
             .addOnFailureListener { onStatusChanged?.invoke("Failed to start node.") }
+    }
+
+    private fun startScannerPulse() {
+        scannerPulseRunnable = object : Runnable {
+            override fun run() {
+                // OPTIMIZATION: Pulse every 3 seconds (Aggressive but Stable)
+                // Only pulse if we aren't currently in a "Pending" connection or already have peers
+                if (connectedEndpointIds.isEmpty() && pendingNames.isEmpty()) {
+                    Log.d("MeshNetwork", "Scanner Pulse: Jolting Radio...")
+                    connectionsClient.stopDiscovery()
+                    startNativeScanner()
+                }
+                scannerPulseHandler.postDelayed(this, 3000)
+            }
+        }
+        scannerPulseHandler.postDelayed(scannerPulseRunnable!!, 3000)
     }
 
     private fun calculatePowerScore(): Int {
@@ -100,8 +123,8 @@ class MeshNetworkManager(private val context: Context) {
             .setLowPower(false) // High-power mode to find peers instantly
             .build()
         connectionsClient.startDiscovery(activeServiceId, endpointDiscoveryCallback, discoveryOptions)
-            .addOnSuccessListener { onStatusChanged?.invoke("Node Active. Seeking peers continuously...") }
-            .addOnFailureListener { onStatusChanged?.invoke("Scanner failed to start.") }
+            .addOnSuccessListener { onStatusChanged?.invoke("Seeking peers...") }
+            .addOnFailureListener { onStatusChanged?.invoke("Scanner failed.") }
     }
 
     private fun startHeartbeat() {
