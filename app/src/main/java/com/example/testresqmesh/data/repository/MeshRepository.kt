@@ -52,23 +52,25 @@ class MeshRepository(private val networkManager: MeshNetworkManager) {
             _connectedDevices.value = _connectedDevices.value.filter { it.endpointId != endpointId }
         }
 
-        networkManager.onDeviceScanned = { id, name, score, role ->
-            val currentScanned = _scannedDevices.value
-            val isNotConnected = _connectedDevices.value.none { it.endpointId == id }
+        networkManager.onDeviceScanned = { id, name, score, role, isConnecting ->
+            val isNotConnected = _connectedDevices.value.none { it.endpointId == id || it.name == name }
             
             if (isNotConnected) {
-                val index = currentScanned.indexOfFirst { it.endpointId == id }
-                if (index != -1) {
-                    val updated = currentScanned.toMutableList()
-                    updated[index] = updated[index].copy(
+                val currentScanned = _scannedDevices.value.toMutableList()
+                val existingIndex = currentScanned.indexOfFirst { it.name == name }
+                
+                if (existingIndex != -1) {
+                    currentScanned[existingIndex] = currentScanned[existingIndex].copy(
+                        endpointId = id,
                         lastSeen = System.currentTimeMillis(),
                         powerScore = score,
-                        myRole = role
+                        myRole = role,
+                        isConnecting = isConnecting || currentScanned[existingIndex].isConnecting
                     )
-                    _scannedDevices.value = updated
                 } else {
-                    _scannedDevices.value = currentScanned + ScannedDevice(id, name, System.currentTimeMillis(), score, role)
+                    currentScanned.add(ScannedDevice(id, name, System.currentTimeMillis(), score, role, isConnecting))
                 }
+                _scannedDevices.value = currentScanned
             }
         }
 

@@ -26,7 +26,7 @@ class MeshNetworkManager(private val context: Context) {
     var onMessageReceived: ((String, String, String, Boolean, Boolean, String?, String?) -> Unit)? = null
 
     var onStatusChanged: ((String) -> Unit)? = null
-    var onDeviceScanned: ((String, String, Int, String) -> Unit)? = null // Added score and role
+    var onDeviceScanned: ((String, String, Int, String, Boolean) -> Unit)? = null // Added isConnecting flag
     var onDeviceScanRemoved: ((String) -> Unit)? = null
 
     // Heartbeat & Scanner Handlers
@@ -228,7 +228,7 @@ class MeshNetworkManager(private val context: Context) {
             }
             
             val myRole = if (shouldInitiate) "MASTER" else "FOLLOWER"
-            onDeviceScanned?.invoke(endpointId, cleanPeerName, peerScore, myRole)
+            onDeviceScanned?.invoke(endpointId, cleanPeerName, peerScore, myRole, false)
 
             // Don't connect to yourself
             if (cleanPeerName == myDeviceName) return
@@ -279,7 +279,12 @@ class MeshNetworkManager(private val context: Context) {
             
             // Clean the score prefix from the stored name
             val rawName = info.endpointName
-            val cleanName = if (rawName.contains("|")) rawName.split("|")[1] else rawName
+            val parts = rawName.split("|", limit = 2)
+            val peerScore = parts.getOrNull(0)?.toIntOrNull() ?: 0
+            val cleanName = parts.getOrNull(1) ?: rawName
+            
+            // NEW: Notify the UI that an inbound connection is starting, even if not scanned
+            onDeviceScanned?.invoke(endpointId, cleanName, peerScore, "CONNECTING", true)
             
             pendingNames[endpointId] = cleanName
             connectionsClient.acceptConnection(endpointId, payloadCallback)

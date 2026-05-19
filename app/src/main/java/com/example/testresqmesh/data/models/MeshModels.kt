@@ -20,5 +20,6 @@ data class ScannedDevice(
     val name: String,
     val lastSeen: Long,
     val powerScore: Int = 0,
-    val myRole: String = "IDLE"
+    val myRole: String = "IDLE",
+    val isConnecting: Boolean = false
 )

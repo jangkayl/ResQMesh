@@ -47,10 +47,11 @@ fun RadarScreen(viewModel: RadarViewModel) {
     val scannedNodes = uiState.scannedDevices
         .filter { it.name !in connectedNames }
         .map {
+            val displayStatus = if (it.isConnecting) "SYNCING..." else "Score: ${it.powerScore} • Role: ${it.myRole}"
             NodeItemData(
                 it.name, 
-                "Score: ${it.powerScore} • Role: ${it.myRole}",
-                it.myRole == "MASTER"
+                displayStatus,
+                it.myRole == "MASTER" || it.isConnecting
             )
         }
 
