@@ -5,6 +5,7 @@ import android.os.Handler
 import android.os.Looper
 import android.util.Log
 import com.example.testresqmesh.data.models.ConnectedDevice
+import com.example.testresqmesh.utils.AppLogger
 import com.example.testresqmesh.utils.NotificationHelper
 import com.google.android.gms.nearby.Nearby
 import com.google.android.gms.nearby.connection.*
@@ -59,7 +60,7 @@ class MeshNetworkManager(private val context: Context) {
 
         // OPTIMIZATION: High-power advertising for "Fast Pair" experience
         val options = AdvertisingOptions.Builder()
-            .setStrategy(Strategy.P2P_CLUSTER)
+            .setStrategy(Strategy.P2P_STAR)
             .setLowPower(false) // Maximize radio frequency for faster discovery
             .build()
 
@@ -79,7 +80,7 @@ class MeshNetworkManager(private val context: Context) {
                 // OPTIMIZATION: Pulse every 3 seconds (Aggressive but Stable)
                 // Only pulse if we aren't currently in a "Pending" connection or already have peers
                 if (connectedEndpointIds.isEmpty() && pendingNames.isEmpty()) {
-                    Log.d("MeshNetwork", "Scanner Pulse: Jolting Radio...")
+                    AppLogger.d("MeshNetwork", "Scanner Pulse: Jolting Radio...")
                     connectionsClient.stopDiscovery()
                     startNativeScanner()
                 }
@@ -119,7 +120,7 @@ class MeshNetworkManager(private val context: Context) {
     // 1. Smooth continuous native scanner with high-power optimization:
     private fun startNativeScanner() {
         val discoveryOptions = DiscoveryOptions.Builder()
-            .setStrategy(Strategy.P2P_CLUSTER)
+            .setStrategy(Strategy.P2P_STAR)
             .setLowPower(false) // High-power mode to find peers instantly
             .build()
         connectionsClient.startDiscovery(activeServiceId, endpointDiscoveryCallback, discoveryOptions)
@@ -152,7 +153,7 @@ class MeshNetworkManager(private val context: Context) {
         val jitter = kotlin.random.Random.nextLong(100, 600)
         Handler(Looper.getMainLooper()).postDelayed({
             val discoveryOptions = DiscoveryOptions.Builder()
-                .setStrategy(Strategy.P2P_CLUSTER)
+                .setStrategy(Strategy.P2P_STAR)
                 .setLowPower(false)
                 .build()
             connectionsClient.startDiscovery(activeServiceId, endpointDiscoveryCallback, discoveryOptions)
@@ -170,7 +171,7 @@ class MeshNetworkManager(private val context: Context) {
                 seenMessageIds.add(msgId)
             }
         } catch (e: Exception) {
-            Log.e("MeshNetwork", "Failed to cache outbound message ID", e)
+            AppLogger.d("MeshNetwork_ERROR", "Failed to cache outbound message ID: ${e.message}")
         }
         // ----------------------
 
@@ -190,7 +191,7 @@ class MeshNetworkManager(private val context: Context) {
                 seenMessageIds.add(msgId)
             }
         } catch (e: Exception) {
-            Log.e("MeshNetwork", "Failed to cache outbound message ID", e)
+            AppLogger.d("MeshNetwork_ERROR", "Failed to cache outbound message ID: ${e.message}")
         }
         // ----------------------
 
@@ -235,17 +236,17 @@ class MeshNetworkManager(private val context: Context) {
 
             if (shouldInitiate) {
                 // PRIMARY (The Boss): We are stronger. 
-                Log.d("MeshNetwork", "I am Primary (Score $myPowerScore) for $cleanPeerName (Score $peerScore)")
+                AppLogger.d("MeshNetwork", "I am Primary (Score $myPowerScore) for $cleanPeerName (Score $peerScore)")
                 connectionsClient.stopDiscovery()
                 attemptConnection(endpointId, cleanPeerName)
             } else {
                 // BACKUP (Yielding): We are weaker. Wait for them to call us.
                 val jitter = kotlin.random.Random.nextLong(0, 500)
-                Log.d("MeshNetwork", "I am Backup (Score $myPowerScore). Yielding to $cleanPeerName (Score $peerScore)...")
+                AppLogger.d("MeshNetwork", "I am Backup (Score $myPowerScore). Yielding to $cleanPeerName (Score $peerScore)...")
                 
                 Handler(Looper.getMainLooper()).postDelayed({
                     if (!connectedEndpointIds.contains(endpointId) && activeScannedEndpoints.contains(endpointId)) {
-                        Log.d("MeshNetwork", "Primary failed. Backup taking over for $endpointId")
+                        AppLogger.d("MeshNetwork", "Primary failed. Backup taking over for $endpointId")
                         connectionsClient.stopDiscovery()
                         attemptConnection(endpointId, cleanPeerName)
                     }
@@ -296,15 +297,9 @@ class MeshNetworkManager(private val context: Context) {
                 connectedEndpointIds.add(endpointId)
                 onDeviceConnected?.invoke(ConnectedDevice(endpointId, deviceName))
 
-                // TRIGGER BANDWIDTH UPGRADE: Sending a small dummy payload immediately 
-                // tells Google Nearby to switch from Bluetooth to high-speed Wi-Fi.
-                val triggerPayload = JSONObject().apply {
-                    put("id", java.util.UUID.randomUUID().toString())
-                    put("senderName", myDeviceName)
-                    put("isSystem", true)
-                    put("type", "bandwidth_upgrade_trigger")
-                }.toString()
-                connectionsClient.sendPayload(endpointId, Payload.fromBytes(triggerPayload.toByteArray()))
+                // We no longer need the dummy STREAM hack.
+                // Because we switched to P2P_STAR, Google Nearby will automatically 
+                // and eagerly upgrade the connection to Wi-Fi Direct for us.
             }
         }
         override fun onDisconnected(endpointId: String) {
@@ -366,7 +361,7 @@ class MeshNetworkManager(private val context: Context) {
                     }
 
                 } catch (e: Exception) {
-                    Log.e("MeshNetwork", "Parse error", e)
+                    AppLogger.d("MeshNetwork_ERROR", "Parse error: ${e.message}")
                 }
             }
         }

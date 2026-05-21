@@ -23,6 +23,7 @@ import com.example.testresqmesh.ui.theme.Spacing
 import com.example.testresqmesh.utils.MediaHelper
 
 import com.example.testresqmesh.viewmodel.CommunicationViewModel
+import com.example.testresqmesh.utils.AppLogger
 
 @Composable
 fun ChatContainerScreen(
@@ -60,6 +61,14 @@ fun ChatContainerScreenContent(
                     )
                 },
                 actions = {
+                    IconButton(onClick = { AppLogger.toggleTerminal() }) {
+                        Icon(
+                            Icons.Outlined.Shield,
+                            contentDescription = "Debug Terminal",
+                            tint = Color.White,
+                            modifier = Modifier.size(28.dp)
+                        )
+                    }
                     IconButton(onClick = { /* TODO: New Message */ }) {
                         Icon(
                             Icons.Outlined.AddBox,

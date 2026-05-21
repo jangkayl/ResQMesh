@@ -101,35 +101,40 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    when (currentStage) {
-                        AppState.Splash -> SplashScreen {
-                            // If fully set up, go to Identity Setup, else go to Permissions
-                            currentStage = if (hasRequiredPermissions() && isHardwareEnabledSafe()) {
-                                AppState.IdentitySetup
-                            } else {
-                                AppState.Permissions
+                    androidx.compose.foundation.layout.Box(modifier = Modifier.fillMaxSize()) {
+                        when (currentStage) {
+                            AppState.Splash -> SplashScreen {
+                                // If fully set up, go to Identity Setup, else go to Permissions
+                                currentStage = if (hasRequiredPermissions() && isHardwareEnabledSafe()) {
+                                    AppState.IdentitySetup
+                                } else {
+                                    AppState.Permissions
+                                }
                             }
-                        }
-                        AppState.Permissions -> PermissionsScreen(
-                            onAllSet = { currentStage = AppState.IdentitySetup },
-                            hasPermissions = hasRequiredPermissions(),
-                            requestPermissions = { requestPermissionLauncher.launch(getRequiredPermissions()) },
-                            checkHardware = { isHardwareEnabledSafe() }
-                        )
-                        AppState.IdentitySetup -> IdentitySetupScreen(setupViewModel) {
-                            if (isHardwareEnabledSafe()) {
-                                currentStage = AppState.Main
-                            } else {
-                                // Fallback to permissions if hardware turned off
-                                currentStage = AppState.Permissions
+                            AppState.Permissions -> PermissionsScreen(
+                                onAllSet = { currentStage = AppState.IdentitySetup },
+                                hasPermissions = hasRequiredPermissions(),
+                                requestPermissions = { requestPermissionLauncher.launch(getRequiredPermissions()) },
+                                checkHardware = { isHardwareEnabledSafe() }
+                            )
+                            AppState.IdentitySetup -> IdentitySetupScreen(setupViewModel) {
+                                if (isHardwareEnabledSafe()) {
+                                    currentStage = AppState.Main
+                                } else {
+                                    // Fallback to permissions if hardware turned off
+                                    currentStage = AppState.Permissions
+                                }
                             }
+                            AppState.Main -> MainContainerScreen(
+                                setupViewModel = setupViewModel,
+                                radarViewModel = radarViewModel,
+                                commsViewModel = commsViewModel,
+                                mediaHelper = mediaHelper
+                            )
                         }
-                        AppState.Main -> MainContainerScreen(
-                            setupViewModel = setupViewModel,
-                            radarViewModel = radarViewModel,
-                            commsViewModel = commsViewModel,
-                            mediaHelper = mediaHelper
-                        )
+                        
+                        // GLOBAL DEBUG TERMINAL OVERLAY
+                        com.example.testresqmesh.ui.components.debug.DebugTerminal()
                     }
                 }
             }

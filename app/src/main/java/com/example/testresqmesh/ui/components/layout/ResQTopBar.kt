@@ -3,6 +3,9 @@ package com.example.testresqmesh.ui.components.layout
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Security
+import com.example.testresqmesh.utils.AppLogger
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -19,7 +22,16 @@ fun ResQTopBar(
                 fontWeight = FontWeight.Bold
             )
         },
-        actions = { actions() },
+        actions = { 
+            IconButton(onClick = { AppLogger.toggleTerminal() }) {
+                Icon(
+                    imageVector = Icons.Default.Security, 
+                    contentDescription = "Debug Terminal",
+                    tint = MaterialTheme.colorScheme.primary
+                )
+            }
+            actions() 
+        },
         navigationIcon = { navigationIcon() },
         colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
             containerColor = MaterialTheme.colorScheme.background,

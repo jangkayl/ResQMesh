@@ -31,6 +31,7 @@ import com.example.testresqmesh.ui.theme.InboxBackground
 import com.example.testresqmesh.ui.theme.InboxAccentBlue
 import com.example.testresqmesh.ui.theme.Spacing
 import com.example.testresqmesh.viewmodel.RadarViewModel
+import com.example.testresqmesh.utils.AppLogger
 
 @Composable
 fun RadarScreen(viewModel: RadarViewModel) {
@@ -84,8 +85,8 @@ fun RadarScreenContent(
             TopAppBar(
                 title = { Text("ResQMesh", fontWeight = FontWeight.Black, color = Color.White) },
                 actions = {
-                    IconButton(onClick = { /* Security settings */ }) {
-                        Icon(Icons.Outlined.Shield, contentDescription = null, tint = Color.White)
+                    IconButton(onClick = { AppLogger.toggleTerminal() }) {
+                        Icon(Icons.Outlined.Shield, contentDescription = "Debug Terminal", tint = Color.White)
                     }
                     IconButton(onClick = { /* Mesh settings */ }) {
                         Icon(Icons.Default.Wifi, contentDescription = null, tint = InboxAccentBlue)
