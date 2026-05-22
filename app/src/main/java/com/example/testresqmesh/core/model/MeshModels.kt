@@ -10,7 +10,9 @@ data class ChatMessage(
     val locationLng: Double? = null,
     val isMine: Boolean,
     val isPrivate: Boolean = false,
-    val timestamp: Long = System.currentTimeMillis()
+    val timestamp: Long = System.currentTimeMillis(),
+    val receiveMedium: String = "Bluetooth 5.4", // Default until upgraded
+    val seenBy: List<String> = emptyList() // The Bouncer will populate this via Gossip!
 )
 
 data class ConnectedDevice(

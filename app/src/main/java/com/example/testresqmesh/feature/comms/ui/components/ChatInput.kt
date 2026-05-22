@@ -3,19 +3,27 @@ package com.example.testresqmesh.feature.comms.ui.components
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.example.testresqmesh.core.ui.components.buttons.ResQButton
+import androidx.compose.ui.unit.sp
 import com.example.testresqmesh.core.ui.components.inputs.ResQTextField
 import com.example.testresqmesh.core.ui.theme.Spacing
 import com.example.testresqmesh.core.utils.MediaHelper
@@ -42,66 +50,98 @@ fun ChatInput(
     }
 
     Surface(
-        tonalElevation = 2.dp,
-        shadowElevation = 4.dp,
+        color = MaterialTheme.colorScheme.surface,
+        shadowElevation = 8.dp,
         modifier = Modifier.fillMaxWidth()
     ) {
         Column(
             modifier = Modifier
-                .padding(Spacing.Small)
+                .padding(Spacing.Medium)
                 .navigationBarsPadding()
                 .imePadding()
         ) {
+            // Image Attachment Preview Area
             if (pendingImage != null) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.padding(bottom = Spacing.Small)
-                ) {
-                    Text(
-                        "📷 Image Attached",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.weight(1f)
-                    )
-                    TextButton(onClick = onClearImage) {
-                        Text("Clear", color = MaterialTheme.colorScheme.error)
+                val bitmap = remember(pendingImage) { mediaHelper.decodeBase64ToBitmap(pendingImage) }
+                Box(modifier = Modifier.padding(bottom = Spacing.Small)) {
+                    if (bitmap != null) {
+                        Image(
+                            bitmap = bitmap.asImageBitmap(),
+                            contentDescription = "Preview",
+                            modifier = Modifier
+                                .size(80.dp)
+                                .clip(RoundedCornerShape(12.dp)),
+                            contentScale = ContentScale.Crop
+                        )
+                    } else {
+                        Box(
+                            modifier = Modifier
+                                .size(80.dp)
+                                .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(12.dp))
+                        )
+                    }
+                    
+                    // Clear button
+                    IconButton(
+                        onClick = onClearImage,
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .offset(x = 8.dp, y = (-8).dp)
+                            .size(24.dp)
+                            .background(MaterialTheme.colorScheme.error, CircleShape)
+                    ) {
+                        Text("✕", color = MaterialTheme.colorScheme.onError, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                     }
                 }
             }
 
+            // Input Row
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(Spacing.Small)
+                modifier = Modifier.fillMaxWidth()
             ) {
-                IconButton(onClick = onSendLocation) {
-                    Icon(androidx.compose.material.icons.Icons.Default.LocationOn, contentDescription = "Share Location")
-                }
-                IconButton(onClick = { imagePickerLauncher.launch("image/*") }) {
-                    Text("📷")
-                }
-                
-                IconButton(onClick = onToggleRecord) {
-                    Text(if (isRecording) "⏹️" else "🎤")
+                // Sleek Actions Bar
+                Row(
+                    modifier = Modifier
+                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f), RoundedCornerShape(24.dp))
+                        .padding(horizontal = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    IconButton(onClick = onSendLocation, modifier = Modifier.size(40.dp)) {
+                        Text("📍", fontSize = 18.sp)
+                    }
+                    IconButton(onClick = { imagePickerLauncher.launch("image/*") }, modifier = Modifier.size(40.dp)) {
+                        Text("📷", fontSize = 18.sp)
+                    }
+                    IconButton(onClick = onToggleRecord, modifier = Modifier.size(40.dp)) {
+                        Text(if (isRecording) "⏹️" else "🎤", fontSize = 18.sp)
+                    }
                 }
 
+                Spacer(modifier = Modifier.width(Spacing.Small))
+
+                // Text field
                 ResQTextField(
-                    value = if (isRecording) "Recording..." else inputText,
+                    value = if (isRecording) "Recording voice note..." else inputText,
                     onValueChange = onTextChange,
                     modifier = Modifier.weight(1f),
-                    placeholder = "Type a message...",
+                    placeholder = "Message...",
                     enabled = !isRecording
                 )
 
-                IconButton(
-                    onClick = onSend,
-                    enabled = (inputText.isNotBlank() || pendingImage != null) && !isRecording,
-                    colors = IconButtonDefaults.iconButtonColors(
-                        containerColor = MaterialTheme.colorScheme.primary,
-                        contentColor = MaterialTheme.colorScheme.onPrimary,
-                        disabledContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)
-                    )
+                Spacer(modifier = Modifier.width(Spacing.Small))
+
+                // Send Button
+                val canSend = (inputText.isNotBlank() || pendingImage != null) && !isRecording
+                FloatingActionButton(
+                    onClick = { if (canSend) onSend() },
+                    containerColor = if (canSend) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
+                    contentColor = if (canSend) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
+                    elevation = FloatingActionButtonDefaults.elevation(if (canSend) 4.dp else 0.dp),
+                    shape = CircleShape,
+                    modifier = Modifier.size(48.dp)
                 ) {
-                    Icon(Icons.Default.Send, contentDescription = "Send")
+                    Icon(Icons.Default.Send, contentDescription = "Send", modifier = Modifier.size(20.dp))
                 }
             }
         }

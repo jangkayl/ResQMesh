@@ -32,9 +32,12 @@ import com.example.testresqmesh.core.ui.theme.Spacing
 import com.example.testresqmesh.feature.comms.viewmodel.CommunicationViewModel
 
 data class ChatMessageData(
+    val id: String,
     val text: String,
     val time: String,
     val hops: String,
+    val receiveMedium: String,
+    val seenBy: List<String>,
     val locationLat: Double? = null,
     val locationLng: Double? = null,
     val isMine: Boolean,
@@ -147,11 +150,20 @@ fun ActiveChatScreen(name: String, viewModel: CommunicationViewModel, onBack: ()
             }
 
             items(messages) { msg ->
+                if (!msg.isMine && !msg.seenBy.contains("Me")) {
+                    LaunchedEffect(msg.id) {
+                        viewModel.markMessageAsSeen(msg.id, isPrivate = true, targetId = name)
+                    }
+                }
+
                 HighFidelityChatBubble(
                     ChatMessageData(
+                        id = msg.id,
                         text = msg.text,
-                        time = "now",
+                        time = java.text.SimpleDateFormat("hh:mm a", java.util.Locale.getDefault()).format(java.util.Date(msg.timestamp)),
                         hops = "Direct",
+                        receiveMedium = msg.receiveMedium,
+                        seenBy = msg.seenBy,
                         locationLat = msg.locationLat,
                         locationLng = msg.locationLng,
                         isMine = msg.isMine,
@@ -213,15 +225,16 @@ fun HighFidelityChatBubble(msg: ChatMessageData) {
             verticalAlignment = Alignment.CenterVertically
         ) {
             if (!msg.isMine) {
+                val mediumColor = if (msg.receiveMedium.contains("Wi-Fi")) com.example.testresqmesh.core.ui.theme.SuccessGreen else InboxAccentBlue
+                Text("📶 ${msg.receiveMedium}", style = MaterialTheme.typography.labelSmall, color = mediumColor.copy(alpha = 0.8f), fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                DotSeparator()
                 Text(msg.time, style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.5f), fontSize = 10.sp, fontWeight = FontWeight.Bold)
                 DotSeparator()
                 Icon(Icons.Outlined.Lock, contentDescription = null, tint = Color.White.copy(alpha = 0.3f), modifier = Modifier.size(10.dp))
                 Spacer(modifier = Modifier.width(4.dp))
                 Text(msg.hops, style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.5f), fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                DotSeparator()
-                Text("DELIVERED", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Black, color = Color.White.copy(alpha = 0.7f), fontSize = 9.sp)
             } else {
-                Text(if (msg.isSent) "SENT" else "DELIVERED", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Black, color = Color.White.copy(alpha = 0.7f), fontSize = 9.sp)
+                Text(if (msg.seenBy.isNotEmpty()) "READ" else if (msg.isSent) "DELIVERED" else "SENT", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Black, color = if (msg.seenBy.isNotEmpty()) com.example.testresqmesh.core.ui.theme.SuccessGreen else Color.White.copy(alpha = 0.7f), fontSize = 9.sp)
                 DotSeparator()
                 Icon(Icons.Outlined.Lock, contentDescription = null, tint = Color.White.copy(alpha = 0.3f), modifier = Modifier.size(10.dp))
                 Spacer(modifier = Modifier.width(4.dp))

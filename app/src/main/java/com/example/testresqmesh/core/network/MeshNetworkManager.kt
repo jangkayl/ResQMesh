@@ -23,8 +23,11 @@ class MeshNetworkManager(private val context: Context) {
     var onDeviceConnected: ((ConnectedDevice) -> Unit)? = null
     var onDeviceDisconnected: ((String) -> Unit)? = null
 
-    // THIS IS THE LINE THAT WAS CAUSING THE HEADACHE! (Notice the 9 parameters now)
-    var onMessageReceived: ((String, String, String, Boolean, Boolean, String?, String?, Double?, Double?) -> Unit)? = null
+    // THIS IS THE LINE THAT WAS CAUSING THE HEADACHE! (Notice the 11 parameters now)
+    var onMessageReceived: ((String, String, String, String, Boolean, Boolean, String?, String?, Double?, Double?, String) -> Unit)? = null
+    
+    // NEW: Gossip Protocol SEEN Callback (msgId, readerName)
+    var onMessageSeen: ((String, String) -> Unit)? = null
 
     var onStatusChanged: ((String) -> Unit)? = null
     var onDeviceScanned: ((String, String, Int, String, Boolean) -> Unit)? = null // Added isConnecting flag
@@ -39,6 +42,9 @@ class MeshNetworkManager(private val context: Context) {
     private val connectedEndpointIds = mutableSetOf<String>()
     // NEW: The Bouncer's Memory (Stores IDs of messages we already processed)
     private val seenMessageIds = mutableSetOf<String>()
+    
+    // Connection Medium Tracker (Defaults to Bluetooth 5.4 until upgraded)
+    private val endpointMedium = mutableMapOf<String, String>()
 
     // Scanner Failsafe State
     private var isHandshaking = false
@@ -170,6 +176,7 @@ class MeshNetworkManager(private val context: Context) {
         connectionsClient.stopAllEndpoints()
         connectedEndpointIds.clear()
         pendingNames.clear()
+        endpointMedium.clear()
         onStatusChanged?.invoke("Offline")
     }
 
@@ -226,14 +233,31 @@ class MeshNetworkManager(private val context: Context) {
     }
 
     private fun sendSystemPulse() {
+        val pulseId = java.util.UUID.randomUUID().toString()
         val jsonString = JSONObject().apply {
-            put("id", java.util.UUID.randomUUID().toString())
+            put("id", pulseId)
             put("senderName", myDeviceName)
             put("isSystem", true)
         }.toString()
         broadcastPayload(jsonString)
         // Dummy ID "LOCAL" for your own pulse
-        onMessageReceived?.invoke("LOCAL", myDeviceName, "", false, true, null, null, null, null)
+        onMessageReceived?.invoke("LOCAL", pulseId, myDeviceName, "", false, true, null, null, null, null, "LOCAL")
+    }
+
+    fun broadcastSeenReceipt(targetMessageId: String, isPrivate: Boolean, targetId: String? = null) {
+        val jsonString = JSONObject().apply {
+            put("id", java.util.UUID.randomUUID().toString()) // Bouncer needs unique ID for the payload itself
+            put("type", "SEEN")
+            put("targetMessageId", targetMessageId)
+            put("reader", myDeviceName)
+            put("isPrivate", isPrivate)
+        }.toString()
+
+        if (isPrivate && targetId != null) {
+            sendDirectPayload(targetId, jsonString)
+        } else {
+            broadcastPayload(jsonString)
+        }
     }
 
     private val endpointDiscoveryCallback = object : EndpointDiscoveryCallback() {
@@ -344,6 +368,7 @@ class MeshNetworkManager(private val context: Context) {
 
             if (result.status.statusCode == ConnectionsStatusCodes.STATUS_OK) {
                 connectedEndpointIds.add(endpointId)
+                endpointMedium[endpointId] = "Bluetooth 5.4" // Start with Bluetooth assumption
                 onDeviceConnected?.invoke(ConnectedDevice(endpointId, deviceName))
 
                 // Force bandwidth upgrade to Wi-Fi Direct using the Dummy Stream Hack
@@ -355,9 +380,20 @@ class MeshNetworkManager(private val context: Context) {
         }
         override fun onDisconnected(endpointId: String) {
             pendingNames.remove(endpointId) // BUG FIX: Ensure clean memory
+            endpointMedium.remove(endpointId)
             onDeviceScanRemoved?.invoke(endpointId)
             connectedEndpointIds.remove(endpointId)
             onDeviceDisconnected?.invoke(endpointId)
+        }
+        
+        override fun onBandwidthChanged(endpointId: String, bandwidthInfo: BandwidthInfo) {
+            if (bandwidthInfo.quality == BandwidthInfo.Quality.HIGH) {
+                endpointMedium[endpointId] = "Wi-Fi Direct"
+                AppLogger.d("MeshNetwork", "Bandwidth UPGRADED to Wi-Fi Direct for $endpointId")
+            } else {
+                endpointMedium[endpointId] = "Bluetooth 5.4"
+                AppLogger.d("MeshNetwork", "Bandwidth DOWNGRADED to Bluetooth for $endpointId")
+            }
         }
     }
 
@@ -385,11 +421,27 @@ class MeshNetworkManager(private val context: Context) {
                     }
                     // ----------------------------
 
+                    // --- 2. GOSSIP PROTOCOL SEEN RECEIPTS ---
+                    if (jsonObject.has("type") && jsonObject.getString("type") == "SEEN") {
+                        val targetMessageId = jsonObject.getString("targetMessageId")
+                        val reader = jsonObject.getString("reader")
+                        val isPrivateReceipt = jsonObject.optBoolean("isPrivate", false)
+                        
+                        // Tell the UI that someone saw this message!
+                        onMessageSeen?.invoke(targetMessageId, reader)
+                        
+                        // Gossip: Forward the receipt to everyone else (unless it's private)
+                        if (!isPrivateReceipt) {
+                            broadcastPayload(jsonString, excludeEndpointId = endpointId)
+                        }
+                        return
+                    }
+
                     val sender = jsonObject.getString("senderName")
                     val isSystem = jsonObject.optBoolean("isSystem", false)
 
                     if (isSystem) {
-                        onMessageReceived?.invoke(endpointId, sender, "", false, true, null, null, null, null)
+                        onMessageReceived?.invoke(endpointId, msgId, sender, "", false, true, null, null, null, null, "LOCAL")
                         broadcastPayload(jsonString, excludeEndpointId = endpointId)
                         return
                     }
@@ -407,8 +459,11 @@ class MeshNetworkManager(private val context: Context) {
                     val locationLat = if (jsonObject.has("locationLat")) jsonObject.getDouble("locationLat") else null
                     val locationLng = if (jsonObject.has("locationLng")) jsonObject.getDouble("locationLng") else null
 
+                    // Determine what medium this message just arrived on
+                    val medium = endpointMedium[endpointId] ?: "Bluetooth 5.4"
+
                     // Passing the exact endpointId right here!
-                    onMessageReceived?.invoke(endpointId, sender, text, isPrivate, false, imageBase64, audioBase64, locationLat, locationLng)
+                    onMessageReceived?.invoke(endpointId, msgId, sender, text, isPrivate, false, imageBase64, audioBase64, locationLat, locationLng, medium)
 
                     if (!isPrivate) {
                         broadcastPayload(jsonString, excludeEndpointId = endpointId)

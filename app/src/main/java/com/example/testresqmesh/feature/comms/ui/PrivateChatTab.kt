@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Modifier
 import com.example.testresqmesh.feature.comms.ui.components.EndOfMeshIndicator
 import com.example.testresqmesh.feature.comms.ui.components.InboxMessageItem
@@ -62,6 +63,15 @@ fun PrivateChatTab(
 
     LazyColumn(modifier = Modifier.fillMaxSize()) {
         items(allItems) { item ->
+            val messages = uiState.privateMessages[item.id]
+            messages?.lastOrNull()?.let { lastMsg ->
+                if (!lastMsg.isMine && !lastMsg.seenBy.contains("Me")) {
+                    LaunchedEffect(lastMsg.id) {
+                        viewModel.markMessageAsSeen(lastMsg.id, isPrivate = true, targetId = item.id)
+                    }
+                }
+            }
+
             InboxMessageItem(
                 name = item.name,
                 message = item.message,

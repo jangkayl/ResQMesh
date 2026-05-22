@@ -42,6 +42,10 @@ class CommunicationViewModel(private val repository: MeshRepository) : ViewModel
         repository.sendPrivateMessage(target, text, imageBase64, audioBase64)
     }
 
+    fun markMessageAsSeen(messageId: String, isPrivate: Boolean, targetId: String? = null) {
+        repository.broadcastSeenReceipt(messageId, isPrivate, targetId)
+    }
+
     @androidx.annotation.RequiresPermission(anyOf = ["android.permission.ACCESS_FINE_LOCATION", "android.permission.ACCESS_COARSE_LOCATION"])
     fun broadcastLocation(context: android.content.Context, isPrivate: Boolean, targetDevice: ConnectedDevice? = null) {
         // The BEST way to get location on Android (Handles indoors via Wi-Fi/Cell + outdoors via GPS seamlessly)

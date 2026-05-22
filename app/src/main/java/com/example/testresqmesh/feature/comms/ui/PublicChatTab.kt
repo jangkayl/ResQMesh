@@ -14,6 +14,9 @@ import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.animation.core.*
+import androidx.compose.foundation.shape.CircleShape
+import com.example.testresqmesh.core.ui.theme.ErrorRed
 import com.example.testresqmesh.core.ui.theme.InboxBackground
 import com.example.testresqmesh.core.ui.theme.InboxTextSecondary
 import com.example.testresqmesh.core.ui.theme.WarningAmber
@@ -46,28 +49,46 @@ fun PublicChatTab(
             .fillMaxSize()
             .background(InboxBackground)
     ) {
-        // Sticky Header Banner
+        // Dynamic Sticky Header
+        val infiniteTransition = rememberInfiniteTransition()
+        val pulseAlpha by infiniteTransition.animateFloat(
+            initialValue = 0.2f,
+            targetValue = 0.8f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(1200, easing = FastOutSlowInEasing),
+                repeatMode = RepeatMode.Reverse
+            ),
+            label = "pulseAlpha"
+        )
+        
         Surface(
-            color = WarningAmber.copy(alpha = 0.15f),
+            color = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f),
+            shadowElevation = 4.dp,
             modifier = Modifier.fillMaxWidth()
         ) {
             Row(
                 modifier = Modifier.padding(16.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text("📢", fontSize = 24.sp)
-                Spacer(modifier = Modifier.width(12.dp))
+                // Pulsing Live Indicator
+                Box(contentAlignment = Alignment.Center) {
+                    Box(modifier = Modifier.size(16.dp).background(ErrorRed.copy(alpha = pulseAlpha), CircleShape))
+                    Box(modifier = Modifier.size(8.dp).background(ErrorRed, CircleShape))
+                }
+                
+                Spacer(modifier = Modifier.width(16.dp))
                 Column {
                     Text(
-                        "PUBLIC BROADCAST CHANNEL", 
+                        "LIVE PUBLIC BROADCAST", 
                         style = MaterialTheme.typography.labelLarge,
-                        color = WarningAmber,
-                        fontWeight = FontWeight.Bold
+                        color = MaterialTheme.colorScheme.onSurface,
+                        fontWeight = FontWeight.Black,
+                        letterSpacing = 1.sp
                     )
                     Text(
-                        "Messages here are visible to all connected nodes. Do not share sensitive private data.",
+                        "Messages are visible to all connected mesh nodes. SOS keywords automatically trigger emergency alerts.",
                         style = MaterialTheme.typography.bodySmall,
-                        color = InboxTextSecondary,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         lineHeight = 14.sp
                     )
                 }
@@ -83,6 +104,13 @@ fun PublicChatTab(
             contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
         ) {
             items(sortedMessages) { msg ->
+                // Fire a SEEN receipt over the mesh when this message is rendered on screen!
+                if (!msg.isMine && !msg.seenBy.contains("Me")) {
+                    LaunchedEffect(msg.id) {
+                        viewModel.markMessageAsSeen(msg.id, isPrivate = false)
+                    }
+                }
+                
                 ChatBubble(message = msg, mediaHelper = mediaHelper)
             }
 

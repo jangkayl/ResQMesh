@@ -78,10 +78,10 @@ class MeshRepository(private val networkManager: MeshNetworkManager) {
             _scannedDevices.value = _scannedDevices.value.filter { it.endpointId != id }
         }
 
-        networkManager.onMessageReceived = { endpointId, sender, text, isPrivate, isSystem, img, audio, lat, lng ->
+        networkManager.onMessageReceived = { endpointId, msgId, sender, text, isPrivate, isSystem, img, audio, lat, lng, medium ->
             if (!isSystem) {
                 val message = ChatMessage(
-                    id = UUID.randomUUID().toString(),
+                    id = msgId, // Use exact sender's ID!
                     senderName = sender,
                     text = text,
                     imageBase64 = img,
@@ -90,7 +90,8 @@ class MeshRepository(private val networkManager: MeshNetworkManager) {
                     locationLng = lng,
                     isMine = false,
                     isPrivate = isPrivate,
-                    timestamp = System.currentTimeMillis()
+                    timestamp = System.currentTimeMillis(),
+                    receiveMedium = medium
                 )
                 if (isPrivate) {
                     val currentMap = _privateMessages.value.toMutableMap()
@@ -102,6 +103,34 @@ class MeshRepository(private val networkManager: MeshNetworkManager) {
                 }
             }
         }
+        
+        networkManager.onMessageSeen = { msgId, readerName ->
+            // Update Public Messages
+            val updatedPublic = _publicMessages.value.map { msg ->
+                if (msg.id == msgId && !msg.seenBy.contains(readerName)) {
+                    msg.copy(seenBy = msg.seenBy + readerName)
+                } else {
+                    msg
+                }
+            }
+            _publicMessages.value = updatedPublic
+
+            // Update Private Messages
+            val updatedPrivate = _privateMessages.value.mapValues { entry ->
+                entry.value.map { msg ->
+                    if (msg.id == msgId && !msg.seenBy.contains(readerName)) {
+                        msg.copy(seenBy = msg.seenBy + readerName)
+                    } else {
+                        msg
+                    }
+                }
+            }
+            _privateMessages.value = updatedPrivate
+        }
+    }
+
+    fun broadcastSeenReceipt(messageId: String, isPrivate: Boolean, targetId: String? = null) {
+        networkManager.broadcastSeenReceipt(messageId, isPrivate, targetId)
     }
 
     fun startNode(customName: String, nodeTag: String, teamKey: String) {
