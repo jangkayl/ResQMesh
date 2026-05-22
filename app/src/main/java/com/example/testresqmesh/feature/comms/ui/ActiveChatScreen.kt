@@ -37,6 +37,7 @@ data class ChatMessageData(
     val time: String,
     val hops: String,
     val receiveMedium: String,
+    val deliveredTo: List<String>,
     val seenBy: List<String>,
     val locationLat: Double? = null,
     val locationLng: Double? = null,
@@ -163,6 +164,7 @@ fun ActiveChatScreen(name: String, viewModel: CommunicationViewModel, onBack: ()
                         time = java.text.SimpleDateFormat("hh:mm a", java.util.Locale.getDefault()).format(java.util.Date(msg.timestamp)),
                         hops = "Direct",
                         receiveMedium = msg.receiveMedium,
+                        deliveredTo = msg.deliveredTo,
                         seenBy = msg.seenBy,
                         locationLat = msg.locationLat,
                         locationLng = msg.locationLng,
@@ -234,7 +236,18 @@ fun HighFidelityChatBubble(msg: ChatMessageData) {
                 Spacer(modifier = Modifier.width(4.dp))
                 Text(msg.hops, style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.5f), fontSize = 10.sp, fontWeight = FontWeight.Bold)
             } else {
-                Text(if (msg.seenBy.isNotEmpty()) "READ" else if (msg.isSent) "DELIVERED" else "SENT", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Black, color = if (msg.seenBy.isNotEmpty()) com.example.testresqmesh.core.ui.theme.SuccessGreen else Color.White.copy(alpha = 0.7f), fontSize = 9.sp)
+                val statusText = when {
+                    msg.seenBy.isNotEmpty() -> "READ"
+                    msg.deliveredTo.isNotEmpty() -> "DELIVERED"
+                    else -> "SENT"
+                }
+                
+                val statusColor = when {
+                    msg.seenBy.isNotEmpty() -> com.example.testresqmesh.core.ui.theme.SuccessGreen
+                    else -> Color.White.copy(alpha = 0.7f)
+                }
+                
+                Text(statusText, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Black, color = statusColor, fontSize = 9.sp)
                 DotSeparator()
                 Icon(Icons.Outlined.Lock, contentDescription = null, tint = Color.White.copy(alpha = 0.3f), modifier = Modifier.size(10.dp))
                 Spacer(modifier = Modifier.width(4.dp))

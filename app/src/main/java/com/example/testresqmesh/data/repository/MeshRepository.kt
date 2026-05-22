@@ -98,10 +98,40 @@ class MeshRepository(private val networkManager: MeshNetworkManager) {
                     val log = currentMap[endpointId] ?: emptyList()
                     currentMap[endpointId] = log + message
                     _privateMessages.value = currentMap
+                    
+                    // The moment we save a private message, tell the sender we received it!
+                    networkManager.broadcastDeliveredReceipt(msgId, isPrivate = true, targetId = endpointId)
                 } else {
                     _publicMessages.value = _publicMessages.value + message
+                    
+                    // The moment we save a public message, broadcast that we received it!
+                    networkManager.broadcastDeliveredReceipt(msgId, isPrivate = false)
                 }
             }
+        }
+        
+        networkManager.onMessageDelivered = { msgId, readerName ->
+            // Update Public Messages
+            val updatedPublic = _publicMessages.value.map { msg ->
+                if (msg.id == msgId && !msg.deliveredTo.contains(readerName)) {
+                    msg.copy(deliveredTo = msg.deliveredTo + readerName)
+                } else {
+                    msg
+                }
+            }
+            _publicMessages.value = updatedPublic
+
+            // Update Private Messages
+            val updatedPrivate = _privateMessages.value.mapValues { entry ->
+                entry.value.map { msg ->
+                    if (msg.id == msgId && !msg.deliveredTo.contains(readerName)) {
+                        msg.copy(deliveredTo = msg.deliveredTo + readerName)
+                    } else {
+                        msg
+                    }
+                }
+            }
+            _privateMessages.value = updatedPrivate
         }
         
         networkManager.onMessageSeen = { msgId, readerName ->

@@ -28,6 +28,7 @@ class MeshNetworkManager(private val context: Context) {
     
     // NEW: Gossip Protocol SEEN Callback (msgId, readerName)
     var onMessageSeen: ((String, String) -> Unit)? = null
+    var onMessageDelivered: ((String, String) -> Unit)? = null
 
     var onStatusChanged: ((String) -> Unit)? = null
     var onDeviceScanned: ((String, String, Int, String, Boolean) -> Unit)? = null // Added isConnecting flag
@@ -260,6 +261,22 @@ class MeshNetworkManager(private val context: Context) {
         }
     }
 
+    fun broadcastDeliveredReceipt(targetMessageId: String, isPrivate: Boolean, targetId: String? = null) {
+        val jsonString = JSONObject().apply {
+            put("id", java.util.UUID.randomUUID().toString())
+            put("type", "DELIVERED")
+            put("targetMessageId", targetMessageId)
+            put("reader", myDeviceName)
+            put("isPrivate", isPrivate)
+        }.toString()
+
+        if (isPrivate && targetId != null) {
+            sendDirectPayload(targetId, jsonString)
+        } else {
+            broadcastPayload(jsonString)
+        }
+    }
+
     private val endpointDiscoveryCallback = object : EndpointDiscoveryCallback() {
         override fun onEndpointFound(endpointId: String, info: DiscoveredEndpointInfo) {
             // Parse the peer's power score and name
@@ -422,13 +439,18 @@ class MeshNetworkManager(private val context: Context) {
                     // ----------------------------
 
                     // --- 2. GOSSIP PROTOCOL SEEN RECEIPTS ---
-                    if (jsonObject.has("type") && jsonObject.getString("type") == "SEEN") {
+                    if (jsonObject.has("type") && (jsonObject.getString("type") == "SEEN" || jsonObject.getString("type") == "DELIVERED")) {
+                        val payloadType = jsonObject.getString("type")
                         val targetMessageId = jsonObject.getString("targetMessageId")
                         val reader = jsonObject.getString("reader")
                         val isPrivateReceipt = jsonObject.optBoolean("isPrivate", false)
                         
-                        // Tell the UI that someone saw this message!
-                        onMessageSeen?.invoke(targetMessageId, reader)
+                        // Tell the UI that someone saw or received this message!
+                        if (payloadType == "SEEN") {
+                            onMessageSeen?.invoke(targetMessageId, reader)
+                        } else if (payloadType == "DELIVERED") {
+                            onMessageDelivered?.invoke(targetMessageId, reader)
+                        }
                         
                         // Gossip: Forward the receipt to everyone else (unless it's private)
                         if (!isPrivateReceipt) {

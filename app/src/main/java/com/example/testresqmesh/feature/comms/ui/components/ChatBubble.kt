@@ -235,11 +235,23 @@ fun ChatBubble(message: ChatMessage, mediaHelper: MediaHelper) {
                     )
                     if (isMine) {
                         Spacer(modifier = Modifier.width(4.dp))
+                        
+                        val statusText = when {
+                            message.seenBy.isNotEmpty() -> "👀"
+                            message.deliveredTo.isNotEmpty() -> "✓✓"
+                            else -> "✓"
+                        }
+                        
+                        val statusColor = when {
+                            message.seenBy.isNotEmpty() -> SuccessGreen
+                            else -> contentColor.copy(alpha = 0.6f)
+                        }
+                        
                         Text(
-                            text = if (message.seenBy.isNotEmpty()) "👀" else "✓✓", // Sent vs Seen status
+                            text = statusText,
                             style = MaterialTheme.typography.labelSmall,
                             fontSize = 8.sp,
-                            color = if (message.seenBy.isNotEmpty()) SuccessGreen else contentColor.copy(alpha = 0.6f)
+                            color = statusColor
                         )
                     }
                 }

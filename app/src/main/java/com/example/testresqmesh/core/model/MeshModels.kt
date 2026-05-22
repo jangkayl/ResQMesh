@@ -12,6 +12,7 @@ data class ChatMessage(
     val isPrivate: Boolean = false,
     val timestamp: Long = System.currentTimeMillis(),
     val receiveMedium: String = "Bluetooth 5.4", // Default until upgraded
+    val deliveredTo: List<String> = emptyList(), // Phones that received it but haven't rendered it yet
     val seenBy: List<String> = emptyList() // The Bouncer will populate this via Gossip!
 )
 
