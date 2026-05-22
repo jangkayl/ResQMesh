@@ -1,9 +1,9 @@
 package com.example.testresqmesh.data.repository
 
-import com.example.testresqmesh.data.models.ChatMessage
-import com.example.testresqmesh.data.models.ConnectedDevice
-import com.example.testresqmesh.data.models.ScannedDevice
-import com.example.testresqmesh.network.MeshNetworkManager
+import com.example.testresqmesh.core.model.ChatMessage
+import com.example.testresqmesh.core.model.ConnectedDevice
+import com.example.testresqmesh.core.model.ScannedDevice
+import com.example.testresqmesh.core.network.MeshNetworkManager
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import org.json.JSONObject
@@ -78,7 +78,7 @@ class MeshRepository(private val networkManager: MeshNetworkManager) {
             _scannedDevices.value = _scannedDevices.value.filter { it.endpointId != id }
         }
 
-        networkManager.onMessageReceived = { endpointId, sender, text, isPrivate, isSystem, img, audio ->
+        networkManager.onMessageReceived = { endpointId, sender, text, isPrivate, isSystem, img, audio, lat, lng ->
             if (!isSystem) {
                 val message = ChatMessage(
                     id = UUID.randomUUID().toString(),
@@ -86,7 +86,10 @@ class MeshRepository(private val networkManager: MeshNetworkManager) {
                     text = text,
                     imageBase64 = img,
                     audioBase64 = audio,
+                    locationLat = lat,
+                    locationLng = lng,
                     isMine = false,
+                    isPrivate = isPrivate,
                     timestamp = System.currentTimeMillis()
                 )
                 if (isPrivate) {
@@ -121,7 +124,7 @@ class MeshRepository(private val networkManager: MeshNetworkManager) {
         networkManager.rescan()
     }
 
-    fun sendPublicMessage(text: String, imageBase64: String?, audioBase64: String?) {
+    fun sendPublicMessage(text: String, imageBase64: String?, audioBase64: String?, locationLat: Double? = null, locationLng: Double? = null) {
         val msgId = UUID.randomUUID().toString()
         val timestamp = System.currentTimeMillis()
         val jsonString = JSONObject().apply {
@@ -133,14 +136,16 @@ class MeshRepository(private val networkManager: MeshNetworkManager) {
             put("isSystem", false)
             if (imageBase64 != null) put("image", imageBase64)
             if (audioBase64 != null) put("audio", audioBase64)
+            if (locationLat != null) put("locationLat", locationLat)
+            if (locationLng != null) put("locationLng", locationLng)
         }.toString()
 
-        val message = ChatMessage(msgId, "Me", text, imageBase64, audioBase64, true, timestamp)
+        val message = ChatMessage(msgId, "Me", text, imageBase64, audioBase64, locationLat, locationLng, true, false, timestamp)
         _publicMessages.value = _publicMessages.value + message
         networkManager.broadcastPayload(jsonString)
     }
 
-    fun sendPrivateMessage(target: ConnectedDevice, text: String, imageBase64: String?, audioBase64: String?) {
+    fun sendPrivateMessage(target: ConnectedDevice, text: String, imageBase64: String?, audioBase64: String?, locationLat: Double? = null, locationLng: Double? = null) {
         val msgId = UUID.randomUUID().toString()
         val timestamp = System.currentTimeMillis()
         val jsonString = JSONObject().apply {
@@ -152,9 +157,11 @@ class MeshRepository(private val networkManager: MeshNetworkManager) {
             put("isSystem", false)
             if (imageBase64 != null) put("image", imageBase64)
             if (audioBase64 != null) put("audio", audioBase64)
+            if (locationLat != null) put("locationLat", locationLat)
+            if (locationLng != null) put("locationLng", locationLng)
         }.toString()
 
-        val message = ChatMessage(msgId, "Me", text, imageBase64, audioBase64, true, timestamp)
+        val message = ChatMessage(msgId, "Me", text, imageBase64, audioBase64, locationLat, locationLng, true, true, timestamp)
         val currentMap = _privateMessages.value.toMutableMap()
         val log = currentMap[target.endpointId] ?: emptyList()
         currentMap[target.endpointId] = log + message

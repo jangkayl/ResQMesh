@@ -61,4 +61,5 @@ dependencies {
     debugImplementation(libs.androidx.compose.ui.tooling)
 
     implementation("com.google.android.gms:play-services-nearby:19.3.0") // Updated to latest stable version
+    implementation("com.google.android.gms:play-services-location:21.3.0") // Fused Location for indoor accuracy
 }

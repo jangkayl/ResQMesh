@@ -21,16 +21,16 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.testresqmesh.data.repository.MeshRepository
-import com.example.testresqmesh.network.MeshNetworkManager
-import com.example.testresqmesh.ui.screens.MainContainerScreen
-import com.example.testresqmesh.ui.screens.setup.IdentitySetupScreen
-import com.example.testresqmesh.ui.screens.setup.PermissionsScreen
-import com.example.testresqmesh.ui.screens.setup.SplashScreen
-import com.example.testresqmesh.ui.theme.TestResQMeshTheme
-import com.example.testresqmesh.viewmodel.CommunicationViewModel
-import com.example.testresqmesh.viewmodel.RadarViewModel
-import com.example.testresqmesh.viewmodel.SetupViewModel
-import com.example.testresqmesh.utils.MediaHelper
+import com.example.testresqmesh.core.network.MeshNetworkManager
+import com.example.testresqmesh.core.ui.MainContainerScreen
+import com.example.testresqmesh.feature.setup.ui.IdentitySetupScreen
+import com.example.testresqmesh.feature.setup.ui.PermissionsScreen
+import com.example.testresqmesh.feature.setup.ui.SplashScreen
+import com.example.testresqmesh.core.ui.theme.TestResQMeshTheme
+import com.example.testresqmesh.feature.comms.viewmodel.CommunicationViewModel
+import com.example.testresqmesh.feature.radar.viewmodel.RadarViewModel
+import com.example.testresqmesh.feature.setup.viewmodel.SetupViewModel
+import com.example.testresqmesh.core.utils.MediaHelper
 
 import android.bluetooth.BluetoothManager
 import android.content.Context
@@ -134,7 +134,7 @@ class MainActivity : ComponentActivity() {
                         }
                         
                         // GLOBAL DEBUG TERMINAL OVERLAY
-                        com.example.testresqmesh.ui.components.debug.DebugTerminal()
+                        com.example.testresqmesh.core.ui.components.debug.DebugTerminal()
                     }
                 }
             }
