@@ -11,6 +11,7 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.CheckCircle
+import androidx.compose.material.icons.outlined.LinkOff
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.RadioButtonChecked
 import androidx.compose.material.icons.outlined.Wifi
@@ -88,6 +89,9 @@ fun ActiveChatScreen(name: String, viewModel: CommunicationViewModel, onBack: ()
                         }
                     },
                     actions = {
+                        IconButton(onClick = { viewModel.disconnectDevice(name) }) {
+                            Icon(Icons.Outlined.LinkOff, contentDescription = "Disconnect Link", tint = Color(0xFFEF4444))
+                        }
                         IconButton(onClick = {}) {
                             Icon(Icons.Default.MoreHoriz, contentDescription = null, tint = Color.White)
                         }
@@ -119,10 +123,10 @@ fun ActiveChatScreen(name: String, viewModel: CommunicationViewModel, onBack: ()
             val context = androidx.compose.ui.platform.LocalContext.current
             ChatBottomInput(
                 onSendMessage = { text ->
-                    viewModel.sendPrivateMessage(ConnectedDevice(name, displayName), text)
+                    viewModel.sendPrivateMessage(displayName, text)
                 },
                 onSendLocation = {
-                    viewModel.broadcastLocation(context, isPrivate = true, targetDevice = ConnectedDevice(name, displayName))
+                    viewModel.broadcastLocation(context, isPrivate = true, targetName = displayName)
                 }
             )
         }
@@ -162,7 +166,7 @@ fun ActiveChatScreen(name: String, viewModel: CommunicationViewModel, onBack: ()
                         id = msg.id,
                         text = msg.text,
                         time = java.text.SimpleDateFormat("hh:mm a", java.util.Locale.getDefault()).format(java.util.Date(msg.timestamp)),
-                        hops = "Direct",
+                        hops = if (msg.isHopped) "🌐 MESH HOPPED" else "🟢 DIRECT",
                         receiveMedium = msg.receiveMedium,
                         deliveredTo = msg.deliveredTo,
                         seenBy = msg.seenBy,
@@ -234,7 +238,8 @@ fun HighFidelityChatBubble(msg: ChatMessageData) {
                 DotSeparator()
                 Icon(Icons.Outlined.Lock, contentDescription = null, tint = Color.White.copy(alpha = 0.3f), modifier = Modifier.size(10.dp))
                 Spacer(modifier = Modifier.width(4.dp))
-                Text(msg.hops, style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.5f), fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                val hopsColor = if (msg.hops.contains("HOPPED")) Color(0xFFF59E0B) else Color.White.copy(alpha = 0.5f)
+                Text(msg.hops, style = MaterialTheme.typography.labelSmall, color = hopsColor, fontSize = 10.sp, fontWeight = FontWeight.Bold)
             } else {
                 val statusText = when {
                     msg.seenBy.isNotEmpty() -> "READ"

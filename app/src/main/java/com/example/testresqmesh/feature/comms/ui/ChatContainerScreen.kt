@@ -25,6 +25,7 @@ import com.example.testresqmesh.core.utils.MediaHelper
 import com.example.testresqmesh.feature.comms.viewmodel.CommunicationViewModel
 import com.example.testresqmesh.core.utils.AppLogger
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ChatContainerScreen(
     viewModel: CommunicationViewModel, 
@@ -32,10 +33,30 @@ fun ChatContainerScreen(
     onChatSelected: (String) -> Unit
 ) {
     val selectedTabIndex = remember { mutableIntStateOf(0) }
+    var showNewMessageModal by remember { mutableStateOf(false) }
+
+    if (showNewMessageModal) {
+        val uiState by viewModel.uiState.collectAsState()
+        ModalBottomSheet(
+            onDismissRequest = { showNewMessageModal = false },
+            containerColor = Color(0xFF232E35),
+            dragHandle = { BottomSheetDefaults.DragHandle() }
+        ) {
+            NewMessageModal(
+                uiState = uiState,
+                onDismiss = { showNewMessageModal = false },
+                onNodeSelected = {
+                    showNewMessageModal = false
+                    onChatSelected(it)
+                }
+            )
+        }
+    }
 
     ChatContainerScreenContent(
         selectedTabIndex = selectedTabIndex.intValue,
         onTabSelected = { selectedTabIndex.intValue = it },
+        onNewMessageClick = { showNewMessageModal = true },
         privateTabContent = { PrivateChatTab(viewModel, mediaHelper, onChatSelected) },
         publicTabContent = { PublicChatTab(viewModel, mediaHelper, onChatSelected) }
     )
@@ -46,6 +67,7 @@ fun ChatContainerScreen(
 fun ChatContainerScreenContent(
     selectedTabIndex: Int,
     onTabSelected: (Int) -> Unit,
+    onNewMessageClick: () -> Unit,
     privateTabContent: @Composable () -> Unit,
     publicTabContent: @Composable () -> Unit
 ) {
@@ -69,7 +91,7 @@ fun ChatContainerScreenContent(
                             modifier = Modifier.size(28.dp)
                         )
                     }
-                    IconButton(onClick = { /* TODO: New Message */ }) {
+                    IconButton(onClick = onNewMessageClick) {
                         Icon(
                             Icons.Outlined.AddBox,
                             contentDescription = "New Message",
@@ -184,6 +206,7 @@ fun ChatContainerScreenPreview() {
         ChatContainerScreenContent(
             selectedTabIndex = 0,
             onTabSelected = {},
+            onNewMessageClick = {},
             privateTabContent = {
                 Column {
                     // Previews updated to be empty (Production state)

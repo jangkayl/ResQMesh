@@ -23,9 +23,11 @@ import com.example.testresqmesh.core.ui.theme.InboxBackground
 import com.example.testresqmesh.core.ui.theme.InboxAccentBlue
 import com.example.testresqmesh.core.ui.theme.Spacing
 
+import com.example.testresqmesh.ui.state.ChatUiState
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun NewMessageModal(onDismiss: () -> Unit, onNodeSelected: (String) -> Unit) {
+fun NewMessageModal(uiState: ChatUiState, onDismiss: () -> Unit, onNodeSelected: (String) -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -108,14 +110,15 @@ fun NewMessageModal(onDismiss: () -> Unit, onNodeSelected: (String) -> Unit) {
 
         Spacer(modifier = Modifier.height(Spacing.Medium))
 
-        LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            val nodesInRange = listOf(
-                RangeNode("Sgt. Miller", "RX-9201-FB", "~45M DIRECT"),
-                RangeNode("Rescue Center 1", "NODE-ALPHA", "~120M MULTI-HOP"),
-                RangeNode("Anya Petrov", "RE-4421-ZQ", "~12M DIRECT"),
-                RangeNode("Medic Team Alpha", "ME-0021-X", "~85M MULTI-HOP")
+        val nodesInRange = uiState.knownNodes.map { node ->
+            RangeNode(
+                name = node.name, 
+                id = "MESH-NODE", 
+                distance = if (node.isDirect) "🟢 DIRECT LINK" else "🌐 MESH HOP"
             )
-            
+        }
+
+        LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             items(nodesInRange) { node ->
                 ModalNodeItem(node, onNodeSelected)
             }
@@ -178,7 +181,12 @@ fun ModalNodeItem(node: RangeNode, onClick: (String) -> Unit) {
                 }
             }
             
-            Icon(Icons.Default.ChevronRight, contentDescription = null, tint = Color.White.copy(alpha = 0.2f))
+            Column(horizontalAlignment = Alignment.End) {
+                if (node.distance.contains("HOP")) {
+                    Icon(Icons.Outlined.Shield, contentDescription = null, tint = Color(0xFFF59E0B), modifier = Modifier.size(16.dp))
+                }
+                Icon(Icons.Default.ChevronRight, contentDescription = null, tint = Color.White.copy(alpha = 0.2f))
+            }
         }
     }
 }

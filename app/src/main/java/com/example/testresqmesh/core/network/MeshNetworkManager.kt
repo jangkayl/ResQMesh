@@ -145,6 +145,15 @@ class MeshNetworkManager(private val context: Context) {
         pendingNames.clear()
         endpointMedium.clear()
         onStatusChanged?.invoke("Offline")
+        AppLogger.d("MeshNetwork", "Mesh Node completely stopped.")
+    }
+
+    fun disconnectFromEndpoint(endpointId: String) {
+        AppLogger.d("MeshNetwork", "TESTING TOOL: Manually disconnecting from physical endpoint -> $endpointId")
+        connectionsClient.disconnectFromEndpoint(endpointId)
+        connectedEndpointIds.remove(endpointId)
+        endpointMedium.remove(endpointId)
+        onDeviceDisconnected?.invoke(endpointId)
     }
 
     fun rescan() {
@@ -177,8 +186,11 @@ class MeshNetworkManager(private val context: Context) {
 
         val targets = connectedEndpointIds.filter { it != excludeEndpointId }
         if (targets.isNotEmpty()) {
+            AppLogger.d("MeshNetwork", "ROUTE (Broadcast): Flooding message to ${targets.size} physical connections.")
             val payload = com.google.android.gms.nearby.connection.Payload.fromBytes(jsonString.toByteArray(Charsets.UTF_8))
             connectionsClient.sendPayload(targets.toList(), payload)
+        } else {
+            AppLogger.d("MeshNetwork", "ROUTE (Broadcast): No other nodes to relay to. Chain stops here.")
         }
     }
 
@@ -195,6 +207,7 @@ class MeshNetworkManager(private val context: Context) {
         }
         // ----------------------
 
+        AppLogger.d("MeshNetwork", "ROUTE (Direct): Sending private payload to physical endpoint -> $targetId")
         val payload = com.google.android.gms.nearby.connection.Payload.fromBytes(jsonString.toByteArray(Charsets.UTF_8))
         connectionsClient.sendPayload(targetId, payload)
     }
@@ -418,25 +431,28 @@ class MeshNetworkManager(private val context: Context) {
             }
 
             val text = jsonObject.getString("text")
+            val targetName = jsonObject.optString("targetName", "")
             val isPrivate = jsonObject.optBoolean("isPrivate", false)
 
-            if (isPrivate) {
-                // Fire the local notification alert!
-                notificationHelper.showPrivateMessageNotification(sender, text)
-            }
+            AppLogger.d("MeshNetwork", "ROUTE (Received): Message from [$sender] arrived physically via endpoint [$endpointId] using ${endpointMedium[endpointId] ?: "Bluetooth"}")
 
             val imageBase64 = if (jsonObject.has("image")) jsonObject.getString("image") else null
             val audioBase64 = if (jsonObject.has("audio")) jsonObject.getString("audio") else null
             val locationLat = if (jsonObject.has("locationLat")) jsonObject.getDouble("locationLat") else null
             val locationLng = if (jsonObject.has("locationLng")) jsonObject.getDouble("locationLng") else null
-
-            // Determine what medium this message just arrived on
             val medium = endpointMedium[endpointId] ?: "Bluetooth 5.4"
 
-            // Passing the exact endpointId right here!
-            onMessageReceived?.invoke(endpointId, msgId, sender, text, isPrivate, false, imageBase64, audioBase64, locationLat, locationLng, medium)
-
-            if (!isPrivate) {
+            if (isPrivate) {
+                if (targetName == myDeviceName) {
+                    notificationHelper.showPrivateMessageNotification(sender, text)
+                    onMessageReceived?.invoke(endpointId, msgId, sender, text, isPrivate, false, imageBase64, audioBase64, locationLat, locationLng, medium)
+                } else {
+                    AppLogger.d("MeshNetwork", "ROUTE (Relay): Forwarding Private message meant for [$targetName] securely across the mesh.")
+                    broadcastPayload(jsonString, excludeEndpointId = endpointId)
+                }
+            } else {
+                onMessageReceived?.invoke(endpointId, msgId, sender, text, isPrivate, false, imageBase64, audioBase64, locationLat, locationLng, medium)
+                AppLogger.d("MeshNetwork", "ROUTE (Relay): Forwarding public message from [$sender] to all other connected peers.")
                 broadcastPayload(jsonString, excludeEndpointId = endpointId)
             }
 

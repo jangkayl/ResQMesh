@@ -3,6 +3,7 @@ package com.example.testresqmesh.data.repository
 import com.example.testresqmesh.core.model.ChatMessage
 import com.example.testresqmesh.core.model.ConnectedDevice
 import com.example.testresqmesh.core.model.ScannedDevice
+import com.example.testresqmesh.core.model.KnownNode
 import com.example.testresqmesh.core.network.MeshNetworkManager
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -19,6 +20,9 @@ class MeshRepository(private val networkManager: MeshNetworkManager) {
 
     private val _scannedDevices = MutableStateFlow<List<ScannedDevice>>(emptyList())
     val scannedDevices = _scannedDevices.asStateFlow()
+
+    private val _knownNodes = MutableStateFlow<List<KnownNode>>(emptyList())
+    val knownNodes = _knownNodes.asStateFlow()
 
     private val _publicMessages = MutableStateFlow<List<ChatMessage>>(emptyList())
     val publicMessages = _publicMessages.asStateFlow()
@@ -79,6 +83,17 @@ class MeshRepository(private val networkManager: MeshNetworkManager) {
         }
 
         networkManager.onMessageReceived = { endpointId, msgId, sender, text, isPrivate, isSystem, img, audio, lat, lng, medium ->
+            // Gossip Presence: Log every device that speaks, whether direct or relayed!
+            val isDirect = _connectedDevices.value.any { it.name == sender }
+            val currentNodes = _knownNodes.value.toMutableList()
+            val existingNode = currentNodes.find { it.name == sender }
+            if (existingNode != null) {
+                currentNodes[currentNodes.indexOf(existingNode)] = existingNode.copy(isDirect = isDirect, lastSeen = System.currentTimeMillis())
+            } else {
+                currentNodes.add(KnownNode(sender, isDirect, System.currentTimeMillis()))
+            }
+            _knownNodes.value = currentNodes
+
             if (!isSystem) {
                 val message = ChatMessage(
                     id = msgId, // Use exact sender's ID!
@@ -91,12 +106,13 @@ class MeshRepository(private val networkManager: MeshNetworkManager) {
                     isMine = false,
                     isPrivate = isPrivate,
                     timestamp = System.currentTimeMillis(),
+                    isHopped = !isDirect,
                     receiveMedium = medium
                 )
                 if (isPrivate) {
                     val currentMap = _privateMessages.value.toMutableMap()
-                    val log = currentMap[endpointId] ?: emptyList()
-                    currentMap[endpointId] = log + message
+                    val log = currentMap[sender] ?: emptyList()
+                    currentMap[sender] = log + message
                     _privateMessages.value = currentMap
                     
                     // The moment we save a private message, tell the sender we received it!
@@ -175,8 +191,13 @@ class MeshRepository(private val networkManager: MeshNetworkManager) {
         _isOnline.value = false
         _connectedDevices.value = emptyList()
         _scannedDevices.value = emptyList()
+        _knownNodes.value = emptyList()
         _publicMessages.value = emptyList()
         _privateMessages.value = emptyMap()
+    }
+
+    fun disconnectDevice(endpointId: String) {
+        networkManager.disconnectFromEndpoint(endpointId)
     }
 
     fun rescan() {
@@ -204,13 +225,14 @@ class MeshRepository(private val networkManager: MeshNetworkManager) {
         networkManager.broadcastPayload(jsonString)
     }
 
-    fun sendPrivateMessage(target: ConnectedDevice, text: String, imageBase64: String?, audioBase64: String?, locationLat: Double? = null, locationLng: Double? = null) {
+    fun sendPrivateMessage(targetName: String, text: String, imageBase64: String?, audioBase64: String?, locationLat: Double? = null, locationLng: Double? = null) {
         val msgId = UUID.randomUUID().toString()
         val timestamp = System.currentTimeMillis()
         val jsonString = JSONObject().apply {
             put("id", msgId)
             put("timestamp", timestamp)
             put("senderName", myNodeName)
+            put("targetName", targetName) // ADVANCED ROUTING: Specify target explicitly!
             put("text", text)
             put("isPrivate", true)
             put("isSystem", false)
@@ -222,10 +244,18 @@ class MeshRepository(private val networkManager: MeshNetworkManager) {
 
         val message = ChatMessage(msgId, "Me", text, imageBase64, audioBase64, locationLat, locationLng, true, true, timestamp)
         val currentMap = _privateMessages.value.toMutableMap()
-        val log = currentMap[target.endpointId] ?: emptyList()
-        currentMap[target.endpointId] = log + message
+        val log = currentMap[targetName] ?: emptyList()
+        currentMap[targetName] = log + message
         _privateMessages.value = currentMap
 
-        networkManager.sendDirectPayload(target.endpointId, jsonString)
+        val isDirect = _connectedDevices.value.any { it.name == targetName }
+        val directEndpointId = _connectedDevices.value.find { it.name == targetName }?.endpointId
+
+        if (isDirect && directEndpointId != null) {
+            networkManager.sendDirectPayload(directEndpointId, jsonString)
+        } else {
+            // RELAY ROUTING: It is a hopped node! Broadcast it, but it's flagged as private with a targetName!
+            networkManager.broadcastPayload(jsonString)
+        }
     }
 }

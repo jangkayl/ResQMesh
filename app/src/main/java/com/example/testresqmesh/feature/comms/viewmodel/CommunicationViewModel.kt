@@ -32,14 +32,23 @@ class CommunicationViewModel(private val repository: MeshRepository) : ViewModel
                 _uiState.update { it.copy(connectedDevices = devices) }
             }
         }
+        viewModelScope.launch {
+            repository.knownNodes.collect { nodes ->
+                _uiState.update { it.copy(knownNodes = nodes) }
+            }
+        }
     }
 
     fun sendPublicMessage(text: String, imageBase64: String? = null, audioBase64: String? = null) {
         repository.sendPublicMessage(text, imageBase64, audioBase64)
     }
 
-    fun sendPrivateMessage(target: ConnectedDevice, text: String, imageBase64: String? = null, audioBase64: String? = null) {
-        repository.sendPrivateMessage(target, text, imageBase64, audioBase64)
+    fun sendPrivateMessage(targetName: String, text: String, imageBase64: String? = null, audioBase64: String? = null) {
+        repository.sendPrivateMessage(targetName, text, imageBase64, audioBase64)
+    }
+
+    fun disconnectDevice(endpointId: String) {
+        repository.disconnectDevice(endpointId)
     }
 
     fun markMessageAsSeen(messageId: String, isPrivate: Boolean, targetId: String? = null) {
@@ -47,7 +56,7 @@ class CommunicationViewModel(private val repository: MeshRepository) : ViewModel
     }
 
     @androidx.annotation.RequiresPermission(anyOf = ["android.permission.ACCESS_FINE_LOCATION", "android.permission.ACCESS_COARSE_LOCATION"])
-    fun broadcastLocation(context: android.content.Context, isPrivate: Boolean, targetDevice: ConnectedDevice? = null) {
+    fun broadcastLocation(context: android.content.Context, isPrivate: Boolean, targetName: String? = null) {
         // The BEST way to get location on Android (Handles indoors via Wi-Fi/Cell + outdoors via GPS seamlessly)
         val fusedLocationClient = com.google.android.gms.location.LocationServices.getFusedLocationProviderClient(context)
         
@@ -57,37 +66,37 @@ class CommunicationViewModel(private val repository: MeshRepository) : ViewModel
                 null
             ).addOnSuccessListener { location ->
                 if (location != null) {
-                    sendLocationMessage(location, isPrivate, targetDevice)
+                    sendLocationMessage(location, isPrivate, targetName)
                 } else {
                     // Fallback to cache if fresh fetch miraculously fails
                     fusedLocationClient.lastLocation.addOnSuccessListener { lastLoc ->
                         if (lastLoc != null) {
-                            sendLocationMessage(lastLoc, isPrivate, targetDevice)
+                            sendLocationMessage(lastLoc, isPrivate, targetName)
                         } else {
-                            sendLocationError(isPrivate, targetDevice)
+                            sendLocationError(isPrivate, targetName)
                         }
-                    }.addOnFailureListener { sendLocationError(isPrivate, targetDevice) }
+                    }.addOnFailureListener { sendLocationError(isPrivate, targetName) }
                 }
             }.addOnFailureListener {
-                sendLocationError(isPrivate, targetDevice)
+                sendLocationError(isPrivate, targetName)
             }
         } catch (e: SecurityException) {
-            sendLocationError(isPrivate, targetDevice)
+            sendLocationError(isPrivate, targetName)
         }
     }
 
-    private fun sendLocationMessage(location: android.location.Location, isPrivate: Boolean, targetDevice: ConnectedDevice?) {
-        if (isPrivate && targetDevice != null) {
-            repository.sendPrivateMessage(targetDevice, "📍 I am sharing my location.", null, null, location.latitude, location.longitude)
+    private fun sendLocationMessage(location: android.location.Location, isPrivate: Boolean, targetName: String?) {
+        if (isPrivate && targetName != null) {
+            repository.sendPrivateMessage(targetName, "📍 I am sharing my location.", null, null, location.latitude, location.longitude)
         } else {
             repository.sendPublicMessage("📍 I am sharing my location.", null, null, location.latitude, location.longitude)
         }
     }
 
-    private fun sendLocationError(isPrivate: Boolean, targetDevice: ConnectedDevice?) {
+    private fun sendLocationError(isPrivate: Boolean, targetName: String?) {
         val errorMsg = "⚠️ Failed to get fresh GPS lock. Make sure Location is on, and you have sky visibility."
-        if (isPrivate && targetDevice != null) {
-            repository.sendPrivateMessage(targetDevice, errorMsg, null, null, null, null)
+        if (isPrivate && targetName != null) {
+            repository.sendPrivateMessage(targetName, errorMsg, null, null, null, null)
         } else {
             repository.sendPublicMessage(errorMsg, null, null, null, null)
         }
