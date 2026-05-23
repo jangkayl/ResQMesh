@@ -26,7 +26,7 @@ class MeshNetworkManager(private val context: Context) {
     // THIS IS THE LINE THAT WAS CAUSING THE HEADACHE! (Notice the 11 parameters now)
     var onMessageReceived: ((String, String, String, String, Boolean, Boolean, String?, String?, Double?, Double?, String) -> Unit)? = null
     
-    // NEW: Gossip Protocol SEEN Callback (msgId, readerName)
+    // Gossip Protocol SEEN Callback (msgId, readerName)
     var onMessageSeen: ((String, String) -> Unit)? = null
     var onMessageDelivered: ((String, String) -> Unit)? = null
 
@@ -37,19 +37,12 @@ class MeshNetworkManager(private val context: Context) {
     // Heartbeat & Scanner Handlers
     private val heartbeatHandler = Handler(Looper.getMainLooper())
     private var heartbeatRunnable: Runnable? = null
-    private val scannerPulseHandler = Handler(Looper.getMainLooper())
-    private var scannerPulseRunnable: Runnable? = null
-
     private val connectedEndpointIds = mutableSetOf<String>()
-    // NEW: The Bouncer's Memory (Stores IDs of messages we already processed)
+    // The Bouncer's Memory (Stores IDs of messages we already processed)
     private val seenMessageIds = mutableSetOf<String>()
     
-    // Connection Medium Tracker (Defaults to Bluetooth 5.4 until upgraded)
-    private val endpointMedium = mutableMapOf<String, String>()
-
-    // Scanner Failsafe State
-    private var isHandshaking = false
-    private var handshakeStartTime = 0L
+    // Tracks which physical medium (Wi-Fi Direct vs Bluetooth) the endpoint is currently using
+    val endpointMedium = mutableMapOf<String, String>()
 
     private var activeServiceId = "com.example.testresqmesh.p2p.PUBLIC"
 
@@ -63,7 +56,6 @@ class MeshNetworkManager(private val context: Context) {
         // Manually resetting the client before starting ensures a fresh radio state (Fixes "Stale Cache")
         connectionsClient.stopAdvertising()
         connectionsClient.stopDiscovery()
-        // ------------------------------------
 
         val formattedKey = teamKey.trim().uppercase().ifEmpty { "PUBLIC" }
         activeServiceId = "com.example.testresqmesh.p2p.$formattedKey"
@@ -83,43 +75,18 @@ class MeshNetworkManager(private val context: Context) {
                 onStatusChanged?.invoke("Node Active [Room: $formattedKey]. Seeking peers...")
                 startNativeScanner()
                 startHeartbeat()
-                startScannerPulse() // NEW: Start the periodic pulse
             }
             .addOnFailureListener { onStatusChanged?.invoke("Failed to start node.") }
-    }
-
-    private fun startScannerPulse() {
-        scannerPulseRunnable = object : Runnable {
-            override fun run() {
-                val currentTime = System.currentTimeMillis()
-                val isStuck = isHandshaking && (currentTime - handshakeStartTime > 15000)
-
-                if (isStuck) {
-                    AppLogger.d("MeshNetwork", "Scanner Pulse: Handshake appears stuck. Forcing failsafe scanner restart!")
-                    isHandshaking = false
-                }
-
-                // OPTIMIZATION: Pulse every 7 seconds to keep finding new mesh peers
-                // We only skip the pulse if we are ACTIVELY in the middle of a healthy handshake.
-                if (!isHandshaking) {
-                    AppLogger.d("MeshNetwork", "Scanner Pulse: Jolting Radio to find more peers...")
-                    connectionsClient.stopDiscovery()
-                    startNativeScanner()
-                }
-                scannerPulseHandler.postDelayed(this, scanningDelay)
-            }
-        }
-        scannerPulseHandler.postDelayed(scannerPulseRunnable!!, scanningDelay)
     }
 
     private fun calculatePowerScore(): Int {
         var score = 10 // Base score
         
-        // 1. CPU Processing Power
+        // CPU Processing Power
         val numCores = Runtime.getRuntime().availableProcessors()
         score += (numCores * 5)
         
-        // 2. RAM (Memory Capacity)
+        // RAM (Memory Capacity)
         try {
             val actManager = context.getSystemService(Context.ACTIVITY_SERVICE) as android.app.ActivityManager
             val memInfo = android.app.ActivityManager.MemoryInfo()
@@ -130,12 +97,12 @@ class MeshNetworkManager(private val context: Context) {
             AppLogger.d("MeshNetwork", "Failed to read RAM for power score.")
         }
         
-        // 3. Operating System (Better background handling)
+        // Operating System (Better background handling)
         val apiLevel = android.os.Build.VERSION.SDK_INT
         if (apiLevel >= 33) score += 20 // Android 13+
         else if (apiLevel >= 31) score += 10 // Android 12
         
-        // 4. Bluetooth Advanced Features (Safer check)
+        // Bluetooth Advanced Features (Safer check)
         try {
             val bluetoothAdapter = (context.getSystemService(Context.BLUETOOTH_SERVICE) as? android.bluetooth.BluetoothManager)?.adapter
             if (bluetoothAdapter != null && android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
@@ -150,7 +117,7 @@ class MeshNetworkManager(private val context: Context) {
         return score
     }
 
-    // 1. Smooth continuous native scanner with high-power optimization:
+    // Smooth continuous native scanner with high-power optimization:
     private fun startNativeScanner() {
         val discoveryOptions = DiscoveryOptions.Builder()
             .setStrategy(Strategy.P2P_CLUSTER)
@@ -173,7 +140,6 @@ class MeshNetworkManager(private val context: Context) {
 
     fun stopMeshNode() {
         heartbeatRunnable?.let { heartbeatHandler.removeCallbacks(it) }
-        scannerPulseRunnable?.let { scannerPulseHandler.removeCallbacks(it) }
         connectionsClient.stopAllEndpoints()
         connectedEndpointIds.clear()
         pendingNames.clear()
@@ -211,7 +177,7 @@ class MeshNetworkManager(private val context: Context) {
 
         val targets = connectedEndpointIds.filter { it != excludeEndpointId }
         if (targets.isNotEmpty()) {
-            val payload = Payload.fromBytes(jsonString.toByteArray(Charsets.UTF_8))
+            val payload = com.google.android.gms.nearby.connection.Payload.fromBytes(jsonString.toByteArray(Charsets.UTF_8))
             connectionsClient.sendPayload(targets.toList(), payload)
         }
     }
@@ -229,7 +195,7 @@ class MeshNetworkManager(private val context: Context) {
         }
         // ----------------------
 
-        val payload = Payload.fromBytes(jsonString.toByteArray(Charsets.UTF_8))
+        val payload = com.google.android.gms.nearby.connection.Payload.fromBytes(jsonString.toByteArray(Charsets.UTF_8))
         connectionsClient.sendPayload(targetId, payload)
     }
 
@@ -328,23 +294,14 @@ class MeshNetworkManager(private val context: Context) {
     }
 
     private fun attemptConnection(endpointId: String, endpointName: String, retryCount: Int = 0) {
-        // Pause discovery immediately to free up the Bluetooth antenna for the handshake!
-        isHandshaking = true
-        handshakeStartTime = System.currentTimeMillis()
-        connectionsClient.stopDiscovery()
-
         connectionsClient.requestConnection(myDeviceName, endpointId, connectionLifecycleCallback)
             .addOnFailureListener { e ->
-                isHandshaking = false
                 if (connectedEndpointIds.contains(endpointId)) return@addOnFailureListener
                 
                 // Exponential backoff
                 val baseDelay = (Math.pow(2.0, retryCount.toDouble()) * 1000).toLong()
                 val jitter = kotlin.random.Random.nextLong(200, 800)
                 
-                // Resume discovery while waiting for backoff, so we aren't completely blind
-                startNativeScanner()
-
                 Handler(Looper.getMainLooper()).postDelayed({
                     if (activeScannedEndpoints.contains(endpointId) && !connectedEndpointIds.contains(endpointId)) {
                         attemptConnection(endpointId, endpointName, retryCount + 1)
@@ -355,11 +312,6 @@ class MeshNetworkManager(private val context: Context) {
 
     private val connectionLifecycleCallback = object : ConnectionLifecycleCallback() {
         override fun onConnectionInitiated(endpointId: String, info: ConnectionInfo) {
-            // Receiver also pauses discovery to help the handshake complete smoothly
-            isHandshaking = true
-            handshakeStartTime = System.currentTimeMillis()
-            connectionsClient.stopDiscovery()
-
             onDeviceScanRemoved?.invoke(endpointId)
             
             // Clean the score prefix from the stored name
@@ -368,7 +320,7 @@ class MeshNetworkManager(private val context: Context) {
             val peerScore = parts.getOrNull(0)?.toIntOrNull() ?: 0
             val cleanName = parts.getOrNull(1) ?: rawName
             
-            // NEW: Notify the UI that an inbound connection is starting, even if not scanned
+            // otify the UI that an inbound connection is starting, even if not scanned
             onDeviceScanned?.invoke(endpointId, cleanName, peerScore, "CONNECTING", true)
             
             pendingNames[endpointId] = cleanName
@@ -376,10 +328,6 @@ class MeshNetworkManager(private val context: Context) {
         }
     
         override fun onConnectionResult(endpointId: String, result: ConnectionResolution) {
-            // Whatever the result is, we must resume discovery now that the handshake is over!
-            isHandshaking = false
-            startNativeScanner()
-
             val deviceName = pendingNames[endpointId] ?: "Unknown"
             pendingNames.remove(endpointId) // BUG FIX: Free the memory leak!
 
@@ -387,12 +335,6 @@ class MeshNetworkManager(private val context: Context) {
                 connectedEndpointIds.add(endpointId)
                 endpointMedium[endpointId] = "Bluetooth 5.4" // Start with Bluetooth assumption
                 onDeviceConnected?.invoke(ConnectedDevice(endpointId, deviceName))
-
-                // Force bandwidth upgrade to Wi-Fi Direct using the Dummy Stream Hack
-                // Since this API version doesn't support requestBandwidthUpgrade, 
-                // sending a stream payload forces the system to spin up Wi-Fi Direct.
-                val dummyStream = java.io.ByteArrayInputStream(ByteArray(1))
-                connectionsClient.sendPayload(endpointId, com.google.android.gms.nearby.connection.Payload.fromStream(dummyStream))
             }
         }
         override fun onDisconnected(endpointId: String) {
@@ -415,87 +357,91 @@ class MeshNetworkManager(private val context: Context) {
     }
 
     private val payloadCallback = object : PayloadCallback() {
-        override fun onPayloadReceived(endpointId: String, payload: Payload) {
-            if (payload.type == Payload.Type.BYTES) {
+        override fun onPayloadReceived(endpointId: String, payload: com.google.android.gms.nearby.connection.Payload) {
+            if (payload.type == com.google.android.gms.nearby.connection.Payload.Type.BYTES) {
                 val jsonString = String(payload.asBytes()!!, Charsets.UTF_8)
-                try {
-                    val jsonObject = JSONObject(jsonString)
-
-                    // --- 1. THE BOUNCER LOGIC ---
-                    val msgId = jsonObject.getString("id")
-
-                    if (seenMessageIds.contains(msgId)) {
-                        // We already saw this exact message. Drop it so it doesn't spam!
-                        return
-                    }
-
-                    // It's a new message! Add it to memory.
-                    seenMessageIds.add(msgId)
-
-                    // Keep memory clean so the app doesn't crash after 500 messages
-                    if (seenMessageIds.size > 500) {
-                        seenMessageIds.remove(seenMessageIds.first())
-                    }
-                    // ----------------------------
-
-                    // --- 2. GOSSIP PROTOCOL SEEN RECEIPTS ---
-                    if (jsonObject.has("type") && (jsonObject.getString("type") == "SEEN" || jsonObject.getString("type") == "DELIVERED")) {
-                        val payloadType = jsonObject.getString("type")
-                        val targetMessageId = jsonObject.getString("targetMessageId")
-                        val reader = jsonObject.getString("reader")
-                        val isPrivateReceipt = jsonObject.optBoolean("isPrivate", false)
-                        
-                        // Tell the UI that someone saw or received this message!
-                        if (payloadType == "SEEN") {
-                            onMessageSeen?.invoke(targetMessageId, reader)
-                        } else if (payloadType == "DELIVERED") {
-                            onMessageDelivered?.invoke(targetMessageId, reader)
-                        }
-                        
-                        // Gossip: Forward the receipt to everyone else (unless it's private)
-                        if (!isPrivateReceipt) {
-                            broadcastPayload(jsonString, excludeEndpointId = endpointId)
-                        }
-                        return
-                    }
-
-                    val sender = jsonObject.getString("senderName")
-                    val isSystem = jsonObject.optBoolean("isSystem", false)
-
-                    if (isSystem) {
-                        onMessageReceived?.invoke(endpointId, msgId, sender, "", false, true, null, null, null, null, "LOCAL")
-                        broadcastPayload(jsonString, excludeEndpointId = endpointId)
-                        return
-                    }
-
-                    val text = jsonObject.getString("text")
-                    val isPrivate = jsonObject.optBoolean("isPrivate", false)
-
-                    if (isPrivate) {
-                        // Fire the local notification alert!
-                        notificationHelper.showPrivateMessageNotification(sender, text)
-                    }
-
-                    val imageBase64 = if (jsonObject.has("image")) jsonObject.getString("image") else null
-                    val audioBase64 = if (jsonObject.has("audio")) jsonObject.getString("audio") else null
-                    val locationLat = if (jsonObject.has("locationLat")) jsonObject.getDouble("locationLat") else null
-                    val locationLng = if (jsonObject.has("locationLng")) jsonObject.getDouble("locationLng") else null
-
-                    // Determine what medium this message just arrived on
-                    val medium = endpointMedium[endpointId] ?: "Bluetooth 5.4"
-
-                    // Passing the exact endpointId right here!
-                    onMessageReceived?.invoke(endpointId, msgId, sender, text, isPrivate, false, imageBase64, audioBase64, locationLat, locationLng, medium)
-
-                    if (!isPrivate) {
-                        broadcastPayload(jsonString, excludeEndpointId = endpointId)
-                    }
-
-                } catch (e: Exception) {
-                    AppLogger.d("MeshNetwork_ERROR", "Parse error: ${e.message}")
-                }
+                processJsonPayload(endpointId, jsonString)
             }
         }
         override fun onPayloadTransferUpdate(endpointId: String, update: PayloadTransferUpdate) {}
+    }
+
+    private fun processJsonPayload(endpointId: String, jsonString: String) {
+        try {
+            val jsonObject = JSONObject(jsonString)
+
+            // --- 1. THE BOUNCER LOGIC ---
+            val msgId = jsonObject.getString("id")
+
+            if (seenMessageIds.contains(msgId)) {
+                // We already saw this exact message. Drop it so it doesn't spam!
+                return
+            }
+
+            // It's a new message! Add it to memory.
+            seenMessageIds.add(msgId)
+
+            // Keep memory clean so the app doesn't crash after 500 messages
+            if (seenMessageIds.size > 500) {
+                seenMessageIds.remove(seenMessageIds.first())
+            }
+            // ----------------------------
+
+            // --- GOSSIP PROTOCOL SEEN RECEIPTS ---
+            if (jsonObject.has("type") && (jsonObject.getString("type") == "SEEN" || jsonObject.getString("type") == "DELIVERED")) {
+                val payloadType = jsonObject.getString("type")
+                val targetMessageId = jsonObject.getString("targetMessageId")
+                val reader = jsonObject.getString("reader")
+                val isPrivateReceipt = jsonObject.optBoolean("isPrivate", false)
+                
+                // Tell the UI that someone saw or received this message!
+                if (payloadType == "SEEN") {
+                    onMessageSeen?.invoke(targetMessageId, reader)
+                } else if (payloadType == "DELIVERED") {
+                    onMessageDelivered?.invoke(targetMessageId, reader)
+                }
+                
+                // Gossip: Forward the receipt to everyone else (unless it's private)
+                if (!isPrivateReceipt) {
+                    broadcastPayload(jsonString, excludeEndpointId = endpointId)
+                }
+                return
+            }
+
+            val sender = jsonObject.getString("senderName")
+            val isSystem = jsonObject.optBoolean("isSystem", false)
+
+            if (isSystem) {
+                onMessageReceived?.invoke(endpointId, msgId, sender, "", false, true, null, null, null, null, "LOCAL")
+                broadcastPayload(jsonString, excludeEndpointId = endpointId)
+                return
+            }
+
+            val text = jsonObject.getString("text")
+            val isPrivate = jsonObject.optBoolean("isPrivate", false)
+
+            if (isPrivate) {
+                // Fire the local notification alert!
+                notificationHelper.showPrivateMessageNotification(sender, text)
+            }
+
+            val imageBase64 = if (jsonObject.has("image")) jsonObject.getString("image") else null
+            val audioBase64 = if (jsonObject.has("audio")) jsonObject.getString("audio") else null
+            val locationLat = if (jsonObject.has("locationLat")) jsonObject.getDouble("locationLat") else null
+            val locationLng = if (jsonObject.has("locationLng")) jsonObject.getDouble("locationLng") else null
+
+            // Determine what medium this message just arrived on
+            val medium = endpointMedium[endpointId] ?: "Bluetooth 5.4"
+
+            // Passing the exact endpointId right here!
+            onMessageReceived?.invoke(endpointId, msgId, sender, text, isPrivate, false, imageBase64, audioBase64, locationLat, locationLng, medium)
+
+            if (!isPrivate) {
+                broadcastPayload(jsonString, excludeEndpointId = endpointId)
+            }
+
+        } catch (e: Exception) {
+            AppLogger.d("MeshNetwork_ERROR", "Parse error: ${e.message}")
+        }
     }
 }
