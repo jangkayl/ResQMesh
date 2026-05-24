@@ -79,6 +79,9 @@ fun ActiveChatScreen(name: String, viewModel: CommunicationViewModel, onBack: ()
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text(displayName, fontWeight = FontWeight.Black, color = Color.White, fontSize = 20.sp)
                             Spacer(modifier = Modifier.width(12.dp))
+                            
+                            val isDirect = uiState.knownNodes.find { it.name == displayName }?.isDirect ?: false
+                            
                             Surface(
                                 color = Color.White.copy(alpha = 0.05f),
                                 shape = RoundedCornerShape(16.dp),
@@ -88,9 +91,9 @@ fun ActiveChatScreen(name: String, viewModel: CommunicationViewModel, onBack: ()
                                     modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Icon(Icons.Outlined.RadioButtonChecked, contentDescription = null, tint = Color(0xFF10B981), modifier = Modifier.size(12.dp))
+                                    Icon(Icons.Outlined.RadioButtonChecked, contentDescription = null, tint = if (isDirect) Color(0xFF10B981) else Color(0xFFF59E0B), modifier = Modifier.size(12.dp))
                                     Spacer(modifier = Modifier.width(6.dp))
-                                    Text("IN RANGE", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, fontSize = 9.sp, color = Color.White)
+                                    Text(if (isDirect) "IN RANGE" else "MESH HOP", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, fontSize = 9.sp, color = Color.White)
                                 }
                             }
                         }

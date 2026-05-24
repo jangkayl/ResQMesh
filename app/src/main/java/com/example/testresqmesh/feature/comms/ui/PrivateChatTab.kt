@@ -32,36 +32,21 @@ fun PrivateChatTab(
             ?: messages.firstOrNull { it.senderName != "Me" }?.senderName 
             ?: id
 
+        val isDirectNode = uiState.knownNodes.find { it.name == peerName }?.isDirect ?: false
+
         InboxItemData(
             id = id,
             name = peerName,
             message = lastMsg?.text ?: "Open channel",
             timestamp = lastMsg?.timestamp ?: 0L,
-            hops = "DIRECT",
+            hops = if (isDirectNode) "DIRECT" else "MESH HOPPED",
             hasNotification = false
         )
     }
 
-    // Real connected devices that don't have messages yet
-    val connectedWithoutMessages = uiState.connectedDevices.filter { device ->
-        uiState.privateMessages.keys.none { it == device.endpointId }
-    }.map { device ->
-        InboxItemData(
-            id = device.endpointId,
-            name = device.name,
-            message = "Tap to establish secure link",
-            timestamp = 0L, // Newest connected but no messages yet
-            hops = "DIRECT",
-            hasNotification = false
-        )
-    }
-
-    // Merge and sort: Newest messages (or newest connections) at top
-    val allItems = remember(conversationItems, connectedWithoutMessages) {
-        (conversationItems + connectedWithoutMessages).sortedWith(
-            compareByDescending<InboxItemData> { it.timestamp }
-                .thenByDescending { it.id } // Tie-break with ID if needed
-        )
+    // Sort: Newest messages at top
+    val allItems = remember(conversationItems) {
+        conversationItems.sortedByDescending { it.timestamp }
     }
 
     LazyColumn(modifier = Modifier.fillMaxSize()) {

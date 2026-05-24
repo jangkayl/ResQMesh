@@ -273,13 +273,13 @@ class MeshRepository(private val networkManager: MeshNetworkManager) {
             if (locationLng != null) put("locationLng", locationLng)
         }.toString()
 
-        val message = ChatMessage(msgId, "Me", text, imageBase64, audioBase64, locationLat, locationLng, true, true, timestamp)
+        val isDirect = _connectedDevices.value.any { it.name == targetName }
+        val message = ChatMessage(msgId, "Me", text, imageBase64, audioBase64, locationLat, locationLng, true, true, timestamp, isHopped = !isDirect)
         val currentMap = _privateMessages.value.toMutableMap()
         val log = currentMap[targetName] ?: emptyList()
         currentMap[targetName] = log + message
         _privateMessages.value = currentMap
 
-        val isDirect = _connectedDevices.value.any { it.name == targetName }
         val directEndpointId = _connectedDevices.value.find { it.name == targetName }?.endpointId
 
         if (isDirect && directEndpointId != null) {

@@ -243,11 +243,8 @@ class MeshNetworkManager(private val context: Context) {
             put("isPrivate", isPrivate)
         }.toString()
 
-        if (isPrivate && targetId != null) {
-            sendDirectPayload(targetId, jsonString)
-        } else {
-            broadcastPayload(jsonString)
-        }
+        // Send it via broadcast so it can traverse the mesh if needed
+        broadcastPayload(jsonString)
     }
 
     fun broadcastDeliveredReceipt(targetMessageId: String, isPrivate: Boolean, targetId: String? = null) {
@@ -259,11 +256,8 @@ class MeshNetworkManager(private val context: Context) {
             put("isPrivate", isPrivate)
         }.toString()
 
-        if (isPrivate && targetId != null) {
-            sendDirectPayload(targetId, jsonString)
-        } else {
-            broadcastPayload(jsonString)
-        }
+        // Send it via broadcast so it can traverse the mesh if needed
+        broadcastPayload(jsonString)
     }
 
     private val endpointDiscoveryCallback = object : EndpointDiscoveryCallback() {
@@ -448,10 +442,8 @@ class MeshNetworkManager(private val context: Context) {
                     onMessageDelivered?.invoke(targetMessageId, reader)
                 }
                 
-                // Gossip: Forward the receipt to everyone else (unless it's private)
-                if (!isPrivateReceipt) {
-                    broadcastPayload(jsonString, excludeEndpointId = endpointId)
-                }
+                // Gossip: Forward the receipt to everyone else so it can reach the sender securely!
+                broadcastPayload(jsonString, excludeEndpointId = endpointId)
                 return
             }
 
