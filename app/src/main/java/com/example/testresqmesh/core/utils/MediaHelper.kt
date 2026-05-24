@@ -88,4 +88,38 @@ class MediaHelper(private val context: Context) {
             BitmapFactory.decodeByteArray(decodedBytes, 0, decodedBytes.size)
         } catch (e: Exception) { null }
     }
+
+    // --- PROCEDURAL EMERGENCY SIREN ---
+    // Uses the system ToneGenerator to create a high-fidelity "Hi-Lo" emergency siren without requiring an external mp3 file.
+    private var sirenThread: Thread? = null
+    private var isSirenPlaying = false
+
+    fun playEmergencySiren() {
+        if (isSirenPlaying) return
+        isSirenPlaying = true
+
+        sirenThread = Thread {
+            val toneGenerator = android.media.ToneGenerator(android.media.AudioManager.STREAM_ALARM, 100)
+            try {
+                while (isSirenPlaying) {
+                    // "Hi" tone
+                    toneGenerator.startTone(android.media.ToneGenerator.TONE_CDMA_ALERT_NETWORK_LITE, 400)
+                    Thread.sleep(450)
+                    // "Lo" tone
+                    toneGenerator.startTone(android.media.ToneGenerator.TONE_SUP_ERROR, 400)
+                    Thread.sleep(450)
+                }
+            } catch (e: InterruptedException) {
+                // Thread stopped
+            } finally {
+                toneGenerator.release()
+            }
+        }.apply { start() }
+    }
+
+    fun stopEmergencySiren() {
+        isSirenPlaying = false
+        sirenThread?.interrupt()
+        sirenThread = null
+    }
 }

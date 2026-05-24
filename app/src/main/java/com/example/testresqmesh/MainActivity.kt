@@ -57,11 +57,16 @@ class MeshViewModelFactory(private val repository: MeshRepository) : ViewModelPr
 
 class MainActivity : ComponentActivity() {
 
+    companion object {
+        var isAppInForeground = false
+    }
+
     private lateinit var networkManager: MeshNetworkManager
     private lateinit var repository: MeshRepository
     private lateinit var mediaHelper: MediaHelper
 
     private var onPermissionsResult: ((Boolean) -> Unit)? = null
+    private val sosDeepLinkTriggered = mutableStateOf(false)
 
     private val requestPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -77,6 +82,14 @@ class MainActivity : ComponentActivity() {
         repository = MeshRepository(networkManager)
         mediaHelper = MediaHelper(applicationContext)
 
+        lifecycle.addObserver(LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_START || event == Lifecycle.Event.ON_RESUME) {
+                isAppInForeground = true
+            } else if (event == Lifecycle.Event.ON_STOP || event == Lifecycle.Event.ON_PAUSE) {
+                isAppInForeground = false
+            }
+        })
+
         val factory = MeshViewModelFactory(repository)
 
         setContent {
@@ -91,9 +104,10 @@ class MainActivity : ComponentActivity() {
                 var currentStage by remember { mutableStateOf(AppState.Splash) }
 
                 // Initial stage determination - if already online, skip to Main
-                LaunchedEffect(setupState.isOnline) {
-                    if (setupState.isOnline && currentStage != AppState.Main) {
+                LaunchedEffect(setupState.isOnline, sosDeepLinkTriggered.value) {
+                    if (sosDeepLinkTriggered.value || (setupState.isOnline && currentStage != AppState.Main)) {
                         currentStage = AppState.Main
+                        sosDeepLinkTriggered.value = false
                     }
                 }
 
@@ -180,5 +194,12 @@ class MainActivity : ComponentActivity() {
     override fun onDestroy() {
         super.onDestroy()
         networkManager.stopMeshNode()
+    }
+
+    override fun onNewIntent(intent: android.content.Intent?) {
+        super.onNewIntent(intent)
+        if (intent?.getBooleanExtra("EXTRA_TRIGGER_SOS", false) == true) {
+            sosDeepLinkTriggered.value = true
+        }
     }
 }

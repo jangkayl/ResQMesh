@@ -6,6 +6,7 @@ import com.example.testresqmesh.core.model.ScannedDevice
 import com.example.testresqmesh.core.model.KnownNode
 import com.example.testresqmesh.core.network.MeshNetworkManager
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -23,7 +24,14 @@ class MeshRepository(private val networkManager: MeshNetworkManager) {
     val connectedDevices = _connectedDevices.asStateFlow()
 
     private val _scannedDevices = MutableStateFlow<List<ScannedDevice>>(emptyList())
-    val scannedDevices = _scannedDevices.asStateFlow()
+    val scannedDevices: StateFlow<List<ScannedDevice>> = _scannedDevices.asStateFlow()
+
+    private val _incomingSosAlert = MutableStateFlow<ChatMessage?>(null)
+    val incomingSosAlert: StateFlow<ChatMessage?> = _incomingSosAlert.asStateFlow()
+
+    fun clearSosAlert() {
+        _incomingSosAlert.value = null
+    }
 
     private val _knownNodes = MutableStateFlow<List<KnownNode>>(emptyList())
     val knownNodes = _knownNodes.asStateFlow()
@@ -113,8 +121,11 @@ class MeshRepository(private val networkManager: MeshNetworkManager) {
             _scannedDevices.value = _scannedDevices.value.filter { it.endpointId != id }
         }
 
+        networkManager.onSosCancelled = {
+            clearSosAlert()
+        }
+
         networkManager.onMessageReceived = { endpointId, msgId, sender, text, isPrivate, isSystem, img, audio, lat, lng, medium, routePath ->
-            // BUG FIX: Never add yourself to the "Known Nodes" list.
             if (sender != myNodeName) {
                 lastSeenMap[sender] = System.currentTimeMillis()
                 recalculateKnownNodes()
@@ -134,7 +145,8 @@ class MeshRepository(private val networkManager: MeshNetworkManager) {
                         timestamp = System.currentTimeMillis(),
                         isHopped = !isDirect,
                         receiveMedium = medium,
-                        outboundRoute = routePath
+                        outboundRoute = routePath,
+                        isSOS = text.contains("🚨 CRITICAL SOS")
                     )
                     if (isPrivate) {
                         val currentMap = _privateMessages.value.toMutableMap()
@@ -153,12 +165,22 @@ class MeshRepository(private val networkManager: MeshNetworkManager) {
                         
                         // The moment we save a public message, broadcast that we received it!
                         networkManager.broadcastDeliveredReceipt(msgId, isPrivate = false)
+                        
+                        if (message.isSOS) {
+                            _incomingSosAlert.value = message
+                        }
                     }
                 }
             }
         }
         
         networkManager.onMessageDelivered = { msgId, readerName, returnRoute ->
+            // Update Incoming SOS if it matches
+            val currentSos = _incomingSosAlert.value
+            if (currentSos?.id == msgId && !currentSos.deliveredTo.contains(readerName)) {
+                _incomingSosAlert.value = currentSos.copy(deliveredTo = currentSos.deliveredTo + readerName)
+            }
+
             // Update Public Messages
             val updatedPublic = _publicMessages.value.map { msg ->
                 if (msg.id == msgId && !msg.deliveredTo.contains(readerName)) {
@@ -240,7 +262,7 @@ class MeshRepository(private val networkManager: MeshNetworkManager) {
         networkManager.rescan()
     }
 
-    fun sendPublicMessage(text: String, imageBase64: String?, audioBase64: String?, locationLat: Double? = null, locationLng: Double? = null) {
+    fun sendPublicMessage(text: String, imageBase64: String?, audioBase64: String?, locationLat: Double? = null, locationLng: Double? = null, isSOS: Boolean = false, isSOSCancel: Boolean = false): String {
         val msgId = UUID.randomUUID().toString()
         val timestamp = System.currentTimeMillis()
         val jsonString = JSONObject().apply {
@@ -250,15 +272,18 @@ class MeshRepository(private val networkManager: MeshNetworkManager) {
             put("text", text)
             put("isPrivate", false)
             put("isSystem", false)
+            put("isSOS", isSOS)
+            put("isSOSCancel", isSOSCancel)
             if (imageBase64 != null) put("image", imageBase64)
             if (audioBase64 != null) put("audio", audioBase64)
             if (locationLat != null) put("locationLat", locationLat)
             if (locationLng != null) put("locationLng", locationLng)
         }.toString()
 
-        val message = ChatMessage(msgId, "Me", text, imageBase64, audioBase64, locationLat, locationLng, true, false, timestamp)
+        val message = ChatMessage(msgId, "Me", text, imageBase64, audioBase64, locationLat, locationLng, true, false, timestamp, isSOS = isSOS)
         _publicMessages.value = _publicMessages.value + message
         networkManager.broadcastPayload(jsonString)
+        return msgId
     }
 
     fun sendPrivateMessage(targetName: String, text: String, imageBase64: String?, audioBase64: String?, locationLat: Double? = null, locationLng: Double? = null) {
@@ -376,7 +401,7 @@ class MeshRepository(private val networkManager: MeshNetworkManager) {
                 val iterator = lastSeenMap.iterator()
                 while (iterator.hasNext()) {
                     val entry = iterator.next()
-                    if (now - entry.value > 20000) {
+                    if (now - entry.value > 10000) {
                         val deadNode = entry.key
                         iterator.remove()
                         networkGraph.remove(deadNode)

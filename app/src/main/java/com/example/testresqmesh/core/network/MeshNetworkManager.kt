@@ -33,6 +33,7 @@ class MeshNetworkManager(private val context: Context) {
     // Gossip Protocol SEEN Callback (msgId, readerName)
     var onMessageSeen: ((String, String) -> Unit)? = null
     var onMessageDelivered: ((String, String, List<String>) -> Unit)? = null
+    var onSosCancelled: (() -> Unit)? = null
     
     // Routing Table / Topology Callback
     var onRoutingTableReceived: ((String, List<String>) -> Unit)? = null
@@ -535,6 +536,9 @@ class MeshNetworkManager(private val context: Context) {
                 for (i in 0 until arr.length()) directedRoute.add(arr.getString(i))
             }
 
+            val isSOS = jsonObject.optBoolean("isSOS", false)
+            val isSOSCancel = jsonObject.optBoolean("isSOSCancel", false)
+
             if (isPrivate) {
                 if (targetName == myDeviceName) {
                     notificationHelper.showPrivateMessageNotification(sender, text)
@@ -560,6 +564,15 @@ class MeshNetworkManager(private val context: Context) {
                     broadcastPayload(jsonObject.toString(), excludeEndpointId = endpointId)
                 }
             } else {
+                if (isSOSCancel) {
+                    onSosCancelled?.invoke()
+                }
+                
+                if (isSOS && sender != myDeviceName) {
+                    if (!com.example.testresqmesh.MainActivity.isAppInForeground) {
+                        notificationHelper.showSosEmergencyNotification(sender, text)
+                    }
+                }
                 onMessageReceived?.invoke(endpointId, msgId, sender, text, isPrivate, false, imageBase64, audioBase64, locationLat, locationLng, medium, routePath)
                 AppLogger.d("MeshNetwork", "ROUTE (Relay): Gossiping Public message across the mesh.")
                 routePath.add(myDeviceName)

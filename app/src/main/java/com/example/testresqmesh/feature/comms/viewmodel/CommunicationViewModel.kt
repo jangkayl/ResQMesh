@@ -15,6 +15,15 @@ class CommunicationViewModel(private val repository: MeshRepository) : ViewModel
 
     private val _uiState = MutableStateFlow(ChatUiState())
     val uiState: StateFlow<ChatUiState> = _uiState.asStateFlow()
+    
+    private val _activeSosMessageId = MutableStateFlow<String?>(null)
+    val activeSosMessageId: StateFlow<String?> = _activeSosMessageId.asStateFlow()
+    
+    val incomingSosAlert = repository.incomingSosAlert
+    
+    fun clearSosAlert() {
+        repository.clearSosAlert()
+    }
 
     init {
         viewModelScope.launch {
@@ -31,6 +40,7 @@ class CommunicationViewModel(private val repository: MeshRepository) : ViewModel
             repository.connectedDevices.collect { devices ->
                 _uiState.update { it.copy(connectedDevices = devices) }
             }
+
         }
         viewModelScope.launch {
             repository.knownNodes.collect { nodes ->
@@ -41,6 +51,18 @@ class CommunicationViewModel(private val repository: MeshRepository) : ViewModel
 
     fun sendPublicMessage(text: String, imageBase64: String? = null, audioBase64: String? = null) {
         repository.sendPublicMessage(text, imageBase64, audioBase64)
+    }
+
+    fun sendEmergencySOS(sosType: String) {
+        val text = "🚨 CRITICAL SOS: $sosType EMERGENCY!"
+        val msgId = repository.sendPublicMessage(text, null, null, null, null, isSOS = true)
+        _activeSosMessageId.value = msgId
+    }
+
+    fun cancelEmergencySOS() {
+        _activeSosMessageId.value = null
+        repository.clearSosAlert()
+        repository.sendPublicMessage("✅ SOS Cancelled & Resolved", null, null, null, null, isSOS = false, isSOSCancel = true)
     }
 
     fun sendPrivateMessage(targetName: String, text: String, imageBase64: String? = null, audioBase64: String? = null) {

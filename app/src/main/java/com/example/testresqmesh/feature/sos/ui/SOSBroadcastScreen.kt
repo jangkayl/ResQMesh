@@ -1,8 +1,12 @@
 package com.example.testresqmesh.feature.sos.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -14,6 +18,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -25,13 +30,15 @@ import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SOSBroadcastScreen(onCancel: () -> Unit) {
+fun SOSBroadcastScreen(onCancel: () -> Unit, onSosTriggered: (String) -> Unit = {}) {
     val sosRed = Color(0xFFFF5252)
+    var selectedContext by remember { mutableStateOf("GENERAL") }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
             .background(sosRed)
+            .verticalScroll(rememberScrollState())
             .padding(Spacing.Large),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
@@ -87,13 +94,18 @@ fun SOSBroadcastScreen(onCancel: () -> Unit) {
 
         // Context Grid
         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                SOSContextCard(Icons.Default.LocalHospital, "MEDICAL", Modifier.weight(1f))
-                SOSContextCard(Icons.Default.Whatshot, "FIRE", Modifier.weight(1f))
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                SOSContextCard(Icons.Default.LocalHospital, "MEDICAL", selectedContext == "MEDICAL", { selectedContext = "MEDICAL" }, Modifier.weight(1f))
+                SOSContextCard(Icons.Default.Whatshot, "FIRE", selectedContext == "FIRE", { selectedContext = "FIRE" }, Modifier.weight(1f))
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                SOSContextCard(Icons.Default.BackHand, "TRAPPED", Modifier.weight(1f))
-                SOSContextCard(Icons.Default.Groups, "SEARCH", Modifier.weight(1f))
+            Spacer(modifier = Modifier.height(8.dp))
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                SOSContextCard(Icons.Default.BackHand, "TRAPPED", selectedContext == "TRAPPED", { selectedContext = "TRAPPED" }, Modifier.weight(1f))
+                SOSContextCard(Icons.Default.Groups, "SEARCH", selectedContext == "SEARCH", { selectedContext = "SEARCH" }, Modifier.weight(1f))
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                SOSContextCard(Icons.Default.Warning, "GENERAL", selectedContext == "GENERAL", { selectedContext = "GENERAL" }, Modifier.weight(1f))
             }
         }
 
@@ -124,7 +136,9 @@ fun SOSBroadcastScreen(onCancel: () -> Unit) {
         Spacer(modifier = Modifier.weight(1f))
 
         // Swipe to Broadcast Slider
-        SOSSlider()
+        SOSSlider(onSlideComplete = {
+            onSosTriggered(selectedContext)
+        })
 
         Spacer(modifier = Modifier.height(24.dp))
 
@@ -152,12 +166,18 @@ fun SOSBroadcastScreen(onCancel: () -> Unit) {
 }
 
 @Composable
-fun SOSContextCard(icon: ImageVector, label: String, modifier: Modifier = Modifier) {
+fun SOSContextCard(
+    icon: ImageVector, 
+    label: String, 
+    isSelected: Boolean, 
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
     Surface(
-        modifier = modifier.height(100.dp),
-        color = Color.White.copy(alpha = 0.1f),
-        shape = RoundedCornerShape(16.dp),
-        border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.2f))
+        modifier = modifier.height(100.dp).clickable { onClick() },
+        color = if (isSelected) Color(0xFFFF5252) else Color.White.copy(alpha = 0.1f),
+        shape = MaterialTheme.shapes.medium,
+        border = androidx.compose.foundation.BorderStroke(1.dp, if (isSelected) Color(0xFFFF5252) else Color.White.copy(alpha = 0.2f))
     ) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -171,9 +191,16 @@ fun SOSContextCard(icon: ImageVector, label: String, modifier: Modifier = Modifi
 }
 
 @Composable
-fun SOSSlider() {
+fun SOSSlider(onSlideComplete: () -> Unit) {
     val sliderWidth = 300.dp
     val thumbSize = 64.dp
+    
+    val density = LocalDensity.current
+    val sliderWidthPx = with(density) { sliderWidth.toPx() }
+    val thumbSizePx = with(density) { thumbSize.toPx() }
+    val maxDragPx = sliderWidthPx - thumbSizePx - with(density) { 8.dp.toPx() }
+    
+    var offsetX by remember { mutableStateOf(0f) }
     
     Surface(
         modifier = Modifier.width(sliderWidth).height(thumbSize + 8.dp),
@@ -190,10 +217,26 @@ fun SOSSlider() {
                 letterSpacing = 1.sp
             )
             
-            // Simple static thumb for now to match the UI
             Box(modifier = Modifier.fillMaxSize().padding(4.dp)) {
                 Surface(
-                    modifier = Modifier.size(thumbSize).align(Alignment.CenterStart),
+                    modifier = Modifier
+                        .size(thumbSize)
+                        .offset(x = with(density) { offsetX.toDp() })
+                        .pointerInput(Unit) {
+                            detectHorizontalDragGestures(
+                                onDragEnd = {
+                                    if (offsetX >= maxDragPx * 0.9f) {
+                                        offsetX = maxDragPx
+                                        onSlideComplete()
+                                    } else {
+                                        offsetX = 0f
+                                    }
+                                }
+                            ) { change, dragAmount ->
+                                change.consume()
+                                offsetX = (offsetX + dragAmount).coerceIn(0f, maxDragPx)
+                            }
+                        },
                     shape = CircleShape,
                     color = Color.White,
                     shadowElevation = 8.dp

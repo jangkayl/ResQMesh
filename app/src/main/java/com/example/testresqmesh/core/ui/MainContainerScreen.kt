@@ -11,11 +11,14 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
+import androidx.compose.runtime.collectAsState
 import com.example.testresqmesh.feature.comms.ui.ActiveChatScreen
 import com.example.testresqmesh.feature.comms.ui.ChatContainerScreen
 import com.example.testresqmesh.feature.radar.ui.RadarScreen
 import com.example.testresqmesh.feature.radar.ui.ResponderTrackerScreen
 import com.example.testresqmesh.feature.sos.ui.SOSBroadcastScreen
+import com.example.testresqmesh.feature.sos.ui.FullScreenSosAlarm
+import com.example.testresqmesh.feature.sos.ui.ActiveSOSMonitoringScreen
 import com.example.testresqmesh.feature.profile.ui.ProfileScreen
 import com.example.testresqmesh.feature.comms.viewmodel.CommunicationViewModel
 import com.example.testresqmesh.feature.radar.viewmodel.RadarViewModel
@@ -42,11 +45,38 @@ fun MainContainerScreen(
     var activeChatNode by remember { mutableStateOf<String?>(null) }
     var trackingNode by remember { mutableStateOf<String?>(null) }
     var isSOSActive by remember { mutableStateOf(false) }
+    
+    val incomingSosAlert by commsViewModel.incomingSosAlert.collectAsState()
+    val activeSosMessageId by commsViewModel.activeSosMessageId.collectAsState()
 
     val items = listOf(NavItem.Radar, NavItem.Messages, NavItem.SOS, NavItem.Settings)
 
+    if (incomingSosAlert != null) {
+        FullScreenSosAlarm(
+            alertMessage = incomingSosAlert!!,
+            onDismiss = { commsViewModel.clearSosAlert() }
+        )
+        BackHandler { commsViewModel.clearSosAlert() }
+        return
+    }
+
+    if (activeSosMessageId != null) {
+        ActiveSOSMonitoringScreen(
+            commsViewModel = commsViewModel,
+            onResolve = { commsViewModel.cancelEmergencySOS() }
+        )
+        BackHandler { }
+        return
+    }
+
     if (isSOSActive) {
-        SOSBroadcastScreen(onCancel = { isSOSActive = false })
+        SOSBroadcastScreen(
+            onCancel = { isSOSActive = false },
+            onSosTriggered = { type ->
+                commsViewModel.sendEmergencySOS(type)
+                isSOSActive = false
+            }
+        )
         BackHandler { isSOSActive = false }
         return
     }

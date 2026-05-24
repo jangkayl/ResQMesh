@@ -16,7 +16,8 @@ data class ChatMessage(
     val deliveredTo: List<String> = emptyList(),
     val seenBy: List<String> = emptyList(),
     val outboundRoute: List<String> = emptyList(),
-    val returnRoute: List<String> = emptyList()
+    val returnRoute: List<String> = emptyList(),
+    val isSOS: Boolean = false
 )
 
 data class ConnectedDevice(
