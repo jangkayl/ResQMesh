@@ -288,9 +288,13 @@ class MeshNetworkManager(private val context: Context) {
             // Add them to our physical room tracker
             activeScannedEndpoints.add(endpointId)
 
-            // --- DETERMINISTIC TIE-BREAKER: Lexicographical comparison ---
-            // This completely mathematically eliminates Connection Collisions.
-            val shouldInitiate = myDeviceName.compareTo(cleanPeerName) > 0
+            // --- DETERMINISTIC TIE-BREAKER: Power Score -> Lexicographical comparison ---
+            // The phone with higher hardware specs initiates. If perfectly tied, fallback to name comparison to eliminate collisions.
+            val shouldInitiate = if (myPowerScore != peerScore) {
+                myPowerScore > peerScore
+            } else {
+                myDeviceName.compareTo(cleanPeerName) > 0
+            }
             
             val myRole = if (shouldInitiate) "INITIATOR" else "RECEIVER"
             onDeviceScanned?.invoke(endpointId, cleanPeerName, peerScore, myRole, false)
