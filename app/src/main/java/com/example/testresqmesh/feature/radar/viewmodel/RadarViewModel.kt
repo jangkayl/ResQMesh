@@ -35,4 +35,8 @@ class RadarViewModel(private val repository: MeshRepository) : ViewModel() {
     fun disconnectDevice(endpointId: String) {
         repository.disconnectDevice(endpointId)
     }
+
+    fun forceConnect(endpointId: String, endpointName: String) {
+        repository.forceConnect(endpointId, endpointName)
+    }
 }

@@ -286,8 +286,8 @@ class MeshNetworkManager(private val context: Context) {
                 attemptConnection(endpointId, cleanPeerName)
             } else {
                 // RECEIVER: Patient Fallback Protocol
-                // Passively yield for 10-13 seconds to give the strong phone plenty of time to find us over long distances.
-                val patienceTimer = 10000L + kotlin.random.Random.nextLong(0, 3000)
+                // Passively yield for 3 seconds to give the strong phone time to find us.
+                val patienceTimer = 3000L + kotlin.random.Random.nextLong(0, 1000)
                 AppLogger.d("MeshNetwork", "I am Receiver. Passively yielding to $cleanPeerName for ${patienceTimer}ms...")
                 
                 Handler(Looper.getMainLooper()).postDelayed({
@@ -306,20 +306,29 @@ class MeshNetworkManager(private val context: Context) {
         }
     }
 
+    fun forceConnectToDevice(endpointId: String, endpointName: String) {
+        AppLogger.d("MeshNetwork", "FORCE CONNECT requested for $endpointName ($endpointId)")
+        attemptConnection(endpointId, endpointName, 0)
+    }
+
     private fun attemptConnection(endpointId: String, endpointName: String, retryCount: Int = 0) {
         connectionsClient.requestConnection(myDeviceName, endpointId, connectionLifecycleCallback)
             .addOnFailureListener { e ->
                 if (connectedEndpointIds.contains(endpointId)) return@addOnFailureListener
                 
-                // Exponential backoff
-                val baseDelay = (Math.pow(2.0, retryCount.toDouble()) * 1000).toLong()
-                val jitter = kotlin.random.Random.nextLong(200, 800)
+                // --- SMART BURST RETRY LOGIC ---
+                // If retryCount < 3: 1s interval (Rapid Burst)
+                // If retryCount >= 3: 8s interval (Lazy Fallback)
+                val delay = if (retryCount < 3) 1000L else 8000L
+                val jitter = kotlin.random.Random.nextLong(100, 400)
                 
+                AppLogger.d("MeshNetwork", "Connection to $endpointName failed. Retry #$retryCount in ${delay}ms...")
+
                 Handler(Looper.getMainLooper()).postDelayed({
                     if (activeScannedEndpoints.contains(endpointId) && !connectedEndpointIds.contains(endpointId)) {
                         attemptConnection(endpointId, endpointName, retryCount + 1)
                     }
-                }, baseDelay + jitter)
+                }, delay + jitter)
             }
     }
 

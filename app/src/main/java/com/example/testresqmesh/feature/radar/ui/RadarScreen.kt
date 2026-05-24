@@ -63,7 +63,8 @@ fun RadarScreen(viewModel: RadarViewModel) {
         activeNodesCount = uiState.connectedDevices.size + scannedNodes.size,
         nodes = connectedNodes + scannedNodes,
         onRefresh = { viewModel.rescan() },
-        onDisconnect = { viewModel.disconnectDevice(it) }
+        onDisconnect = { viewModel.disconnectDevice(it) },
+        onForceConnect = { id, name -> viewModel.forceConnect(id, name) }
     )
 }
 
@@ -73,7 +74,8 @@ fun RadarScreenContent(
     activeNodesCount: Int,
     nodes: List<NodeItemData>,
     onRefresh: () -> Unit,
-    onDisconnect: (String) -> Unit
+    onDisconnect: (String) -> Unit,
+    onForceConnect: (String, String) -> Unit
 ) {
     val infiniteTransition = rememberInfiniteTransition()
     val radarSweep by infiniteTransition.animateFloat(
@@ -250,7 +252,7 @@ fun RadarScreenContent(
                 verticalArrangement = Arrangement.spacedBy(Spacing.Small)
             ) {
                 nodes.forEach { node ->
-                    NearbyNodeItem(node, onDisconnect)
+                    NearbyNodeItem(node, onDisconnect, onForceConnect)
                 }
                 
                 if (nodes.isEmpty()) {
@@ -294,7 +296,7 @@ fun StatusMetric(label: String, value: String) {
 }
 
 @Composable
-fun NearbyNodeItem(node: NodeItemData, onDisconnect: (String) -> Unit) {
+fun NearbyNodeItem(node: NodeItemData, onDisconnect: (String) -> Unit, onForceConnect: (String, String) -> Unit) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
         color = Color.White.copy(alpha = 0.05f),
@@ -351,9 +353,13 @@ fun NearbyNodeItem(node: NodeItemData, onDisconnect: (String) -> Unit) {
                     )
                 }
             } else {
-                Column(horizontalAlignment = Alignment.End) {
-                    Icon(Icons.Default.SignalCellularAlt, contentDescription = null, tint = Color(0xFFF97316))
-                    Text("AVAILABLE", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, fontSize = 8.sp, color = Color.White.copy(alpha = 0.4f))
+                TextButton(
+                    onClick = { onForceConnect(node.endpointId, node.name) },
+                    colors = ButtonDefaults.textButtonColors(contentColor = InboxAccentBlue)
+                ) {
+                    Icon(Icons.Default.Bolt, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("FORCE CONNECT", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Black)
                 }
             }
         }
@@ -383,7 +389,8 @@ fun RadarScreenPreview() {
             activeNodesCount = 6,
             nodes = mockNodes,
             onRefresh = {},
-            onDisconnect = {}
+            onDisconnect = {},
+            onForceConnect = { _, _ -> }
         )
     }
 }

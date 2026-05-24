@@ -200,6 +200,10 @@ class MeshRepository(private val networkManager: MeshNetworkManager) {
         networkManager.disconnectFromEndpoint(endpointId)
     }
 
+    fun forceConnect(endpointId: String, endpointName: String) {
+        networkManager.forceConnectToDevice(endpointId, endpointName)
+    }
+
     fun rescan() {
         networkManager.rescan()
     }
