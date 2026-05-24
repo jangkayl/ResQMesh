@@ -23,12 +23,19 @@ class MeshNetworkManager(private val context: Context) {
     var onDeviceConnected: ((ConnectedDevice) -> Unit)? = null
     var onDeviceDisconnected: ((String) -> Unit)? = null
 
+    data class ConnectionRequest(val endpointId: String, val endpointName: String, val retryCount: Int = 0)
+    private val connectionQueue = java.util.concurrent.ConcurrentLinkedQueue<ConnectionRequest>()
+    private val isConnecting = java.util.concurrent.atomic.AtomicBoolean(false)
+
     // THIS IS THE LINE THAT WAS CAUSING THE HEADACHE! (Notice the 11 parameters now)
     var onMessageReceived: ((String, String, String, String, Boolean, Boolean, String?, String?, Double?, Double?, String) -> Unit)? = null
     
     // Gossip Protocol SEEN Callback (msgId, readerName)
     var onMessageSeen: ((String, String) -> Unit)? = null
     var onMessageDelivered: ((String, String) -> Unit)? = null
+    
+    // Routing Table / Topology Callback
+    var onRoutingTableReceived: ((String, List<String>) -> Unit)? = null
 
     var onStatusChanged: ((String) -> Unit)? = null
     var onDeviceScanned: ((String, String, Int, String, Boolean) -> Unit)? = null // Added isConnecting flag
@@ -38,6 +45,8 @@ class MeshNetworkManager(private val context: Context) {
     private val heartbeatHandler = Handler(Looper.getMainLooper())
     private var heartbeatRunnable: Runnable? = null
     private val connectedEndpointIds = mutableSetOf<String>()
+    private val connectedEndpointNames = mutableMapOf<String, String>() // Fast lookup for topology broadcasting
+    
     // The Bouncer's Memory (Stores IDs of messages we already processed)
     private val seenMessageIds = mutableSetOf<String>()
     
@@ -214,14 +223,15 @@ class MeshNetworkManager(private val context: Context) {
 
     private fun sendSystemPulse() {
         val pulseId = java.util.UUID.randomUUID().toString()
+        val nodesArray = org.json.JSONArray(connectedEndpointNames.values.toList())
+        
         val jsonString = JSONObject().apply {
             put("id", pulseId)
             put("senderName", myDeviceName)
             put("isSystem", true)
+            put("connectedNodes", nodesArray)
         }.toString()
         broadcastPayload(jsonString)
-        // Dummy ID "LOCAL" for your own pulse
-        onMessageReceived?.invoke("LOCAL", pulseId, myDeviceName, "", false, true, null, null, null, null, "LOCAL")
     }
 
     fun broadcastSeenReceipt(targetMessageId: String, isPrivate: Boolean, targetId: String? = null) {
@@ -264,39 +274,26 @@ class MeshNetworkManager(private val context: Context) {
             val peerScore = parts.getOrNull(0)?.toIntOrNull() ?: 0
             val cleanPeerName = parts.getOrNull(1) ?: rawName
 
+            // Don't connect to yourself OR detect yourself in the list
+            if (cleanPeerName == myDeviceName) return
+
             // Add them to our physical room tracker
             activeScannedEndpoints.add(endpointId)
 
-            // --- POWER SCORE TIE-BREAKER: The strongest phone leads ---
-            val shouldInitiate = if (myPowerScore != peerScore) {
-                myPowerScore > peerScore
-            } else {
-                myDeviceName.compareTo(cleanPeerName) > 0
-            }
+            // --- DETERMINISTIC TIE-BREAKER: Lexicographical comparison ---
+            // This completely mathematically eliminates Connection Collisions.
+            val shouldInitiate = myDeviceName.compareTo(cleanPeerName) > 0
             
             val myRole = if (shouldInitiate) "INITIATOR" else "RECEIVER"
             onDeviceScanned?.invoke(endpointId, cleanPeerName, peerScore, myRole, false)
 
-            // Don't connect to yourself
-            if (cleanPeerName == myDeviceName) return
-
             if (shouldInitiate) {
-                // INITIATOR: We will trigger the connection request. 
+                // INITIATOR: We will trigger the connection request sequentially. 
                 AppLogger.d("MeshNetwork", "I am Initiator for $cleanPeerName")
-                attemptConnection(endpointId, cleanPeerName)
+                queueConnection(endpointId, cleanPeerName)
             } else {
-                // RECEIVER: Patient Fallback Protocol
-                // Passively yield for 3 seconds to give the strong phone time to find us.
-                val patienceTimer = 3000L + kotlin.random.Random.nextLong(0, 1000)
-                AppLogger.d("MeshNetwork", "I am Receiver. Passively yielding to $cleanPeerName for ${patienceTimer}ms...")
-                
-                Handler(Looper.getMainLooper()).postDelayed({
-                    // If the timer expires and we STILL aren't connected, the Initiator must be suffering from a blind scan.
-                    if (!connectedEndpointIds.contains(endpointId) && activeScannedEndpoints.contains(endpointId)) {
-                        AppLogger.d("MeshNetwork", "Initiator appears blind. Receiver taking over for $endpointId")
-                        attemptConnection(endpointId, cleanPeerName)
-                    }
-                }, patienceTimer)
+                // RECEIVER: Passively yield and do absolutely nothing. Wait for them to call us.
+                AppLogger.d("MeshNetwork", "I am Receiver. Passively yielding to $cleanPeerName...")
             }
         }
 
@@ -308,28 +305,49 @@ class MeshNetworkManager(private val context: Context) {
 
     fun forceConnectToDevice(endpointId: String, endpointName: String) {
         AppLogger.d("MeshNetwork", "FORCE CONNECT requested for $endpointName ($endpointId)")
-        attemptConnection(endpointId, endpointName, 0)
+        queueConnection(endpointId, endpointName)
     }
 
-    private fun attemptConnection(endpointId: String, endpointName: String, retryCount: Int = 0) {
-        connectionsClient.requestConnection(myDeviceName, endpointId, connectionLifecycleCallback)
-            .addOnFailureListener { e ->
-                if (connectedEndpointIds.contains(endpointId)) return@addOnFailureListener
-                
-                // --- SMART BURST RETRY LOGIC ---
-                // If retryCount < 3: 1s interval (Rapid Burst)
-                // If retryCount >= 3: 8s interval (Lazy Fallback)
-                val delay = if (retryCount < 3) 1000L else 8000L
-                val jitter = kotlin.random.Random.nextLong(100, 400)
-                
-                AppLogger.d("MeshNetwork", "Connection to $endpointName failed. Retry #$retryCount in ${delay}ms...")
+    private fun queueConnection(endpointId: String, endpointName: String, retryCount: Int = 0) {
+        if (connectedEndpointIds.contains(endpointId)) return
+        connectionQueue.add(ConnectionRequest(endpointId, endpointName, retryCount))
+        processNextConnection()
+    }
 
-                Handler(Looper.getMainLooper()).postDelayed({
-                    if (activeScannedEndpoints.contains(endpointId) && !connectedEndpointIds.contains(endpointId)) {
-                        attemptConnection(endpointId, endpointName, retryCount + 1)
-                    }
-                }, delay + jitter)
+    private fun processNextConnection() {
+        if (isConnecting.get() || connectionQueue.isEmpty()) return
+        
+        val next = connectionQueue.poll() ?: return
+        if (connectedEndpointIds.contains(next.endpointId)) {
+            processNextConnection()
+            return
+        }
+
+        isConnecting.set(true)
+        executeConnectionRequest(next)
+    }
+
+    private fun executeConnectionRequest(request: ConnectionRequest) {
+        AppLogger.d("MeshNetwork", "Executing connection request to ${request.endpointName} (Retry: ${request.retryCount})")
+        connectionsClient.requestConnection(myDeviceName, request.endpointId, connectionLifecycleCallback)
+            .addOnFailureListener { e ->
+                AppLogger.d("MeshNetwork_ERROR", "requestConnection failed immediately: ${e.message}")
+                releaseConnectionLockAndProcessNext()
+                
+                // Exponential backoff
+                if (request.retryCount < 3 && activeScannedEndpoints.contains(request.endpointId)) {
+                    val delay = 1000L * (request.retryCount + 1) + kotlin.random.Random.nextLong(100, 500)
+                    AppLogger.d("MeshNetwork", "Queuing retry for ${request.endpointName} in ${delay}ms...")
+                    Handler(Looper.getMainLooper()).postDelayed({
+                        queueConnection(request.endpointId, request.endpointName, request.retryCount + 1)
+                    }, delay)
+                }
             }
+    }
+
+    private fun releaseConnectionLockAndProcessNext() {
+        isConnecting.set(false)
+        processNextConnection()
     }
 
     private val connectionLifecycleCallback = object : ConnectionLifecycleCallback() {
@@ -355,15 +373,22 @@ class MeshNetworkManager(private val context: Context) {
 
             if (result.status.statusCode == ConnectionsStatusCodes.STATUS_OK) {
                 connectedEndpointIds.add(endpointId)
+                connectedEndpointNames[endpointId] = deviceName
                 endpointMedium[endpointId] = "Bluetooth 5.4" // Start with Bluetooth assumption
                 onDeviceConnected?.invoke(ConnectedDevice(endpointId, deviceName))
+            } else {
+                AppLogger.d("MeshNetwork", "Connection to $deviceName failed with status ${result.status.statusCode}")
             }
+            
+            // Release the lock so the next device in the queue can be paired!
+            releaseConnectionLockAndProcessNext()
         }
         override fun onDisconnected(endpointId: String) {
             pendingNames.remove(endpointId) // BUG FIX: Ensure clean memory
             endpointMedium.remove(endpointId)
             onDeviceScanRemoved?.invoke(endpointId)
             connectedEndpointIds.remove(endpointId)
+            connectedEndpointNames.remove(endpointId)
             onDeviceDisconnected?.invoke(endpointId)
         }
         
@@ -431,9 +456,22 @@ class MeshNetworkManager(private val context: Context) {
             }
 
             val sender = jsonObject.getString("senderName")
+            
+            // SECURITY/BUG FIX: If we receive our own message (relayed back to us), ignore it!
+            if (sender == myDeviceName) return
+
             val isSystem = jsonObject.optBoolean("isSystem", false)
 
             if (isSystem) {
+                if (jsonObject.has("connectedNodes")) {
+                    val nodesArray = jsonObject.getJSONArray("connectedNodes")
+                    val connectedList = mutableListOf<String>()
+                    for (i in 0 until nodesArray.length()) {
+                        connectedList.add(nodesArray.getString(i))
+                    }
+                    onRoutingTableReceived?.invoke(sender, connectedList)
+                }
+                
                 onMessageReceived?.invoke(endpointId, msgId, sender, "", false, true, null, null, null, null, "LOCAL")
                 broadcastPayload(jsonString, excludeEndpointId = endpointId)
                 return

@@ -7,6 +7,10 @@ import com.example.testresqmesh.core.model.KnownNode
 import com.example.testresqmesh.core.network.MeshNetworkManager
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
 import org.json.JSONObject
 import java.util.UUID
 
@@ -36,8 +40,13 @@ class MeshRepository(private val networkManager: MeshNetworkManager) {
 
     private var myNodeName: String = ""
 
+    private val networkGraph = mutableMapOf<String, Set<String>>()
+    private val lastSeenMap = mutableMapOf<String, Long>()
+    private val repositoryScope = CoroutineScope(Dispatchers.Default)
+
     init {
         setupCallbacks()
+        startTopologyCleanup()
     }
 
     private fun setupCallbacks() {
@@ -49,32 +58,54 @@ class MeshRepository(private val networkManager: MeshNetworkManager) {
             if (_connectedDevices.value.none { it.endpointId == device.endpointId }) {
                 _connectedDevices.value = _connectedDevices.value + device
                 _scannedDevices.value = _scannedDevices.value.filter { it.endpointId != device.endpointId }
+                
+                lastSeenMap[device.name] = System.currentTimeMillis()
+                recalculateKnownNodes()
             }
         }
 
         networkManager.onDeviceDisconnected = { endpointId ->
             _connectedDevices.value = _connectedDevices.value.filter { it.endpointId != endpointId }
+            recalculateKnownNodes()
+        }
+        
+        networkManager.onRoutingTableReceived = { senderName, connectedNodes ->
+            if (senderName != myNodeName) {
+                lastSeenMap[senderName] = System.currentTimeMillis()
+                networkGraph[senderName] = connectedNodes.toSet()
+                
+                // Also update lastSeen for all the nodes they are connected to
+                connectedNodes.forEach { node ->
+                    if (node != myNodeName) {
+                        lastSeenMap[node] = System.currentTimeMillis()
+                    }
+                }
+                recalculateKnownNodes()
+            }
         }
 
         networkManager.onDeviceScanned = { id, name, score, role, isConnecting ->
-            val isNotConnected = _connectedDevices.value.none { it.endpointId == id || it.name == name }
-            
-            if (isNotConnected) {
-                val currentScanned = _scannedDevices.value.toMutableList()
-                val existingIndex = currentScanned.indexOfFirst { it.name == name }
+            // Prevent local node from appearing in the scan list
+            if (name != myNodeName) {
+                val isNotConnected = _connectedDevices.value.none { it.endpointId == id || it.name == name }
                 
-                if (existingIndex != -1) {
-                    currentScanned[existingIndex] = currentScanned[existingIndex].copy(
-                        endpointId = id,
-                        lastSeen = System.currentTimeMillis(),
-                        powerScore = score,
-                        myRole = role,
-                        isConnecting = isConnecting || currentScanned[existingIndex].isConnecting
-                    )
-                } else {
-                    currentScanned.add(ScannedDevice(id, name, System.currentTimeMillis(), score, role, isConnecting))
+                if (isNotConnected) {
+                    val currentScanned = _scannedDevices.value.toMutableList()
+                    val existingIndex = currentScanned.indexOfFirst { it.name == name }
+                    
+                    if (existingIndex != -1) {
+                        currentScanned[existingIndex] = currentScanned[existingIndex].copy(
+                            endpointId = id,
+                            lastSeen = System.currentTimeMillis(),
+                            powerScore = score,
+                            myRole = role,
+                            isConnecting = isConnecting || currentScanned[existingIndex].isConnecting
+                        )
+                    } else {
+                        currentScanned.add(ScannedDevice(id, name, System.currentTimeMillis(), score, role, isConnecting))
+                    }
+                    _scannedDevices.value = currentScanned
                 }
-                _scannedDevices.value = currentScanned
             }
         }
 
@@ -83,45 +114,41 @@ class MeshRepository(private val networkManager: MeshNetworkManager) {
         }
 
         networkManager.onMessageReceived = { endpointId, msgId, sender, text, isPrivate, isSystem, img, audio, lat, lng, medium ->
-            // Gossip Presence: Log every device that speaks, whether direct or relayed!
-            val isDirect = _connectedDevices.value.any { it.name == sender }
-            val currentNodes = _knownNodes.value.toMutableList()
-            val existingNode = currentNodes.find { it.name == sender }
-            if (existingNode != null) {
-                currentNodes[currentNodes.indexOf(existingNode)] = existingNode.copy(isDirect = isDirect, lastSeen = System.currentTimeMillis())
-            } else {
-                currentNodes.add(KnownNode(sender, isDirect, System.currentTimeMillis()))
-            }
-            _knownNodes.value = currentNodes
+            // BUG FIX: Never add yourself to the "Known Nodes" list.
+            if (sender != myNodeName) {
+                lastSeenMap[sender] = System.currentTimeMillis()
+                recalculateKnownNodes()
 
-            if (!isSystem) {
-                val message = ChatMessage(
-                    id = msgId, // Use exact sender's ID!
-                    senderName = sender,
-                    text = text,
-                    imageBase64 = img,
-                    audioBase64 = audio,
-                    locationLat = lat,
-                    locationLng = lng,
-                    isMine = false,
-                    isPrivate = isPrivate,
-                    timestamp = System.currentTimeMillis(),
-                    isHopped = !isDirect,
-                    receiveMedium = medium
-                )
-                if (isPrivate) {
-                    val currentMap = _privateMessages.value.toMutableMap()
-                    val log = currentMap[sender] ?: emptyList()
-                    currentMap[sender] = log + message
-                    _privateMessages.value = currentMap
-                    
-                    // The moment we save a private message, tell the sender we received it!
-                    networkManager.broadcastDeliveredReceipt(msgId, isPrivate = true, targetId = endpointId)
-                } else {
-                    _publicMessages.value = _publicMessages.value + message
-                    
-                    // The moment we save a public message, broadcast that we received it!
-                    networkManager.broadcastDeliveredReceipt(msgId, isPrivate = false)
+                if (!isSystem) {
+                    val isDirect = _connectedDevices.value.any { it.name == sender }
+                    val message = ChatMessage(
+                        id = msgId, // Use exact sender's ID!
+                        senderName = sender,
+                        text = text,
+                        imageBase64 = img,
+                        audioBase64 = audio,
+                        locationLat = lat,
+                        locationLng = lng,
+                        isMine = false,
+                        isPrivate = isPrivate,
+                        timestamp = System.currentTimeMillis(),
+                        isHopped = !isDirect,
+                        receiveMedium = medium
+                    )
+                    if (isPrivate) {
+                        val currentMap = _privateMessages.value.toMutableMap()
+                        val log = currentMap[sender] ?: emptyList()
+                        currentMap[sender] = log + message
+                        _privateMessages.value = currentMap
+                        
+                        // The moment we save a private message, tell the sender we received it!
+                        networkManager.broadcastDeliveredReceipt(msgId, isPrivate = true, targetId = endpointId)
+                    } else {
+                        _publicMessages.value = _publicMessages.value + message
+                        
+                        // The moment we save a public message, broadcast that we received it!
+                        networkManager.broadcastDeliveredReceipt(msgId, isPrivate = false)
+                    }
                 }
             }
         }
@@ -260,6 +287,52 @@ class MeshRepository(private val networkManager: MeshNetworkManager) {
         } else {
             // RELAY ROUTING: It is a hopped node! Broadcast it, but it's flagged as private with a targetName!
             networkManager.broadcastPayload(jsonString)
+        }
+    }
+
+    private fun recalculateKnownNodes() {
+        val newKnownNodes = mutableListOf<KnownNode>()
+        // Add direct nodes
+        _connectedDevices.value.forEach { device ->
+            val lastSeen = lastSeenMap[device.name] ?: System.currentTimeMillis()
+            newKnownNodes.add(KnownNode(device.name, isDirect = true, lastSeen = lastSeen))
+        }
+        
+        // Add indirect nodes from the graph
+        networkGraph.values.flatten().toSet().forEach { indirectNode ->
+            // Don't add ourselves, and don't add if already in direct nodes
+            if (indirectNode != myNodeName && newKnownNodes.none { it.name == indirectNode }) {
+                val lastSeen = lastSeenMap[indirectNode] ?: System.currentTimeMillis()
+                newKnownNodes.add(KnownNode(indirectNode, isDirect = false, lastSeen = lastSeen))
+            }
+        }
+        
+        _knownNodes.value = newKnownNodes
+    }
+
+    private fun startTopologyCleanup() {
+        repositoryScope.launch {
+            while (true) {
+                delay(5000)
+                val now = System.currentTimeMillis()
+                var changed = false
+                
+                // Purge nodes older than 20 seconds (4 missed pulses)
+                val iterator = lastSeenMap.iterator()
+                while (iterator.hasNext()) {
+                    val entry = iterator.next()
+                    if (now - entry.value > 20000) {
+                        val deadNode = entry.key
+                        iterator.remove()
+                        networkGraph.remove(deadNode)
+                        changed = true
+                    }
+                }
+                
+                if (changed) {
+                    recalculateKnownNodes()
+                }
+            }
         }
     }
 }
