@@ -31,4 +31,8 @@ class RadarViewModel(private val repository: MeshRepository) : ViewModel() {
     fun rescan() {
         repository.rescan()
     }
+
+    fun disconnectDevice(endpointId: String) {
+        repository.disconnectDevice(endpointId)
+    }
 }

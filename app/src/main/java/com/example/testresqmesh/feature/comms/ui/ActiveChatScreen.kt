@@ -96,9 +96,6 @@ fun ActiveChatScreen(name: String, viewModel: CommunicationViewModel, onBack: ()
                         }
                     },
                     actions = {
-                        IconButton(onClick = { viewModel.disconnectDevice(name) }) {
-                            Icon(Icons.Outlined.LinkOff, contentDescription = "Disconnect Link", tint = Color(0xFFEF4444))
-                        }
                         IconButton(onClick = {}) {
                             Icon(Icons.Default.MoreHoriz, contentDescription = null, tint = Color.White)
                         }

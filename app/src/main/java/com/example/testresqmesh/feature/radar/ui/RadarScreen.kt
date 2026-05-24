@@ -12,6 +12,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.TrendingUp
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.outlined.LinkOff
 import androidx.compose.material.icons.outlined.Shield
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -41,7 +42,7 @@ fun RadarScreen(viewModel: RadarViewModel) {
     val connectedNames = uiState.connectedDevices.map { it.name }.toSet()
 
     val connectedNodes = uiState.connectedDevices.map { 
-        NodeItemData(it.name, "Connected • Mesh Peer", true)
+        NodeItemData(it.endpointId, it.name, "Connected • Mesh Peer", isConnected = true, isActiveRelay = true)
     }
     
     // VISUAL-ONLY FILTER: Hide any scanned node that has the same name as a connected one
@@ -50,16 +51,19 @@ fun RadarScreen(viewModel: RadarViewModel) {
         .map {
             val displayStatus = if (it.isConnecting) "SYNCING..." else "Score: ${it.powerScore} • Role: ${it.myRole}"
             NodeItemData(
+                it.endpointId,
                 it.name, 
                 displayStatus,
-                it.myRole == "MASTER" || it.isConnecting
+                isConnected = false,
+                isActiveRelay = it.myRole == "MASTER" || it.isConnecting
             )
         }
 
     RadarScreenContent(
         activeNodesCount = uiState.connectedDevices.size + scannedNodes.size,
         nodes = connectedNodes + scannedNodes,
-        onRefresh = { viewModel.rescan() }
+        onRefresh = { viewModel.rescan() },
+        onDisconnect = { viewModel.disconnectDevice(it) }
     )
 }
 
@@ -68,7 +72,8 @@ fun RadarScreen(viewModel: RadarViewModel) {
 fun RadarScreenContent(
     activeNodesCount: Int,
     nodes: List<NodeItemData>,
-    onRefresh: () -> Unit
+    onRefresh: () -> Unit,
+    onDisconnect: (String) -> Unit
 ) {
     val infiniteTransition = rememberInfiniteTransition()
     val radarSweep by infiniteTransition.animateFloat(
@@ -245,7 +250,7 @@ fun RadarScreenContent(
                 verticalArrangement = Arrangement.spacedBy(Spacing.Small)
             ) {
                 nodes.forEach { node ->
-                    NearbyNodeItem(node)
+                    NearbyNodeItem(node, onDisconnect)
                 }
                 
                 if (nodes.isEmpty()) {
@@ -289,7 +294,7 @@ fun StatusMetric(label: String, value: String) {
 }
 
 @Composable
-fun NearbyNodeItem(node: NodeItemData) {
+fun NearbyNodeItem(node: NodeItemData, onDisconnect: (String) -> Unit) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
         color = Color.White.copy(alpha = 0.05f),
@@ -325,9 +330,9 @@ fun NearbyNodeItem(node: NodeItemData) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(node.name, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Black, color = Color.White)
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    val statusColor = if (node.status.contains("MASTER")) InboxAccentBlue else Color.White.copy(alpha = 0.4f)
+                    val statusColor = if (node.status.contains("MASTER") || node.isConnected) InboxAccentBlue else Color.White.copy(alpha = 0.4f)
                     Icon(
-                        if (node.status.contains("MASTER")) Icons.Default.Bolt else Icons.Default.Info, 
+                        if (node.status.contains("MASTER") || node.isConnected) Icons.Default.Bolt else Icons.Default.Info, 
                         contentDescription = null, 
                         tint = statusColor, 
                         modifier = Modifier.size(12.dp)
@@ -337,31 +342,48 @@ fun NearbyNodeItem(node: NodeItemData) {
                 }
             }
 
-            Column(horizontalAlignment = Alignment.End) {
-                Icon(Icons.Default.SignalCellularAlt, contentDescription = null, tint = Color(0xFFF97316))
-                Text("CONNECTED", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, fontSize = 8.sp, color = Color.White.copy(alpha = 0.4f))
+            if (node.isConnected) {
+                IconButton(onClick = { onDisconnect(node.endpointId) }) {
+                    Icon(
+                        imageVector = Icons.Outlined.LinkOff,
+                        contentDescription = "Unlink Device",
+                        tint = Color(0xFFEF4444)
+                    )
+                }
+            } else {
+                Column(horizontalAlignment = Alignment.End) {
+                    Icon(Icons.Default.SignalCellularAlt, contentDescription = null, tint = Color(0xFFF97316))
+                    Text("AVAILABLE", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, fontSize = 8.sp, color = Color.White.copy(alpha = 0.4f))
+                }
             }
         }
     }
 }
 
-data class NodeItemData(val name: String, val status: String, val isActiveRelay: Boolean = false)
+data class NodeItemData(
+    val endpointId: String,
+    val name: String,
+    val status: String,
+    val isConnected: Boolean = false,
+    val isActiveRelay: Boolean = false
+)
 
 @Preview(showBackground = true)
 @Composable
 fun RadarScreenPreview() {
     val mockNodes = listOf(
-        NodeItemData("Node_X77A", "120m • End Device"),
-        NodeItemData("Node_BK29", "250m • Active Relay", true),
-        NodeItemData("Node_L005", "410m • End Device"),
-        NodeItemData("Node_MN04", "680m • Active Relay", true),
-        NodeItemData("Node_PJ88", "910m • End Device")
+        NodeItemData("id1", "Node_X77A", "120m • End Device"),
+        NodeItemData("id2", "Node_BK29", "250m • Active Relay", isConnected = true, isActiveRelay = true),
+        NodeItemData("id3", "Node_L005", "410m • End Device"),
+        NodeItemData("id4", "Node_MN04", "680m • Active Relay", isConnected = false, isActiveRelay = true),
+        NodeItemData("id5", "Node_PJ88", "910m • End Device")
     )
     TestResQMeshTheme {
         RadarScreenContent(
             activeNodesCount = 6,
             nodes = mockNodes,
-            onRefresh = {}
+            onRefresh = {},
+            onDisconnect = {}
         )
     }
 }
