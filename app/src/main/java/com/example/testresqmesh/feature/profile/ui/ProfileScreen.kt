@@ -21,7 +21,7 @@ import com.example.testresqmesh.core.ui.theme.InboxAccentBlue
 import com.example.testresqmesh.core.ui.theme.Spacing
 import com.example.testresqmesh.feature.setup.viewmodel.SetupViewModel
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class) 
 @Composable
 fun ProfileScreen(viewModel: SetupViewModel) {
     val uiState by viewModel.uiState.collectAsState()

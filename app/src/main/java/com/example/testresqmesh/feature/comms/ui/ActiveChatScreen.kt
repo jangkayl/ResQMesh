@@ -5,6 +5,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -54,6 +55,12 @@ fun ActiveChatScreen(name: String, viewModel: CommunicationViewModel, onBack: ()
     // Messages for this specific target (name is treated as endpointId here)
     val messages = uiState.privateMessages[name] ?: emptyList()
     
+    // Sort messages newest first for reverseLayout
+    val sortedMessages = remember(messages) { messages.sortedByDescending { it.timestamp } }
+    
+    // LazyListState to control scrolling if needed
+    val listState = rememberLazyListState()
+
     // Fix: Prioritize connected device name, then look for the first message not sent by "Me"
     val displayName = uiState.connectedDevices.find { it.endpointId == name }?.name 
         ?: messages.firstOrNull { it.senderName != "Me" }?.senderName 
@@ -132,29 +139,14 @@ fun ActiveChatScreen(name: String, viewModel: CommunicationViewModel, onBack: ()
         }
     ) { innerPadding ->
         LazyColumn(
+            state = listState,
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
-                .padding(horizontal = Spacing.Medium)
+                .padding(horizontal = Spacing.Medium),
+            reverseLayout = true
         ) {
-            item {
-                Spacer(modifier = Modifier.height(32.dp))
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
-                    HorizontalDivider(modifier = Modifier.width(60.dp), color = Color.White.copy(alpha = 0.1f))
-                    Text(
-                        "TODAY • OCTOBER 24",
-                        modifier = Modifier.padding(horizontal = 16.dp),
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.Black,
-                        color = Color.White.copy(alpha = 0.3f),
-                        letterSpacing = 1.sp
-                    )
-                    HorizontalDivider(modifier = Modifier.width(60.dp), color = Color.White.copy(alpha = 0.1f))
-                }
-                Spacer(modifier = Modifier.height(24.dp))
-            }
-
-            items(messages) { msg ->
+            items(sortedMessages) { msg ->
                 if (!msg.isMine && !msg.seenBy.contains("Me")) {
                     LaunchedEffect(msg.id) {
                         viewModel.markMessageAsSeen(msg.id, isPrivate = true, targetId = name)
@@ -176,6 +168,23 @@ fun ActiveChatScreen(name: String, viewModel: CommunicationViewModel, onBack: ()
                         isSent = msg.isMine
                     )
                 )
+            }
+
+            item {
+                Spacer(modifier = Modifier.height(24.dp))
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
+                    HorizontalDivider(modifier = Modifier.width(60.dp), color = Color.White.copy(alpha = 0.1f))
+                    Text(
+                        "TODAY • OCTOBER 24",
+                        modifier = Modifier.padding(horizontal = 16.dp),
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Black,
+                        color = Color.White.copy(alpha = 0.3f),
+                        letterSpacing = 1.sp
+                    )
+                    HorizontalDivider(modifier = Modifier.width(60.dp), color = Color.White.copy(alpha = 0.1f))
+                }
+                Spacer(modifier = Modifier.height(32.dp))
             }
         }
     }

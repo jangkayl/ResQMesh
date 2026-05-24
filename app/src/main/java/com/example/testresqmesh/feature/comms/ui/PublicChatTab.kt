@@ -42,7 +42,7 @@ fun PublicChatTab(
 
     // Sort messages by timestamp descending (newest first). 
     // reverseLayout = true will anchor newest to the bottom.
-    val sortedMessages = uiState.publicMessages.sortedByDescending { it.timestamp }
+    val sortedMessages = remember(uiState.publicMessages) { uiState.publicMessages.sortedByDescending { it.timestamp } }
 
     Column(
         modifier = Modifier

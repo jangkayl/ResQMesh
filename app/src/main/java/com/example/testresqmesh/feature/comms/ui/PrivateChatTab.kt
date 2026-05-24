@@ -12,6 +12,7 @@ import com.example.testresqmesh.core.utils.MediaHelper
 
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import com.example.testresqmesh.feature.comms.viewmodel.CommunicationViewModel
 
 @Composable
@@ -56,10 +57,12 @@ fun PrivateChatTab(
     }
 
     // Merge and sort: Newest messages (or newest connections) at top
-    val allItems = (conversationItems + connectedWithoutMessages).sortedWith(
-        compareByDescending<InboxItemData> { it.timestamp }
-            .thenByDescending { it.id } // Tie-break with ID if needed
-    )
+    val allItems = remember(conversationItems, connectedWithoutMessages) {
+        (conversationItems + connectedWithoutMessages).sortedWith(
+            compareByDescending<InboxItemData> { it.timestamp }
+                .thenByDescending { it.id } // Tie-break with ID if needed
+        )
+    }
 
     LazyColumn(modifier = Modifier.fillMaxSize()) {
         items(allItems) { item ->
