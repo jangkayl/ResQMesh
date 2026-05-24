@@ -10,6 +10,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.runtime.collectAsState
 import com.example.testresqmesh.feature.comms.ui.ActiveChatScreen
@@ -19,6 +20,9 @@ import com.example.testresqmesh.feature.radar.ui.ResponderTrackerScreen
 import com.example.testresqmesh.feature.sos.ui.SOSBroadcastScreen
 import com.example.testresqmesh.feature.sos.ui.FullScreenSosAlarm
 import com.example.testresqmesh.feature.sos.ui.ActiveSOSMonitoringScreen
+import com.example.testresqmesh.feature.sos.ui.SosMapScreen
+import com.example.testresqmesh.feature.sos.ui.OfflineMapPromptModal
+import com.example.testresqmesh.feature.sos.utils.MapDownloadManager
 import com.example.testresqmesh.feature.profile.ui.ProfileScreen
 import com.example.testresqmesh.feature.comms.viewmodel.CommunicationViewModel
 import com.example.testresqmesh.feature.radar.viewmodel.RadarViewModel
@@ -45,6 +49,11 @@ fun MainContainerScreen(
     var activeChatNode by remember { mutableStateOf<String?>(null) }
     var trackingNode by remember { mutableStateOf<String?>(null) }
     var isSOSActive by remember { mutableStateOf(false) }
+    var mapSosAlert by remember { mutableStateOf<com.example.testresqmesh.core.model.ChatMessage?>(null) }
+    
+    val context = LocalContext.current
+    val mapDownloadManager = remember { MapDownloadManager(context) }
+    var showMapDownloadPrompt by remember { mutableStateOf(!mapDownloadManager.isMapDownloaded()) }
     
     val incomingSosAlert by commsViewModel.incomingSosAlert.collectAsState()
     val activeSosMessageId by commsViewModel.activeSosMessageId.collectAsState()
@@ -54,9 +63,21 @@ fun MainContainerScreen(
     if (incomingSosAlert != null) {
         FullScreenSosAlarm(
             alertMessage = incomingSosAlert!!,
-            onDismiss = { commsViewModel.clearSosAlert() }
+            onDismiss = { commsViewModel.clearSosAlert() },
+            onViewMap = { 
+                mapSosAlert = incomingSosAlert
+            }
         )
         BackHandler { commsViewModel.clearSosAlert() }
+        return
+    }
+
+    if (mapSosAlert != null) {
+        SosMapScreen(
+            alertMessage = mapSosAlert!!,
+            onBack = { mapSosAlert = null }
+        )
+        BackHandler { mapSosAlert = null }
         return
     }
 
@@ -70,10 +91,11 @@ fun MainContainerScreen(
     }
 
     if (isSOSActive) {
+        val context = LocalContext.current
         SOSBroadcastScreen(
             onCancel = { isSOSActive = false },
             onSosTriggered = { type ->
-                commsViewModel.sendEmergencySOS(type)
+                commsViewModel.sendEmergencySOS(context, type)
                 isSOSActive = false
             }
         )
@@ -81,11 +103,31 @@ fun MainContainerScreen(
         return
     }
 
+    if (showMapDownloadPrompt) {
+        OfflineMapPromptModal(
+            downloadManager = mapDownloadManager,
+            onDismiss = { showMapDownloadPrompt = false }
+        )
+    }
+
     if (activeChatNode != null) {
         ActiveChatScreen(
-            name = activeChatNode!!, 
+            name = activeChatNode!!,
             viewModel = commsViewModel,
-            onBack = { activeChatNode = null }
+            onBack = { activeChatNode = null },
+            onViewMap = { lat, lng, sender, text ->
+                mapSosAlert = com.example.testresqmesh.core.model.ChatMessage(
+                    id = "view_map_${System.currentTimeMillis()}",
+                    senderName = sender,
+                    text = text,
+                    imageBase64 = null,
+                    audioBase64 = null,
+                    locationLat = lat,
+                    locationLng = lng,
+                    isMine = false,
+                    isPrivate = true
+                )
+            }
         )
         BackHandler { activeChatNode = null }
         return

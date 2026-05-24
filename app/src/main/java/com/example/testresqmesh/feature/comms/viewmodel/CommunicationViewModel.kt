@@ -53,10 +53,34 @@ class CommunicationViewModel(private val repository: MeshRepository) : ViewModel
         repository.sendPublicMessage(text, imageBase64, audioBase64)
     }
 
-    fun sendEmergencySOS(sosType: String) {
+    @androidx.annotation.RequiresPermission(anyOf = ["android.permission.ACCESS_FINE_LOCATION", "android.permission.ACCESS_COARSE_LOCATION"])
+    fun sendEmergencySOS(context: android.content.Context, sosType: String) {
         val text = "🚨 CRITICAL SOS: $sosType EMERGENCY!"
-        val msgId = repository.sendPublicMessage(text, null, null, null, null, isSOS = true)
-        _activeSosMessageId.value = msgId
+        
+        try {
+            val fusedLocationClient = com.google.android.gms.location.LocationServices.getFusedLocationProviderClient(context)
+            fusedLocationClient.getCurrentLocation(
+                com.google.android.gms.location.Priority.PRIORITY_HIGH_ACCURACY, 
+                null
+            ).addOnSuccessListener { location ->
+                if (location != null) {
+                    val msgId = repository.sendPublicMessage(text, null, null, location.latitude, location.longitude, isSOS = true)
+                    _activeSosMessageId.value = msgId
+                } else {
+                    // Fallback to no location if null
+                    val msgId = repository.sendPublicMessage(text, null, null, null, null, isSOS = true)
+                    _activeSosMessageId.value = msgId
+                }
+            }.addOnFailureListener {
+                // Fallback to no location on error
+                val msgId = repository.sendPublicMessage(text, null, null, null, null, isSOS = true)
+                _activeSosMessageId.value = msgId
+            }
+        } catch (e: Exception) {
+            // Permission missing or service unavailable
+            val msgId = repository.sendPublicMessage(text, null, null, null, null, isSOS = true)
+            _activeSosMessageId.value = msgId
+        }
     }
 
     fun cancelEmergencySOS() {

@@ -28,7 +28,7 @@ import com.example.testresqmesh.core.model.ChatMessage
 import com.example.testresqmesh.core.utils.MediaHelper
 
 @Composable
-fun FullScreenSosAlarm(alertMessage: ChatMessage, onDismiss: () -> Unit) {
+fun FullScreenSosAlarm(alertMessage: ChatMessage, onDismiss: () -> Unit, onViewMap: () -> Unit = {}) {
     val context = LocalContext.current
     val mediaHelper = remember { MediaHelper(context) }
     val sosRed = Color(0xFFFF1744)
@@ -158,21 +158,40 @@ fun FullScreenSosAlarm(alertMessage: ChatMessage, onDismiss: () -> Unit) {
             
             Button(
                 onClick = onDismiss,
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = Color.White,
-                    contentColor = sosRed
-                ),
-                shape = CircleShape,
+                colors = ButtonDefaults.buttonColors(containerColor = Color.White),
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .height(64.dp)
+                    .fillMaxWidth(0.8f)
+                    .height(56.dp),
+                shape = MaterialTheme.shapes.extraLarge
             ) {
                 Text(
-                    "ACKNOWLEDGE",
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.Black,
-                    letterSpacing = 1.sp
+                    text = "ACKNOWLEDGE & DISMISS",
+                    color = sosRed,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 16.sp
                 )
+            }
+            
+            if (alertMessage.locationLat != null && alertMessage.locationLng != null) {
+                Spacer(modifier = Modifier.height(16.dp))
+                Button(
+                    onClick = {
+                        onDismiss()
+                        onViewMap()
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2196F3)),
+                    modifier = Modifier
+                        .fillMaxWidth(0.8f)
+                        .height(56.dp),
+                    shape = MaterialTheme.shapes.extraLarge
+                ) {
+                    Text(
+                        text = "ACKNOWLEDGE & VIEW MAP",
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 16.sp
+                    )
+                }
             }
         }
     }

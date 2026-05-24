@@ -51,7 +51,12 @@ data class ChatMessageData(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ActiveChatScreen(name: String, viewModel: CommunicationViewModel, onBack: () -> Unit) {
+fun ActiveChatScreen(
+    name: String, 
+    viewModel: CommunicationViewModel, 
+    onBack: () -> Unit,
+    onViewMap: (Double, Double, String, String) -> Unit = { _, _, _, _ -> }
+) {
     val uiState by viewModel.uiState.collectAsState()
     
     // Messages for this specific target (name is treated as endpointId here)
@@ -170,7 +175,10 @@ fun ActiveChatScreen(name: String, viewModel: CommunicationViewModel, onBack: ()
                         isSent = msg.isMine,
                         outboundRoute = msg.outboundRoute,
                         returnRoute = msg.returnRoute
-                    )
+                    ),
+                    onViewMap = { lat, lng ->
+                        onViewMap(lat, lng, msg.senderName, msg.text)
+                    }
                 )
             }
 
@@ -195,7 +203,7 @@ fun ActiveChatScreen(name: String, viewModel: CommunicationViewModel, onBack: ()
 }
 
 @Composable
-fun HighFidelityChatBubble(msg: ChatMessageData) {
+fun HighFidelityChatBubble(msg: ChatMessageData, onViewMap: (Double, Double) -> Unit = { _, _ -> }) {
     val bubbleColor = if (msg.isMine) InboxAccentBlue else Color(0xFF35424D) // Lighter slate for others
     val alignment = if (msg.isMine) Alignment.End else Alignment.Start
     val shape = if (msg.isMine) {
@@ -227,6 +235,19 @@ fun HighFidelityChatBubble(msg: ChatMessageData) {
                             style = MaterialTheme.typography.bodyMedium,
                             fontWeight = FontWeight.Bold
                         )
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Button(
+                        onClick = { onViewMap(msg.locationLat, msg.locationLng) },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color.Black.copy(alpha = 0.3f)),
+                        modifier = Modifier.fillMaxWidth().height(36.dp),
+                        contentPadding = PaddingValues(0.dp)
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.Map, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("VIEW IN MAP", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        }
                     }
                     Spacer(modifier = Modifier.height(8.dp))
                 }
