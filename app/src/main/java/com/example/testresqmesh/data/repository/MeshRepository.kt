@@ -113,7 +113,7 @@ class MeshRepository(private val networkManager: MeshNetworkManager) {
             _scannedDevices.value = _scannedDevices.value.filter { it.endpointId != id }
         }
 
-        networkManager.onMessageReceived = { endpointId, msgId, sender, text, isPrivate, isSystem, img, audio, lat, lng, medium ->
+        networkManager.onMessageReceived = { endpointId, msgId, sender, text, isPrivate, isSystem, img, audio, lat, lng, medium, routePath ->
             // BUG FIX: Never add yourself to the "Known Nodes" list.
             if (sender != myNodeName) {
                 lastSeenMap[sender] = System.currentTimeMillis()
@@ -133,7 +133,8 @@ class MeshRepository(private val networkManager: MeshNetworkManager) {
                         isPrivate = isPrivate,
                         timestamp = System.currentTimeMillis(),
                         isHopped = !isDirect,
-                        receiveMedium = medium
+                        receiveMedium = medium,
+                        outboundRoute = routePath
                     )
                     if (isPrivate) {
                         val currentMap = _privateMessages.value.toMutableMap()
@@ -141,8 +142,12 @@ class MeshRepository(private val networkManager: MeshNetworkManager) {
                         currentMap[sender] = log + message
                         _privateMessages.value = currentMap
                         
-                        // The moment we save a private message, tell the sender we received it!
-                        networkManager.broadcastDeliveredReceipt(msgId, isPrivate = true, targetId = endpointId)
+                        // The moment we save a private message, tell the sender we received it using reversed strict routing!
+                        val reversedRoute = routePath.reversed().toMutableList()
+                        if (reversedRoute.isNotEmpty() && reversedRoute.first() != myNodeName) {
+                            reversedRoute.add(0, myNodeName)
+                        }
+                        networkManager.broadcastDeliveredReceipt(msgId, isPrivate = true, targetId = endpointId, directedReturnRoute = reversedRoute)
                     } else {
                         _publicMessages.value = _publicMessages.value + message
                         
@@ -153,11 +158,11 @@ class MeshRepository(private val networkManager: MeshNetworkManager) {
             }
         }
         
-        networkManager.onMessageDelivered = { msgId, readerName ->
+        networkManager.onMessageDelivered = { msgId, readerName, returnRoute ->
             // Update Public Messages
             val updatedPublic = _publicMessages.value.map { msg ->
                 if (msg.id == msgId && !msg.deliveredTo.contains(readerName)) {
-                    msg.copy(deliveredTo = msg.deliveredTo + readerName)
+                    msg.copy(deliveredTo = msg.deliveredTo + readerName, returnRoute = returnRoute)
                 } else {
                     msg
                 }
@@ -168,7 +173,7 @@ class MeshRepository(private val networkManager: MeshNetworkManager) {
             val updatedPrivate = _privateMessages.value.mapValues { entry ->
                 entry.value.map { msg ->
                     if (msg.id == msgId && !msg.deliveredTo.contains(readerName)) {
-                        msg.copy(deliveredTo = msg.deliveredTo + readerName)
+                        msg.copy(deliveredTo = msg.deliveredTo + readerName, returnRoute = returnRoute)
                     } else {
                         msg
                     }
@@ -271,10 +276,17 @@ class MeshRepository(private val networkManager: MeshNetworkManager) {
             if (audioBase64 != null) put("audio", audioBase64)
             if (locationLat != null) put("locationLat", locationLat)
             if (locationLng != null) put("locationLng", locationLng)
+            put("routePath", org.json.JSONArray().apply { put(myNodeName) })
+            
+            val directedRoute = findShortestPath(targetName)
+            if (directedRoute.isNotEmpty()) {
+                put("directedRoute", org.json.JSONArray(directedRoute))
+            }
         }.toString()
 
         val isDirect = _connectedDevices.value.any { it.name == targetName }
-        val message = ChatMessage(msgId, "Me", text, imageBase64, audioBase64, locationLat, locationLng, true, true, timestamp, isHopped = !isDirect)
+        val directedRouteList = findShortestPath(targetName)
+        val message = ChatMessage(msgId, "Me", text, imageBase64, audioBase64, locationLat, locationLng, true, true, timestamp, isHopped = !isDirect, outboundRoute = directedRouteList)
         val currentMap = _privateMessages.value.toMutableMap()
         val log = currentMap[targetName] ?: emptyList()
         currentMap[targetName] = log + message
@@ -285,9 +297,52 @@ class MeshRepository(private val networkManager: MeshNetworkManager) {
         if (isDirect && directEndpointId != null) {
             networkManager.sendDirectPayload(directEndpointId, jsonString)
         } else {
-            // RELAY ROUTING: It is a hopped node! Broadcast it, but it's flagged as private with a targetName!
-            networkManager.broadcastPayload(jsonString)
+            // STRICT DIRECTED SOURCE ROUTING
+            if (directedRouteList.size > 1) {
+                val nextHopName = directedRouteList[1]
+                val nextHopEndpointId = _connectedDevices.value.find { it.name == nextHopName }?.endpointId
+                if (nextHopEndpointId != null) {
+                    networkManager.sendDirectPayload(nextHopEndpointId, jsonString)
+                } else {
+                    // Fallback to flood if topology is stale
+                    networkManager.broadcastPayload(jsonString)
+                }
+            } else {
+                networkManager.broadcastPayload(jsonString)
+            }
         }
+    }
+
+    private fun findShortestPath(targetName: String): List<String> {
+        val queue = ArrayDeque<List<String>>()
+        val visited = mutableSetOf<String>()
+        
+        queue.add(listOf(myNodeName))
+        visited.add(myNodeName)
+        
+        while (queue.isNotEmpty()) {
+            val path = queue.removeFirst()
+            val currentNode = path.last()
+            
+            if (currentNode == targetName) {
+                return path
+            }
+            
+            val neighbors = mutableSetOf<String>()
+            if (currentNode == myNodeName) {
+                neighbors.addAll(_connectedDevices.value.map { it.name })
+            } else {
+                networkGraph[currentNode]?.let { neighbors.addAll(it) }
+            }
+            
+            for (neighbor in neighbors) {
+                if (neighbor !in visited) {
+                    visited.add(neighbor)
+                    queue.add(path + neighbor)
+                }
+            }
+        }
+        return emptyList()
     }
 
     private fun recalculateKnownNodes() {

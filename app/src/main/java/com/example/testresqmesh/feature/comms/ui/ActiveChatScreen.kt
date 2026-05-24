@@ -44,7 +44,9 @@ data class ChatMessageData(
     val locationLat: Double? = null,
     val locationLng: Double? = null,
     val isMine: Boolean,
-    val isSent: Boolean = false
+    val isSent: Boolean = false,
+    val outboundRoute: List<String> = emptyList(),
+    val returnRoute: List<String> = emptyList()
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -165,7 +167,9 @@ fun ActiveChatScreen(name: String, viewModel: CommunicationViewModel, onBack: ()
                         locationLat = msg.locationLat,
                         locationLng = msg.locationLng,
                         isMine = msg.isMine,
-                        isSent = msg.isMine
+                        isSent = msg.isMine,
+                        outboundRoute = msg.outboundRoute,
+                        returnRoute = msg.returnRoute
                     )
                 )
             }
@@ -268,6 +272,40 @@ fun HighFidelityChatBubble(msg: ChatMessageData) {
                 Text(msg.hops, style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.5f), fontSize = 10.sp, fontWeight = FontWeight.Bold)
                 DotSeparator()
                 Text(msg.time, style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.5f), fontSize = 10.sp, fontWeight = FontWeight.Bold)
+            }
+        }
+
+        // --- Visual Mesh Route Tracer UI ---
+        if (msg.hops.contains("HOPPED") && msg.isMine) {
+            var showRoute by remember { mutableStateOf(false) }
+
+            Text(
+                "Trace Route 📍",
+                modifier = Modifier
+                    .padding(top = 4.dp)
+                    .clickable { showRoute = !showRoute },
+                style = MaterialTheme.typography.labelSmall,
+                color = InboxAccentBlue.copy(alpha = 0.8f),
+                fontWeight = FontWeight.Bold
+            )
+
+            if (showRoute) {
+                Surface(
+                    modifier = Modifier.padding(top = 8.dp).widthIn(max = 280.dp),
+                    color = Color.Black.copy(alpha = 0.3f),
+                    shape = RoundedCornerShape(8.dp),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.1f))
+                ) {
+                    Column(modifier = Modifier.padding(12.dp)) {
+                        Text("Outbound Path:", color = Color.White.copy(alpha = 0.5f), fontSize = 9.sp, fontWeight = FontWeight.Black)
+                        val outboundStr = if (msg.outboundRoute.isNotEmpty()) msg.outboundRoute.joinToString(" -> ") else "Unknown"
+                        Text(outboundStr, color = Color.White, fontSize = 11.sp, modifier = Modifier.padding(bottom = 6.dp))
+
+                        Text("Return Receipt Path:", color = Color.White.copy(alpha = 0.5f), fontSize = 9.sp, fontWeight = FontWeight.Black)
+                        val returnStr = if (msg.returnRoute.isNotEmpty()) msg.returnRoute.joinToString(" -> ") else "Pending..."
+                        Text(returnStr, color = Color(0xFF10B981), fontSize = 11.sp)
+                    }
+                }
             }
         }
     }

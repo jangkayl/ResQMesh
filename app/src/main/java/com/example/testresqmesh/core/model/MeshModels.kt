@@ -14,7 +14,9 @@ data class ChatMessage(
     val isHopped: Boolean = false,
     val receiveMedium: String = "Bluetooth 5.4",
     val deliveredTo: List<String> = emptyList(),
-    val seenBy: List<String> = emptyList()
+    val seenBy: List<String> = emptyList(),
+    val outboundRoute: List<String> = emptyList(),
+    val returnRoute: List<String> = emptyList()
 )
 
 data class ConnectedDevice(

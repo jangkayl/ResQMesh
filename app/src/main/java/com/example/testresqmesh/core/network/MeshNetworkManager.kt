@@ -27,12 +27,12 @@ class MeshNetworkManager(private val context: Context) {
     private val connectionQueue = java.util.concurrent.ConcurrentLinkedQueue<ConnectionRequest>()
     private val isConnecting = java.util.concurrent.atomic.AtomicBoolean(false)
 
-    // THIS IS THE LINE THAT WAS CAUSING THE HEADACHE! (Notice the 11 parameters now)
-    var onMessageReceived: ((String, String, String, String, Boolean, Boolean, String?, String?, Double?, Double?, String) -> Unit)? = null
+    // THIS IS THE LINE THAT WAS CAUSING THE HEADACHE! (Notice the 12 parameters now)
+    var onMessageReceived: ((String, String, String, String, Boolean, Boolean, String?, String?, Double?, Double?, String, List<String>) -> Unit)? = null
     
     // Gossip Protocol SEEN Callback (msgId, readerName)
     var onMessageSeen: ((String, String) -> Unit)? = null
-    var onMessageDelivered: ((String, String) -> Unit)? = null
+    var onMessageDelivered: ((String, String, List<String>) -> Unit)? = null
     
     // Routing Table / Topology Callback
     var onRoutingTableReceived: ((String, List<String>) -> Unit)? = null
@@ -247,17 +247,30 @@ class MeshNetworkManager(private val context: Context) {
         broadcastPayload(jsonString)
     }
 
-    fun broadcastDeliveredReceipt(targetMessageId: String, isPrivate: Boolean, targetId: String? = null) {
+    fun broadcastDeliveredReceipt(targetMessageId: String, isPrivate: Boolean, targetId: String? = null, directedReturnRoute: List<String> = emptyList()) {
         val jsonString = JSONObject().apply {
             put("id", java.util.UUID.randomUUID().toString())
             put("type", "DELIVERED")
             put("targetMessageId", targetMessageId)
             put("reader", myDeviceName)
             put("isPrivate", isPrivate)
+            put("returnRoute", org.json.JSONArray().apply { put(myDeviceName) })
+            if (directedReturnRoute.isNotEmpty()) {
+                put("directedRoute", org.json.JSONArray(directedReturnRoute))
+            }
         }.toString()
 
-        // Send it via broadcast so it can traverse the mesh if needed
-        broadcastPayload(jsonString)
+        if (isPrivate && directedReturnRoute.size > 1) {
+            val nextHopName = directedReturnRoute[1]
+            val nextHopEndpointId = connectedEndpointNames.entries.find { it.value == nextHopName }?.key
+            if (nextHopEndpointId != null) {
+                sendDirectPayload(nextHopEndpointId, jsonString)
+            } else {
+                broadcastPayload(jsonString)
+            }
+        } else {
+            broadcastPayload(jsonString)
+        }
     }
 
     private val endpointDiscoveryCallback = object : EndpointDiscoveryCallback() {
@@ -435,15 +448,44 @@ class MeshNetworkManager(private val context: Context) {
                 val reader = jsonObject.getString("reader")
                 val isPrivateReceipt = jsonObject.optBoolean("isPrivate", false)
                 
+                val returnRoute = mutableListOf<String>()
+                if (jsonObject.has("returnRoute")) {
+                    val arr = jsonObject.getJSONArray("returnRoute")
+                    for (i in 0 until arr.length()) returnRoute.add(arr.getString(i))
+                }
+
+                val directedRoute = mutableListOf<String>()
+                if (jsonObject.has("directedRoute")) {
+                    val arr = jsonObject.getJSONArray("directedRoute")
+                    for (i in 0 until arr.length()) directedRoute.add(arr.getString(i))
+                }
+                
                 // Tell the UI that someone saw or received this message!
                 if (payloadType == "SEEN") {
                     onMessageSeen?.invoke(targetMessageId, reader)
                 } else if (payloadType == "DELIVERED") {
-                    onMessageDelivered?.invoke(targetMessageId, reader)
+                    onMessageDelivered?.invoke(targetMessageId, reader, returnRoute)
                 }
                 
-                // Gossip: Forward the receipt to everyone else so it can reach the sender securely!
-                broadcastPayload(jsonString, excludeEndpointId = endpointId)
+                // Append myself to the return route before forwarding
+                returnRoute.add(myDeviceName)
+                jsonObject.put("returnRoute", org.json.JSONArray(returnRoute))
+                
+                // Strict Routing logic for receipt
+                if (directedRoute.isNotEmpty()) {
+                    val myIndex = directedRoute.indexOf(myDeviceName)
+                    if (myIndex != -1 && myIndex + 1 < directedRoute.size) {
+                        val nextHopName = directedRoute[myIndex + 1]
+                        val nextHopEndpointId = connectedEndpointNames.entries.find { it.value == nextHopName }?.key
+                        if (nextHopEndpointId != null) {
+                            sendDirectPayload(nextHopEndpointId, jsonObject.toString())
+                            return
+                        }
+                    }
+                }
+                
+                // Fallback
+                broadcastPayload(jsonObject.toString(), excludeEndpointId = endpointId)
                 return
             }
 
@@ -464,7 +506,7 @@ class MeshNetworkManager(private val context: Context) {
                     onRoutingTableReceived?.invoke(sender, connectedList)
                 }
                 
-                onMessageReceived?.invoke(endpointId, msgId, sender, "", false, true, null, null, null, null, "LOCAL")
+                onMessageReceived?.invoke(endpointId, msgId, sender, "", false, true, null, null, null, null, "LOCAL", emptyList())
                 broadcastPayload(jsonString, excludeEndpointId = endpointId)
                 return
             }
@@ -481,18 +523,48 @@ class MeshNetworkManager(private val context: Context) {
             val locationLng = if (jsonObject.has("locationLng")) jsonObject.getDouble("locationLng") else null
             val medium = endpointMedium[endpointId] ?: "Bluetooth 5.4"
 
+            val routePath = mutableListOf<String>()
+            if (jsonObject.has("routePath")) {
+                val arr = jsonObject.getJSONArray("routePath")
+                for (i in 0 until arr.length()) routePath.add(arr.getString(i))
+            }
+
+            val directedRoute = mutableListOf<String>()
+            if (jsonObject.has("directedRoute")) {
+                val arr = jsonObject.getJSONArray("directedRoute")
+                for (i in 0 until arr.length()) directedRoute.add(arr.getString(i))
+            }
+
             if (isPrivate) {
                 if (targetName == myDeviceName) {
                     notificationHelper.showPrivateMessageNotification(sender, text)
-                    onMessageReceived?.invoke(endpointId, msgId, sender, text, isPrivate, false, imageBase64, audioBase64, locationLat, locationLng, medium)
+                    onMessageReceived?.invoke(endpointId, msgId, sender, text, isPrivate, false, imageBase64, audioBase64, locationLat, locationLng, medium, routePath)
                 } else {
                     AppLogger.d("MeshNetwork", "ROUTE (Relay): Forwarding Private message meant for [$targetName] securely across the mesh.")
-                    broadcastPayload(jsonString, excludeEndpointId = endpointId)
+                    routePath.add(myDeviceName)
+                    jsonObject.put("routePath", org.json.JSONArray(routePath))
+                    
+                    if (directedRoute.isNotEmpty()) {
+                        val myIndex = directedRoute.indexOf(myDeviceName)
+                        if (myIndex != -1 && myIndex + 1 < directedRoute.size) {
+                            val nextHopName = directedRoute[myIndex + 1]
+                            val nextHopEndpointId = connectedEndpointNames.entries.find { it.value == nextHopName }?.key
+                            if (nextHopEndpointId != null) {
+                                sendDirectPayload(nextHopEndpointId, jsonObject.toString())
+                                return
+                            }
+                        }
+                    }
+                    
+                    // Fallback
+                    broadcastPayload(jsonObject.toString(), excludeEndpointId = endpointId)
                 }
             } else {
-                onMessageReceived?.invoke(endpointId, msgId, sender, text, isPrivate, false, imageBase64, audioBase64, locationLat, locationLng, medium)
-                AppLogger.d("MeshNetwork", "ROUTE (Relay): Forwarding public message from [$sender] to all other connected peers.")
-                broadcastPayload(jsonString, excludeEndpointId = endpointId)
+                onMessageReceived?.invoke(endpointId, msgId, sender, text, isPrivate, false, imageBase64, audioBase64, locationLat, locationLng, medium, routePath)
+                AppLogger.d("MeshNetwork", "ROUTE (Relay): Gossiping Public message across the mesh.")
+                routePath.add(myDeviceName)
+                jsonObject.put("routePath", org.json.JSONArray(routePath))
+                broadcastPayload(jsonObject.toString(), excludeEndpointId = endpointId)
             }
 
         } catch (e: Exception) {
