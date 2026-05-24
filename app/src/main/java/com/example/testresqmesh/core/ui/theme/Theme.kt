@@ -24,7 +24,6 @@ private val DarkColorScheme = darkColorScheme(
     outline = InboxDivider
 )
 
-// We maintain a light scheme just in case, but styled similar for consistency
 private val LightColorScheme = lightColorScheme(
     primary = InboxAccentBlue,
     onPrimary = InboxTextPrimary,

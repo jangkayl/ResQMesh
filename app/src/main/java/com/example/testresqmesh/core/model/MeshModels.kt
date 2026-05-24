@@ -11,10 +11,10 @@ data class ChatMessage(
     val isMine: Boolean,
     val isPrivate: Boolean = false,
     val timestamp: Long = System.currentTimeMillis(),
-    val isHopped: Boolean = false, // True if received via multi-hop relay
-    val receiveMedium: String = "Bluetooth 5.4", // Default until upgraded
-    val deliveredTo: List<String> = emptyList(), // Phones that received it but haven't rendered it yet
-    val seenBy: List<String> = emptyList() // The Bouncer will populate this via Gossip!
+    val isHopped: Boolean = false,
+    val receiveMedium: String = "Bluetooth 5.4",
+    val deliveredTo: List<String> = emptyList(),
+    val seenBy: List<String> = emptyList()
 )
 
 data class ConnectedDevice(
