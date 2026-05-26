@@ -62,10 +62,19 @@ class MeshNetworkManager(private val context: Context) {
 
     fun startMeshNode(teamKey: String) {
         isNodeActive.set(true)
-        // --- THE "DOUBLE-START JOLT" FIX ---
-        // Manually resetting the client before starting ensures a fresh radio state (Fixes "Stale Cache")
+        
+        // --- THE "DEEP CACHE WIPE" FIX ---
+        // Violently drop all zombie sockets and background scanners left alive by Android OS
+        connectionsClient.stopAllEndpoints()
         connectionsClient.stopAdvertising()
         connectionsClient.stopDiscovery()
+        
+        // Wipe all memory arrays to simulate a 100% clean Bluetooth restart
+        connectedEndpointIds.clear()
+        pendingNames.clear()
+        endpointMedium.clear()
+        activeScannedEndpoints.clear()
+        connectedEndpointNames.clear()
 
         val formattedKey = teamKey.trim().uppercase().ifEmpty { "PUBLIC" }
         activeServiceId = "com.example.testresqmesh.p2p.$formattedKey"
@@ -403,6 +412,7 @@ class MeshNetworkManager(private val context: Context) {
         override fun onDisconnected(endpointId: String) {
             pendingNames.remove(endpointId) // BUG FIX: Ensure clean memory
             endpointMedium.remove(endpointId)
+            activeScannedEndpoints.remove(endpointId) // BUG FIX: Purge Ghost IDs to prevent Jitter Slowdown
             onDeviceScanRemoved?.invoke(endpointId)
             connectedEndpointIds.remove(endpointId)
             connectedEndpointNames.remove(endpointId)
