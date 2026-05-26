@@ -23,10 +23,6 @@ class MeshNetworkManager(private val context: Context) {
     var onDeviceConnected: ((ConnectedDevice) -> Unit)? = null
     var onDeviceDisconnected: ((String) -> Unit)? = null
 
-    data class ConnectionRequest(val endpointId: String, val endpointName: String, val retryCount: Int = 0)
-    private val connectionQueue = java.util.concurrent.ConcurrentLinkedQueue<ConnectionRequest>()
-    private val isConnecting = java.util.concurrent.atomic.AtomicBoolean(false)
-
     // THIS IS THE LINE THAT WAS CAUSING THE HEADACHE! (Notice the 12 parameters now)
     var onMessageReceived: ((String, String, String, String, Boolean, Boolean, String?, String?, Double?, Double?, String, List<String>) -> Unit)? = null
     
@@ -49,7 +45,10 @@ class MeshNetworkManager(private val context: Context) {
     private val connectedEndpointNames = mutableMapOf<String, String>() // Fast lookup for topology broadcasting
     
     // The Bouncer's Memory (Stores IDs of messages we already processed)
-    private val seenMessageIds = mutableSetOf<String>()
+    private val seenMessageIds = java.util.LinkedHashSet<String>()
+    
+    // Tracks if the node is currently running to prevent zombie connection retries
+    private val isNodeActive = java.util.concurrent.atomic.AtomicBoolean(false)
     
     // Tracks which physical medium (Wi-Fi Direct vs Bluetooth) the endpoint is currently using
     val endpointMedium = mutableMapOf<String, String>()
@@ -62,6 +61,7 @@ class MeshNetworkManager(private val context: Context) {
     private val afterDiscoveryDelay: Long = 3000
 
     fun startMeshNode(teamKey: String) {
+        isNodeActive.set(true)
         // --- THE "DOUBLE-START JOLT" FIX ---
         // Manually resetting the client before starting ensures a fresh radio state (Fixes "Stale Cache")
         connectionsClient.stopAdvertising()
@@ -80,13 +80,15 @@ class MeshNetworkManager(private val context: Context) {
             .setLowPower(false) // Maximize radio frequency for faster discovery
             .build()
 
+        // Concurrent Dual-Radio Startup: Start Advertising and Discovery simultaneously
         connectionsClient.startAdvertising(advertisingName, activeServiceId, connectionLifecycleCallback, options)
             .addOnSuccessListener {
                 onStatusChanged?.invoke("Node Active [Room: $formattedKey]. Seeking peers...")
-                startNativeScanner()
                 startHeartbeat()
             }
             .addOnFailureListener { onStatusChanged?.invoke("Failed to start node.") }
+            
+        startNativeScanner()
     }
 
     private fun calculatePowerScore(): Int {
@@ -149,11 +151,14 @@ class MeshNetworkManager(private val context: Context) {
     }
 
     fun stopMeshNode() {
+        isNodeActive.set(false)
         heartbeatRunnable?.let { heartbeatHandler.removeCallbacks(it) }
         connectionsClient.stopAllEndpoints()
         connectedEndpointIds.clear()
         pendingNames.clear()
         endpointMedium.clear()
+        activeScannedEndpoints.clear()
+        connectedEndpointNames.clear()
         onStatusChanged?.invoke("Offline")
         AppLogger.d("MeshNetwork", "Mesh Node completely stopped.")
     }
@@ -171,6 +176,7 @@ class MeshNetworkManager(private val context: Context) {
         connectionsClient.stopDiscovery()
         val jitter = kotlin.random.Random.nextLong(100, 600)
         Handler(Looper.getMainLooper()).postDelayed({
+            if (!isNodeActive.get()) return@postDelayed
             val discoveryOptions = DiscoveryOptions.Builder()
                 .setStrategy(Strategy.P2P_CLUSTER)
                 .setLowPower(false)
@@ -288,7 +294,7 @@ class MeshNetworkManager(private val context: Context) {
             // Add them to our physical room tracker
             activeScannedEndpoints.add(endpointId)
 
-            // --- DETERMINISTIC TIE-BREAKER: Power Score -> Lexicographical comparison ---
+            /* --- COMMENTED OUT: DETERMINISTIC TIE-BREAKER ---
             // The phone with higher hardware specs initiates. If perfectly tied, fallback to name comparison to eliminate collisions.
             val shouldInitiate = if (myPowerScore != peerScore) {
                 myPowerScore > peerScore
@@ -300,13 +306,29 @@ class MeshNetworkManager(private val context: Context) {
             onDeviceScanned?.invoke(endpointId, cleanPeerName, peerScore, myRole, false)
 
             if (shouldInitiate) {
-                // INITIATOR: We will trigger the connection request sequentially. 
+                // INITIATOR: Trigger connection asynchronously with random jitter
                 AppLogger.d("MeshNetwork", "I am Initiator for $cleanPeerName")
-                queueConnection(endpointId, cleanPeerName)
+                initiateConnection(endpointId, cleanPeerName)
             } else {
-                // RECEIVER: Passively yield and do absolutely nothing. Wait for them to call us.
+                // RECEIVER: Passively yield. Wait for them to call us.
                 AppLogger.d("MeshNetwork", "I am Receiver. Passively yielding to $cleanPeerName...")
+                
+                // IMPATIENT RECEIVER FAILSAFE
+                // If the Initiator takes longer than 2000ms to discover us and connect, we forcefully take over and initiate!
+                Handler(Looper.getMainLooper()).postDelayed({
+                    if (!isNodeActive.get()) return@postDelayed
+                    if (!connectedEndpointIds.contains(endpointId) && activeScannedEndpoints.contains(endpointId)) {
+                        AppLogger.d("MeshNetwork", "Impatient Receiver Failsafe triggered for $cleanPeerName!")
+                        initiateConnection(endpointId, cleanPeerName)
+                    }
+                }, 2000)
             }
+            ------------------------------------------------- */
+
+            // NEW: Aggressive Flooding of Pairing (Ignore hierarchy, connect instantly)
+            onDeviceScanned?.invoke(endpointId, cleanPeerName, peerScore, "FLOODING", false)
+            AppLogger.d("MeshNetwork", "AGGRESSIVE FLOODING: Instantly connecting to $cleanPeerName!")
+            initiateConnection(endpointId, cleanPeerName)
         }
 
         override fun onEndpointLost(endpointId: String) {
@@ -317,49 +339,35 @@ class MeshNetworkManager(private val context: Context) {
 
     fun forceConnectToDevice(endpointId: String, endpointName: String) {
         AppLogger.d("MeshNetwork", "FORCE CONNECT requested for $endpointName ($endpointId)")
-        queueConnection(endpointId, endpointName)
+        initiateConnection(endpointId, endpointName)
     }
 
-    private fun queueConnection(endpointId: String, endpointName: String, retryCount: Int = 0) {
+    private fun initiateConnection(endpointId: String, endpointName: String, retryCount: Int = 0) {
         if (connectedEndpointIds.contains(endpointId)) return
-        connectionQueue.add(ConnectionRequest(endpointId, endpointName, retryCount))
-        processNextConnection()
-    }
-
-    private fun processNextConnection() {
-        if (isConnecting.get() || connectionQueue.isEmpty()) return
         
-        val next = connectionQueue.poll() ?: return
-        if (connectedEndpointIds.contains(next.endpointId)) {
-            processNextConnection()
-            return
-        }
-
-        isConnecting.set(true)
-        executeConnectionRequest(next)
-    }
-
-    private fun executeConnectionRequest(request: ConnectionRequest) {
-        AppLogger.d("MeshNetwork", "Executing connection request to ${request.endpointName} (Retry: ${request.retryCount})")
-        connectionsClient.requestConnection(myDeviceName, request.endpointId, connectionLifecycleCallback)
-            .addOnFailureListener { e ->
-                AppLogger.d("MeshNetwork_ERROR", "requestConnection failed immediately: ${e.message}")
-                releaseConnectionLockAndProcessNext()
-                
-                // Exponential backoff
-                if (request.retryCount < 3 && activeScannedEndpoints.contains(request.endpointId)) {
-                    val delay = 1000L * (request.retryCount + 1) + kotlin.random.Random.nextLong(100, 500)
-                    AppLogger.d("MeshNetwork", "Queuing retry for ${request.endpointName} in ${delay}ms...")
-                    Handler(Looper.getMainLooper()).postDelayed({
-                        queueConnection(request.endpointId, request.endpointName, request.retryCount + 1)
-                    }, delay)
+        // Adaptive Jitter: If 1-on-1 pairing, use tiny jitter to prevent simultaneous collision. Otherwise, mid jitter for multi-device protection.
+        val jitter = if (activeScannedEndpoints.size <= 2) kotlin.random.Random.nextLong(50, 400) else kotlin.random.Random.nextLong(100, 800)
+        
+        Handler(Looper.getMainLooper()).postDelayed({
+            if (!isNodeActive.get()) return@postDelayed
+            if (connectedEndpointIds.contains(endpointId)) return@postDelayed
+            
+            AppLogger.d("MeshNetwork", "Executing connection request to $endpointName (Retry: $retryCount)")
+            connectionsClient.requestConnection(myDeviceName, endpointId, connectionLifecycleCallback)
+                .addOnFailureListener { e ->
+                    AppLogger.d("MeshNetwork_ERROR", "requestConnection failed immediately: ${e.message}")
+                    
+                    // Exponential backoff
+                    if (retryCount < 3 && activeScannedEndpoints.contains(endpointId)) {
+                        val delay = 1000L * (retryCount + 1) + kotlin.random.Random.nextLong(100, 500)
+                        AppLogger.d("MeshNetwork", "Queuing retry for $endpointName in ${delay}ms...")
+                        Handler(Looper.getMainLooper()).postDelayed({
+                            if (!isNodeActive.get()) return@postDelayed
+                            initiateConnection(endpointId, endpointName, retryCount + 1)
+                        }, delay)
+                    }
                 }
-            }
-    }
-
-    private fun releaseConnectionLockAndProcessNext() {
-        isConnecting.set(false)
-        processNextConnection()
+        }, jitter)
     }
 
     private val connectionLifecycleCallback = object : ConnectionLifecycleCallback() {
@@ -391,9 +399,6 @@ class MeshNetworkManager(private val context: Context) {
             } else {
                 AppLogger.d("MeshNetwork", "Connection to $deviceName failed with status ${result.status.statusCode}")
             }
-            
-            // Release the lock so the next device in the queue can be paired!
-            releaseConnectionLockAndProcessNext()
         }
         override fun onDisconnected(endpointId: String) {
             pendingNames.remove(endpointId) // BUG FIX: Ensure clean memory
