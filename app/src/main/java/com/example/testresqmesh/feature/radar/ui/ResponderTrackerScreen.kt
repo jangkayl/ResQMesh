@@ -20,8 +20,8 @@ import androidx.compose.ui.unit.sp
 import com.example.testresqmesh.core.ui.components.buttons.ButtonVariant
 import com.example.testresqmesh.core.ui.components.buttons.ResQButton
 import com.example.testresqmesh.core.ui.components.layout.ResQTopBar
-import com.example.testresqmesh.core.ui.theme.InboxBackground
-import com.example.testresqmesh.core.ui.theme.InboxAccentBlue
+import com.example.testresqmesh.core.ui.theme.AppBackground
+import com.example.testresqmesh.core.ui.theme.CyanPrimary
 import com.example.testresqmesh.core.ui.theme.Spacing
 
 @Composable
@@ -46,7 +46,7 @@ fun ResponderTrackerScreen(nodeName: String, onBack: () -> Unit, onChat: () -> U
                 }
             )
         },
-        containerColor = InboxBackground
+        containerColor = AppBackground
     ) { innerPadding ->
         Column(
             modifier = Modifier
@@ -165,7 +165,7 @@ fun ResponderTrackerScreen(nodeName: String, onBack: () -> Unit, onChat: () -> U
                 border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.1f))
             ) {
                 Row(modifier = Modifier.padding(Spacing.Medium), verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Outlined.ChatBubbleOutline, contentDescription = null, tint = InboxAccentBlue)
+                    Icon(Icons.Outlined.ChatBubbleOutline, contentDescription = null, tint = CyanPrimary)
                     Spacer(modifier = Modifier.width(16.dp))
                     Column(modifier = Modifier.weight(1f)) {
                         Text("Send Mesh Message", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold, color = Color.White)
@@ -206,15 +206,15 @@ fun PathNodeIcon(isMe: Boolean) {
     Surface(
         modifier = Modifier.size(24.dp),
         shape = CircleShape,
-        color = if (isMe) InboxAccentBlue.copy(alpha = 0.2f) else Color.White.copy(alpha = 0.1f),
-        border = androidx.compose.foundation.BorderStroke(1.dp, if (isMe) InboxAccentBlue else Color.White.copy(alpha = 0.2f))
+        color = if (isMe) CyanPrimary.copy(alpha = 0.2f) else Color.White.copy(alpha = 0.1f),
+        border = androidx.compose.foundation.BorderStroke(1.dp, if (isMe) CyanPrimary else Color.White.copy(alpha = 0.2f))
     ) {
         Box(contentAlignment = Alignment.Center) {
             Icon(
                 if (isMe) Icons.Default.LocationOn else Icons.Default.Wifi, 
                 contentDescription = null, 
                 modifier = Modifier.size(12.dp),
-                tint = if (isMe) InboxAccentBlue else Color.White.copy(alpha = 0.6f)
+                tint = if (isMe) CyanPrimary else Color.White.copy(alpha = 0.6f)
             )
         }
     }

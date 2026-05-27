@@ -1,5 +1,6 @@
 package com.example.testresqmesh.feature.setup.ui
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -24,6 +25,8 @@ import com.example.testresqmesh.core.ui.components.buttons.ResQButton
 import com.example.testresqmesh.core.ui.theme.*
 import android.os.Build
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
+import com.example.testresqmesh.R
 import com.example.testresqmesh.feature.setup.viewmodel.SetupViewModel
 
 @Composable
@@ -46,7 +49,7 @@ fun IdentitySetupContent(connectionStatus: String, onIdentityGenerated: () -> Un
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(InboxBackground)
+            .background(AppBackground)
             .verticalScroll(scrollState)
             .padding(Spacing.Large),
         horizontalAlignment = Alignment.CenterHorizontally
@@ -56,11 +59,11 @@ fun IdentitySetupContent(connectionStatus: String, onIdentityGenerated: () -> Un
         Text(
             text = "Step 2: Identity Setup",
             style = MaterialTheme.typography.labelMedium,
-            color = InboxAccentBlue,
+            color = CyanPrimary,
             modifier = Modifier
                 .align(Alignment.Start)
                 .clip(RoundedCornerShape(12.dp))
-                .background(InboxAccentBlue.copy(alpha = 0.1f))
+                .background(CyanPrimary.copy(alpha = 0.1f))
                 .padding(horizontal = 12.dp, vertical = 4.dp)
         )
 
@@ -93,15 +96,13 @@ fun IdentitySetupContent(connectionStatus: String, onIdentityGenerated: () -> Un
             color = Color.White.copy(alpha = 0.1f)
         ) {
             Box(contentAlignment = Alignment.Center) {
-                Surface(
-                    modifier = Modifier.size(80.dp),
-                    shape = RoundedCornerShape(20.dp),
-                    color = Color.White
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Text("⚡", fontSize = 32.sp)
-                    }
-                }
+                Image(
+                    painter = painterResource(id = R.drawable.ic_resqmesh_logo),
+                    contentDescription = "ResQMesh Logo",
+                    modifier = Modifier
+                        .size(90.dp)
+                        .clip(RoundedCornerShape(20.dp))
+                )
             }
         }
 

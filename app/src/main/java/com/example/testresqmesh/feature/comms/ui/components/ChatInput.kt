@@ -29,8 +29,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.testresqmesh.core.ui.theme.InboxAccentBlue
-import com.example.testresqmesh.core.ui.theme.InboxBackground
+import com.example.testresqmesh.core.ui.theme.CyanPrimary
+import com.example.testresqmesh.core.ui.theme.AppBackground
 import com.example.testresqmesh.core.ui.theme.Spacing
 import com.example.testresqmesh.core.utils.MediaHelper
 
@@ -59,14 +59,14 @@ fun ChatInput(
 
     Column(
         modifier = Modifier
-            .background(InboxBackground)
+            .background(AppBackground)
             .padding(horizontal = Spacing.Medium, vertical = 16.dp)
     ) {
         // Audio Preview Area
         if (pendingAudio != null) {
             Surface(
                 onClick = { mediaHelper.playVoiceMail(pendingAudio) },
-                color = InboxAccentBlue.copy(alpha = 0.2f),
+                color = CyanPrimary.copy(alpha = 0.2f),
                 shape = RoundedCornerShape(12.dp),
                 modifier = Modifier.fillMaxWidth().padding(bottom = Spacing.Small)
             ) {
@@ -168,7 +168,7 @@ fun ChatInput(
                             onSend()
                         }
                     }) {
-                        Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "Send", tint = if (canSend) InboxAccentBlue else Color.White.copy(alpha = 0.3f), modifier = Modifier.size(20.dp))
+                        Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "Send", tint = if (canSend) CyanPrimary else Color.White.copy(alpha = 0.3f), modifier = Modifier.size(20.dp))
                     }
                 }
             }

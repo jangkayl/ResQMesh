@@ -16,8 +16,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.testresqmesh.core.ui.theme.InboxBackground
-import com.example.testresqmesh.core.ui.theme.InboxAccentBlue
+import com.example.testresqmesh.core.ui.theme.AppBackground
+import com.example.testresqmesh.core.ui.theme.CyanPrimary
 import com.example.testresqmesh.core.ui.theme.Spacing
 import com.example.testresqmesh.feature.setup.viewmodel.SetupViewModel
 
@@ -35,10 +35,10 @@ fun ProfileScreen(viewModel: SetupViewModel) {
                         Icon(Icons.Default.MoreVert, contentDescription = null, tint = Color.White)
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = InboxBackground)
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = AppBackground)
             )
         },
-        containerColor = InboxBackground
+        containerColor = AppBackground
     ) { innerPadding ->
         LazyColumn(
             modifier = Modifier
@@ -86,7 +86,7 @@ fun PerformanceCard() {
     ) {
         Column(modifier = Modifier.padding(Spacing.Medium)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Default.TrendingUp, contentDescription = null, tint = InboxAccentBlue, modifier = Modifier.size(24.dp))
+                Icon(Icons.Default.TrendingUp, contentDescription = null, tint = CyanPrimary, modifier = Modifier.size(24.dp))
                 Spacer(modifier = Modifier.width(12.dp))
                 Column(modifier = Modifier.weight(1f)) {
                     Text("Store-Carry-Forward", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = Color.White)
@@ -121,7 +121,7 @@ fun PerformanceCard() {
             ) {
                 val barHeights = listOf(0.4f, 0.6f, 0.3f, 0.8f, 0.5f, 0.2f, 0.9f, 0.7f, 0.4f, 0.6f, 0.8f, 0.5f, 0.3f, 0.7f, 0.4f)
                 barHeights.forEach { h ->
-                    Box(modifier = Modifier.weight(1f).fillMaxHeight(h).clip(RoundedCornerShape(topStart = 2.dp, topEnd = 2.dp)).background(InboxAccentBlue))
+                    Box(modifier = Modifier.weight(1f).fillMaxHeight(h).clip(RoundedCornerShape(topStart = 2.dp, topEnd = 2.dp)).background(CyanPrimary))
                 }
             }
         }
@@ -153,7 +153,7 @@ fun HardwareToggle(icon: androidx.compose.ui.graphics.vector.ImageVector, title:
     ) {
         Surface(modifier = Modifier.size(40.dp), shape = CircleShape, color = Color.White.copy(alpha = 0.1f)) {
             Box(contentAlignment = Alignment.Center) {
-                Icon(icon, contentDescription = null, tint = InboxAccentBlue, modifier = Modifier.size(20.dp))
+                Icon(icon, contentDescription = null, tint = CyanPrimary, modifier = Modifier.size(20.dp))
             }
         }
         Spacer(modifier = Modifier.width(16.dp))
@@ -164,7 +164,7 @@ fun HardwareToggle(icon: androidx.compose.ui.graphics.vector.ImageVector, title:
         Switch(
             checked = checked, 
             onCheckedChange = {},
-            colors = SwitchDefaults.colors(checkedThumbColor = Color.White, checkedTrackColor = InboxAccentBlue)
+            colors = SwitchDefaults.colors(checkedThumbColor = Color.White, checkedTrackColor = CyanPrimary)
         )
     }
 }
@@ -189,7 +189,7 @@ fun PrivacyCard(onGoOffline: () -> Unit) {
             
             // Progress Bar
             Box(modifier = Modifier.fillMaxWidth().height(8.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.1f))) {
-                Box(modifier = Modifier.fillMaxWidth(0.124f).fillMaxHeight().background(InboxAccentBlue))
+                Box(modifier = Modifier.fillMaxWidth(0.124f).fillMaxHeight().background(CyanPrimary))
             }
             
             Spacer(modifier = Modifier.height(8.dp))
@@ -253,7 +253,7 @@ fun IdentityCard(name: String) {
                     "RESQM-SHA256-8A2F-9D11-E0B1-4C55-77FF-BC12-001X",
                     modifier = Modifier.padding(Spacing.Medium),
                     style = MaterialTheme.typography.labelSmall,
-                    color = InboxAccentBlue,
+                    color = CyanPrimary,
                     fontWeight = FontWeight.Bold,
                     fontSize = 9.sp
                 )
@@ -268,7 +268,7 @@ fun IdentityCard(name: String) {
                     Text("PROTOCOL V2.1.0-MESH-STABLE", style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.4f), fontWeight = FontWeight.Bold)
                 }
                 TextButton(onClick = {}) {
-                    Text("Re-generate ID >", color = InboxAccentBlue, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+                    Text("Re-generate ID >", color = CyanPrimary, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
                 }
             }
         }

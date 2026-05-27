@@ -19,8 +19,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.testresqmesh.core.ui.theme.InboxBackground
-import com.example.testresqmesh.core.ui.theme.InboxAccentBlue
+import com.example.testresqmesh.core.ui.theme.AppBackground
+import com.example.testresqmesh.core.ui.theme.CyanPrimary
 import com.example.testresqmesh.core.ui.theme.Spacing
 
 import com.example.testresqmesh.ui.state.ChatUiState
@@ -76,7 +76,7 @@ fun NewMessageModal(uiState: ChatUiState, onDismiss: () -> Unit, onNodeSelected:
             Button(
                 onClick = {},
                 modifier = Modifier.weight(1f).height(48.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = InboxAccentBlue),
+                colors = ButtonDefaults.buttonColors(containerColor = CyanPrimary),
                 shape = RoundedCornerShape(10.dp)
             ) {
                 Icon(Icons.Default.Wifi, contentDescription = null, modifier = Modifier.size(18.dp))
@@ -91,7 +91,7 @@ fun NewMessageModal(uiState: ChatUiState, onDismiss: () -> Unit, onNodeSelected:
                 border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.1f))
             ) {
                 Box(contentAlignment = Alignment.Center) {
-                    Icon(Icons.Default.Refresh, contentDescription = null, tint = InboxAccentBlue)
+                    Icon(Icons.Default.Refresh, contentDescription = null, tint = CyanPrimary)
                 }
             }
         }
@@ -160,7 +160,7 @@ fun ModalNodeItem(node: RangeNode, onClick: (String) -> Unit) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(node.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Black, color = Color.White)
                     Spacer(modifier = Modifier.width(8.dp))
-                    Icon(Icons.Outlined.Shield, contentDescription = null, tint = InboxAccentBlue, modifier = Modifier.size(14.dp))
+                    Icon(Icons.Outlined.Shield, contentDescription = null, tint = CyanPrimary, modifier = Modifier.size(14.dp))
                 }
                 Text("ID: ${node.id}", style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.4f))
                 Row(verticalAlignment = Alignment.CenterVertically) {

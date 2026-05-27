@@ -29,12 +29,13 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.tooling.preview.Preview
 import com.example.testresqmesh.core.model.ConnectedDevice
 import com.example.testresqmesh.core.ui.theme.TestResQMeshTheme
-import com.example.testresqmesh.core.ui.theme.InboxBackground
-import com.example.testresqmesh.core.ui.theme.InboxAccentBlue
+import com.example.testresqmesh.core.ui.theme.AppBackground
+import com.example.testresqmesh.core.ui.theme.CyanPrimary
 import com.example.testresqmesh.core.ui.theme.Spacing
 import com.example.testresqmesh.feature.comms.viewmodel.CommunicationViewModel
 import com.example.testresqmesh.feature.comms.ui.components.ChatInput
 import com.example.testresqmesh.core.utils.MediaHelper
+
 
 data class ChatMessageData(
     val id: String,
@@ -86,7 +87,7 @@ fun ActiveChatScreen(
 
     Scaffold(
         topBar = {
-            Column(modifier = Modifier.background(InboxBackground)) {
+            Column(modifier = Modifier.background(AppBackground)) {
                 TopAppBar(
                     navigationIcon = {
                         IconButton(onClick = onBack) {
@@ -121,7 +122,7 @@ fun ActiveChatScreen(
                             Icon(Icons.Default.MoreHoriz, contentDescription = null, tint = Color.White)
                         }
                     },
-                    colors = TopAppBarDefaults.topAppBarColors(containerColor = InboxBackground)
+                    colors = TopAppBarDefaults.topAppBarColors(containerColor = AppBackground)
                 )
                 Row(
                     modifier = Modifier
@@ -135,7 +136,7 @@ fun ActiveChatScreen(
                         Text("SIGNAL STRENGTH: HIGH", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Black, color = Color.White.copy(alpha = 0.5f), fontSize = 10.sp)
                     }
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Outlined.CheckCircle, contentDescription = null, tint = InboxAccentBlue.copy(alpha = 0.8f), modifier = Modifier.size(14.dp))
+                        Icon(Icons.Outlined.CheckCircle, contentDescription = null, tint = CyanPrimary.copy(alpha = 0.8f), modifier = Modifier.size(14.dp))
                         Spacer(modifier = Modifier.width(6.dp))
                         Text("E2E ENCRYPTED", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Black, color = Color.White.copy(alpha = 0.5f), fontSize = 10.sp)
                     }
@@ -143,7 +144,7 @@ fun ActiveChatScreen(
                 HorizontalDivider(color = Color.White.copy(alpha = 0.1f), thickness = 1.dp)
             }
         },
-        containerColor = InboxBackground,
+        containerColor = AppBackground,
         bottomBar = {
             val context = androidx.compose.ui.platform.LocalContext.current
             androidx.compose.foundation.layout.Box(modifier = Modifier.imePadding()) {
@@ -253,7 +254,7 @@ fun ActiveChatScreen(
 
 @Composable
 fun HighFidelityChatBubble(msg: ChatMessageData, mediaHelper: MediaHelper, onViewMap: (Double, Double) -> Unit = { _, _ -> }) {
-    val bubbleColor = if (msg.isMine) InboxAccentBlue else Color(0xFF35424D) // Lighter slate for others
+    val bubbleColor = if (msg.isMine) CyanPrimary else Color(0xFF35424D) // Lighter slate for others
     val alignment = if (msg.isMine) Alignment.End else Alignment.Start
     val shape = if (msg.isMine) {
         RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp, bottomStart = 16.dp, bottomEnd = 2.dp)
@@ -356,7 +357,7 @@ fun HighFidelityChatBubble(msg: ChatMessageData, mediaHelper: MediaHelper, onVie
             verticalAlignment = Alignment.CenterVertically
         ) {
             if (!msg.isMine) {
-                val mediumColor = if (msg.receiveMedium.contains("Wi-Fi")) com.example.testresqmesh.core.ui.theme.SuccessGreen else InboxAccentBlue
+                val mediumColor = if (msg.receiveMedium.contains("Wi-Fi")) com.example.testresqmesh.core.ui.theme.SuccessGreen else CyanPrimary
                 Text("📶 ${msg.receiveMedium}", style = MaterialTheme.typography.labelSmall, color = mediumColor.copy(alpha = 0.8f), fontSize = 10.sp, fontWeight = FontWeight.Bold)
                 DotSeparator()
                 Text(msg.time, style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.5f), fontSize = 10.sp, fontWeight = FontWeight.Bold)
@@ -397,7 +398,7 @@ fun HighFidelityChatBubble(msg: ChatMessageData, mediaHelper: MediaHelper, onVie
                     .padding(top = 4.dp)
                     .clickable { showRoute = !showRoute },
                 style = MaterialTheme.typography.labelSmall,
-                color = InboxAccentBlue.copy(alpha = 0.8f),
+                color = CyanPrimary.copy(alpha = 0.8f),
                 fontWeight = FontWeight.Bold
             )
 

@@ -28,8 +28,8 @@ import androidx.compose.ui.unit.sp
 import java.util.Locale
 import androidx.compose.ui.tooling.preview.Preview
 import com.example.testresqmesh.core.ui.theme.TestResQMeshTheme
-import com.example.testresqmesh.core.ui.theme.InboxBackground
-import com.example.testresqmesh.core.ui.theme.InboxAccentBlue
+import com.example.testresqmesh.core.ui.theme.AppBackground
+import com.example.testresqmesh.core.ui.theme.CyanPrimary
 import com.example.testresqmesh.core.ui.theme.Spacing
 import com.example.testresqmesh.feature.radar.viewmodel.RadarViewModel
 import com.example.testresqmesh.core.utils.AppLogger
@@ -116,10 +116,10 @@ fun RadarScreenContent(
                         Icon(Icons.Outlined.Shield, contentDescription = "Debug Terminal", tint = Color.White)
                     }
                     IconButton(onClick = { /* Mesh settings */ }) {
-                        Icon(Icons.Default.Wifi, contentDescription = null, tint = InboxAccentBlue)
+                        Icon(Icons.Default.Wifi, contentDescription = null, tint = CyanPrimary)
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = InboxBackground)
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = AppBackground)
             )
         },
         floatingActionButton = {
@@ -132,7 +132,7 @@ fun RadarScreenContent(
                 Icon(Icons.Default.Notifications, contentDescription = "SOS", tint = Color.White, modifier = Modifier.size(32.dp))
             }
         },
-        containerColor = InboxBackground
+        containerColor = AppBackground
     ) { innerPadding ->
         Column(
             modifier = Modifier
@@ -179,7 +179,7 @@ fun RadarScreenContent(
 
                     // Sweep
                     drawArc(
-                        color = InboxAccentBlue.copy(alpha = 0.3f),
+                        color = CyanPrimary.copy(alpha = 0.3f),
                         startAngle = radarSweep,
                         sweepAngle = 60f,
                         useCenter = true,
@@ -205,7 +205,7 @@ fun RadarScreenContent(
 
                     // Center point (Me)
                     drawCircle(color = Color.White, radius = 4.dp.toPx(), center = center)
-                    drawCircle(color = InboxAccentBlue, radius = 8.dp.toPx(), center = center, style = Stroke(2.dp.toPx()))
+                    drawCircle(color = CyanPrimary, radius = 8.dp.toPx(), center = center, style = Stroke(2.dp.toPx()))
                 }
                 
                 Text(
@@ -260,8 +260,8 @@ fun RadarScreenContent(
             ) {
                 Text("NEARBY NODES", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Black, color = Color.White)
                 TextButton(onClick = onRefresh) {
-                    Text("Refresh", color = InboxAccentBlue, style = MaterialTheme.typography.labelMedium)
-                    Icon(Icons.Default.ChevronRight, contentDescription = null, tint = InboxAccentBlue, modifier = Modifier.size(16.dp))
+                    Text("Refresh", color = CyanPrimary, style = MaterialTheme.typography.labelMedium)
+                    Icon(Icons.Default.ChevronRight, contentDescription = null, tint = CyanPrimary, modifier = Modifier.size(16.dp))
                 }
             }
 
@@ -344,7 +344,7 @@ fun NearbyNodeItem(
                         modifier = Modifier
                             .size(16.dp)
                             .clip(CircleShape)
-                            .background(InboxAccentBlue)
+                            .background(CyanPrimary)
                             .align(Alignment.TopEnd)
                             .border(2.dp, Color(0xFF1E293B), CircleShape)
                     ) {
@@ -358,7 +358,7 @@ fun NearbyNodeItem(
             Column(modifier = Modifier.weight(1f)) {
                 Text(node.name, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Black, color = if (node.isBlocked) Color.Gray else Color.White)
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    val statusColor = if (node.isBlocked) Color.Red else if (node.status.contains("MASTER") || node.isConnected) InboxAccentBlue else Color.White.copy(alpha = 0.4f)
+                    val statusColor = if (node.isBlocked) Color.Red else if (node.status.contains("MASTER") || node.isConnected) CyanPrimary else Color.White.copy(alpha = 0.4f)
                     Icon(
                         if (node.isBlocked) Icons.Default.Block else if (node.status.contains("MASTER") || node.isConnected) Icons.Default.Bolt else Icons.Default.Info, 
                         contentDescription = null, 
@@ -402,7 +402,7 @@ fun NearbyNodeItem(
                 }
                 TextButton(
                     onClick = { onForceConnect(node.endpointId, node.name) },
-                    colors = ButtonDefaults.textButtonColors(contentColor = InboxAccentBlue)
+                    colors = ButtonDefaults.textButtonColors(contentColor = CyanPrimary)
                 ) {
                     Icon(Icons.Default.Bolt, contentDescription = null, modifier = Modifier.size(16.dp))
                     Spacer(modifier = Modifier.width(4.dp))

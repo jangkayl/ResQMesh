@@ -15,8 +15,9 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.testresqmesh.core.ui.theme.InboxBackground
-import com.example.testresqmesh.core.ui.theme.InboxAccentBlue
+import com.example.testresqmesh.R
+import com.example.testresqmesh.core.ui.theme.AppBackground
+import com.example.testresqmesh.core.ui.theme.CyanPrimary
 import kotlinx.coroutines.delay
 
 @Composable
@@ -29,20 +30,18 @@ fun SplashScreen(onTimeout: () -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(InboxBackground),
+            .background(AppBackground),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        // Mock Logo (The lightning bolt in a white square)
-        Surface(
-            modifier = Modifier.size(100.dp),
-            shape = RoundedCornerShape(24.dp),
-            color = Color.White
-        ) {
-            Box(contentAlignment = Alignment.Center) {
-                Text("⚡", fontSize = 48.sp) // Representing the logo in the image
-            }
-        }
+        // Actual Logo
+        Image(
+            painter = painterResource(id = R.drawable.ic_resqmesh_logo),
+            contentDescription = "ResQMesh Logo",
+            modifier = Modifier
+                .size(140.dp)
+                .clip(RoundedCornerShape(28.dp))
+        )
 
         Spacer(modifier = Modifier.height(48.dp))
 
@@ -78,7 +77,7 @@ fun SplashScreen(onTimeout: () -> Unit) {
                 modifier = Modifier
                     .fillMaxHeight()
                     .fillMaxWidth(animatedProgress)
-                    .background(InboxAccentBlue)
+                    .background(CyanPrimary)
             )
         }
 
