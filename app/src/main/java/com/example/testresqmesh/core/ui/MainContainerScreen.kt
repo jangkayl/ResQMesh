@@ -17,6 +17,8 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.runtime.collectAsState
+import androidx.compose.ui.text.font.FontWeight
+import com.example.testresqmesh.core.ui.theme.*
 import com.example.testresqmesh.feature.comms.ui.ActiveChatScreen
 import com.example.testresqmesh.feature.comms.ui.ChatContainerScreen
 import com.example.testresqmesh.feature.radar.ui.RadarScreen
@@ -164,13 +166,13 @@ fun MainContainerScreen(
         contentWindowInsets = WindowInsets.systemBars,
         bottomBar = {
             NavigationBar(
-                containerColor = MaterialTheme.colorScheme.background,
-                tonalElevation = 0.dp
+                containerColor = WarmWhite,
+                tonalElevation = 8.dp
             ) {
                 items.forEach { item ->
                     NavigationBarItem(
                         icon = { Icon(item.icon, contentDescription = item.label) },
-                        label = { Text(item.label) },
+                        label = { Text(item.label, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold) },
                         selected = currentItem == item,
                         onClick = { 
                             if (item == NavItem.SOS) {
@@ -180,11 +182,11 @@ fun MainContainerScreen(
                             }
                         },
                         colors = NavigationBarItemDefaults.colors(
-                            selectedIconColor = MaterialTheme.colorScheme.primary,
-                            selectedTextColor = MaterialTheme.colorScheme.primary,
-                            unselectedIconColor = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
-                            unselectedTextColor = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
-                            indicatorColor = androidx.compose.ui.graphics.Color.Transparent
+                            selectedIconColor = PrimaryRed,
+                            selectedTextColor = PrimaryRed,
+                            unselectedIconColor = MediumGray,
+                            unselectedTextColor = MediumGray,
+                            indicatorColor = PrimaryRed.copy(alpha = 0.1f)
                         )
                     )
                 }

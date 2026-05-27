@@ -1,182 +1,161 @@
 package com.example.testresqmesh.feature.comms.ui
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material.icons.outlined.Shield
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.testresqmesh.core.ui.theme.AppBackground
-import com.example.testresqmesh.core.ui.theme.CyanPrimary
-import com.example.testresqmesh.core.ui.theme.Spacing
-
+import com.example.testresqmesh.core.ui.components.layout.ResQCard
+import com.example.testresqmesh.core.ui.theme.*
 import com.example.testresqmesh.ui.state.ChatUiState
+import com.example.testresqmesh.core.model.KnownNode
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun NewMessageModal(uiState: ChatUiState, onDismiss: () -> Unit, onNodeSelected: (String) -> Unit) {
+fun NewMessageModal(
+    uiState: ChatUiState,
+    onNodeSelected: (String) -> Unit,
+    onDismiss: () -> Unit
+) {
+    val knownNodes = uiState.knownNodes.sortedByDescending { it.isDirect }
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .fillMaxHeight(0.9f)
-            .background(Color(0xFF232E35)) // Surface color
-            .padding(Spacing.Medium)
+            .background(WarmWhite)
+            .padding(bottom = 48.dp, start = 24.dp, end = 24.dp)
     ) {
-        // Header
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Column {
-                Text("New Mesh Thread", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Black, color = Color.White)
-                Text("Select a node to establish a link", style = MaterialTheme.typography.labelMedium, color = Color.White.copy(alpha = 0.6f))
-            }
+            Text(
+                "New Private Chat",
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold,
+                color = DarkGray
+            )
+            
             IconButton(
-                onClick = onDismiss,
-                modifier = Modifier.background(Color.Black.copy(alpha = 0.3f), CircleShape)
+                onClick = { /* Refresh handled by VM */ },
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(CircleShape)
+                    .background(PrimaryRed.copy(alpha = 0.1f))
             ) {
-                Icon(Icons.Default.Close, contentDescription = "Close", tint = Color.White)
+                Icon(Icons.Default.Refresh, contentDescription = null, tint = PrimaryRed)
             }
         }
 
-        Spacer(modifier = Modifier.height(Spacing.Large))
+        Text(
+            "Select a nearby responder to start a mesh-secured session.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = TextSecondary,
+            modifier = Modifier.padding(top = 4.dp, bottom = 24.dp)
+        )
 
-        // Search Bar
-        Surface(
-            color = Color.Black.copy(alpha = 0.4f),
-            shape = RoundedCornerShape(12.dp)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
-                verticalAlignment = Alignment.CenterVertically
+        if (knownNodes.isEmpty()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(200.dp),
+                contentAlignment = Alignment.Center
             ) {
-                Icon(Icons.Default.Search, contentDescription = null, tint = Color.White.copy(alpha = 0.4f))
-                Spacer(modifier = Modifier.width(12.dp))
-                Text("Search Mesh ID or Name...", color = Color.White.copy(alpha = 0.4f), style = MaterialTheme.typography.bodyMedium)
-            }
-        }
-
-        Spacer(modifier = Modifier.height(Spacing.Medium))
-
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Button(
-                onClick = {},
-                modifier = Modifier.weight(1f).height(48.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = CyanPrimary),
-                shape = RoundedCornerShape(10.dp)
-            ) {
-                Icon(Icons.Default.Wifi, contentDescription = null, modifier = Modifier.size(18.dp))
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("Broadcast to Local", fontWeight = FontWeight.Bold)
-            }
-            Surface(
-                onClick = {},
-                modifier = Modifier.size(48.dp),
-                shape = RoundedCornerShape(10.dp),
-                color = Color.White.copy(alpha = 0.05f),
-                border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.1f))
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Icon(Icons.Default.Refresh, contentDescription = null, tint = CyanPrimary)
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    CircularProgressIndicator(color = PrimaryRed, modifier = Modifier.size(32.dp))
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text(
+                        "Searching for nearby responders...",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = TextMuted
+                    )
                 }
             }
-        }
-
-        Spacer(modifier = Modifier.height(Spacing.Large))
-
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(Icons.Default.SignalCellularAlt, contentDescription = null, tint = Color.White.copy(alpha = 0.4f), modifier = Modifier.size(16.dp))
-            Spacer(modifier = Modifier.width(8.dp))
-            Text("CURRENTLY IN RANGE", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Black, color = Color.White.copy(alpha = 0.4f))
-            Spacer(modifier = Modifier.weight(1f))
-            Surface(color = Color.White.copy(alpha = 0.1f), shape = RoundedCornerShape(12.dp)) {
-                Text("4 Active", style = MaterialTheme.typography.labelSmall, color = Color.White, modifier = Modifier.padding(horizontal = 10.dp, vertical = 2.dp))
-            }
-        }
-
-        Spacer(modifier = Modifier.height(Spacing.Medium))
-
-        val nodesInRange = uiState.knownNodes.map { node ->
-            RangeNode(
-                name = node.name, 
-                id = "NODE",
-                distance = if (node.isDirect) "🟢 DIRECT LINK" else "🌐 MESH HOP"
-            )
-        }
-
-        LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            items(nodesInRange) { node ->
-                ModalNodeItem(node, onNodeSelected)
+        } else {
+            LazyColumn(
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                items(knownNodes) { node ->
+                    NodeSelectionItem(
+                        node = node,
+                        onClick = { 
+                            onNodeSelected(node.name)
+                        }
+                    )
+                }
             }
         }
     }
 }
 
 @Composable
-fun ModalNodeItem(node: RangeNode, onClick: (String) -> Unit) {
-    Surface(
-        onClick = { onClick(node.name) },
-        modifier = Modifier.fillMaxWidth(),
-        color = Color.White.copy(alpha = 0.05f),
-        shape = RoundedCornerShape(12.dp)
+fun NodeSelectionItem(node: KnownNode, onClick: () -> Unit) {
+    ResQCard(
+        modifier = Modifier.fillMaxWidth().clickable { onClick() },
+        cornerRadius = 20.dp,
+        elevation = 2.dp
     ) {
         Row(
-            modifier = Modifier.padding(Spacing.Medium),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Box {
-                Surface(modifier = Modifier.size(52.dp), shape = CircleShape, color = Color.White.copy(alpha = 0.1f)) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(Icons.Default.Person, contentDescription = null, tint = Color.White.copy(alpha = 0.5f))
-                    }
+            Surface(
+                modifier = Modifier.size(48.dp),
+                shape = CircleShape,
+                color = PrimaryRed.copy(alpha = 0.1f)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Text(
+                        node.name.take(1).uppercase(),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = PrimaryRed
+                    )
                 }
-                Box(
-                    modifier = Modifier
-                        .size(12.dp)
-                        .clip(CircleShape)
-                        .background(Color(0xFF10B981))
-                        .align(Alignment.BottomEnd)
-                        .border(2.dp, Color(0xFF232E35), CircleShape)
-                )
             }
-            
-            Spacer(modifier = Modifier.width(Spacing.Medium))
-            
+
+            Spacer(modifier = Modifier.width(16.dp))
+
             Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    node.name,
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.SemiBold,
+                    color = DarkGray
+                )
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(node.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Black, color = Color.White)
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Icon(Icons.Outlined.Shield, contentDescription = null, tint = CyanPrimary, modifier = Modifier.size(14.dp))
-                }
-                Text("ID: ${node.id}", style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.4f))
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.SignalCellularAlt, contentDescription = null, tint = Color.White.copy(alpha = 0.4f), modifier = Modifier.size(12.dp))
-                    Text(node.distance, style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.4f), fontWeight = FontWeight.Bold)
+                    Icon(Icons.Default.Bolt, contentDescription = null, tint = if (node.isDirect) SuccessGreen else WarningAmber, modifier = Modifier.size(14.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        if (node.isDirect) "Direct Link" else "Mesh Hop",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = TextSecondary
+                    )
                 }
             }
-            
-            Column(horizontalAlignment = Alignment.End) {
-                if (node.distance.contains("HOP")) {
-                    Icon(Icons.Outlined.Shield, contentDescription = null, tint = Color(0xFFF59E0B), modifier = Modifier.size(16.dp))
-                }
-                Icon(Icons.Default.ChevronRight, contentDescription = null, tint = Color.White.copy(alpha = 0.2f))
-            }
+
+            Icon(
+                Icons.AutoMirrored.Filled.ArrowForward,
+                contentDescription = null,
+                tint = LightGray,
+                modifier = Modifier.size(20.dp)
+            )
         }
     }
 }
-
-data class RangeNode(val name: String, val id: String, val distance: String)

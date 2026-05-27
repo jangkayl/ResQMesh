@@ -1,5 +1,6 @@
 package com.example.testresqmesh.core.ui.components.inputs
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -34,10 +35,10 @@ fun ResQTextField(
     Column(modifier = modifier.fillMaxWidth()) {
         if (label != null) {
             Text(
-                text = label.uppercase(),
-                style = MaterialTheme.typography.labelSmall,
-                fontWeight = FontWeight.Black,
-                color = if (isFocused) CyanPrimary else TextSecondary,
+                text = label,
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = if (isFocused) PrimaryRed else TextSecondary,
                 modifier = Modifier.padding(bottom = 8.dp, start = 4.dp)
             )
         }
@@ -46,21 +47,18 @@ fun ResQTextField(
             modifier = Modifier
                 .fillMaxWidth()
                 .onFocusChanged { isFocused = it.isFocused }
-                .border(
-                    width = 1.dp,
-                    color = when {
-                        isError -> ErrorRed
-                        isFocused -> CyanPrimary
-                        else -> AppBorder
-                    },
-                    shape = RoundedCornerShape(12.dp)
+                .then(
+                    if (isFocused || isError) 
+                        Modifier.border(1.dp, if (isError) ErrorRed else PrimaryRed, RoundedCornerShape(16.dp))
+                    else Modifier
                 ),
-            color = if (isFocused) AppSurfaceVariant else AppSurface,
-            shape = RoundedCornerShape(12.dp)
+            color = if (isFocused) WarmWhite else OffWhite,
+            shape = RoundedCornerShape(16.dp),
+            shadowElevation = if (isFocused) 1.dp else 0.dp
         ) {
             Row(
                 modifier = Modifier
-                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                    .padding(horizontal = 20.dp, vertical = 16.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 if (leadingIcon != null) {
@@ -84,7 +82,7 @@ fun ResQTextField(
                         enabled = enabled,
                         singleLine = singleLine,
                         textStyle = MaterialTheme.typography.bodyLarge.copy(color = TextPrimary),
-                        cursorBrush = SolidColor(CyanPrimary)
+                        cursorBrush = SolidColor(PrimaryRed)
                     )
                 }
 
@@ -100,7 +98,7 @@ fun ResQTextField(
                 text = errorMessage,
                 style = MaterialTheme.typography.labelSmall,
                 color = ErrorRed,
-                modifier = Modifier.padding(top = 4.dp, start = 4.dp)
+                modifier = Modifier.padding(top = 4.dp, start = 12.dp)
             )
         }
     }

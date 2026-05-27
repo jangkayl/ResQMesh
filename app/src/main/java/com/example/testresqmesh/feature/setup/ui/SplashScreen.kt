@@ -4,6 +4,7 @@ import androidx.compose.animation.core.*
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -16,14 +17,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.testresqmesh.R
-import com.example.testresqmesh.core.ui.theme.AppBackground
-import com.example.testresqmesh.core.ui.theme.CyanPrimary
+import com.example.testresqmesh.core.ui.theme.*
 import kotlinx.coroutines.delay
 
 @Composable
 fun SplashScreen(onTimeout: () -> Unit) {
     LaunchedEffect(Unit) {
-        delay(3000)
+        delay(2500)
         onTimeout()
     }
 
@@ -34,75 +34,56 @@ fun SplashScreen(onTimeout: () -> Unit) {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        // Actual Logo
-        Image(
-            painter = painterResource(id = R.drawable.ic_resqmesh_logo),
-            contentDescription = "ResQMesh Logo",
-            modifier = Modifier
-                .size(140.dp)
-                .clip(RoundedCornerShape(28.dp))
-        )
+        // High-fidelity Logo Container
+        Surface(
+            modifier = Modifier.size(160.dp),
+            shape = CircleShape,
+            color = WarmWhite,
+            shadowElevation = 8.dp
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Image(
+                    painter = painterResource(id = R.drawable.ic_resqmesh_logo),
+                    contentDescription = "ResQMesh Logo",
+                    modifier = Modifier
+                        .size(110.dp)
+                        .clip(RoundedCornerShape(24.dp))
+                )
+            }
+        }
 
-        Spacer(modifier = Modifier.height(48.dp))
+        Spacer(modifier = Modifier.height(32.dp))
 
         Text(
-            text = "OFFLINE EMERGENCY MESH",
-            style = MaterialTheme.typography.labelLarge,
-            fontWeight = FontWeight.Black,
-            letterSpacing = 2.sp,
-            color = Color.White
+            text = "ResQMesh",
+            style = MaterialTheme.typography.displayMedium,
+            fontWeight = FontWeight.Bold,
+            color = PrimaryRed
+        )
+
+        Text(
+            text = "Always Connected. Always Safe.",
+            style = MaterialTheme.typography.bodyLarge,
+            color = TextSecondary,
+            fontWeight = FontWeight.Medium
         )
 
         Spacer(modifier = Modifier.height(180.dp))
 
-        // Progress Bar
-        Box(
-            modifier = Modifier
-                .width(280.dp)
-                .height(4.dp)
-                .clip(RoundedCornerShape(2.dp))
-                .background(Color.White.copy(alpha = 0.1f))
-        ) {
-            var progress by remember { mutableStateOf(0f) }
-            val animatedProgress by animateFloatAsState(
-                targetValue = progress,
-                animationSpec = tween(durationMillis = 2500, easing = LinearEasing)
+        // Minimal, Friendly Loading Indicator
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            CircularProgressIndicator(
+                color = PrimaryRed,
+                strokeWidth = 3.dp,
+                modifier = Modifier.size(24.dp)
             )
-            
-            LaunchedEffect(Unit) {
-                progress = 1f
-            }
-
-            Box(
-                modifier = Modifier
-                    .fillMaxHeight()
-                    .fillMaxWidth(animatedProgress)
-                    .background(CyanPrimary)
+            Spacer(modifier = Modifier.height(12.dp))
+            Text(
+                text = "Securing your network...",
+                style = MaterialTheme.typography.labelSmall,
+                color = TextMuted,
+                letterSpacing = 0.5.sp
             )
         }
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        Text(
-            text = "INITIALIZING P2P PROTOCOL",
-            style = MaterialTheme.typography.labelSmall,
-            fontWeight = FontWeight.Bold,
-            color = Color.White.copy(alpha = 0.4f)
-        )
-        Text(
-            text = "Scanning local nodes...",
-            style = MaterialTheme.typography.labelSmall,
-            color = Color.White.copy(alpha = 0.3f)
-        )
-
-        Spacer(modifier = Modifier.height(48.dp))
-
-        Text(
-            text = "v1.0.4-BETA • SECURE OFFLINE NODES",
-            style = MaterialTheme.typography.labelSmall,
-            fontWeight = FontWeight.Bold,
-            color = Color.White.copy(alpha = 0.3f),
-            fontSize = 10.sp
-        )
     }
 }

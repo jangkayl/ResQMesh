@@ -8,26 +8,27 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Security
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.tooling.preview.Preview
-import com.example.testresqmesh.core.ui.components.buttons.ResQButton
-import com.example.testresqmesh.core.ui.theme.*
-import android.os.Build
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.painterResource
 import com.example.testresqmesh.R
+import com.example.testresqmesh.core.ui.components.buttons.ResQButton
+import com.example.testresqmesh.core.ui.components.inputs.ResQTextField
+import com.example.testresqmesh.core.ui.components.layout.ResQCard
+import com.example.testresqmesh.core.ui.theme.*
 import com.example.testresqmesh.feature.setup.viewmodel.SetupViewModel
+import android.os.Build
 
 @Composable
 fun IdentitySetupScreen(viewModel: SetupViewModel, onIdentityGenerated: () -> Unit) {
@@ -46,6 +47,10 @@ fun IdentitySetupScreen(viewModel: SetupViewModel, onIdentityGenerated: () -> Un
 @Composable
 fun IdentitySetupContent(connectionStatus: String, onIdentityGenerated: () -> Unit) {
     val scrollState = rememberScrollState()
+    var name by remember { mutableStateOf("") }
+    var emergencyContact by remember { mutableStateOf("") }
+    var bloodType by remember { mutableStateOf("") }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -54,182 +59,129 @@ fun IdentitySetupContent(connectionStatus: String, onIdentityGenerated: () -> Un
             .padding(Spacing.Large),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Spacer(modifier = Modifier.height(24.dp))
+        Spacer(modifier = Modifier.height(48.dp))
         
         Text(
-            text = "Step 2: Identity Setup",
-            style = MaterialTheme.typography.labelMedium,
-            color = CyanPrimary,
-            modifier = Modifier
-                .align(Alignment.Start)
-                .clip(RoundedCornerShape(12.dp))
-                .background(CyanPrimary.copy(alpha = 0.1f))
-                .padding(horizontal = 12.dp, vertical = 4.dp)
+            text = "Welcome to ResQMesh",
+            style = MaterialTheme.typography.displaySmall,
+            fontWeight = FontWeight.Bold,
+            color = DarkGray,
+            textAlign = TextAlign.Center
         )
 
-        Spacer(modifier = Modifier.height(24.dp))
-
         Text(
-            text = "No Signal?\nNo Problem.",
-            style = MaterialTheme.typography.displayMedium,
-            fontWeight = FontWeight.Black,
-            color = Color.White,
-            modifier = Modifier.align(Alignment.Start),
-            lineHeight = 44.sp
-        )
-
-        Spacer(modifier = Modifier.height(Spacing.Medium))
-
-        Text(
-            text = "ResQMesh creates a secure, private identity that works entirely without cellular or internet connectivity.",
+            text = "Your safe link when networks fail.",
             style = MaterialTheme.typography.bodyLarge,
-            color = Color.White.copy(alpha = 0.6f),
-            modifier = Modifier.align(Alignment.Start)
+            color = TextSecondary,
+            textAlign = TextAlign.Center
         )
 
-        Spacer(modifier = Modifier.height(48.dp))
+        Spacer(modifier = Modifier.height(40.dp))
 
-        // Large Logo Surface
-        Surface(
-            modifier = Modifier.size(120.dp),
-            shape = CircleShape,
-            color = Color.White.copy(alpha = 0.1f)
+        // Main Profile Card
+        ResQCard(
+            modifier = Modifier.fillMaxWidth(),
+            cornerRadius = 32.dp
         ) {
-            Box(contentAlignment = Alignment.Center) {
-                Image(
-                    painter = painterResource(id = R.drawable.ic_resqmesh_logo),
-                    contentDescription = "ResQMesh Logo",
-                    modifier = Modifier
-                        .size(90.dp)
-                        .clip(RoundedCornerShape(20.dp))
-                )
-            }
-        }
-
-        Spacer(modifier = Modifier.height(Spacing.Medium))
-
-        Surface(
-            color = if (connectionStatus.contains("ERROR")) Color.Red.copy(alpha = 0.4f) else Color.Black.copy(alpha = 0.4f),
-            shape = RoundedCornerShape(16.dp),
-            border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.2f))
-        ) {
-            Text(
-                if (connectionStatus.contains("ERROR")) "SYSTEM ERROR" else "READY TO SYNC",
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
-                style = MaterialTheme.typography.labelSmall,
-                fontWeight = FontWeight.Bold,
-                color = Color.White
-            )
-        }
-
-        Spacer(modifier = Modifier.height(48.dp))
-
-        // Secure Terminal Output
-        Surface(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(160.dp),
-            color = Color(0xFF1E293B), // Darker slate
-            shape = RoundedCornerShape(12.dp),
-            border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.1f))
-        ) {
-            Column(modifier = Modifier.padding(Spacing.Medium)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+            Column(
+                modifier = Modifier.padding(Spacing.Medium),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Surface(
+                    modifier = Modifier.size(80.dp),
+                    shape = CircleShape,
+                    color = PrimaryRed.copy(alpha = 0.1f)
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(">_", color = Color.White, fontWeight = FontWeight.Bold)
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            "SECURE TERMINAL OUTPUT",
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White
-                        )
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(Icons.Default.Security, contentDescription = null, tint = PrimaryRed, modifier = Modifier.size(40.dp))
                     }
-                    Icon(Icons.Default.Lock, contentDescription = null, modifier = Modifier.size(14.dp), tint = Color.White.copy(alpha = 0.3f))
                 }
-                HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = Color.White.copy(alpha = 0.1f))
+
+                Spacer(modifier = Modifier.height(24.dp))
+
                 Text(
-                    text = connectionStatus,
+                    text = "Emergency Profile",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = DarkGray
+                )
+
+                Text(
+                    text = "Optional details to help responders.",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = TextMuted
+                )
+
+                Spacer(modifier = Modifier.height(32.dp))
+
+                ResQTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    label = "Your Name",
+                    placeholder = "e.g. John Doe"
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                    ResQTextField(
+                        value = bloodType,
+                        onValueChange = { bloodType = it },
+                        label = "Blood Type",
+                        placeholder = "O+",
+                        modifier = Modifier.weight(1f)
+                    )
+                    ResQTextField(
+                        value = emergencyContact,
+                        onValueChange = { emergencyContact = it },
+                        label = "Contact #",
+                        placeholder = "Emergency phone",
+                        modifier = Modifier.weight(2f)
+                    )
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(32.dp))
+
+        // Reassurance Card
+        ResQCard(
+            modifier = Modifier.fillMaxWidth(),
+            backgroundColor = PrimaryRed.copy(alpha = 0.05f),
+            elevation = 0.dp,
+            cornerRadius = 24.dp
+        ) {
+            Row(
+                modifier = Modifier.padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(Icons.Default.Info, contentDescription = null, tint = PrimaryRed, modifier = Modifier.size(20.dp))
+                Spacer(modifier = Modifier.width(12.dp))
+                Text(
+                    text = "No internet required. No account needed. Privacy is built-in.",
                     style = MaterialTheme.typography.bodySmall,
-                    fontFamily = FontFamily.Monospace,
-                    color = if (connectionStatus.contains("ERROR")) Color.Red.copy(alpha = 0.7f) else Color.White.copy(alpha = 0.5f)
+                    color = TextSecondary
                 )
             }
         }
 
-        Spacer(modifier = Modifier.height(24.dp))
-
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            TechnicalInfoCard(
-                icon = "⚙️",
-                title = "On-Device Encryption",
-                modifier = Modifier.weight(1f)
-            )
-            TechnicalInfoCard(
-                icon = "🔗",
-                title = "Zero-Cloud Dependency",
-                modifier = Modifier.weight(1f)
-            )
-        }
-
+        Spacer(modifier = Modifier.weight(1f))
         Spacer(modifier = Modifier.height(48.dp))
 
         ResQButton(
             onClick = onIdentityGenerated,
-            modifier = Modifier.fillMaxWidth().height(56.dp)
+            modifier = Modifier.fillMaxWidth().height(64.dp)
         ) {
-            Text("Generate Secure ID", fontWeight = FontWeight.Black)
+            Text("Start Using ResQMesh", fontWeight = FontWeight.Bold, fontSize = 18.sp)
         }
 
         Spacer(modifier = Modifier.height(16.dp))
 
         Text(
-            text = "RESQMESH UTILIZES 256-BIT ENCRYPTION.\nYOUR KEYS NEVER LEAVE THIS DEVICE.",
+            text = "By continuing, you enable decentralized mesh networking.",
             style = MaterialTheme.typography.labelSmall,
-            fontSize = 9.sp,
-            textAlign = TextAlign.Center,
-            color = Color.White.copy(alpha = 0.4f),
-            letterSpacing = 0.5.sp
+            color = TextMuted,
+            textAlign = TextAlign.Center
         )
-    }
-}
-
-@Preview(showBackground = true)
-@Composable
-fun IdentitySetupScreenPreview() {
-    TestResQMeshTheme {
-        IdentitySetupContent(
-            connectionStatus = "READY TO SYNC",
-            onIdentityGenerated = {}
-        )
-    }
-}
-
-@Composable
-fun TechnicalInfoCard(icon: String, title: String, modifier: Modifier = Modifier) {
-    Surface(
-        modifier = modifier,
-        color = Color.White.copy(alpha = 0.05f),
-        shape = RoundedCornerShape(12.dp),
-        border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.1f))
-    ) {
-        Row(
-            modifier = Modifier.padding(Spacing.Small),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(icon, fontSize = 16.sp)
-            Spacer(modifier = Modifier.width(8.dp))
-            Text(
-                title,
-                style = MaterialTheme.typography.labelSmall,
-                fontWeight = FontWeight.Bold,
-                color = Color.White.copy(alpha = 0.8f),
-                lineHeight = 12.sp
-            )
-        }
     }
 }

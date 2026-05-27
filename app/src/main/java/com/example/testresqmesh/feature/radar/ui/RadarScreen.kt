@@ -1,36 +1,29 @@
 package com.example.testresqmesh.feature.radar.ui
 
 import androidx.compose.animation.core.*
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.TrendingUp
 import androidx.compose.material.icons.filled.*
-import androidx.compose.material.icons.outlined.LinkOff
 import androidx.compose.material.icons.outlined.Shield
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.center
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import java.util.Locale
 import androidx.compose.ui.tooling.preview.Preview
-import com.example.testresqmesh.core.ui.theme.TestResQMeshTheme
-import com.example.testresqmesh.core.ui.theme.AppBackground
-import com.example.testresqmesh.core.ui.theme.CyanPrimary
-import com.example.testresqmesh.core.ui.theme.Spacing
+import androidx.compose.ui.text.style.TextAlign
+import com.example.testresqmesh.core.ui.components.buttons.ResQButton
+import com.example.testresqmesh.core.ui.components.layout.ResQCard
+import com.example.testresqmesh.core.ui.theme.*
 import com.example.testresqmesh.feature.radar.viewmodel.RadarViewModel
 import com.example.testresqmesh.core.utils.AppLogger
 
@@ -38,99 +31,49 @@ import com.example.testresqmesh.core.utils.AppLogger
 fun RadarScreen(viewModel: RadarViewModel) {
     val uiState by viewModel.uiState.collectAsState()
     
-    // Create a set of names that are already connected for visual filtering
-    val connectedNames = uiState.connectedDevices.map { it.name }.toSet()
-
-    val connectedNodes = uiState.connectedDevices.map { 
-        NodeItemData(it.endpointId, it.name, "Connected • Mesh Peer", isConnected = true, isActiveRelay = true)
+    val nodes = uiState.connectedDevices.map { 
+        NodeItemData(it.endpointId, it.name, "Connected", isConnected = true)
+    } + uiState.scannedDevices.map {
+        NodeItemData(it.endpointId, it.name, "Nearby", isConnected = false)
     }
-    
-    // VISUAL-ONLY FILTER: Hide any scanned node that has the same name as a connected one
-    val scannedNodes = uiState.scannedDevices
-        .filter { it.name !in connectedNames }
-        .map {
-            val displayStatus = if (it.isConnecting) "SYNCING..." else "Score: ${it.powerScore} • Role: ${it.myRole}"
-            NodeItemData(
-                it.endpointId,
-                it.name, 
-                displayStatus,
-                isConnected = false,
-                isActiveRelay = it.myRole == "MASTER" || it.isConnecting,
-                isBlocked = uiState.blockedDeviceNames.contains(it.name)
-            )
-        }
 
-    // Include blocked devices that are completely out of range so the user can still unblock them
-    val scannedAndConnectedNames = connectedNames + scannedNodes.map { it.name }
-    val offlineBlockedNodes = uiState.blockedDeviceNames
-        .filter { it !in scannedAndConnectedNames }
-        .map { name ->
-            NodeItemData(
-                endpointId = "",
-                name = name,
-                status = "OFFLINE",
-                isConnected = false,
-                isActiveRelay = false,
-                isBlocked = true
-            )
-        }
-
-    RadarScreenContent(
-        activeNodesCount = uiState.connectedDevices.size + scannedNodes.size,
-        nodes = connectedNodes + scannedNodes + offlineBlockedNodes,
-        onRefresh = { viewModel.rescan() },
-        onDisconnect = { viewModel.disconnectDevice(it) },
-        onForceConnect = { id, name -> viewModel.forceConnect(id, name) },
-        onBlock = { name -> viewModel.blockDevice(name) },
-        onUnblock = { name -> viewModel.unblockDevice(name) }
+    DashboardContent(
+        nodes = nodes,
+        activeNodesCount = nodes.size,
+        onRefresh = { viewModel.rescan() }
     )
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun RadarScreenContent(
-    activeNodesCount: Int,
+fun DashboardContent(
     nodes: List<NodeItemData>,
-    onRefresh: () -> Unit,
-    onDisconnect: (String) -> Unit,
-    onForceConnect: (String, String) -> Unit,
-    onBlock: (String) -> Unit,
-    onUnblock: (String) -> Unit
+    activeNodesCount: Int,
+    onRefresh: () -> Unit
 ) {
-    val infiniteTransition = rememberInfiniteTransition()
-    val radarSweep by infiniteTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = 360f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(4000, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart
-        )
-    )
+    val scrollState = rememberScrollState()
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("ResQMesh", fontWeight = FontWeight.Black, color = Color.White) },
+                title = { 
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Surface(modifier = Modifier.size(32.dp), shape = CircleShape, color = PrimaryRed) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Text("R", color = WarmWhite, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                            }
+                        }
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Text("ResQMesh", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = DarkGray)
+                    }
+                },
                 actions = {
                     IconButton(onClick = { AppLogger.toggleTerminal() }) {
-                        Icon(Icons.Outlined.Shield, contentDescription = "Debug Terminal", tint = Color.White)
-                    }
-                    IconButton(onClick = { /* Mesh settings */ }) {
-                        Icon(Icons.Default.Wifi, contentDescription = null, tint = CyanPrimary)
+                        Icon(Icons.Outlined.Shield, contentDescription = "Debug", tint = MediumGray)
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = AppBackground)
             )
-        },
-        floatingActionButton = {
-            LargeFloatingActionButton(
-                onClick = { /* Quick SOS */ },
-                containerColor = Color(0xFFEF4444),
-                shape = CircleShape,
-                modifier = Modifier.padding(bottom = 16.dp)
-            ) {
-                Icon(Icons.Default.Notifications, contentDescription = "SOS", tint = Color.White, modifier = Modifier.size(32.dp))
-            }
         },
         containerColor = AppBackground
     ) { innerPadding ->
@@ -138,277 +81,157 @@ fun RadarScreenContent(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
-                .verticalScroll(rememberScrollState())
+                .verticalScroll(scrollState)
+                .padding(horizontal = Spacing.Medium)
         ) {
-            // Radar Visualization Section
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(300.dp),
-                contentAlignment = Alignment.Center
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // SOS Hero Card
+            ResQCard(
+                modifier = Modifier.fillMaxWidth(),
+                backgroundColor = PrimaryRed,
+                cornerRadius = 32.dp
             ) {
-                // Active Nodes Counter Badge
-                Surface(
-                    color = Color.Black.copy(alpha = 0.5f),
-                    shape = RoundedCornerShape(16.dp),
-                    modifier = Modifier.align(Alignment.TopStart).padding(Spacing.Medium)
+                Column(
+                    modifier = Modifier.padding(24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(Color(0xFFF97316)))
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("$activeNodesCount ACTIVE NODES", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Black, color = Color.White)
-                    }
-                }
-
-                Canvas(modifier = Modifier.size(240.dp)) {
-                    val center = size.center
-                    val radius = size.minDimension / 2
-                    
-                    // Circles
-                    drawCircle(color = Color.White.copy(alpha = 0.05f), radius = radius)
-                    drawCircle(color = Color.White.copy(alpha = 0.05f), radius = radius * 0.75f, style = Stroke(1.dp.toPx()))
-                    drawCircle(color = Color.White.copy(alpha = 0.05f), radius = radius * 0.5f, style = Stroke(1.dp.toPx()))
-                    drawCircle(color = Color.White.copy(alpha = 0.05f), radius = radius * 0.25f, style = Stroke(1.dp.toPx()))
-                    
-                    // Crosshair lines
-                    drawLine(color = Color.White.copy(alpha = 0.1f), start = androidx.compose.ui.geometry.Offset(0f, center.y), end = androidx.compose.ui.geometry.Offset(size.width, center.y))
-                    drawLine(color = Color.White.copy(alpha = 0.1f), start = androidx.compose.ui.geometry.Offset(center.x, 0f), end = androidx.compose.ui.geometry.Offset(center.x, size.height))
-
-                    // Sweep
-                    drawArc(
-                        color = CyanPrimary.copy(alpha = 0.3f),
-                        startAngle = radarSweep,
-                        sweepAngle = 60f,
-                        useCenter = true,
-                        size = size
+                    Text(
+                        text = "EMERGENCY ASSISTANCE",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = WarmWhite.copy(alpha = 0.8f),
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 1.sp
                     )
                     
-                    // Dynamic Nodes (the orange dots)
-                    nodes.forEach { node ->
-                        // Deterministic position based on name
-                        val random = java.util.Random(node.name.hashCode().toLong())
-                        val angle = random.nextFloat() * 360f
-                        val distance = (0.3f + random.nextFloat() * 0.6f) * radius
-                        
-                        val x = center.x + distance * kotlin.math.cos(Math.toRadians(angle.toDouble())).toFloat()
-                        val y = center.y + distance * kotlin.math.sin(Math.toRadians(angle.toDouble())).toFloat()
-                        
-                        drawCircle(
-                            color = Color(0xFFF97316), 
-                            radius = 5.dp.toPx(), 
-                            center = androidx.compose.ui.geometry.Offset(x, y)
-                        )
+                    Spacer(modifier = Modifier.height(24.dp))
+
+                    // Pulse SOS Button
+                    Surface(
+                        onClick = { /* SOS Logic */ },
+                        modifier = Modifier.size(140.dp),
+                        shape = CircleShape,
+                        color = WarmWhite,
+                        shadowElevation = 8.dp
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Text(
+                                text = "SOS",
+                                style = MaterialTheme.typography.displaySmall,
+                                fontWeight = FontWeight.Black,
+                                color = PrimaryRed
+                            )
+                        }
                     }
 
-                    // Center point (Me)
-                    drawCircle(color = Color.White, radius = 4.dp.toPx(), center = center)
-                    drawCircle(color = CyanPrimary, radius = 8.dp.toPx(), center = center, style = Stroke(2.dp.toPx()))
+                    Spacer(modifier = Modifier.height(24.dp))
+
+                    Text(
+                        text = "Press and hold to alert nearby responders",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = WarmWhite,
+                        textAlign = TextAlign.Center
+                    )
                 }
-                
-                Text(
-                    "SCAN RANGE: 1.2KM",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = Color.White.copy(alpha = 0.3f),
-                    modifier = Modifier.align(Alignment.BottomEnd).padding(Spacing.Medium)
+            }
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            // Status Cards Row
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                StatusCard(
+                    icon = Icons.Default.SignalWifiStatusbar4Bar,
+                    label = "Network",
+                    value = if (activeNodesCount > 0) "Healthy" else "Searching...",
+                    modifier = Modifier.weight(1f)
+                )
+                StatusCard(
+                    icon = Icons.Default.BatteryChargingFull,
+                    label = "Battery",
+                    value = "84%",
+                    modifier = Modifier.weight(1f)
                 )
             }
 
-            // Network Status Card
-            Surface(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = Spacing.Medium),
-                color = Color.White.copy(alpha = 0.05f),
-                shape = RoundedCornerShape(16.dp),
-                border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.1f))
-            ) {
-                Column(modifier = Modifier.padding(Spacing.Medium)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.AutoMirrored.Filled.TrendingUp, contentDescription = null, tint = Color.White, modifier = Modifier.size(20.dp))
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text("Network Status", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = Color.White)
-                            Text("Mesh Protocol: v2.4 Active", style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.6f))
-                        }
-                        Surface(color = Color.White.copy(alpha = 0.1f), shape = RoundedCornerShape(12.dp)) {
-                            Text("Healthy", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = Color.White, modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp))
-                        }
-                    }
-                    
-                    HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), color = Color.White.copy(alpha = 0.1f))
-                    
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        StatusMetric("NODES", String.format(Locale.getDefault(), "%02d", activeNodesCount))
-                        StatusMetric("DEPTH", "3 Hops")
-                        StatusMetric("RANGE", "~800m")
-                    }
-                }
-            }
+            Spacer(modifier = Modifier.height(24.dp))
 
-            Spacer(modifier = Modifier.height(Spacing.Large))
-
-            // Nearby Nodes List Header
+            // Mesh Network Section
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = Spacing.Medium),
+                modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text("NEARBY NODES", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Black, color = Color.White)
+                Text(
+                    text = "Nearby Safety Network",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = DarkGray
+                )
                 TextButton(onClick = onRefresh) {
-                    Text("Refresh", color = CyanPrimary, style = MaterialTheme.typography.labelMedium)
-                    Icon(Icons.Default.ChevronRight, contentDescription = null, tint = CyanPrimary, modifier = Modifier.size(16.dp))
+                    Text("Sync", color = PrimaryRed, fontWeight = FontWeight.SemiBold)
                 }
             }
 
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = Spacing.Medium),
-                verticalArrangement = Arrangement.spacedBy(Spacing.Small)
+            ResQCard(
+                modifier = Modifier.fillMaxWidth(),
+                elevation = 1.dp,
+                cornerRadius = 24.dp
             ) {
-                nodes.forEach { node ->
-                    NearbyNodeItem(node, onDisconnect, onForceConnect, onBlock, onUnblock)
-                }
-                
-                if (nodes.isEmpty()) {
-                    Box(modifier = Modifier.fillMaxWidth().height(100.dp), contentAlignment = Alignment.Center) {
-                        Text("No nodes detected nearby.", color = Color.White.copy(alpha = 0.4f), style = MaterialTheme.typography.bodyMedium)
+                Column(modifier = Modifier.padding(16.dp)) {
+                    if (nodes.isEmpty()) {
+                        Box(
+                            modifier = Modifier.fillMaxWidth().height(100.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text("Scanning for nearby ResQMesh devices...", style = MaterialTheme.typography.bodySmall, color = TextMuted)
+                        }
+                    } else {
+                        nodes.forEachIndexed { index, node ->
+                            NearbyNodeRow(node)
+                            if (index < nodes.size - 1) {
+                                HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), color = LightGray)
+                            }
+                        }
                     }
                 }
-
-                Spacer(modifier = Modifier.height(Spacing.Large))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.Center,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        Icons.Default.SignalCellularAlt,
-                        contentDescription = null,
-                        tint = Color.White.copy(alpha = 0.2f),
-                        modifier = Modifier.size(14.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        "AES-256 MESH-TUNNEL ESTABLISHED",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = Color.White.copy(alpha = 0.2f),
-                        fontSize = 8.sp
-                    )
-                }
-                Spacer(modifier = Modifier.height(Spacing.Large))
             }
+
+            Spacer(modifier = Modifier.height(32.dp))
         }
     }
 }
 
 @Composable
-fun StatusMetric(label: String, value: String) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(label, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = Color.White.copy(alpha = 0.4f))
-        Text(value, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Black, color = Color.White)
+fun StatusCard(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, value: String, modifier: Modifier = Modifier) {
+    ResQCard(
+        modifier = modifier,
+        cornerRadius = 24.dp,
+        elevation = 2.dp
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Icon(icon, contentDescription = null, tint = PrimaryRed, modifier = Modifier.size(24.dp))
+            Spacer(modifier = Modifier.height(12.dp))
+            Text(label, style = MaterialTheme.typography.labelSmall, color = TextSecondary)
+            Text(value, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = DarkGray)
+        }
     }
 }
 
 @Composable
-fun NearbyNodeItem(
-    node: NodeItemData, 
-    onDisconnect: (String) -> Unit, 
-    onForceConnect: (String, String) -> Unit,
-    onBlock: (String) -> Unit,
-    onUnblock: (String) -> Unit
-) {
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        color = Color.White.copy(alpha = 0.05f),
-        shape = RoundedCornerShape(12.dp)
-    ) {
-        Row(
-            modifier = Modifier.padding(Spacing.Medium),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            // Avatar
-            Box {
-                Surface(modifier = Modifier.size(44.dp), shape = CircleShape, color = Color.White.copy(alpha = 0.1f)) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(Icons.Default.Person, contentDescription = null, tint = Color.White.copy(alpha = 0.5f))
-                    }
-                }
-                if (node.isActiveRelay) {
-                    Box(
-                        modifier = Modifier
-                            .size(16.dp)
-                            .clip(CircleShape)
-                            .background(CyanPrimary)
-                            .align(Alignment.TopEnd)
-                            .border(2.dp, Color(0xFF1E293B), CircleShape)
-                    ) {
-                        Icon(Icons.Default.Wifi, contentDescription = null, tint = Color.White, modifier = Modifier.padding(2.dp))
-                    }
-                }
+fun NearbyNodeRow(node: NodeItemData) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Surface(modifier = Modifier.size(40.dp), shape = CircleShape, color = OffWhite) {
+            Box(contentAlignment = Alignment.Center) {
+                Icon(Icons.Default.Person, contentDescription = null, tint = MediumGray, modifier = Modifier.size(20.dp))
             }
-
-            Spacer(modifier = Modifier.width(Spacing.Medium))
-
-            Column(modifier = Modifier.weight(1f)) {
-                Text(node.name, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Black, color = if (node.isBlocked) Color.Gray else Color.White)
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    val statusColor = if (node.isBlocked) Color.Red else if (node.status.contains("MASTER") || node.isConnected) CyanPrimary else Color.White.copy(alpha = 0.4f)
-                    Icon(
-                        if (node.isBlocked) Icons.Default.Block else if (node.status.contains("MASTER") || node.isConnected) Icons.Default.Bolt else Icons.Default.Info, 
-                        contentDescription = null, 
-                        tint = statusColor, 
-                        modifier = Modifier.size(12.dp)
-                    )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(if (node.isBlocked) "BLOCKED" else node.status, style = MaterialTheme.typography.labelSmall, color = statusColor)
-                }
-            }
-
-            if (node.isBlocked) {
-                TextButton(
-                    onClick = { onUnblock(node.name) },
-                    colors = ButtonDefaults.textButtonColors(contentColor = Color(0xFF10B981))
-                ) {
-                    Text("UNBLOCK", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Black)
-                }
-            } else if (node.isConnected) {
-                IconButton(onClick = { onBlock(node.name) }) {
-                    Icon(
-                        imageVector = Icons.Default.Block,
-                        contentDescription = "Block Device",
-                        tint = Color.Gray
-                    )
-                }
-                IconButton(onClick = { onDisconnect(node.endpointId) }) {
-                    Icon(
-                        imageVector = Icons.Outlined.LinkOff,
-                        contentDescription = "Unlink Device",
-                        tint = Color(0xFFEF4444)
-                    )
-                }
-            } else {
-                IconButton(onClick = { onBlock(node.name) }) {
-                    Icon(
-                        imageVector = Icons.Default.Block,
-                        contentDescription = "Block Device",
-                        tint = Color.Gray
-                    )
-                }
-                TextButton(
-                    onClick = { onForceConnect(node.endpointId, node.name) },
-                    colors = ButtonDefaults.textButtonColors(contentColor = CyanPrimary)
-                ) {
-                    Icon(Icons.Default.Bolt, contentDescription = null, modifier = Modifier.size(16.dp))
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text("FORCE", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Black)
-                }
-            }
+        }
+        Spacer(modifier = Modifier.width(16.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(node.name, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold, color = DarkGray)
+            Text(node.status, style = MaterialTheme.typography.labelSmall, color = if (node.isConnected) SuccessGreen else TextMuted)
+        }
+        if (node.isConnected) {
+            Icon(Icons.Default.CheckCircle, contentDescription = null, tint = SuccessGreen, modifier = Modifier.size(20.dp))
         }
     }
 }
@@ -417,30 +240,5 @@ data class NodeItemData(
     val endpointId: String,
     val name: String,
     val status: String,
-    val isConnected: Boolean = false,
-    val isActiveRelay: Boolean = false,
-    val isBlocked: Boolean = false
+    val isConnected: Boolean
 )
-
-@Preview(showBackground = true)
-@Composable
-fun RadarScreenPreview() {
-    val mockNodes = listOf(
-        NodeItemData("id1", "Node_X77A", "120m • End Device"),
-        NodeItemData("id2", "Node_BK29", "250m • Active Relay", isConnected = true, isActiveRelay = true),
-        NodeItemData("id3", "Node_L005", "410m • End Device"),
-        NodeItemData("id4", "Node_MN04", "680m • Active Relay", isConnected = false, isActiveRelay = true),
-        NodeItemData("id5", "Node_PJ88", "910m • End Device")
-    )
-    TestResQMeshTheme {
-        RadarScreenContent(
-            activeNodesCount = 6,
-            nodes = mockNodes,
-            onRefresh = {},
-            onDisconnect = {},
-            onForceConnect = { _, _ -> },
-            onBlock = {},
-            onUnblock = {}
-        )
-    }
-}

@@ -1,8 +1,8 @@
 package com.example.testresqmesh.feature.sos.ui
 
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -10,12 +10,14 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
@@ -25,199 +27,146 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.testresqmesh.core.ui.theme.Spacing
+import com.example.testresqmesh.core.ui.theme.*
+import com.example.testresqmesh.core.ui.components.layout.ResQCard
 import kotlin.math.roundToInt
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SOSBroadcastScreen(onCancel: () -> Unit, onSosTriggered: (String) -> Unit = {}) {
-    val sosRed = Color(0xFFFF5252)
     var selectedContext by remember { mutableStateOf("GENERAL") }
+
+    val infiniteTransition = rememberInfiniteTransition()
+    val pulseScale by infiniteTransition.animateFloat(
+        initialValue = 1f,
+        targetValue = 1.15f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1000, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        )
+    )
 
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(sosRed)
+            .background(PrimaryRed)
             .verticalScroll(rememberScrollState())
             .padding(Spacing.Large),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-            Button(
-                onClick = onCancel,
-                colors = ButtonDefaults.buttonColors(containerColor = Color.Black.copy(alpha = 0.2f)),
-                shape = RoundedCornerShape(20.dp)
-            ) {
-                Icon(Icons.Default.Close, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("Cancel", fontWeight = FontWeight.Bold, color = Color.White)
-            }
-        }
-
-        Spacer(modifier = Modifier.height(24.dp))
-
-        Surface(
-            modifier = Modifier.size(100.dp),
-            shape = CircleShape,
-            color = Color.White.copy(alpha = 0.2f)
-        ) {
-            Box(contentAlignment = Alignment.Center) {
-                Surface(modifier = Modifier.size(60.dp), shape = CircleShape, color = Color.White) {
+        // Cancel Button
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Start) {
+            IconButton(onClick = onCancel, modifier = Modifier.size(48.dp)) {
+                Surface(modifier = Modifier.fillMaxSize(), shape = CircleShape, color = WarmWhite.copy(alpha = 0.2f)) {
                     Box(contentAlignment = Alignment.Center) {
-                        Text("!", fontSize = 32.sp, fontWeight = FontWeight.Black, color = sosRed)
+                        Icon(Icons.Default.Close, contentDescription = "Cancel", tint = WarmWhite)
                     }
                 }
             }
         }
 
-        Spacer(modifier = Modifier.height(24.dp))
-
-        Text(
-            text = "EMERGENCY\nSOS",
-            style = MaterialTheme.typography.displayMedium,
-            fontWeight = FontWeight.Black,
-            color = Color.White,
-            textAlign = TextAlign.Center,
-            lineHeight = 44.sp
-        )
-
-        Spacer(modifier = Modifier.height(12.dp))
-
-        Text(
-            text = "Select context and slide to flood the local mesh network.",
-            style = MaterialTheme.typography.bodyLarge,
-            color = Color.White.copy(alpha = 0.9f),
-            textAlign = TextAlign.Center
-        )
-
         Spacer(modifier = Modifier.height(32.dp))
 
-        // Context Grid
-        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                SOSContextCard(Icons.Default.LocalHospital, "MEDICAL", selectedContext == "MEDICAL", { selectedContext = "MEDICAL" }, Modifier.weight(1f))
-                SOSContextCard(Icons.Default.Whatshot, "FIRE", selectedContext == "FIRE", { selectedContext = "FIRE" }, Modifier.weight(1f))
-            }
-            Spacer(modifier = Modifier.height(8.dp))
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                SOSContextCard(Icons.Default.BackHand, "TRAPPED", selectedContext == "TRAPPED", { selectedContext = "TRAPPED" }, Modifier.weight(1f))
-                SOSContextCard(Icons.Default.Groups, "SEARCH", selectedContext == "SEARCH", { selectedContext = "SEARCH" }, Modifier.weight(1f))
-            }
-            Spacer(modifier = Modifier.height(8.dp))
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                SOSContextCard(Icons.Default.Warning, "GENERAL", selectedContext == "GENERAL", { selectedContext = "GENERAL" }, Modifier.weight(1f))
+        // Large Animated Indicator
+        Box(contentAlignment = Alignment.Center) {
+            Surface(
+                modifier = Modifier.size(140.dp).scale(pulseScale),
+                shape = CircleShape,
+                color = WarmWhite.copy(alpha = 0.15f)
+            ) {}
+            Surface(
+                modifier = Modifier.size(100.dp),
+                shape = CircleShape,
+                color = WarmWhite,
+                shadowElevation = 8.dp
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(Icons.Default.PriorityHigh, contentDescription = null, tint = PrimaryRed, modifier = Modifier.size(48.dp))
+                }
             }
         }
 
         Spacer(modifier = Modifier.height(32.dp))
 
-        // Warning Box
-        Surface(
-            modifier = Modifier.fillMaxWidth(),
-            color = Color.Black.copy(alpha = 0.2f),
-            shape = RoundedCornerShape(12.dp)
-        ) {
-            Row(
-                modifier = Modifier.padding(Spacing.Medium),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Icon(Icons.Default.Wifi, contentDescription = null, tint = Color.White, modifier = Modifier.size(24.dp))
-                Spacer(modifier = Modifier.width(16.dp))
-                Text(
-                    text = "WARNING: BYPASSES ROUTING LIMITS TO FLOOD LOCAL MESH. CURRENT SIGNAL HOPS: ∞ (UNLIMITED)",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = Color.White,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 9.sp
-                )
+        Text(
+            text = "Emergency SOS",
+            style = MaterialTheme.typography.displaySmall,
+            fontWeight = FontWeight.Bold,
+            color = WarmWhite,
+            textAlign = TextAlign.Center
+        )
+
+        Text(
+            text = "Slide to alert all nearby devices instantly.",
+            style = MaterialTheme.typography.bodyLarge,
+            color = WarmWhite.copy(alpha = 0.8f),
+            textAlign = TextAlign.Center
+        )
+
+        Spacer(modifier = Modifier.height(48.dp))
+
+        // Context Grid
+        Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                SOSOptionCard(Icons.Default.LocalHospital, "Medical", selectedContext == "MEDICAL", { selectedContext = "MEDICAL" }, Modifier.weight(1f))
+                SOSOptionCard(Icons.Default.Whatshot, "Fire", selectedContext == "FIRE", { selectedContext = "FIRE" }, Modifier.weight(1f))
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                SOSOptionCard(Icons.Default.Security, "Police", selectedContext == "GENERAL", { selectedContext = "GENERAL" }, Modifier.weight(1f))
+                SOSOptionCard(Icons.Default.Groups, "Other", selectedContext == "OTHER", { selectedContext = "OTHER" }, Modifier.weight(1f))
             }
         }
 
         Spacer(modifier = Modifier.weight(1f))
+        Spacer(modifier = Modifier.height(64.dp))
 
-        // Swipe to Broadcast Slider
-        SOSSlider(onSlideComplete = {
-            onSosTriggered(selectedContext)
-        })
+        // Large Modern Slide to SOS
+        ModernSOSSlider(onSlideComplete = { onSosTriggered(selectedContext) })
 
-        Spacer(modifier = Modifier.height(24.dp))
-
-        // Footer Status
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.Center,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            FooterStatusItem(Icons.Default.Wifi, "WIFI DIRECT")
-            Spacer(modifier = Modifier.width(16.dp))
-            Box(modifier = Modifier.size(4.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.4f)))
-            Spacer(modifier = Modifier.width(16.dp))
-            FooterStatusItem(Icons.Default.WifiTethering, "BLE MESH")
-            Spacer(modifier = Modifier.width(16.dp))
-            Box(modifier = Modifier.size(4.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.4f)))
-            Spacer(modifier = Modifier.width(16.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(Color(0xFF10B981)))
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("READY", style = MaterialTheme.typography.labelSmall, color = Color.White, fontWeight = FontWeight.Bold)
-            }
-        }
+        Spacer(modifier = Modifier.height(32.dp))
     }
 }
 
 @Composable
-fun SOSContextCard(
-    icon: ImageVector, 
-    label: String, 
-    isSelected: Boolean, 
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Surface(
+fun SOSOptionCard(icon: ImageVector, label: String, isSelected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    ResQCard(
         modifier = modifier.height(100.dp).clickable { onClick() },
-        color = if (isSelected) Color(0xFFFF5252) else Color.White.copy(alpha = 0.1f),
-        shape = MaterialTheme.shapes.medium,
-        border = androidx.compose.foundation.BorderStroke(1.dp, if (isSelected) Color(0xFFFF5252) else Color.White.copy(alpha = 0.2f))
+        backgroundColor = if (isSelected) WarmWhite else WarmWhite.copy(alpha = 0.1f),
+        elevation = if (isSelected) 4.dp else 0.dp,
+        cornerRadius = 24.dp
     ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
-        ) {
-            Icon(icon, contentDescription = null, tint = Color.White, modifier = Modifier.size(32.dp))
+        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+            Icon(icon, contentDescription = null, tint = if (isSelected) PrimaryRed else WarmWhite, modifier = Modifier.size(32.dp))
             Spacer(modifier = Modifier.height(8.dp))
-            Text(label, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Black, color = Color.White)
+            Text(label, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, color = if (isSelected) PrimaryRed else WarmWhite)
         }
     }
 }
 
 @Composable
-fun SOSSlider(onSlideComplete: () -> Unit) {
-    val sliderWidth = 300.dp
+fun ModernSOSSlider(onSlideComplete: () -> Unit) {
+    val sliderWidth = 320.dp
     val thumbSize = 64.dp
-    
     val density = LocalDensity.current
     val sliderWidthPx = with(density) { sliderWidth.toPx() }
     val thumbSizePx = with(density) { thumbSize.toPx() }
     val maxDragPx = sliderWidthPx - thumbSizePx - with(density) { 8.dp.toPx() }
     
     var offsetX by remember { mutableStateOf(0f) }
-    
+
     Surface(
-        modifier = Modifier.width(sliderWidth).height(thumbSize + 8.dp),
-        color = Color.White.copy(alpha = 0.2f),
-        shape = CircleShape,
-        border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.3f))
+        modifier = Modifier.width(sliderWidth).height(thumbSize + 12.dp),
+        color = WarmWhite.copy(alpha = 0.2f),
+        shape = CircleShape
     ) {
         Box(contentAlignment = Alignment.Center) {
             Text(
-                "SLIDE TO BROADCAST SOS",
-                style = MaterialTheme.typography.labelLarge,
-                fontWeight = FontWeight.Black,
-                color = Color.White.copy(alpha = 0.6f),
-                letterSpacing = 1.sp
+                "Slide to Start Broadcast",
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.Bold,
+                color = WarmWhite.copy(alpha = 0.6f)
             )
             
-            Box(modifier = Modifier.fillMaxSize().padding(4.dp)) {
+            Box(modifier = Modifier.fillMaxSize().padding(6.dp)) {
                 Surface(
                     modifier = Modifier
                         .size(thumbSize)
@@ -238,23 +187,14 @@ fun SOSSlider(onSlideComplete: () -> Unit) {
                             }
                         },
                     shape = CircleShape,
-                    color = Color.White,
+                    color = WarmWhite,
                     shadowElevation = 8.dp
                 ) {
                     Box(contentAlignment = Alignment.Center) {
-                        Icon(Icons.Default.ChevronRight, contentDescription = null, tint = Color(0xFFFF5252), modifier = Modifier.size(32.dp))
+                        Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null, tint = PrimaryRed, modifier = Modifier.size(32.dp))
                     }
                 }
             }
         }
-    }
-}
-
-@Composable
-fun FooterStatusItem(icon: ImageVector, label: String) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Icon(icon, contentDescription = null, tint = Color.White.copy(alpha = 0.6f), modifier = Modifier.size(14.dp))
-        Spacer(modifier = Modifier.width(8.dp))
-        Text(label, style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.6f), fontWeight = FontWeight.Bold, fontSize = 8.sp)
     }
 }
