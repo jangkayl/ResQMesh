@@ -55,16 +55,34 @@ fun RadarScreen(viewModel: RadarViewModel) {
                 it.name, 
                 displayStatus,
                 isConnected = false,
-                isActiveRelay = it.myRole == "MASTER" || it.isConnecting
+                isActiveRelay = it.myRole == "MASTER" || it.isConnecting,
+                isBlocked = uiState.blockedDeviceNames.contains(it.name)
+            )
+        }
+
+    // Include blocked devices that are completely out of range so the user can still unblock them
+    val scannedAndConnectedNames = connectedNames + scannedNodes.map { it.name }
+    val offlineBlockedNodes = uiState.blockedDeviceNames
+        .filter { it !in scannedAndConnectedNames }
+        .map { name ->
+            NodeItemData(
+                endpointId = "",
+                name = name,
+                status = "OFFLINE",
+                isConnected = false,
+                isActiveRelay = false,
+                isBlocked = true
             )
         }
 
     RadarScreenContent(
         activeNodesCount = uiState.connectedDevices.size + scannedNodes.size,
-        nodes = connectedNodes + scannedNodes,
+        nodes = connectedNodes + scannedNodes + offlineBlockedNodes,
         onRefresh = { viewModel.rescan() },
         onDisconnect = { viewModel.disconnectDevice(it) },
-        onForceConnect = { id, name -> viewModel.forceConnect(id, name) }
+        onForceConnect = { id, name -> viewModel.forceConnect(id, name) },
+        onBlock = { name -> viewModel.blockDevice(name) },
+        onUnblock = { name -> viewModel.unblockDevice(name) }
     )
 }
 
@@ -75,7 +93,9 @@ fun RadarScreenContent(
     nodes: List<NodeItemData>,
     onRefresh: () -> Unit,
     onDisconnect: (String) -> Unit,
-    onForceConnect: (String, String) -> Unit
+    onForceConnect: (String, String) -> Unit,
+    onBlock: (String) -> Unit,
+    onUnblock: (String) -> Unit
 ) {
     val infiniteTransition = rememberInfiniteTransition()
     val radarSweep by infiniteTransition.animateFloat(
@@ -252,7 +272,7 @@ fun RadarScreenContent(
                 verticalArrangement = Arrangement.spacedBy(Spacing.Small)
             ) {
                 nodes.forEach { node ->
-                    NearbyNodeItem(node, onDisconnect, onForceConnect)
+                    NearbyNodeItem(node, onDisconnect, onForceConnect, onBlock, onUnblock)
                 }
                 
                 if (nodes.isEmpty()) {
@@ -296,7 +316,13 @@ fun StatusMetric(label: String, value: String) {
 }
 
 @Composable
-fun NearbyNodeItem(node: NodeItemData, onDisconnect: (String) -> Unit, onForceConnect: (String, String) -> Unit) {
+fun NearbyNodeItem(
+    node: NodeItemData, 
+    onDisconnect: (String) -> Unit, 
+    onForceConnect: (String, String) -> Unit,
+    onBlock: (String) -> Unit,
+    onUnblock: (String) -> Unit
+) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
         color = Color.White.copy(alpha = 0.05f),
@@ -330,21 +356,35 @@ fun NearbyNodeItem(node: NodeItemData, onDisconnect: (String) -> Unit, onForceCo
             Spacer(modifier = Modifier.width(Spacing.Medium))
 
             Column(modifier = Modifier.weight(1f)) {
-                Text(node.name, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Black, color = Color.White)
+                Text(node.name, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Black, color = if (node.isBlocked) Color.Gray else Color.White)
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    val statusColor = if (node.status.contains("MASTER") || node.isConnected) InboxAccentBlue else Color.White.copy(alpha = 0.4f)
+                    val statusColor = if (node.isBlocked) Color.Red else if (node.status.contains("MASTER") || node.isConnected) InboxAccentBlue else Color.White.copy(alpha = 0.4f)
                     Icon(
-                        if (node.status.contains("MASTER") || node.isConnected) Icons.Default.Bolt else Icons.Default.Info, 
+                        if (node.isBlocked) Icons.Default.Block else if (node.status.contains("MASTER") || node.isConnected) Icons.Default.Bolt else Icons.Default.Info, 
                         contentDescription = null, 
                         tint = statusColor, 
                         modifier = Modifier.size(12.dp)
                     )
                     Spacer(modifier = Modifier.width(4.dp))
-                    Text(node.status, style = MaterialTheme.typography.labelSmall, color = statusColor)
+                    Text(if (node.isBlocked) "BLOCKED" else node.status, style = MaterialTheme.typography.labelSmall, color = statusColor)
                 }
             }
 
-            if (node.isConnected) {
+            if (node.isBlocked) {
+                TextButton(
+                    onClick = { onUnblock(node.name) },
+                    colors = ButtonDefaults.textButtonColors(contentColor = Color(0xFF10B981))
+                ) {
+                    Text("UNBLOCK", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Black)
+                }
+            } else if (node.isConnected) {
+                IconButton(onClick = { onBlock(node.name) }) {
+                    Icon(
+                        imageVector = Icons.Default.Block,
+                        contentDescription = "Block Device",
+                        tint = Color.Gray
+                    )
+                }
                 IconButton(onClick = { onDisconnect(node.endpointId) }) {
                     Icon(
                         imageVector = Icons.Outlined.LinkOff,
@@ -353,13 +393,20 @@ fun NearbyNodeItem(node: NodeItemData, onDisconnect: (String) -> Unit, onForceCo
                     )
                 }
             } else {
+                IconButton(onClick = { onBlock(node.name) }) {
+                    Icon(
+                        imageVector = Icons.Default.Block,
+                        contentDescription = "Block Device",
+                        tint = Color.Gray
+                    )
+                }
                 TextButton(
                     onClick = { onForceConnect(node.endpointId, node.name) },
                     colors = ButtonDefaults.textButtonColors(contentColor = InboxAccentBlue)
                 ) {
                     Icon(Icons.Default.Bolt, contentDescription = null, modifier = Modifier.size(16.dp))
                     Spacer(modifier = Modifier.width(4.dp))
-                    Text("FORCE CONNECT", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Black)
+                    Text("FORCE", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Black)
                 }
             }
         }
@@ -371,7 +418,8 @@ data class NodeItemData(
     val name: String,
     val status: String,
     val isConnected: Boolean = false,
-    val isActiveRelay: Boolean = false
+    val isActiveRelay: Boolean = false,
+    val isBlocked: Boolean = false
 )
 
 @Preview(showBackground = true)
@@ -390,7 +438,9 @@ fun RadarScreenPreview() {
             nodes = mockNodes,
             onRefresh = {},
             onDisconnect = {},
-            onForceConnect = { _, _ -> }
+            onForceConnect = { _, _ -> },
+            onBlock = {},
+            onUnblock = {}
         )
     }
 }

@@ -14,7 +14,8 @@ data class ConnectionUiState(
 
 data class RadarUiState(
     val scannedDevices: List<ScannedDevice> = emptyList(),
-    val connectedDevices: List<ConnectedDevice> = emptyList()
+    val connectedDevices: List<ConnectedDevice> = emptyList(),
+    val blockedDeviceNames: Set<String> = emptySet()
 )
 
 data class ChatUiState(

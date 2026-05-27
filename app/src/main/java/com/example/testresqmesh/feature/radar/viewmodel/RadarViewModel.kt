@@ -26,6 +26,11 @@ class RadarViewModel(private val repository: MeshRepository) : ViewModel() {
                 _uiState.update { it.copy(connectedDevices = connected) }
             }
         }
+        viewModelScope.launch {
+            repository.blockedDeviceNames.collect { blocked ->
+                _uiState.update { it.copy(blockedDeviceNames = blocked) }
+            }
+        }
     }
 
     fun rescan() {
@@ -34,6 +39,14 @@ class RadarViewModel(private val repository: MeshRepository) : ViewModel() {
 
     fun disconnectDevice(endpointId: String) {
         repository.disconnectDevice(endpointId)
+    }
+
+    fun blockDevice(deviceName: String) {
+        repository.blockDevice(deviceName)
+    }
+
+    fun unblockDevice(deviceName: String) {
+        repository.unblockDevice(deviceName)
     }
 
     fun forceConnect(endpointId: String, endpointName: String) {

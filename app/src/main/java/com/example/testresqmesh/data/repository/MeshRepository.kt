@@ -8,6 +8,7 @@ import com.example.testresqmesh.core.network.MeshNetworkManager
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import java.util.UUID
@@ -80,6 +81,19 @@ class MeshRepository(private val networkManager: MeshNetworkManager) {
             meshRouter.recalculateKnownNodes(myNodeName, _connectedDevices.value)
         }
 
+        networkManager.onConnectionFailed = { id ->
+            _scannedDevices.update { current ->
+                val currentScanned = current.toMutableList()
+                val existingIndex = currentScanned.indexOfFirst { it.endpointId == id }
+                if (existingIndex != -1) {
+                    currentScanned[existingIndex] = currentScanned[existingIndex].copy(
+                        isConnecting = false
+                    )
+                }
+                currentScanned
+            }
+        }
+
         networkManager.onDeviceScanned = { id, name, score, role, isConnecting ->
             if (name != myNodeName) {
                 val isNotConnected = _connectedDevices.value.none { it.endpointId == id || it.name == name }
@@ -94,7 +108,7 @@ class MeshRepository(private val networkManager: MeshNetworkManager) {
                             lastSeen = System.currentTimeMillis(),
                             powerScore = score,
                             myRole = role,
-                            isConnecting = isConnecting || currentScanned[existingIndex].isConnecting
+                            isConnecting = isConnecting
                         )
                     } else {
                         currentScanned.add(ScannedDevice(id, name, System.currentTimeMillis(), score, role, isConnecting))
@@ -230,6 +244,16 @@ class MeshRepository(private val networkManager: MeshNetworkManager) {
 
     fun disconnectDevice(endpointId: String) {
         networkManager.disconnectFromEndpoint(endpointId)
+    }
+    
+    val blockedDeviceNames: StateFlow<Set<String>> = networkManager.blockedDeviceNames
+
+    fun blockDevice(deviceName: String) {
+        networkManager.blockDevice(deviceName)
+    }
+
+    fun unblockDevice(deviceName: String) {
+        networkManager.unblockDevice(deviceName)
     }
 
     fun forceConnect(endpointId: String, endpointName: String) {
