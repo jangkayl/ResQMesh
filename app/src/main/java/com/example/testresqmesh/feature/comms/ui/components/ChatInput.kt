@@ -61,8 +61,6 @@ fun ChatInput(
         modifier = Modifier
             .background(InboxBackground)
             .padding(horizontal = Spacing.Medium, vertical = 16.dp)
-            .navigationBarsPadding()
-            .imePadding()
     ) {
         // Audio Preview Area
         if (pendingAudio != null) {

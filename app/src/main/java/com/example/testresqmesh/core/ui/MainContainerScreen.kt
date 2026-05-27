@@ -4,6 +4,8 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.animation.*
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.consumeWindowInsets
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.material.icons.Icons
@@ -191,7 +193,10 @@ fun MainContainerScreen(
     ) { innerPadding ->
         AnimatedContent(
             targetState = currentItem,
-            modifier = Modifier.padding(innerPadding),
+            modifier = Modifier
+                .padding(innerPadding)
+                .consumeWindowInsets(innerPadding)
+                .imePadding(),
             transitionSpec = {
                 fadeIn(animationSpec = tween(220, delayMillis = 90)) togetherWith
                 fadeOut(animationSpec = tween(90))
