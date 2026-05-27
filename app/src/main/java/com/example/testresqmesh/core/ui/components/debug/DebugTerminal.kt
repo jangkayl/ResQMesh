@@ -113,8 +113,8 @@ fun DebugTerminal() {
             val filteredLogs = logs.filter { logMsg ->
                 when (currentFilter) {
                     "ALL" -> true
-                    "PAIRING" -> logMsg.contains("MeshNetwork:") || logMsg.contains("Connection", ignoreCase = true)
-                    "ROUTING" -> logMsg.contains("MeshNetwork_Routing:") || logMsg.contains("PayloadDispatcher:")
+                    "PAIRING" -> logMsg.contains("MeshNetwork_PAIRING:") || logMsg.contains("Connection", ignoreCase = true)
+                    "ROUTING" -> logMsg.contains("MeshNetwork_ROUTING:") || logMsg.contains("PayloadDispatcher:")
                     "E2EE" -> logMsg.contains("MeshNetwork_E2EE:")
                     "ERRORS" -> logMsg.contains("MeshNetwork_ERROR:") || logMsg.contains("Exception", ignoreCase = true) || logMsg.contains("failed", ignoreCase = true)
                     else -> true
