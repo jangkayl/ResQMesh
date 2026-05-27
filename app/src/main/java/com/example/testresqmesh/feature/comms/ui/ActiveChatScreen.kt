@@ -146,47 +146,49 @@ fun ActiveChatScreen(
         containerColor = InboxBackground,
         bottomBar = {
             val context = androidx.compose.ui.platform.LocalContext.current
-            ChatInput(
-                inputText = inputText,
-                onTextChange = { inputText = it },
-                pendingImage = pendingImage,
-                onImageSelected = { pendingImage = it },
-                onClearImage = { pendingImage = null },
-                pendingAudio = pendingAudio,
-                onClearAudio = { pendingAudio = null },
-                isRecording = isRecording,
-                onToggleRecord = {
-                    if (!isRecording) {
-                        val started = mediaHelper.startRecording()
-                        if (started) isRecording = true
-                    } else {
-                        isRecording = false
-                        val audioBase64 = mediaHelper.stopRecording()
-                        if (audioBase64 != null) {
-                            pendingAudio = audioBase64
+            androidx.compose.foundation.layout.Box(modifier = Modifier.imePadding()) {
+                ChatInput(
+                    inputText = inputText,
+                    onTextChange = { inputText = it },
+                    pendingImage = pendingImage,
+                    onImageSelected = { pendingImage = it },
+                    onClearImage = { pendingImage = null },
+                    pendingAudio = pendingAudio,
+                    onClearAudio = { pendingAudio = null },
+                    isRecording = isRecording,
+                    onToggleRecord = {
+                        if (!isRecording) {
+                            val started = mediaHelper.startRecording()
+                            if (started) isRecording = true
+                        } else {
+                            isRecording = false
+                            val audioBase64 = mediaHelper.stopRecording()
+                            if (audioBase64 != null) {
+                                pendingAudio = audioBase64
+                            }
                         }
-                    }
-                },
-                onSend = {
-                    val hasAudio = pendingAudio != null
-                    val finalMessage = if (hasAudio && inputText.isBlank()) "🎤 Voice Note" else inputText.trim()
-                    
-                    viewModel.sendPrivateMessage(
-                        targetName = displayName,
-                        text = finalMessage,
-                        imageBase64 = pendingImage,
-                        audioBase64 = pendingAudio
-                    )
-                    
-                    inputText = ""
-                    pendingImage = null
-                    pendingAudio = null
-                },
-                onSendLocation = {
-                    viewModel.broadcastLocation(context, isPrivate = true, targetName = displayName)
-                },
-                mediaHelper = mediaHelper
-            )
+                    },
+                    onSend = {
+                        val hasAudio = pendingAudio != null
+                        val finalMessage = if (hasAudio && inputText.isBlank()) "🎤 Voice Note" else inputText.trim()
+                        
+                        viewModel.sendPrivateMessage(
+                            targetName = displayName,
+                            text = finalMessage,
+                            imageBase64 = pendingImage,
+                            audioBase64 = pendingAudio
+                        )
+                        
+                        inputText = ""
+                        pendingImage = null
+                        pendingAudio = null
+                    },
+                    onSendLocation = {
+                        viewModel.broadcastLocation(context, isPrivate = true, targetName = displayName)
+                    },
+                    mediaHelper = mediaHelper
+                )
+            }
         }
     ) { innerPadding ->
         LazyColumn(
