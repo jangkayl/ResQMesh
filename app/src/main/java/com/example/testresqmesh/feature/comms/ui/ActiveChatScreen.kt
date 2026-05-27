@@ -22,6 +22,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -32,10 +33,14 @@ import com.example.testresqmesh.core.ui.theme.InboxBackground
 import com.example.testresqmesh.core.ui.theme.InboxAccentBlue
 import com.example.testresqmesh.core.ui.theme.Spacing
 import com.example.testresqmesh.feature.comms.viewmodel.CommunicationViewModel
+import com.example.testresqmesh.feature.comms.ui.components.ChatInput
+import com.example.testresqmesh.core.utils.MediaHelper
 
 data class ChatMessageData(
     val id: String,
     val text: String,
+    val imageBase64: String? = null,
+    val audioBase64: String? = null,
     val time: String,
     val hops: String,
     val receiveMedium: String,
@@ -53,7 +58,8 @@ data class ChatMessageData(
 @Composable
 fun ActiveChatScreen(
     name: String, 
-    viewModel: CommunicationViewModel, 
+    viewModel: CommunicationViewModel,
+    mediaHelper: MediaHelper,
     onBack: () -> Unit,
     onViewMap: (Double, Double, String, String) -> Unit = { _, _, _, _ -> }
 ) {
@@ -67,6 +73,11 @@ fun ActiveChatScreen(
     
     // LazyListState to control scrolling if needed
     val listState = rememberLazyListState()
+
+    var inputText by remember { mutableStateOf("") }
+    var pendingImage by remember { mutableStateOf<String?>(null) }
+    var pendingAudio by remember { mutableStateOf<String?>(null) }
+    var isRecording by remember { mutableStateOf(false) }
 
     // Fix: Prioritize connected device name, then look for the first message not sent by "Me"
     val displayName = uiState.connectedDevices.find { it.endpointId == name }?.name 
@@ -135,13 +146,46 @@ fun ActiveChatScreen(
         containerColor = InboxBackground,
         bottomBar = {
             val context = androidx.compose.ui.platform.LocalContext.current
-            ChatBottomInput(
-                onSendMessage = { text ->
-                    viewModel.sendPrivateMessage(displayName, text)
+            ChatInput(
+                inputText = inputText,
+                onTextChange = { inputText = it },
+                pendingImage = pendingImage,
+                onImageSelected = { pendingImage = it },
+                onClearImage = { pendingImage = null },
+                pendingAudio = pendingAudio,
+                onClearAudio = { pendingAudio = null },
+                isRecording = isRecording,
+                onToggleRecord = {
+                    if (!isRecording) {
+                        val started = mediaHelper.startRecording()
+                        if (started) isRecording = true
+                    } else {
+                        isRecording = false
+                        val audioBase64 = mediaHelper.stopRecording()
+                        if (audioBase64 != null) {
+                            pendingAudio = audioBase64
+                        }
+                    }
+                },
+                onSend = {
+                    val hasAudio = pendingAudio != null
+                    val finalMessage = if (hasAudio && inputText.isBlank()) "🎤 Voice Note" else inputText.trim()
+                    
+                    viewModel.sendPrivateMessage(
+                        targetName = displayName,
+                        text = finalMessage,
+                        imageBase64 = pendingImage,
+                        audioBase64 = pendingAudio
+                    )
+                    
+                    inputText = ""
+                    pendingImage = null
+                    pendingAudio = null
                 },
                 onSendLocation = {
                     viewModel.broadcastLocation(context, isPrivate = true, targetName = displayName)
-                }
+                },
+                mediaHelper = mediaHelper
             )
         }
     ) { innerPadding ->
@@ -164,6 +208,8 @@ fun ActiveChatScreen(
                     ChatMessageData(
                         id = msg.id,
                         text = msg.text,
+                        imageBase64 = msg.imageBase64,
+                        audioBase64 = msg.audioBase64,
                         time = java.text.SimpleDateFormat("hh:mm a", java.util.Locale.getDefault()).format(java.util.Date(msg.timestamp)),
                         hops = if (msg.isHopped) "🌐 MESH HOPPED" else "🟢 DIRECT",
                         receiveMedium = msg.receiveMedium,
@@ -176,6 +222,7 @@ fun ActiveChatScreen(
                         outboundRoute = msg.outboundRoute,
                         returnRoute = msg.returnRoute
                     ),
+                    mediaHelper = mediaHelper,
                     onViewMap = { lat, lng ->
                         onViewMap(lat, lng, msg.senderName, msg.text)
                     }
@@ -203,7 +250,7 @@ fun ActiveChatScreen(
 }
 
 @Composable
-fun HighFidelityChatBubble(msg: ChatMessageData, onViewMap: (Double, Double) -> Unit = { _, _ -> }) {
+fun HighFidelityChatBubble(msg: ChatMessageData, mediaHelper: MediaHelper, onViewMap: (Double, Double) -> Unit = { _, _ -> }) {
     val bubbleColor = if (msg.isMine) InboxAccentBlue else Color(0xFF35424D) // Lighter slate for others
     val alignment = if (msg.isMine) Alignment.End else Alignment.Start
     val shape = if (msg.isMine) {
@@ -251,12 +298,54 @@ fun HighFidelityChatBubble(msg: ChatMessageData, onViewMap: (Double, Double) -> 
                     }
                     Spacer(modifier = Modifier.height(8.dp))
                 }
-                Text(
-                    text = msg.text,
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = Color.White,
-                    lineHeight = 22.sp
-                )
+                
+                if (msg.imageBase64 != null) {
+                    val bitmap = remember(msg.imageBase64) { mediaHelper.decodeBase64ToBitmap(msg.imageBase64) }
+                    bitmap?.let { 
+                        androidx.compose.foundation.Image(
+                            bitmap = it.asImageBitmap(), 
+                            contentDescription = "Attached Image", 
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(200.dp)
+                                .clip(RoundedCornerShape(8.dp))
+                                .padding(bottom = Spacing.ExtraSmall),
+                            contentScale = androidx.compose.ui.layout.ContentScale.Crop
+                        ) 
+                    }
+                }
+                
+                if (msg.audioBase64 != null) {
+                    Surface(
+                        onClick = { mediaHelper.playVoiceMail(msg.audioBase64) },
+                        color = Color.Black.copy(alpha = 0.2f),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.fillMaxWidth().padding(bottom = Spacing.ExtraSmall)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(Spacing.Small),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text("▶️", fontSize = 14.sp)
+                            Spacer(modifier = Modifier.width(Spacing.Small))
+                            Text(
+                                "Voice Note", 
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = Color.White,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                }
+                
+                if (msg.text.isNotBlank()) {
+                    Text(
+                        text = msg.text,
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = Color.White,
+                        lineHeight = 22.sp
+                    )
+                }
             }
         }
         
@@ -337,101 +426,4 @@ fun DotSeparator() {
     Box(modifier = Modifier.padding(horizontal = 8.dp).size(3.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.3f)))
 }
 
-@Composable
-fun ChatBottomInput(onSendMessage: (String) -> Unit, onSendLocation: () -> Unit) {
-    var textState by remember { mutableStateOf("") }
-    
-    Column(
-        modifier = Modifier
-            .background(InboxBackground)
-            .padding(horizontal = Spacing.Medium, vertical = 16.dp)
-            .navigationBarsPadding()
-            .imePadding()
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            // Utility Buttons
-            UtilityButton(Icons.Default.LocationOn, onClick = onSendLocation)
-            UtilityButton(Icons.Outlined.Wifi)
-            
-            // Message Input
-            Surface(
-                modifier = Modifier.weight(1f).height(48.dp),
-                shape = RoundedCornerShape(12.dp),
-                color = Color.White.copy(alpha = 0.08f),
-                border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.15f))
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = 16.dp)) {
-                    BasicTextField(
-                        value = textState,
-                        onValueChange = { textState = it },
-                        modifier = Modifier.weight(1f),
-                        textStyle = MaterialTheme.typography.bodyMedium.copy(color = Color.White),
-                        decorationBox = { innerTextField ->
-                            if (textState.isEmpty()) {
-                                Text("Secure Mesh Message...", color = Color.White.copy(alpha = 0.5f), style = MaterialTheme.typography.bodyMedium)
-                            }
-                            innerTextField()
-                        }
-                    )
-                    IconButton(onClick = {
-                        if (textState.isNotBlank()) {
-                            onSendMessage(textState)
-                            textState = ""
-                        }
-                    }) {
-                        Icon(Icons.Default.Send, contentDescription = "Send", tint = if (textState.isNotBlank()) InboxAccentBlue else Color.White.copy(alpha = 0.3f), modifier = Modifier.size(20.dp))
-                    }
-                }
-            }
-        }
-        
-        Spacer(modifier = Modifier.height(16.dp))
-        
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            QuickReplyChip("Safe") { textState = it }
-            QuickReplyChip("Moving") { textState = it }
-            QuickReplyChip("SOS Needed") { textState = it }
-            QuickReplyChip("Received") { textState = it }
-        }
-    }
-}
 
-@Composable
-fun UtilityButton(icon: androidx.compose.ui.graphics.vector.ImageVector, onClick: () -> Unit = {}) {
-    Surface(
-        onClick = onClick,
-        modifier = Modifier.size(48.dp), 
-        shape = RoundedCornerShape(10.dp), 
-        color = Color.White.copy(alpha = 0.08f),
-        border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.1f))
-    ) {
-        Box(contentAlignment = Alignment.Center) {
-            Icon(icon, contentDescription = null, tint = Color.White.copy(alpha = 0.7f), modifier = Modifier.size(22.dp))
-        }
-    }
-}
-
-@Composable
-fun QuickReplyChip(text: String, onClick: (String) -> Unit) {
-    Surface(
-        modifier = Modifier.clickable { onClick(text) },
-        color = Color.Black.copy(alpha = 0.5f),
-        shape = RoundedCornerShape(20.dp),
-        border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.1f))
-    ) {
-        Text(
-            text = text,
-            modifier = Modifier.padding(horizontal = 18.dp, vertical = 8.dp),
-            style = MaterialTheme.typography.labelMedium,
-            fontWeight = FontWeight.Bold,
-            color = Color.White
-        )
-    }
-}

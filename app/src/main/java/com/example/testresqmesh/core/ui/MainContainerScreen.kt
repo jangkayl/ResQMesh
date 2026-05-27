@@ -4,6 +4,8 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.animation.*
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.systemBars
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -123,6 +125,7 @@ fun MainContainerScreen(
         ActiveChatScreen(
             name = activeChatNode!!,
             viewModel = commsViewModel,
+            mediaHelper = mediaHelper,
             onBack = { activeChatNode = null },
             onViewMap = { lat, lng, sender, text ->
                 mapSosAlert = com.example.testresqmesh.core.model.ChatMessage(
@@ -156,6 +159,7 @@ fun MainContainerScreen(
     }
 
     Scaffold(
+        contentWindowInsets = WindowInsets.systemBars,
         bottomBar = {
             NavigationBar(
                 containerColor = MaterialTheme.colorScheme.background,

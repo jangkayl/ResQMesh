@@ -38,6 +38,7 @@ fun PublicChatTab(
 
     var inputText by remember { mutableStateOf("") }
     var pendingImage by remember { mutableStateOf<String?>(null) }
+    var pendingAudio by remember { mutableStateOf<String?>(null) }
     var isRecording by remember { mutableStateOf(false) }
 
     // Sort messages by timestamp descending (newest first). 
@@ -126,17 +127,34 @@ fun PublicChatTab(
             pendingImage = pendingImage,
             onImageSelected = { pendingImage = it },
             onClearImage = { pendingImage = null },
+            pendingAudio = pendingAudio,
+            onClearAudio = { pendingAudio = null },
             isRecording = isRecording,
-            onToggleRecord = { isRecording = !isRecording },
+            onToggleRecord = {
+                if (!isRecording) {
+                    val started = mediaHelper.startRecording()
+                    if (started) isRecording = true
+                } else {
+                    isRecording = false
+                    val audioBase64 = mediaHelper.stopRecording()
+                    if (audioBase64 != null) {
+                        pendingAudio = audioBase64 // Trap it in the preview state!
+                    }
+                }
+            },
             onSend = {
+                val hasAudio = pendingAudio != null
+                val finalMessage = if (hasAudio && inputText.isBlank()) "🎤 Voice Note" else inputText.trim()
+                
                 viewModel.sendPublicMessage(
-                    text = inputText.trim(),
+                    text = finalMessage,
                     imageBase64 = pendingImage,
-                    audioBase64 = null
+                    audioBase64 = pendingAudio
                 )
                 // Clear input after sending
                 inputText = ""
                 pendingImage = null
+                pendingAudio = null
                 focusManager.clearFocus()
             },
             onSendLocation = {
