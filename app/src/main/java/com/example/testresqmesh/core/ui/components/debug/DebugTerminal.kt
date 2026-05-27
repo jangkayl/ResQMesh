@@ -19,6 +19,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.testresqmesh.core.utils.AppLogger
 import kotlinx.coroutines.launch
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.border
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.lazy.LazyRow
 
 @Composable
 fun DebugTerminal() {
@@ -45,7 +49,8 @@ fun DebugTerminal() {
             .padding(16.dp)
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
-            var hideRoutingLogs by remember { mutableStateOf(true) }
+            var currentFilter by remember { mutableStateOf("ALL") }
+            val filters = listOf("ALL", "PAIRING", "ROUTING", "E2EE", "ERRORS")
             
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -60,13 +65,6 @@ fun DebugTerminal() {
                     fontSize = 14.sp
                 )
                 Row {
-                    IconButton(onClick = { hideRoutingLogs = !hideRoutingLogs }) {
-                        Icon(
-                            imageVector = Icons.Default.Menu,
-                            contentDescription = "Toggle Routing Logs",
-                            tint = if (hideRoutingLogs) Color(0xFF00FF00).copy(alpha = 0.5f) else Color(0xFF00FF00)
-                        )
-                    }
                     IconButton(onClick = { AppLogger.clear() }) {
                         Icon(
                             imageVector = Icons.Default.Delete,
@@ -85,12 +83,42 @@ fun DebugTerminal() {
             }
 
             Divider(color = Color(0xFF00FF00).copy(alpha = 0.5f), thickness = 1.dp)
-            Spacer(modifier = Modifier.height(8.dp))
+            
+            // Filter Chips
+            LazyRow(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                items(filters) { filter ->
+                    val isSelected = currentFilter == filter
+                    Text(
+                        text = filter,
+                        color = if (isSelected) Color.Black else Color(0xFF00FF00),
+                        fontSize = 12.sp,
+                        fontFamily = FontFamily.Monospace,
+                        fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+                        modifier = Modifier
+                            .background(if (isSelected) Color(0xFF00FF00) else Color.Transparent, RoundedCornerShape(4.dp))
+                            .border(1.dp, Color(0xFF00FF00), RoundedCornerShape(4.dp))
+                            .clickable { currentFilter = filter }
+                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                    )
+                }
+            }
+            
+            Spacer(modifier = Modifier.height(4.dp))
 
-            val filteredLogs = if (hideRoutingLogs) {
-                logs.filter { !it.contains("MeshNetwork_Routing:") }
-            } else {
-                logs
+            val filteredLogs = logs.filter { logMsg ->
+                when (currentFilter) {
+                    "ALL" -> true
+                    "PAIRING" -> logMsg.contains("MeshNetwork:") || logMsg.contains("Connection", ignoreCase = true)
+                    "ROUTING" -> logMsg.contains("MeshNetwork_Routing:") || logMsg.contains("PayloadDispatcher:")
+                    "E2EE" -> logMsg.contains("MeshNetwork_E2EE:")
+                    "ERRORS" -> logMsg.contains("MeshNetwork_ERROR:") || logMsg.contains("Exception", ignoreCase = true) || logMsg.contains("failed", ignoreCase = true)
+                    else -> true
+                }
             }
 
             LazyColumn(
