@@ -58,6 +58,15 @@ fun MainContainerScreen(
     val incomingSosAlert by commsViewModel.incomingSosAlert.collectAsState()
     val activeSosMessageId by commsViewModel.activeSosMessageId.collectAsState()
 
+    DisposableEffect(Unit) {
+        // Start passive location tracking when the node is active
+        commsViewModel.startLocationTracking(context)
+        onDispose {
+            // Cleanup when the node is shut down or the app closes
+            commsViewModel.stopLocationTracking()
+        }
+    }
+
     val items = listOf(NavItem.Radar, NavItem.Messages, NavItem.SOS, NavItem.Settings)
 
     if (incomingSosAlert != null) {

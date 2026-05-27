@@ -113,7 +113,7 @@ fun NewMessageModal(uiState: ChatUiState, onDismiss: () -> Unit, onNodeSelected:
         val nodesInRange = uiState.knownNodes.map { node ->
             RangeNode(
                 name = node.name, 
-                id = "MESH-NODE", 
+                id = "NODE",
                 distance = if (node.isDirect) "🟢 DIRECT LINK" else "🌐 MESH HOP"
             )
         }
@@ -121,18 +121,6 @@ fun NewMessageModal(uiState: ChatUiState, onDismiss: () -> Unit, onNodeSelected:
         LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             items(nodesInRange) { node ->
                 ModalNodeItem(node, onNodeSelected)
-            }
-            
-            item {
-                Spacer(modifier = Modifier.height(Spacing.Large))
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.History, contentDescription = null, tint = Color.White.copy(alpha = 0.4f), modifier = Modifier.size(16.dp))
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("PREVIOUSLY CONNECTED", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Black, color = Color.White.copy(alpha = 0.4f))
-                    Spacer(modifier = Modifier.weight(1f))
-                    Text("12 Cached", style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.4f))
-                }
-                Spacer(modifier = Modifier.height(100.dp))
             }
         }
     }

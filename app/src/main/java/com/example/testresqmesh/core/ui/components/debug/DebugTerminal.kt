@@ -8,6 +8,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -44,6 +45,8 @@ fun DebugTerminal() {
             .padding(16.dp)
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
+            var hideRoutingLogs by remember { mutableStateOf(true) }
+            
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -57,6 +60,13 @@ fun DebugTerminal() {
                     fontSize = 14.sp
                 )
                 Row {
+                    IconButton(onClick = { hideRoutingLogs = !hideRoutingLogs }) {
+                        Icon(
+                            imageVector = Icons.Default.Menu,
+                            contentDescription = "Toggle Routing Logs",
+                            tint = if (hideRoutingLogs) Color(0xFF00FF00).copy(alpha = 0.5f) else Color(0xFF00FF00)
+                        )
+                    }
                     IconButton(onClick = { AppLogger.clear() }) {
                         Icon(
                             imageVector = Icons.Default.Delete,
@@ -77,11 +87,17 @@ fun DebugTerminal() {
             Divider(color = Color(0xFF00FF00).copy(alpha = 0.5f), thickness = 1.dp)
             Spacer(modifier = Modifier.height(8.dp))
 
+            val filteredLogs = if (hideRoutingLogs) {
+                logs.filter { !it.contains("MeshNetwork_Routing:") }
+            } else {
+                logs
+            }
+
             LazyColumn(
                 state = listState,
                 modifier = Modifier.fillMaxSize()
             ) {
-                items(logs) { logMsg ->
+                items(filteredLogs) { logMsg ->
                     Text(
                         text = logMsg,
                         color = Color(0xFF00FF00),

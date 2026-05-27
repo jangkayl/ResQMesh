@@ -33,6 +33,7 @@ class MeshNetworkManager(private val context: Context) {
     
     // Routing Table / Topology Callback
     var onRoutingTableReceived: ((String, List<String>) -> Unit)? = null
+    var onPublicKeyReceived: ((String, String) -> Unit)? = null // For E2EE
 
     var onStatusChanged: ((String) -> Unit)? = null
     var onDeviceScanned: ((String, String, Int, String, Boolean) -> Unit)? = null // Added isConnecting flag
@@ -59,6 +60,29 @@ class MeshNetworkManager(private val context: Context) {
 
     private val scanningDelay: Long = 7000
     private val afterDiscoveryDelay: Long = 3000
+
+    private val payloadDispatcher = PayloadDispatcher(object : PayloadDispatcherCallback {
+        override fun getMyDeviceName() = myDeviceName
+        override fun getSeenMessageIds() = seenMessageIds
+        override fun getEndpointMedium(endpointId: String) = endpointMedium[endpointId] ?: "Bluetooth 5.4"
+        override fun getConnectedEndpointIdByName(name: String) = connectedEndpointNames.entries.find { it.value == name }?.key
+        override fun sendDirectPayload(endpointId: String, payload: String) = this@MeshNetworkManager.sendDirectPayload(endpointId, payload)
+        override fun broadcastPayload(payload: String, excludeEndpointId: String?) = this@MeshNetworkManager.broadcastPayload(payload, excludeEndpointId)
+        override fun onMessageSeen(msgId: String, readerName: String) { onMessageSeen?.invoke(msgId, readerName) }
+        override fun onMessageDelivered(msgId: String, readerName: String, returnRoute: List<String>) { onMessageDelivered?.invoke(msgId, readerName, returnRoute) }
+        override fun onPublicKeyReceived(senderName: String, key: String) { onPublicKeyReceived?.invoke(senderName, key) }
+        override fun onRoutingTableReceived(senderName: String, connectedNodes: List<String>) { onRoutingTableReceived?.invoke(senderName, connectedNodes) }
+        override fun onMessageReceived(endpointId: String, msgId: String, senderName: String, text: String, isPrivate: Boolean, isSystem: Boolean, imageBase64: String?, audioBase64: String?, locationLat: Double?, locationLng: Double?, medium: String, routePath: List<String>) {
+            this@MeshNetworkManager.onMessageReceived?.invoke(endpointId, msgId, senderName, text, isPrivate, isSystem, imageBase64, audioBase64, locationLat, locationLng, medium, routePath)
+        }
+        override fun onSosCancelled() { this@MeshNetworkManager.onSosCancelled?.invoke() }
+        override fun showNotification(sender: String, text: String) { notificationHelper.showPrivateMessageNotification(sender, text) }
+        override fun showSosEmergencyNotification(sender: String, text: String) {
+            if (!com.example.testresqmesh.MainActivity.isAppInForeground) {
+                notificationHelper.showSosEmergencyNotification(sender, text)
+            }
+        }
+    })
 
     fun startMeshNode(teamKey: String) {
         isNodeActive.set(true)
@@ -211,11 +235,12 @@ class MeshNetworkManager(private val context: Context) {
 
         val targets = connectedEndpointIds.filter { it != excludeEndpointId }
         if (targets.isNotEmpty()) {
-            AppLogger.d("MeshNetwork", "ROUTE (Broadcast): Flooding message to ${targets.size} physical connections.")
+            AppLogger.d("MeshNetwork_Routing", "ROUTE (Broadcast): Flooding message to ${targets.size} physical connections.")
             val payload = com.google.android.gms.nearby.connection.Payload.fromBytes(jsonString.toByteArray(Charsets.UTF_8))
             connectionsClient.sendPayload(targets.toList(), payload)
         } else {
-            AppLogger.d("MeshNetwork", "ROUTE (Broadcast): No other nodes to relay to. Chain stops here.")
+            // Use a verbose/routing specific tag so it doesn't spam the main console
+            AppLogger.d("MeshNetwork_Routing", "ROUTE (Broadcast): No other nodes to relay to. Chain stops here.")
         }
     }
 
@@ -246,6 +271,7 @@ class MeshNetworkManager(private val context: Context) {
             put("senderName", myDeviceName)
             put("isSystem", true)
             put("connectedNodes", nodesArray)
+            put("publicKey", CryptoManager.getMyPublicKeyBase64()) // Share RSA Public Key
         }.toString()
         broadcastPayload(jsonString)
     }
@@ -303,8 +329,8 @@ class MeshNetworkManager(private val context: Context) {
             // Add them to our physical room tracker
             activeScannedEndpoints.add(endpointId)
 
-            /* --- COMMENTED OUT: DETERMINISTIC TIE-BREAKER ---
-            // The phone with higher hardware specs initiates. If perfectly tied, fallback to name comparison to eliminate collisions.
+            // SMART TIE-BREAKER ALGORITHM
+            // Solves Simultaneous Open Collisions
             val shouldInitiate = if (myPowerScore != peerScore) {
                 myPowerScore > peerScore
             } else {
@@ -315,29 +341,22 @@ class MeshNetworkManager(private val context: Context) {
             onDeviceScanned?.invoke(endpointId, cleanPeerName, peerScore, myRole, false)
 
             if (shouldInitiate) {
-                // INITIATOR: Trigger connection asynchronously with random jitter
-                AppLogger.d("MeshNetwork", "I am Initiator for $cleanPeerName")
+                AppLogger.d("MeshNetwork", "SMART TIE-BREAKER: I am Initiator for $cleanPeerName")
                 initiateConnection(endpointId, cleanPeerName)
             } else {
-                // RECEIVER: Passively yield. Wait for them to call us.
-                AppLogger.d("MeshNetwork", "I am Receiver. Passively yielding to $cleanPeerName...")
+                AppLogger.d("MeshNetwork", "SMART TIE-BREAKER: I am Receiver. Yielding to $cleanPeerName...")
                 
-                // IMPATIENT RECEIVER FAILSAFE
-                // If the Initiator takes longer than 2000ms to discover us and connect, we forcefully take over and initiate!
+                // THE FAILSAFE BUG FIX
+                // Wait 7 seconds for socket to establish.
                 Handler(Looper.getMainLooper()).postDelayed({
                     if (!isNodeActive.get()) return@postDelayed
-                    if (!connectedEndpointIds.contains(endpointId) && activeScannedEndpoints.contains(endpointId)) {
+                    // Only forcefully initiate if we are NOT fully connected AND NOT currently negotiating a connection
+                    if (!connectedEndpointIds.contains(endpointId) && !pendingNames.containsKey(endpointId) && activeScannedEndpoints.contains(endpointId)) {
                         AppLogger.d("MeshNetwork", "Impatient Receiver Failsafe triggered for $cleanPeerName!")
                         initiateConnection(endpointId, cleanPeerName)
                     }
-                }, 2000)
+                }, 7000)
             }
-            ------------------------------------------------- */
-
-            // NEW: Aggressive Flooding of Pairing (Ignore hierarchy, connect instantly)
-            onDeviceScanned?.invoke(endpointId, cleanPeerName, peerScore, "FLOODING", false)
-            AppLogger.d("MeshNetwork", "AGGRESSIVE FLOODING: Instantly connecting to $cleanPeerName!")
-            initiateConnection(endpointId, cleanPeerName)
         }
 
         override fun onEndpointLost(endpointId: String) {
@@ -354,16 +373,24 @@ class MeshNetworkManager(private val context: Context) {
     private fun initiateConnection(endpointId: String, endpointName: String, retryCount: Int = 0) {
         if (connectedEndpointIds.contains(endpointId)) return
         
-        // Adaptive Jitter: If 1-on-1 pairing, use tiny jitter to prevent simultaneous collision. Otherwise, mid jitter for multi-device protection.
-        val jitter = if (activeScannedEndpoints.size <= 2) kotlin.random.Random.nextLong(50, 400) else kotlin.random.Random.nextLong(100, 800)
+        // STANDARD JITTER
+        // The Tie-Breaker algorithm guarantees only one device will call this function.
+        // We use a tiny jitter just to safely offload the API call from the exact millisecond of discovery.
+        val jitter = kotlin.random.Random.nextLong(100, 400)
         
         Handler(Looper.getMainLooper()).postDelayed({
             if (!isNodeActive.get()) return@postDelayed
             if (connectedEndpointIds.contains(endpointId)) return@postDelayed
             
+            // PRE-EMPTIVE ABORT SAFETY
+            if (pendingNames.containsKey(endpointId)) {
+                AppLogger.d("MeshNetwork", "PRE-EMPTIVE ABORT: $endpointName already initiated the connection. Yielding!")
+                return@postDelayed
+            }
+            
             AppLogger.d("MeshNetwork", "Executing connection request to $endpointName (Retry: $retryCount)")
             connectionsClient.requestConnection(myDeviceName, endpointId, connectionLifecycleCallback)
-                .addOnFailureListener { e ->
+                .addOnFailureListener { e ->    
                     AppLogger.d("MeshNetwork_ERROR", "requestConnection failed immediately: ${e.message}")
                     
                     // Exponential backoff
@@ -389,7 +416,7 @@ class MeshNetworkManager(private val context: Context) {
             val peerScore = parts.getOrNull(0)?.toIntOrNull() ?: 0
             val cleanName = parts.getOrNull(1) ?: rawName
             
-            // otify the UI that an inbound connection is starting, even if not scanned
+            // Notify the UI that an inbound connection is starting, even if not scanned
             onDeviceScanned?.invoke(endpointId, cleanName, peerScore, "CONNECTING", true)
             
             pendingNames[endpointId] = cleanName
@@ -407,8 +434,19 @@ class MeshNetworkManager(private val context: Context) {
                 onDeviceConnected?.invoke(ConnectedDevice(endpointId, deviceName))
             } else {
                 AppLogger.d("MeshNetwork", "Connection to $deviceName failed with status ${result.status.statusCode}")
+                
+                // THE "PERMANENT GIVE-UP" BUG FIX: Asynchronous Retry Loop
+                if (activeScannedEndpoints.contains(endpointId)) {
+                    val delay = kotlin.random.Random.nextLong(2000, 5000) // Random backoff to prevent ping-pong storms
+                    AppLogger.d("MeshNetwork", "Queuing asynchronous retry for $deviceName in ${delay}ms...")
+                    Handler(Looper.getMainLooper()).postDelayed({
+                        if (!isNodeActive.get()) return@postDelayed
+                        initiateConnection(endpointId, deviceName, 0)
+                    }, delay)
+                }
             }
         }
+
         override fun onDisconnected(endpointId: String) {
             pendingNames.remove(endpointId) // BUG FIX: Ensure clean memory
             endpointMedium.remove(endpointId)
@@ -441,166 +479,6 @@ class MeshNetworkManager(private val context: Context) {
     }
 
     private fun processJsonPayload(endpointId: String, jsonString: String) {
-        try {
-            val jsonObject = JSONObject(jsonString)
-
-            // --- 1. THE BOUNCER LOGIC ---
-            val msgId = jsonObject.getString("id")
-
-            if (seenMessageIds.contains(msgId)) {
-                // We already saw this exact message. Drop it so it doesn't spam!
-                return
-            }
-
-            // It's a new message! Add it to memory.
-            seenMessageIds.add(msgId)
-
-            // Keep memory clean so the app doesn't crash after 500 messages
-            if (seenMessageIds.size > 500) {
-                seenMessageIds.remove(seenMessageIds.first())
-            }
-            // ----------------------------
-
-            // --- GOSSIP PROTOCOL SEEN RECEIPTS ---
-            if (jsonObject.has("type") && (jsonObject.getString("type") == "SEEN" || jsonObject.getString("type") == "DELIVERED")) {
-                val payloadType = jsonObject.getString("type")
-                val targetMessageId = jsonObject.getString("targetMessageId")
-                val reader = jsonObject.getString("reader")
-                val isPrivateReceipt = jsonObject.optBoolean("isPrivate", false)
-                
-                val returnRoute = mutableListOf<String>()
-                if (jsonObject.has("returnRoute")) {
-                    val arr = jsonObject.getJSONArray("returnRoute")
-                    for (i in 0 until arr.length()) returnRoute.add(arr.getString(i))
-                }
-
-                val directedRoute = mutableListOf<String>()
-                if (jsonObject.has("directedRoute")) {
-                    val arr = jsonObject.getJSONArray("directedRoute")
-                    for (i in 0 until arr.length()) directedRoute.add(arr.getString(i))
-                }
-                
-                // Tell the UI that someone saw or received this message!
-                if (payloadType == "SEEN") {
-                    onMessageSeen?.invoke(targetMessageId, reader)
-                } else if (payloadType == "DELIVERED") {
-                    onMessageDelivered?.invoke(targetMessageId, reader, returnRoute)
-                }
-                
-                // Append myself to the return route before forwarding
-                returnRoute.add(myDeviceName)
-                jsonObject.put("returnRoute", org.json.JSONArray(returnRoute))
-                
-                // Strict Routing logic for receipt
-                if (directedRoute.isNotEmpty()) {
-                    val myIndex = directedRoute.indexOf(myDeviceName)
-                    if (myIndex != -1 && myIndex + 1 < directedRoute.size) {
-                        val nextHopName = directedRoute[myIndex + 1]
-                        val nextHopEndpointId = connectedEndpointNames.entries.find { it.value == nextHopName }?.key
-                        if (nextHopEndpointId != null) {
-                            sendDirectPayload(nextHopEndpointId, jsonObject.toString())
-                            return
-                        }
-                    }
-                }
-                
-                // Fallback
-                broadcastPayload(jsonObject.toString(), excludeEndpointId = endpointId)
-                return
-            }
-
-            val sender = jsonObject.getString("senderName")
-            
-            // SECURITY/BUG FIX: If we receive our own message (relayed back to us), ignore it!
-            if (sender == myDeviceName) return
-
-            val isSystem = jsonObject.optBoolean("isSystem", false)
-
-            if (isSystem) {
-                if (jsonObject.has("connectedNodes")) {
-                    val nodesArray = jsonObject.getJSONArray("connectedNodes")
-                    val connectedList = mutableListOf<String>()
-                    for (i in 0 until nodesArray.length()) {
-                        connectedList.add(nodesArray.getString(i))
-                    }
-                    onRoutingTableReceived?.invoke(sender, connectedList)
-                }
-                
-                onMessageReceived?.invoke(endpointId, msgId, sender, "", false, true, null, null, null, null, "LOCAL", emptyList())
-                broadcastPayload(jsonString, excludeEndpointId = endpointId)
-                return
-            }
-
-            val text = jsonObject.getString("text")
-            val targetName = jsonObject.optString("targetName", "")
-            val isPrivate = jsonObject.optBoolean("isPrivate", false)
-
-            AppLogger.d("MeshNetwork", "ROUTE (Received): Message from [$sender] arrived physically via endpoint [$endpointId] using ${endpointMedium[endpointId] ?: "Bluetooth"}")
-
-            val imageBase64 = if (jsonObject.has("image")) jsonObject.getString("image") else null
-            val audioBase64 = if (jsonObject.has("audio")) jsonObject.getString("audio") else null
-            val locationLat = if (jsonObject.has("locationLat")) jsonObject.getDouble("locationLat") else null
-            val locationLng = if (jsonObject.has("locationLng")) jsonObject.getDouble("locationLng") else null
-            val medium = endpointMedium[endpointId] ?: "Bluetooth 5.4"
-
-            val routePath = mutableListOf<String>()
-            if (jsonObject.has("routePath")) {
-                val arr = jsonObject.getJSONArray("routePath")
-                for (i in 0 until arr.length()) routePath.add(arr.getString(i))
-            }
-
-            val directedRoute = mutableListOf<String>()
-            if (jsonObject.has("directedRoute")) {
-                val arr = jsonObject.getJSONArray("directedRoute")
-                for (i in 0 until arr.length()) directedRoute.add(arr.getString(i))
-            }
-
-            val isSOS = jsonObject.optBoolean("isSOS", false)
-            val isSOSCancel = jsonObject.optBoolean("isSOSCancel", false)
-
-            if (isPrivate) {
-                if (targetName == myDeviceName) {
-                    notificationHelper.showPrivateMessageNotification(sender, text)
-                    onMessageReceived?.invoke(endpointId, msgId, sender, text, isPrivate, false, imageBase64, audioBase64, locationLat, locationLng, medium, routePath)
-                } else {
-                    AppLogger.d("MeshNetwork", "ROUTE (Relay): Forwarding Private message meant for [$targetName] securely across the mesh.")
-                    routePath.add(myDeviceName)
-                    jsonObject.put("routePath", org.json.JSONArray(routePath))
-                    
-                    if (directedRoute.isNotEmpty()) {
-                        val myIndex = directedRoute.indexOf(myDeviceName)
-                        if (myIndex != -1 && myIndex + 1 < directedRoute.size) {
-                            val nextHopName = directedRoute[myIndex + 1]
-                            val nextHopEndpointId = connectedEndpointNames.entries.find { it.value == nextHopName }?.key
-                            if (nextHopEndpointId != null) {
-                                sendDirectPayload(nextHopEndpointId, jsonObject.toString())
-                                return
-                            }
-                        }
-                    }
-                    
-                    // Fallback
-                    broadcastPayload(jsonObject.toString(), excludeEndpointId = endpointId)
-                }
-            } else {
-                if (isSOSCancel) {
-                    onSosCancelled?.invoke()
-                }
-                
-                if (isSOS && sender != myDeviceName) {
-                    if (!com.example.testresqmesh.MainActivity.isAppInForeground) {
-                        notificationHelper.showSosEmergencyNotification(sender, text)
-                    }
-                }
-                onMessageReceived?.invoke(endpointId, msgId, sender, text, isPrivate, false, imageBase64, audioBase64, locationLat, locationLng, medium, routePath)
-                AppLogger.d("MeshNetwork", "ROUTE (Relay): Gossiping Public message across the mesh.")
-                routePath.add(myDeviceName)
-                jsonObject.put("routePath", org.json.JSONArray(routePath))
-                broadcastPayload(jsonObject.toString(), excludeEndpointId = endpointId)
-            }
-
-        } catch (e: Exception) {
-            AppLogger.d("MeshNetwork_ERROR", "Parse error: ${e.message}")
-        }
+        payloadDispatcher.dispatch(endpointId, jsonString)
     }
 }

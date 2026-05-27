@@ -25,6 +25,10 @@ class CommunicationViewModel(private val repository: MeshRepository) : ViewModel
         repository.clearSosAlert()
     }
 
+    private var cachedLocation: android.location.Location? = null
+    private var locationCallback: com.google.android.gms.location.LocationCallback? = null
+    private var fusedLocationClient: com.google.android.gms.location.FusedLocationProviderClient? = null
+
     init {
         viewModelScope.launch {
             repository.publicMessages.collect { messages ->
@@ -54,32 +58,71 @@ class CommunicationViewModel(private val repository: MeshRepository) : ViewModel
     }
 
     @androidx.annotation.RequiresPermission(anyOf = ["android.permission.ACCESS_FINE_LOCATION", "android.permission.ACCESS_COARSE_LOCATION"])
+    fun startLocationTracking(context: android.content.Context) {
+        if (fusedLocationClient == null) {
+            fusedLocationClient = com.google.android.gms.location.LocationServices.getFusedLocationProviderClient(context)
+        }
+        
+        // Smart battery-efficient request: 30s interval, but only triggers if moved 20+ meters
+        val locationRequest = com.google.android.gms.location.LocationRequest.Builder(com.google.android.gms.location.Priority.PRIORITY_BALANCED_POWER_ACCURACY, 30000L)
+            .setMinUpdateDistanceMeters(20f)
+            .build()
+            
+        locationCallback = object : com.google.android.gms.location.LocationCallback() {
+            override fun onLocationResult(result: com.google.android.gms.location.LocationResult) {
+                result.lastLocation?.let { location ->
+                    cachedLocation = location
+                }
+            }
+        }
+        
+        try {
+            fusedLocationClient?.requestLocationUpdates(locationRequest, locationCallback!!, android.os.Looper.getMainLooper())
+        } catch (e: SecurityException) {
+            // Permission denied, ignore gracefully
+        }
+    }
+    
+    fun stopLocationTracking() {
+        locationCallback?.let {
+            fusedLocationClient?.removeLocationUpdates(it)
+        }
+        locationCallback = null
+    }
+
+    @androidx.annotation.RequiresPermission(anyOf = ["android.permission.ACCESS_FINE_LOCATION", "android.permission.ACCESS_COARSE_LOCATION"])
     fun sendEmergencySOS(context: android.content.Context, sosType: String) {
         val text = "🚨 CRITICAL SOS: $sosType EMERGENCY!"
         
+        // 1. Instantly dispatch cached location with zero delay
+        if (cachedLocation != null) {
+            val msgId = repository.sendPublicMessage(text, null, null, cachedLocation!!.latitude, cachedLocation!!.longitude, isSOS = true)
+            _activeSosMessageId.value = msgId
+        } else {
+            // Fallback: send without location instantly
+            val msgId = repository.sendPublicMessage(text, null, null, null, null, isSOS = true)
+            _activeSosMessageId.value = msgId
+        }
+        
+        // 2. Start a background fetch for a high-accuracy pinpoint lock
         try {
-            val fusedLocationClient = com.google.android.gms.location.LocationServices.getFusedLocationProviderClient(context)
-            fusedLocationClient.getCurrentLocation(
+            val client = fusedLocationClient ?: com.google.android.gms.location.LocationServices.getFusedLocationProviderClient(context)
+            client.getCurrentLocation(
                 com.google.android.gms.location.Priority.PRIORITY_HIGH_ACCURACY, 
                 null
             ).addOnSuccessListener { location ->
                 if (location != null) {
-                    val msgId = repository.sendPublicMessage(text, null, null, location.latitude, location.longitude, isSOS = true)
-                    _activeSosMessageId.value = msgId
-                } else {
-                    // Fallback to no location if null
-                    val msgId = repository.sendPublicMessage(text, null, null, null, null, isSOS = true)
-                    _activeSosMessageId.value = msgId
+                    // Check if the fresh location is significantly better/newer than cache
+                    val isBetter = cachedLocation == null || location.accuracy < cachedLocation!!.accuracy || (location.time - cachedLocation!!.time > 60000)
+                    if (isBetter) {
+                        cachedLocation = location
+                        // Send a follow-up pinpoint update!
+                        repository.sendPublicMessage("📍 PINPOINT SOS UPDATE: More precise coordinates acquired.", null, null, location.latitude, location.longitude, isSOS = true)
+                    }
                 }
-            }.addOnFailureListener {
-                // Fallback to no location on error
-                val msgId = repository.sendPublicMessage(text, null, null, null, null, isSOS = true)
-                _activeSosMessageId.value = msgId
             }
         } catch (e: Exception) {
-            // Permission missing or service unavailable
-            val msgId = repository.sendPublicMessage(text, null, null, null, null, isSOS = true)
-            _activeSosMessageId.value = msgId
+            // Ignore if GPS fails, the rough cached location was already sent.
         }
     }
 

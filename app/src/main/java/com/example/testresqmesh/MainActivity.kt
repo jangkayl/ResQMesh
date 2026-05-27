@@ -77,6 +77,12 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        
+        // BUG FIX: Required for OSMDroid to fetch tiles online on certain devices!
+        org.osmdroid.config.Configuration.getInstance().load(
+            applicationContext,
+            applicationContext.getSharedPreferences("osmdroid", android.content.Context.MODE_PRIVATE)
+        )
 
         networkManager = MeshNetworkManager(applicationContext)
         repository = MeshRepository(networkManager)
