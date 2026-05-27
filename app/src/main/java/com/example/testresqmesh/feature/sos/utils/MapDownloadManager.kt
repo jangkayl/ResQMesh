@@ -49,7 +49,7 @@ class MapDownloadManager(private val context: Context) {
         _totalTiles.value = 0
 
         // Configure internal storage paths to avoid SecurityException crashes on newer Androids
-        val basePath = File(context.filesDir, "osmdroid")
+        val basePath = File(context.getExternalFilesDir(null), "osmdroid")
         basePath.mkdirs()
         val cachePath = File(basePath, "tiles")
         cachePath.mkdirs()

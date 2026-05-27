@@ -414,7 +414,7 @@ class MeshNetworkManager(private val context: Context) {
                         connectionQueue.add(Pair(endpointId, cleanPeerName))
                         processNextConnection()
                     }
-                }, 12000)
+                }, 8000)
             }
         }
 

@@ -33,16 +33,13 @@ fun SplashScreen(onTimeout: () -> Unit) {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        // Mock Logo (The lightning bolt in a white square)
-        Surface(
-            modifier = Modifier.size(100.dp),
-            shape = RoundedCornerShape(24.dp),
-            color = Color.White
-        ) {
-            Box(contentAlignment = Alignment.Center) {
-                Text("⚡", fontSize = 48.sp) // Representing the logo in the image
-            }
-        }
+        Image(
+            painter = painterResource(id = com.example.testresqmesh.R.drawable.resqmesh_sublogo),
+            contentDescription = "App Logo",
+            modifier = Modifier
+                .size(100.dp)
+                .clip(RoundedCornerShape(24.dp))
+        )
 
         Spacer(modifier = Modifier.height(48.dp))
 
