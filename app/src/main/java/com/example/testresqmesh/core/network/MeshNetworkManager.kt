@@ -386,7 +386,11 @@ class MeshNetworkManager(private val context: Context) {
             // Add them to our physical room tracker
             activeScannedEndpoints.add(endpointId)
 
-            // SMART TIE-BREAKER ALGORITHM
+            // --- AGGRESSIVE MODE (Commented Out) ---
+            // Bypass power scoring and always initiate connection. Faster, but causes collisions in large groups.
+//             val shouldInitiate = true
+
+            // --- SMART TIE-BREAKER ALGORITHM (Active) ---
             // Solves Simultaneous Open Collisions
             val shouldInitiate = if (myPowerScore != peerScore) {
                 myPowerScore > peerScore
@@ -414,7 +418,7 @@ class MeshNetworkManager(private val context: Context) {
                         connectionQueue.add(Pair(endpointId, cleanPeerName))
                         processNextConnection()
                     }
-                }, 8000)
+                }, 12000)
             }
         }
 

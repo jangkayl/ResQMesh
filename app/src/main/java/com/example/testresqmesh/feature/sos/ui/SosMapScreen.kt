@@ -50,7 +50,7 @@ fun SosMapScreen(
     var distanceInMeters by remember { mutableStateOf<Double?>(null) }
 
     LaunchedEffect(Unit) {
-        val basePath = File(context.getExternalFilesDir(null), "osmdroid")
+        val basePath = File(context.filesDir, "osmdroid")
         basePath.mkdirs()
         val cachePath = File(basePath, "tiles")
         cachePath.mkdirs()
