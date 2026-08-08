@@ -3,9 +3,68 @@ package com.example.testresqmesh.core.network
 import com.example.testresqmesh.core.utils.AppLogger
 import org.json.JSONObject
 
+enum class TransportMode {
+    STRICT_NEARBY,
+    STRICT_CONNECTIONLESS,
+    HYBRID_AUTO
+}
+
 class PayloadDispatcher(private val callback: PayloadDispatcherCallback) {
+    var transportMode: TransportMode = TransportMode.STRICT_CONNECTIONLESS
+
+    private fun routeBroadcast(payload: String, excludeEndpointId: String?, isLargePayload: Boolean) {
+        when (transportMode) {
+            TransportMode.STRICT_NEARBY -> {
+                callback.broadcastPayload(payload, excludeEndpointId)
+            }
+            TransportMode.STRICT_CONNECTIONLESS -> {
+                if (excludeEndpointId != "BLE_CONNECTIONLESS") {
+                    callback.broadcastConnectionless(payload)
+                }
+            }
+            TransportMode.HYBRID_AUTO -> {
+                if (isLargePayload) {
+                    callback.broadcastPayload(payload, excludeEndpointId)
+                } else {
+                    if (excludeEndpointId != "BLE_CONNECTIONLESS") {
+                        callback.broadcastConnectionless(payload)
+                    }
+                    callback.broadcastPayload(payload, excludeEndpointId)
+                }
+            }
+        }
+    }
 
     fun dispatch(endpointId: String, jsonString: String) {
+        if (jsonString.startsWith("RAW:")) {
+            val parts = jsonString.split(":", limit = 3)
+            if (parts.size >= 3) {
+                val sender = parts[1]
+                val text = parts[2]
+                
+                if (sender == callback.getMyDeviceName()) return
+                
+                val msgId = java.util.UUID.randomUUID().toString()
+                callback.onMessageReceived(
+                    endpointId = endpointId,
+                    msgId = msgId,
+                    senderName = sender,
+                    text = "📡 RAW BLE RX: $text",
+                    isPrivate = false,
+                    isSystem = false,
+                    imageBase64 = null,
+                    audioBase64 = null,
+                    locationLat = null,
+                    locationLng = null,
+                    medium = "BLE Connectionless",
+                    routePath = emptyList()
+                )
+                
+                routeBroadcast(jsonString, endpointId, false)
+            }
+            return
+        }
+        
         try {
             val jsonObject = JSONObject(jsonString)
             
@@ -81,7 +140,7 @@ class PayloadDispatcher(private val callback: PayloadDispatcherCallback) {
             }
         }
         
-        callback.broadcastPayload(jsonObject.toString(), endpointId)
+        routeBroadcast(jsonObject.toString(), endpointId, false)
     }
 
     private fun handleSystemPulse(endpointId: String, msgId: String, sender: String, jsonString: String, jsonObject: JSONObject) {
@@ -98,7 +157,7 @@ class PayloadDispatcher(private val callback: PayloadDispatcherCallback) {
         }
         
         callback.onMessageReceived(endpointId, msgId, sender, "", false, true, null, null, null, null, "LOCAL", emptyList())
-        callback.broadcastPayload(jsonString, endpointId)
+        routeBroadcast(jsonString, endpointId, false)
     }
 
     private fun handleStandardMessage(endpointId: String, msgId: String, sender: String, jsonObject: JSONObject) {
@@ -185,7 +244,7 @@ class PayloadDispatcher(private val callback: PayloadDispatcherCallback) {
                     }
                 }
                 
-                callback.broadcastPayload(jsonObject.toString(), endpointId)
+                routeBroadcast(jsonObject.toString(), endpointId, imageBase64 != null || audioBase64 != null)
             }
         } else {
             if (isSOSCancel) {
@@ -199,7 +258,7 @@ class PayloadDispatcher(private val callback: PayloadDispatcherCallback) {
             routePath.add(callback.getMyDeviceName())
             jsonObject.put("routePath", org.json.JSONArray(routePath))
             callback.onMessageReceived(endpointId, msgId, sender, text, isPrivate, false, imageBase64, audioBase64, locationLat, locationLng, medium, routePath)
-            callback.broadcastPayload(jsonObject.toString(), endpointId)
+            routeBroadcast(jsonObject.toString(), endpointId, imageBase64 != null || audioBase64 != null)
         }
     }
 }

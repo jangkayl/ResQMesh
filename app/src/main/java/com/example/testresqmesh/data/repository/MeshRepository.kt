@@ -264,9 +264,28 @@ class MeshRepository(private val networkManager: MeshNetworkManager) {
         networkManager.rescan()
     }
 
+    fun setTransportMode(mode: com.example.testresqmesh.core.network.TransportMode) {
+        networkManager.setTransportMode(mode)
+    }
+
+    fun setStealthMode(enabled: Boolean) {
+        networkManager.isStealthMode = enabled
+    }
+
     fun sendPublicMessage(text: String, imageBase64: String?, audioBase64: String?, locationLat: Double? = null, locationLng: Double? = null, isSOS: Boolean = false, isSOSCancel: Boolean = false): String {
         val msgId = UUID.randomUUID().toString()
         val timestamp = System.currentTimeMillis()
+        
+        // --- RAW BLE BASELINE TESTER ---
+        if (text.trim().startsWith("!raw ")) {
+            val rawMsg = text.trim().substring(5)
+            val specialPayload = "RAW:$myNodeName:$rawMsg"
+            networkManager.broadcastPayload(specialPayload)
+            val message = ChatMessage(msgId, "Me", "📡 RAW BLE TX: $rawMsg", null, null, null, null, true, false, timestamp)
+            _publicMessages.value = _publicMessages.value + message
+            return msgId
+        }
+        // -------------------------------
         
         val jsonString = PayloadFactory.buildPublicPayload(
             msgId = msgId,

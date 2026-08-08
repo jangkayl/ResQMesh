@@ -4,12 +4,15 @@ import com.example.testresqmesh.core.model.ChatMessage
 import com.example.testresqmesh.core.model.ConnectedDevice
 import com.example.testresqmesh.core.model.ScannedDevice
 import com.example.testresqmesh.core.model.KnownNode
+import com.example.testresqmesh.core.network.TransportMode
 
 data class ConnectionUiState(
     val isOnline: Boolean = false,
     val connectionStatus: String = "Ready to deploy Mesh Node.",
     val myNodeName: String = "",
-    val isRescanning: Boolean = false
+    val isRescanning: Boolean = false,
+    val transportMode: TransportMode = TransportMode.STRICT_CONNECTIONLESS,
+    val isStealthMode: Boolean = false
 )
 
 data class RadarUiState(

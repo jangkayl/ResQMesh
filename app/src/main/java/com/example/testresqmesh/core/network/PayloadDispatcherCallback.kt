@@ -8,6 +8,7 @@ interface PayloadDispatcherCallback {
     
     fun sendDirectPayload(endpointId: String, payload: String)
     fun broadcastPayload(payload: String, excludeEndpointId: String?)
+    fun broadcastConnectionless(payload: String)
     
     fun onMessageSeen(msgId: String, readerName: String)
     fun onMessageDelivered(msgId: String, readerName: String, returnRoute: List<String>)

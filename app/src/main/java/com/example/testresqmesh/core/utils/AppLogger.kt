@@ -28,10 +28,10 @@ object AppLogger {
         // Log to in-app terminal
         val timeStr = timeFormat.format(Date())
         val terminalMessage = "[$timeStr] $tag: $message"
-        
+
         val currentLogs = _logs.value.toMutableList()
         currentLogs.add(terminalMessage)
-        
+
         if (currentLogs.size > MAX_LOGS) {
             currentLogs.removeAt(0)
         }

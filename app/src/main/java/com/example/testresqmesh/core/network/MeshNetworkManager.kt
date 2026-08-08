@@ -22,6 +22,15 @@ class MeshNetworkManager(private val context: Context) {
     var myDeviceName: String = ""
     private var myPowerScore: Int = 0
     private val pendingNames = mutableMapOf<String, String>()
+    var isStealthMode: Boolean = false
+
+    private val connectionlessBleEngine = com.example.testresqmesh.core.network.ble.ConnectionlessBleMeshManager(context)
+
+    init {
+        connectionlessBleEngine.onMessageReceived = { msgIdHash, payload ->
+            processJsonPayload("CONNECTIONLESS_BLE", payload)
+        }
+    }
 
     // Callbacks to communicate back to the ViewModel
     var onDeviceConnected: ((ConnectedDevice) -> Unit)? = null
@@ -81,6 +90,9 @@ class MeshNetworkManager(private val context: Context) {
         override fun getConnectedEndpointIdByName(name: String) = connectedEndpointNames.entries.find { it.value == name }?.key
         override fun sendDirectPayload(endpointId: String, payload: String) = this@MeshNetworkManager.sendDirectPayload(endpointId, payload)
         override fun broadcastPayload(payload: String, excludeEndpointId: String?) = this@MeshNetworkManager.broadcastPayload(payload, excludeEndpointId)
+        override fun broadcastConnectionless(payload: String) {
+            connectionlessBleEngine.broadcastPayload(java.util.UUID.randomUUID().toString(), payload)
+        }
         override fun onMessageSeen(msgId: String, readerName: String) { onMessageSeen?.invoke(msgId, readerName) }
         override fun onMessageDelivered(msgId: String, readerName: String, returnRoute: List<String>) { onMessageDelivered?.invoke(msgId, readerName, returnRoute) }
         override fun onPublicKeyReceived(senderName: String, key: String) { onPublicKeyReceived?.invoke(senderName, key) }
@@ -127,14 +139,23 @@ class MeshNetworkManager(private val context: Context) {
             .build()
 
         // Concurrent Dual-Radio Startup: Start Advertising and Discovery simultaneously
-        connectionsClient.startAdvertising(advertisingName, activeServiceId, connectionLifecycleCallback, options)
-            .addOnSuccessListener {
-                onStatusChanged?.invoke("Node Active [Room: $formattedKey]. Seeking peers...")
-                startHeartbeat()
-            }
-            .addOnFailureListener { onStatusChanged?.invoke("Failed to start node.") }
-            
-        startNativeScanner()
+        if (payloadDispatcher.transportMode != TransportMode.STRICT_CONNECTIONLESS) {
+            connectionsClient.startAdvertising(advertisingName, activeServiceId, connectionLifecycleCallback, options)
+                .addOnSuccessListener {
+                    onStatusChanged?.invoke("Node Active [Room: $formattedKey]. Seeking peers...")
+                    startHeartbeat()
+                }
+                .addOnFailureListener { onStatusChanged?.invoke("Failed to start node.") }
+                
+            startNativeScanner()
+        } else {
+            onStatusChanged?.invoke("Node Active [BLE Only]. Seeking peers...")
+            startHeartbeat()
+        }
+
+        if (payloadDispatcher.transportMode != TransportMode.STRICT_NEARBY) {
+            connectionlessBleEngine.startScanning()
+        }
     }
 
     private fun calculatePowerScore(): Int {
@@ -190,16 +211,38 @@ class MeshNetworkManager(private val context: Context) {
         heartbeatRunnable = object : Runnable {
             override fun run() {
                 sendSystemPulse()
+                if (!isStealthMode) {
+                    sendMicroPulse()
+                }
                 heartbeatHandler.postDelayed(this, 5000)
             }
         }
         heartbeatHandler.post(heartbeatRunnable!!)
     }
 
+    private fun sendMicroPulse() {
+        val pulseId = java.util.UUID.randomUUID().toString().substring(0, 8)
+        val jsonString = JSONObject().apply {
+            put("t", "P") // Tiny keys for BLE legacy payload sizes
+            put("n", myDeviceName)
+            put("s", myPowerScore)
+        }.toString()
+        connectionlessBleEngine.broadcastPayload(pulseId, jsonString, ttl = 1) // Only broadcast locally
+    }
+
     fun stopMeshNode() {
         isNodeActive.set(false)
         heartbeatRunnable?.let { heartbeatHandler.removeCallbacks(it) }
+        
+        // Clean up Nearby Hardware & Queues
         connectionsClient.stopAllEndpoints()
+        connectionsClient.stopAdvertising()
+        connectionsClient.stopDiscovery()
+        connectionQueue.clear()
+        isConnectingLock.set(false)
+        
+        connectionlessBleEngine.stopScanning()
+        
         connectedEndpointIds.clear()
         pendingNames.clear()
         endpointMedium.clear()
@@ -279,25 +322,33 @@ class MeshNetworkManager(private val context: Context) {
     fun broadcastPayload(jsonString: String, excludeEndpointId: String? = null) {
         // --- THE SENDER FIX ---
         // Add our OWN message ID to the memory cache before sending it out
+        var msgIdForBle = java.util.UUID.randomUUID().toString()
         try {
             val jsonObject = JSONObject(jsonString)
             if (jsonObject.has("id")) {
                 val msgId = jsonObject.getString("id")
                 seenMessageIds.add(msgId)
+                msgIdForBle = msgId
             }
         } catch (e: Exception) {
             AppLogger.d("MeshNetwork_ERROR", "Failed to cache outbound message ID: ${e.message}")
         }
         // ----------------------
 
-        val targets = connectedEndpointIds.filter { it != excludeEndpointId }
-        if (targets.isNotEmpty()) {
-//            AppLogger.d("MeshNetwork_Routing", "ROUTE (Broadcast): Flooding message to ${targets.size} physical connections.")
-            val payload = com.google.android.gms.nearby.connection.Payload.fromBytes(jsonString.toByteArray(Charsets.UTF_8))
-            connectionsClient.sendPayload(targets.toList(), payload)
-        } else {
-            // Use a verbose/routing specific tag so it doesn't spam the main console
-//            AppLogger.d("MeshNetwork_Routing", "ROUTE (Broadcast): No other nodes to relay to. Chain stops here.")
+        // 1. Send via Google Nearby if allowed
+        if (payloadDispatcher.transportMode != TransportMode.STRICT_CONNECTIONLESS) {
+            val targets = connectedEndpointIds.filter { it != excludeEndpointId }
+            if (targets.isNotEmpty()) {
+                val payload = com.google.android.gms.nearby.connection.Payload.fromBytes(jsonString.toByteArray(Charsets.UTF_8))
+                connectionsClient.sendPayload(targets.toList(), payload)
+            }
+        }
+
+        // 2. Send via BLE if allowed
+        if (payloadDispatcher.transportMode != TransportMode.STRICT_NEARBY) {
+            if (excludeEndpointId != "BLE_CONNECTIONLESS") {
+                connectionlessBleEngine.broadcastPayload(msgIdForBle, jsonString)
+            }
         }
     }
 
@@ -618,17 +669,77 @@ class MeshNetworkManager(private val context: Context) {
     }
 
     private fun processJsonPayload(endpointId: String, jsonString: String) {
+        if (jsonString.startsWith("RAW:")) {
+            AppLogger.d("ConnectionlessBle", "Received raw baseline payload: $jsonString")
+            payloadDispatcher.dispatch(endpointId, jsonString)
+            return
+        }
+        
         try {
             val json = JSONObject(jsonString)
-            if (json.has("type") && json.getString("type") == "BLOCK_NOTIFICATION") {
-                val blockerName = json.getString("name")
-                AppLogger.d("MeshNetwork_PAIRING", "Received BLOCK_NOTIFICATION from $blockerName. Automatically blocking them.")
-                blockDevice(blockerName, sendNotification = false)
-                return
+            val type = if (json.has("type")) json.getString("type") else if (json.has("t")) json.getString("t") else null
+            
+            if (type != null) {
+                if (type == "BLOCK_NOTIFICATION") {
+                    val blockerName = json.getString("name")
+                    AppLogger.d("MeshNetwork_PAIRING", "Received BLOCK_NOTIFICATION from $blockerName. Automatically blocking them.")
+                    blockDevice(blockerName, sendNotification = false)
+                    return
+                } else if (type == "MICRO_PULSE" || type == "P") {
+                    val senderName = if (json.has("name")) json.getString("name") else json.getString("n")
+                    val senderScore = if (json.has("score")) json.getInt("score") else json.getInt("s")
+                    // Bypass chat, just update the Scanner Radar!
+                    onDeviceScanned?.invoke("ble_$senderName", senderName, senderScore, "BLE_PEER", false)
+                    return
+                }
             }
         } catch (e: Exception) {
             AppLogger.d("MeshNetwork_ERROR", "Failed to parse potential control payload: ${e.message}")
         }
         payloadDispatcher.dispatch(endpointId, jsonString)
+    }
+
+    fun setTransportMode(mode: TransportMode) {
+        payloadDispatcher.transportMode = mode
+        
+        if (!isNodeActive.get()) return
+
+        when (mode) {
+            TransportMode.STRICT_CONNECTIONLESS -> {
+                // Shut down Google Nearby entirely to save battery
+                connectionsClient.stopDiscovery()
+                connectionsClient.stopAdvertising()
+                connectionsClient.stopAllEndpoints()
+                
+                // CRITICAL FIX: Destroy any lingering Google Nearby pairing queues!
+                connectionQueue.clear()
+                isConnectingLock.set(false)
+                
+                AppLogger.d("MeshNetwork_HARDWARE", "Google Nearby Hardware Powered Down & Queues Cleared.")
+                
+                // Ensure BLE scanner is running
+                connectionlessBleEngine.startScanning()
+                AppLogger.d("MeshNetwork_HARDWARE", "Native BLE Scanner Active.")
+            }
+            TransportMode.STRICT_NEARBY -> {
+                // Shut down Native BLE
+                connectionlessBleEngine.stopScanning()
+                AppLogger.d("MeshNetwork_HARDWARE", "Native BLE Scanner Powered Down.")
+                
+                // Restart Google Nearby
+                val options = AdvertisingOptions.Builder().setStrategy(Strategy.P2P_CLUSTER).setLowPower(false).build()
+                connectionsClient.startAdvertising("$myPowerScore|$myDeviceName", activeServiceId, connectionLifecycleCallback, options)
+                rescan()
+                AppLogger.d("MeshNetwork_HARDWARE", "Google Nearby Hardware Restarted.")
+            }
+            TransportMode.HYBRID_AUTO -> {
+                // Ensure everything is running
+                connectionlessBleEngine.startScanning()
+                val options = AdvertisingOptions.Builder().setStrategy(Strategy.P2P_CLUSTER).setLowPower(false).build()
+                connectionsClient.startAdvertising("$myPowerScore|$myDeviceName", activeServiceId, connectionLifecycleCallback, options)
+                rescan()
+                AppLogger.d("MeshNetwork_HARDWARE", "Dual-Radio Hybrid Mode Active.")
+            }
+        }
     }
 }

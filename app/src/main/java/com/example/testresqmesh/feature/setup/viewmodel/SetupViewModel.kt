@@ -60,4 +60,14 @@ class SetupViewModel(private val repository: MeshRepository) : ViewModel() {
     fun goOffline() {
         repository.stopNode()
     }
+
+    fun setTransportMode(mode: com.example.testresqmesh.core.network.TransportMode) {
+        _uiState.update { it.copy(transportMode = mode) }
+        repository.setTransportMode(mode)
+    }
+
+    fun setStealthMode(enabled: Boolean) {
+        _uiState.update { it.copy(isStealthMode = enabled) }
+        repository.setStealthMode(enabled)
+    }
 }

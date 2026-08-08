@@ -61,6 +61,13 @@ fun ProfileScreen(viewModel: SetupViewModel) {
                 
                 Spacer(modifier = Modifier.height(24.dp))
                 
+                Text("NETWORK PROTOCOL", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Black, color = Color.White.copy(alpha = 0.4f))
+                Spacer(modifier = Modifier.height(12.dp))
+                
+                TransportModeSettings(viewModel)
+                
+                Spacer(modifier = Modifier.height(24.dp))
+                
                 Text("DATA & PRIVACY", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Black, color = Color.White.copy(alpha = 0.4f))
                 Spacer(modifier = Modifier.height(12.dp))
                 
@@ -271,6 +278,75 @@ fun IdentityCard(name: String) {
                     Text("Re-generate ID >", color = InboxAccentBlue, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
                 }
             }
+        }
+    }
+}
+
+@Composable
+fun TransportModeSettings(viewModel: SetupViewModel) {
+    val uiState by viewModel.uiState.collectAsState()
+    val selectedMode = uiState.transportMode
+    
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = Color.White.copy(alpha = 0.05f),
+        shape = RoundedCornerShape(16.dp)
+    ) {
+        Column(modifier = Modifier.padding(Spacing.Medium)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Default.Router, contentDescription = null, tint = InboxAccentBlue, modifier = Modifier.size(20.dp))
+                Spacer(modifier = Modifier.width(12.dp))
+                Text("TRANSPORT MODE", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold, color = Color.White)
+            }
+            Spacer(modifier = Modifier.height(16.dp))
+            
+            // Mode Segmented Buttons / Chips
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                ModeChip("CONNECTIONLESS", "BLE Broadcast", selectedMode == com.example.testresqmesh.core.network.TransportMode.STRICT_CONNECTIONLESS, Modifier.weight(1f)) { viewModel.setTransportMode(com.example.testresqmesh.core.network.TransportMode.STRICT_CONNECTIONLESS) }
+                ModeChip("NEARBY", "Google Sockets", selectedMode == com.example.testresqmesh.core.network.TransportMode.STRICT_NEARBY, Modifier.weight(1f)) { viewModel.setTransportMode(com.example.testresqmesh.core.network.TransportMode.STRICT_NEARBY) }
+                ModeChip("HYBRID", "Smart Routing", selectedMode == com.example.testresqmesh.core.network.TransportMode.HYBRID_AUTO, Modifier.weight(1f)) { viewModel.setTransportMode(com.example.testresqmesh.core.network.TransportMode.HYBRID_AUTO) }
+            }
+            
+            Spacer(modifier = Modifier.height(16.dp))
+            HorizontalDivider(color = Color.White.copy(alpha = 0.1f))
+            Spacer(modifier = Modifier.height(16.dp))
+            
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                Column {
+                    Text("STEALTH MODE", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold, color = Color.White)
+                    Text("Hide device from public Radar scanning", style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.4f))
+                }
+                Switch(
+                    checked = uiState.isStealthMode,
+                    onCheckedChange = { viewModel.setStealthMode(it) },
+                    colors = SwitchDefaults.colors(
+                        checkedThumbColor = Color.White,
+                        checkedTrackColor = InboxAccentBlue,
+                        uncheckedThumbColor = Color.White.copy(alpha = 0.4f),
+                        uncheckedTrackColor = Color.White.copy(alpha = 0.1f),
+                        uncheckedBorderColor = Color.Transparent
+                    )
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun ModeChip(title: String, sub: String, isSelected: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
+    Surface(
+        onClick = onClick,
+        modifier = modifier,
+        color = if (isSelected) InboxAccentBlue else Color.White.copy(alpha = 0.1f),
+        shape = RoundedCornerShape(8.dp),
+        border = if (isSelected) null else androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.2f))
+    ) {
+        Column(
+            modifier = Modifier.padding(8.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(title, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Black, color = if (isSelected) Color.Black else Color.White, fontSize = 9.sp)
+            Text(sub, style = MaterialTheme.typography.labelSmall, color = if (isSelected) Color.Black.copy(alpha = 0.7f) else Color.White.copy(alpha = 0.4f), fontSize = 8.sp)
         }
     }
 }
