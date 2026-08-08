@@ -45,7 +45,8 @@ class MeshRouter {
             newKnownNodes.add(KnownNode(device.name, isDirect = true, lastSeen = lastSeen))
         }
         
-        networkGraph.values.flatten().toSet().forEach { indirectNode ->
+        val allNodesInGraph = networkGraph.keys + networkGraph.values.flatten().toSet()
+        allNodesInGraph.forEach { indirectNode ->
             if (indirectNode != myNodeName && newKnownNodes.none { it.name == indirectNode }) {
                 val lastSeen = lastSeenMap[indirectNode] ?: System.currentTimeMillis()
                 newKnownNodes.add(KnownNode(indirectNode, isDirect = false, lastSeen = lastSeen))

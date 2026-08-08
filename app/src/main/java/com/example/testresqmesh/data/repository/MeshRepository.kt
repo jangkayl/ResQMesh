@@ -21,6 +21,9 @@ class MeshRepository(private val networkManager: MeshNetworkManager) {
     private val _connectedDevices = MutableStateFlow<List<ConnectedDevice>>(emptyList())
     val connectedDevices = _connectedDevices.asStateFlow()
 
+
+    private var currentTransportMode: com.example.testresqmesh.core.network.TransportMode = com.example.testresqmesh.core.network.TransportMode.STRICT_CONNECTIONLESS
+
     private val _scannedDevices = MutableStateFlow<List<ScannedDevice>>(emptyList())
     val scannedDevices: StateFlow<List<ScannedDevice>> = _scannedDevices.asStateFlow()
 
@@ -223,6 +226,9 @@ class MeshRepository(private val networkManager: MeshNetworkManager) {
     }
 
     fun broadcastSeenReceipt(messageId: String, isPrivate: Boolean, targetId: String? = null) {
+        if (currentTransportMode == com.example.testresqmesh.core.network.TransportMode.STRICT_CONNECTIONLESS) {
+            return // Do not flood the airwaves with read receipts in connectionless mode
+        }
         networkManager.broadcastSeenReceipt(messageId, isPrivate, targetId)
     }
 
@@ -265,6 +271,7 @@ class MeshRepository(private val networkManager: MeshNetworkManager) {
     }
 
     fun setTransportMode(mode: com.example.testresqmesh.core.network.TransportMode) {
+        currentTransportMode = mode
         networkManager.setTransportMode(mode)
     }
 

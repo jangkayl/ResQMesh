@@ -135,15 +135,6 @@ class ConnectionlessBleMeshManager(private val context: Context) {
         
         val runnable = object : Runnable {
             override fun run() {
-                if (currentChunk >= chunks.size) {
-                    loopCount++
-                    if (loopCount >= maxLoops) {
-                        AppLogger.d("ConnectionlessBle", "Finished broadcasting ${chunks.size} chunks $maxLoops times.")
-                        return
-                    }
-                    currentChunk = 0 // Restart the sequence for redundancy
-                }
-                
                 val dataBytes = chunks[currentChunk]
                 val advertiseData = AdvertiseData.Builder()
                     .setIncludeDeviceName(false)
@@ -175,10 +166,16 @@ class ConnectionlessBleMeshManager(private val context: Context) {
                 }
                 
                 currentChunk++
-                if (currentChunk < chunks.size) {
-                    handler.postDelayed(this, 200) // 200ms gap between starting chunks
+                if (currentChunk >= chunks.size) {
+                    loopCount++
+                    if (loopCount < maxLoops) {
+                        currentChunk = 0 // Restart the sequence
+                        handler.postDelayed(this, 300) // 300ms gap before repeating the whole sequence
+                    } else {
+                        AppLogger.d("ConnectionlessBle", "Finished broadcasting ${chunks.size} chunks $maxLoops times.")
+                    }
                 } else {
-                    AppLogger.d("ConnectionlessBle", "Finished initiating broadcast of ${chunks.size} chunks.")
+                    handler.postDelayed(this, 200) // 200ms gap between individual chunks
                 }
             }
         }
