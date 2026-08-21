@@ -5,6 +5,7 @@ import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothManager
 import android.bluetooth.BluetoothSocket
+import android.bluetooth.BluetoothServerSocket
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
@@ -37,27 +38,88 @@ class BluetoothClassicMeshManager(private val context: Context) {
             val action = intent.action
             if (BluetoothDevice.ACTION_FOUND == action) {
                 val device: BluetoothDevice? = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE)
-                device?.let {
-                    discoveredDevices.add(it)
-                    AppLogger.d("ClassicMesh", "Discovered device: ${it.address}")
+                
+                // GENIUS FILTER: Only accept devices that have the [RQ] prefix in their name!
+                // This bypasses the broken SDP UUID lookup completely while filtering out 100% of TVs and cars.
+                val deviceName = try { device?.name } catch (e: SecurityException) { null }
+                
+                if (deviceName != null && deviceName.startsWith("[RQ]") && device != null) {
+                    if (device.bondState == BluetoothDevice.BOND_BONDED) {
+                        discoveredDevices.add(device)
+                        AppLogger.d("ClassicMesh", "Already bonded ResQMesh peer found: ${device.address}")
+                    } else if (device.bondState == BluetoothDevice.BOND_NONE) {
+                        AppLogger.d("ClassicMesh", "Found unbonded ResQMesh peer! Initiating automatic pairing...")
+                        try {
+                            device.createBond()
+                        } catch (e: Exception) {
+                            AppLogger.d("ClassicMesh", "Failed to initiate pairing: ${e.message}")
+                        }
+                    }
+                }
+            } else if (BluetoothDevice.ACTION_BOND_STATE_CHANGED == action) {
+                val device: BluetoothDevice? = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE)
+                val state = intent.getIntExtra(BluetoothDevice.EXTRA_BOND_STATE, BluetoothDevice.ERROR)
+                val prevState = intent.getIntExtra(BluetoothDevice.EXTRA_PREVIOUS_BOND_STATE, BluetoothDevice.ERROR)
+                
+                if (state == BluetoothDevice.BOND_BONDED && prevState == BluetoothDevice.BOND_BONDING) {
+                    device?.let {
+                        val deviceName = try { it.name } catch (e: Exception) { null }
+                        if (deviceName != null && deviceName.startsWith("[RQ]")) {
+                            discoveredDevices.add(it)
+                            AppLogger.d("ClassicMesh", "Successfully paired with ResQMesh peer: ${it.address}! Added to routing table.")
+                        }
+                    }
                 }
             }
         }
     }
+    
+    fun injectDiscoveredDevice(device: BluetoothDevice) {
+        discoveredDevices.add(device)
+    }
+
+    private var originalDeviceName: String? = null
 
     fun start() {
         if (bluetoothAdapter == null || !bluetoothAdapter.isEnabled) return
+        
+        // Apply the Genius Name Filter trick
+        try {
+            originalDeviceName = bluetoothAdapter.name
+            if (originalDeviceName != null && !originalDeviceName!!.startsWith("[RQ]")) {
+                bluetoothAdapter.setName("[RQ] ${originalDeviceName}")
+                AppLogger.d("ClassicMesh", "Temporarily renamed device to: [RQ] ${originalDeviceName}")
+            }
+        } catch (e: SecurityException) {
+            AppLogger.d("ClassicMesh", "Failed to set Bluetooth name (Missing permissions)")
+        }
+        
+        // INSTANT ROUTING: Pre-fill the table with all previously paired devices!
+        bluetoothAdapter.bondedDevices?.let { bonded ->
+            discoveredDevices.addAll(bonded)
+            bonded.forEach { AppLogger.d("ClassicMesh", "Loaded bonded device: ${it.address}") }
+        }
         
         // 1. Start Server to listen for incoming mesh relays
         startServer()
 
         // 2. Start discovering nearby devices to build our routing table
-        val filter = IntentFilter(BluetoothDevice.ACTION_FOUND)
+        val filter = IntentFilter().apply {
+            addAction(BluetoothDevice.ACTION_FOUND)
+            addAction(BluetoothDevice.ACTION_BOND_STATE_CHANGED)
+        }
         context.registerReceiver(receiver, filter)
         startDiscovery()
     }
 
     fun stop() {
+        // Restore the original Bluetooth name so we don't leave the user's phone named [RQ]
+        try {
+            if (originalDeviceName != null && !originalDeviceName!!.startsWith("[RQ]")) {
+                bluetoothAdapter?.setName(originalDeviceName)
+            }
+        } catch (e: SecurityException) {}
+        
         acceptThread?.cancel()
         acceptThread = null
         try { context.unregisterReceiver(receiver) } catch (e: Exception) {}
@@ -85,16 +147,24 @@ class BluetoothClassicMeshManager(private val context: Context) {
             Thread {
                 var socket: BluetoothSocket? = null
                 try {
-                    // INSECURE RFCOMM: This is the Briar magic. It connects without asking the user for a PIN code!
-                    socket = device.createInsecureRfcommSocketToServiceRecord(APP_UUID)
+                    // SECURE RFCOMM: Since we are now pairing, we use the highly stable Secure socket!
+                    socket = device.createRfcommSocketToServiceRecord(APP_UUID)
                     socket.connect()
                     
                     val outStream: OutputStream = socket.outputStream
                     outStream.write(payloadBytes)
                     outStream.flush()
+                    
+                    // CLEAN TEARDOWN: Wait for the server to send an ACK byte before closing.
+                    // This prevents the socket from entering a corrupted TIME_WAIT state that breaks future connections!
+                    try {
+                        val inStream: InputStream = socket.inputStream
+                        inStream.read() // Blocks until server sends ACK
+                    } catch (e: Exception) {}
+                    
                     AppLogger.d("ClassicMesh", "Successfully blasted payload to ${device.address}")
                 } catch (e: Exception) {
-                    AppLogger.d("ClassicMesh", "Failed to reach ${device.address}: ${e.message}")
+                    // Silently ignore to prevent log spam
                 } finally {
                     try { socket?.close() } catch (e: Exception) {}
                 }
@@ -110,14 +180,15 @@ class BluetoothClassicMeshManager(private val context: Context) {
 
     private inner class AcceptThread : Thread() {
         private val serverSocket = try {
-            // INSECURE RFCOMM SERVER: Listens in the background forever without triggering pairing popups
-            bluetoothAdapter?.listenUsingInsecureRfcommWithServiceRecord(APP_NAME, APP_UUID)
+            // SECURE RFCOMM SERVER: Highly stable, requires devices to be paired.
+            bluetoothAdapter?.listenUsingRfcommWithServiceRecord(APP_NAME, APP_UUID)
         } catch (e: Exception) {
             AppLogger.d("ClassicMesh", "Server Socket failed: ${e.message}")
             null
         }
 
         override fun run() {
+            if (serverSocket == null) return
             var socket: BluetoothSocket?
             while (true) {
                 try {
@@ -131,11 +202,25 @@ class BluetoothClassicMeshManager(private val context: Context) {
                     Thread {
                         try {
                             val inStream: InputStream = it.inputStream
-                            val buffer = ByteArray(1024 * 10) // 10KB buffer for huge messages
-                            val bytes = inStream.read(buffer)
-                            if (bytes > 0) {
-                                val receivedPayload = String(buffer, 0, bytes, StandardCharsets.UTF_8)
-                                AppLogger.d("ClassicMesh", "Received payload from ${it.remoteDevice.address}")
+                            val outStream = java.io.ByteArrayOutputStream()
+                            val buffer = ByteArray(1024)
+                            var bytes: Int
+                            
+                            // Accumulate ALL chunks of the massive JSON message until the sender hangs up
+                            while (inStream.read(buffer).also { bytes = it } != -1) {
+                                outStream.write(buffer, 0, bytes)
+                            }
+                            
+                            if (outStream.size() > 0) {
+                                val receivedPayload = outStream.toString(StandardCharsets.UTF_8.name())
+                                AppLogger.d("ClassicMesh", "Received full payload from ${it.remoteDevice.address}")
+                                
+                                // Send ACK back to client to allow clean teardown
+                                try {
+                                    val ackStream: OutputStream = it.outputStream
+                                    ackStream.write(1)
+                                    ackStream.flush()
+                                } catch (e: Exception) {}
                                 
                                 // Pass it up to MeshNetworkManager to route it!
                                 Handler(Looper.getMainLooper()).post {

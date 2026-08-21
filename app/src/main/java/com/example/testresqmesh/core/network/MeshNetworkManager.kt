@@ -25,10 +25,17 @@ class MeshNetworkManager(private val context: Context) {
     var isStealthMode: Boolean = false
 
     private val connectionlessBleEngine = com.example.testresqmesh.core.network.ble.ConnectionlessBleMeshManager(context)
+    private val classicMeshEngine = com.example.testresqmesh.core.network.classic.BluetoothClassicMeshManager(context)
 
     init {
         connectionlessBleEngine.onMessageReceived = { msgIdHash, payload ->
             processJsonPayload("CONNECTIONLESS_BLE", payload)
+        }
+        connectionlessBleEngine.onDeviceDiscovered = { device ->
+            classicMeshEngine.injectDiscoveredDevice(device)
+        }
+        classicMeshEngine.onMessageReceived = { payload ->
+            processJsonPayload("CLASSIC_BT_PEER", payload)
         }
     }
 
@@ -155,6 +162,7 @@ class MeshNetworkManager(private val context: Context) {
 
         if (payloadDispatcher.transportMode != TransportMode.STRICT_NEARBY) {
             connectionlessBleEngine.startScanning()
+            classicMeshEngine.start()
         }
     }
 
@@ -228,6 +236,7 @@ class MeshNetworkManager(private val context: Context) {
             put("s", myPowerScore)
         }.toString()
         connectionlessBleEngine.broadcastPayload(pulseId, jsonString, ttl = 1) // Only broadcast locally
+        classicMeshEngine.broadcastPayload(jsonString)
     }
 
     fun stopMeshNode() {
@@ -242,6 +251,7 @@ class MeshNetworkManager(private val context: Context) {
         isConnectingLock.set(false)
         
         connectionlessBleEngine.stopScanning()
+        classicMeshEngine.stop()
         
         connectedEndpointIds.clear()
         pendingNames.clear()
@@ -348,6 +358,9 @@ class MeshNetworkManager(private val context: Context) {
         if (payloadDispatcher.transportMode != TransportMode.STRICT_NEARBY) {
             if (excludeEndpointId != "BLE_CONNECTIONLESS") {
                 connectionlessBleEngine.broadcastPayload(msgIdForBle, jsonString)
+            }
+            if (excludeEndpointId != "CLASSIC_BT_PEER") {
+                classicMeshEngine.broadcastPayload(jsonString)
             }
         }
     }
@@ -719,11 +732,12 @@ class MeshNetworkManager(private val context: Context) {
                 
                 // Ensure BLE scanner is running
                 connectionlessBleEngine.startScanning()
-                AppLogger.d("MeshNetwork_HARDWARE", "Native BLE Scanner Active.")
+                classicMeshEngine.start()
             }
             TransportMode.STRICT_NEARBY -> {
-                // Shut down Native BLE
+                // Shut down Native BLE & Classic Mesh
                 connectionlessBleEngine.stopScanning()
+                classicMeshEngine.stop()
                 AppLogger.d("MeshNetwork_HARDWARE", "Native BLE Scanner Powered Down.")
                 
                 // Restart Google Nearby
@@ -735,6 +749,7 @@ class MeshNetworkManager(private val context: Context) {
             TransportMode.HYBRID_AUTO -> {
                 // Ensure everything is running
                 connectionlessBleEngine.startScanning()
+                classicMeshEngine.start()
                 val options = AdvertisingOptions.Builder().setStrategy(Strategy.P2P_CLUSTER).setLowPower(false).build()
                 connectionsClient.startAdvertising("$myPowerScore|$myDeviceName", activeServiceId, connectionLifecycleCallback, options)
                 rescan()

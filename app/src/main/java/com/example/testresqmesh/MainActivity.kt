@@ -177,7 +177,9 @@ class MainActivity : ComponentActivity() {
                     locationManager?.isProviderEnabled(android.location.LocationManager.NETWORK_PROVIDER) == true
             val isWifiOn = wifiManager?.isWifiEnabled == true
 
-            isBluetoothOn && isLocationOn && isWifiOn
+            // Only hard block if Bluetooth or Location are off. 
+            // Wi-Fi is now conditionally checked in SetupViewModel depending on the chosen Transport Mode.
+            isBluetoothOn && isLocationOn
         } catch (e: Exception) {
             false
         }

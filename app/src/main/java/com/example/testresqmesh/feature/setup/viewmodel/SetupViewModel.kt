@@ -41,7 +41,11 @@ class SetupViewModel(private val repository: MeshRepository) : ViewModel() {
         val missing = mutableListOf<String>()
         if (bluetoothAdapter == null || !bluetoothAdapter.isEnabled) missing.add("Bluetooth")
         if (!locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER)) missing.add("Location/GPS")
-        if (!wifiManager.isWifiEnabled) missing.add("Wi-Fi")
+        
+        // Wi-Fi is only required if the user wants to use Google Nearby Connections
+        if (_uiState.value.transportMode != com.example.testresqmesh.core.network.TransportMode.STRICT_CONNECTIONLESS) {
+            if (!wifiManager.isWifiEnabled) missing.add("Wi-Fi")
+        }
 
         if (missing.isNotEmpty()) {
             val errorMsg = "HARDWARE ERROR: Please turn on ${missing.joinToString(", ")} to deploy Mesh Node."

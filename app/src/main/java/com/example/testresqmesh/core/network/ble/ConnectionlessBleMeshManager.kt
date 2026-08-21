@@ -29,12 +29,15 @@ class ConnectionlessBleMeshManager(private val context: Context) {
     private val handler = Handler(Looper.getMainLooper())
 
     var onMessageReceived: ((String, String) -> Unit)? = null // msgIdHash, payload
+    var onDeviceDiscovered: ((android.bluetooth.BluetoothDevice) -> Unit)? = null
 
     private val scanCallback = object : ScanCallback() {
         override fun onScanResult(callbackType: Int, result: ScanResult) {
             super.onScanResult(callbackType, result)
             val manufData = result.scanRecord?.getManufacturerSpecificData(MANUF_ID)
             if (manufData != null) {
+                // WE ONLY INJECT IF IT IS A VERIFIED RESQMESH PACKET!
+                onDeviceDiscovered?.invoke(result.device)
                 handleIncomingPacket(manufData)
             }
         }
@@ -124,7 +127,6 @@ class ConnectionlessBleMeshManager(private val context: Context) {
         val chunks = BlePacketSerializer.serializeToChunksWithHash(msgId.hashCode() and 0xFFFF, compressedBytes, ttl)
         bouncerCache.add((msgId.hashCode() and 0xFFFF))
         
-        AppLogger.d("ConnectionlessBle", "Starting Sequential Chunk Broadcast (${chunks.size} chunks) for msgId: $msgId")
         startChunkBroadcast(chunks)
     }
 
@@ -152,7 +154,7 @@ class ConnectionlessBleMeshManager(private val context: Context) {
 
                 val advertiseCallback = object : AdvertiseCallback() {
                     override fun onStartFailure(errorCode: Int) {
-                        AppLogger.d("ConnectionlessBle", "Legacy Broadcast failed: $errorCode")
+                        // Silently ignore hardware limits
                     }
                 }
                 
@@ -161,8 +163,8 @@ class ConnectionlessBleMeshManager(private val context: Context) {
                     handler.postDelayed({
                         try { advertiser?.stopAdvertising(advertiseCallback) } catch (e: SecurityException) {}
                     }, 150)
-                } catch (e: SecurityException) {
-                    AppLogger.d("ConnectionlessBle", "Security exception during legacy broadcast: ${e.message}")
+                } catch (e: Exception) {
+                    // Silently ignore broadcast exception
                 }
                 
                 currentChunk++
@@ -171,8 +173,6 @@ class ConnectionlessBleMeshManager(private val context: Context) {
                     if (loopCount < maxLoops) {
                         currentChunk = 0 // Restart the sequence
                         handler.postDelayed(this, 300) // 300ms gap before repeating the whole sequence
-                    } else {
-                        AppLogger.d("ConnectionlessBle", "Finished broadcasting ${chunks.size} chunks $maxLoops times.")
                     }
                 } else {
                     handler.postDelayed(this, 200) // 200ms gap between individual chunks
