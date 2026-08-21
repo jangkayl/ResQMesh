@@ -31,7 +31,7 @@ import kotlin.math.roundToInt
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SOSBroadcastScreen(onCancel: () -> Unit, onSosTriggered: (String) -> Unit = {}) {
-    val sosRed = Color(0xFFFF5252)
+    val sosRed = MaterialTheme.colorScheme.error
     var selectedContext by remember { mutableStateOf("GENERAL") }
 
     Column(
@@ -157,7 +157,7 @@ fun SOSBroadcastScreen(onCancel: () -> Unit, onSosTriggered: (String) -> Unit = 
             Box(modifier = Modifier.size(4.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.4f)))
             Spacer(modifier = Modifier.width(16.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(Color(0xFF10B981)))
+                Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(MaterialTheme.colorScheme.onPrimary)) // Assuming onPrimary looks good on red
                 Spacer(modifier = Modifier.width(8.dp))
                 Text("READY", style = MaterialTheme.typography.labelSmall, color = Color.White, fontWeight = FontWeight.Bold)
             }
@@ -175,9 +175,9 @@ fun SOSContextCard(
 ) {
     Surface(
         modifier = modifier.height(100.dp).clickable { onClick() },
-        color = if (isSelected) Color(0xFFFF5252) else Color.White.copy(alpha = 0.1f),
+        color = if (isSelected) MaterialTheme.colorScheme.error else Color.White.copy(alpha = 0.1f),
         shape = MaterialTheme.shapes.medium,
-        border = androidx.compose.foundation.BorderStroke(1.dp, if (isSelected) Color(0xFFFF5252) else Color.White.copy(alpha = 0.2f))
+        border = androidx.compose.foundation.BorderStroke(1.dp, if (isSelected) MaterialTheme.colorScheme.error else Color.White.copy(alpha = 0.2f))
     ) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -242,7 +242,7 @@ fun SOSSlider(onSlideComplete: () -> Unit) {
                     shadowElevation = 8.dp
                 ) {
                     Box(contentAlignment = Alignment.Center) {
-                        Icon(Icons.Default.ChevronRight, contentDescription = null, tint = Color(0xFFFF5252), modifier = Modifier.size(32.dp))
+                        Icon(Icons.Default.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(32.dp))
                     }
                 }
             }

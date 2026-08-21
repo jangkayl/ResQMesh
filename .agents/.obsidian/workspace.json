@@ -190,9 +190,10 @@
   },
   "active": "371e10f6b0c448ac",
   "lastOpenFiles": [
+    "skills/mobile-android-design/SKILL.md",
     "skills/ui-ux-pro-max/references/quick-reference.md",
-    "skills/ui-ux-pro-max/references/pro-rules.md",
     "skills/ui-ux-pro-max/SKILL.md",
+    "skills/ui-ux-pro-max/references/pro-rules.md",
     "skills/ui-ux-pro-max/scripts/tests/fixtures/catalogs/phosphor-package.json",
     "skills/ui-ux-pro-max/scripts/tests/fixtures/catalogs/phosphor-react-exports.json",
     "skills/ui-ux-pro-max/scripts/tests/fixtures/catalogs/phosphor-react-package.json",
@@ -203,7 +204,6 @@
     "skills/ui-ux-pro-max/scripts/tests/fixtures/catalogs/google-existing.csv",
     "skills/ui-ux-pro-max/scripts/tests/fixtures/catalogs/google-catalog.json",
     "skills/ui-ux-pro-max/scripts/tests/fixtures/catalogs/google-api.json",
-    "skills/mobile-android-design/SKILL.md",
     "skills/troubleshoot-mesh/SKILL.md",
     "skills/compose-shadcn-ui/SKILL.md",
     "rules/project_summary.md"

@@ -16,9 +16,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.shape.CircleShape
-import com.example.testresqmesh.core.ui.theme.ErrorRed
-import com.example.testresqmesh.core.ui.theme.InboxBackground
-import com.example.testresqmesh.core.ui.theme.InboxTextSecondary
+import com.example.testresqmesh.core.ui.theme.Spacing
 import com.example.testresqmesh.core.ui.theme.WarningAmber
 import com.example.testresqmesh.core.utils.MediaHelper
 import com.example.testresqmesh.feature.comms.ui.components.ChatBubble
@@ -48,7 +46,7 @@ fun PublicChatTab(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(InboxBackground)
+            .background(MaterialTheme.colorScheme.background)
     ) {
         // Dynamic Sticky Header
         val infiniteTransition = rememberInfiniteTransition()

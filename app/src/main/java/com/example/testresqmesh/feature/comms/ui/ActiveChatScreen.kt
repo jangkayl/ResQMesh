@@ -29,8 +29,6 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.tooling.preview.Preview
 import com.example.testresqmesh.core.model.ConnectedDevice
 import com.example.testresqmesh.core.ui.theme.TestResQMeshTheme
-import com.example.testresqmesh.core.ui.theme.InboxBackground
-import com.example.testresqmesh.core.ui.theme.InboxAccentBlue
 import com.example.testresqmesh.core.ui.theme.Spacing
 import com.example.testresqmesh.feature.comms.viewmodel.CommunicationViewModel
 import com.example.testresqmesh.feature.comms.ui.components.ChatInput
@@ -86,42 +84,41 @@ fun ActiveChatScreen(
 
     Scaffold(
         topBar = {
-            Column(modifier = Modifier.background(InboxBackground)) {
+            Column(modifier = Modifier.background(MaterialTheme.colorScheme.background)) {
                 TopAppBar(
                     navigationIcon = {
                         IconButton(onClick = onBack) {
-                            Icon(Icons.Default.ChevronLeft, contentDescription = "Back", tint = Color.White)
+                            Icon(Icons.Default.ChevronLeft, contentDescription = "Back", tint = MaterialTheme.colorScheme.onBackground)
                         }
                     },
                     title = {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(displayName, fontWeight = FontWeight.Black, color = Color.White, fontSize = 20.sp)
+                            Text(displayName, fontWeight = FontWeight.Black, color = MaterialTheme.colorScheme.onBackground, fontSize = 20.sp)
                             Spacer(modifier = Modifier.width(12.dp))
                             
                             val isDirect = uiState.knownNodes.find { it.name == displayName }?.isDirect ?: false
                             
                             Surface(
-                                color = Color.White.copy(alpha = 0.05f),
-                                shape = RoundedCornerShape(16.dp),
-                                border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.1f))
+                                color = MaterialTheme.colorScheme.surfaceVariant,
+                                shape = RoundedCornerShape(16.dp)
                             ) {
                                 Row(
                                     modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Icon(Icons.Outlined.RadioButtonChecked, contentDescription = null, tint = if (isDirect) Color(0xFF10B981) else Color(0xFFF59E0B), modifier = Modifier.size(12.dp))
+                                    Icon(Icons.Outlined.RadioButtonChecked, contentDescription = null, tint = if (isDirect) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error, modifier = Modifier.size(12.dp))
                                     Spacer(modifier = Modifier.width(6.dp))
-                                    Text(if (isDirect) "IN RANGE" else "MESH HOP", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, fontSize = 9.sp, color = Color.White)
+                                    Text(if (isDirect) "IN RANGE" else "MESH HOP", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, fontSize = 9.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 }
                             }
                         }
                     },
                     actions = {
                         IconButton(onClick = {}) {
-                            Icon(Icons.Default.MoreHoriz, contentDescription = null, tint = Color.White)
+                            Icon(Icons.Default.MoreHoriz, contentDescription = null, tint = MaterialTheme.colorScheme.onBackground)
                         }
                     },
-                    colors = TopAppBarDefaults.topAppBarColors(containerColor = InboxBackground)
+                    colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background)
                 )
                 Row(
                     modifier = Modifier
@@ -130,20 +127,20 @@ fun ActiveChatScreen(
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.SignalCellularAlt, contentDescription = null, tint = Color.White.copy(alpha = 0.5f), modifier = Modifier.size(14.dp))
+                        Icon(Icons.Default.SignalCellularAlt, contentDescription = null, tint = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f), modifier = Modifier.size(14.dp))
                         Spacer(modifier = Modifier.width(6.dp))
-                        Text("SIGNAL STRENGTH: HIGH", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Black, color = Color.White.copy(alpha = 0.5f), fontSize = 10.sp)
+                        Text("SIGNAL STRENGTH: HIGH", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Black, color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f), fontSize = 10.sp)
                     }
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Outlined.CheckCircle, contentDescription = null, tint = InboxAccentBlue.copy(alpha = 0.8f), modifier = Modifier.size(14.dp))
+                        Icon(Icons.Outlined.CheckCircle, contentDescription = null, tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.8f), modifier = Modifier.size(14.dp))
                         Spacer(modifier = Modifier.width(6.dp))
-                        Text("E2E ENCRYPTED", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Black, color = Color.White.copy(alpha = 0.5f), fontSize = 10.sp)
+                        Text("E2E ENCRYPTED", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Black, color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f), fontSize = 10.sp)
                     }
                 }
-                HorizontalDivider(color = Color.White.copy(alpha = 0.1f), thickness = 1.dp)
+                HorizontalDivider(color = MaterialTheme.colorScheme.outline, thickness = 1.dp)
             }
         },
-        containerColor = InboxBackground,
+        containerColor = MaterialTheme.colorScheme.background,
         bottomBar = {
             val context = androidx.compose.ui.platform.LocalContext.current
             androidx.compose.foundation.layout.Box(modifier = Modifier.imePadding()) {
@@ -253,7 +250,7 @@ fun ActiveChatScreen(
 
 @Composable
 fun HighFidelityChatBubble(msg: ChatMessageData, mediaHelper: MediaHelper, onViewMap: (Double, Double) -> Unit = { _, _ -> }) {
-    val bubbleColor = if (msg.isMine) InboxAccentBlue else Color(0xFF35424D) // Lighter slate for others
+    val bubbleColor = if (msg.isMine) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface
     val alignment = if (msg.isMine) Alignment.End else Alignment.Start
     val shape = if (msg.isMine) {
         RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp, bottomStart = 16.dp, bottomEnd = 2.dp)
@@ -271,16 +268,16 @@ fun HighFidelityChatBubble(msg: ChatMessageData, mediaHelper: MediaHelper, onVie
             color = bubbleColor,
             shape = shape,
             modifier = Modifier.widthIn(max = 280.dp),
-            border = if (!msg.isMine) androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.1f)) else null
+            border = if (!msg.isMine) androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline) else null
         ) {
             Column(modifier = Modifier.padding(14.dp)) {
                 if (msg.locationLat != null && msg.locationLng != null) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.LocationOn, contentDescription = null, tint = Color.White)
+                        Icon(Icons.Default.LocationOn, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimary)
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
                             "📍 Shared Location:\n[${String.format(java.util.Locale.US, "%.4f", msg.locationLat)}, ${String.format(java.util.Locale.US, "%.4f", msg.locationLng)}]",
-                            color = Color.White,
+                            color = MaterialTheme.colorScheme.onPrimary,
                             style = MaterialTheme.typography.bodyMedium,
                             fontWeight = FontWeight.Bold
                         )
@@ -356,14 +353,14 @@ fun HighFidelityChatBubble(msg: ChatMessageData, mediaHelper: MediaHelper, onVie
             verticalAlignment = Alignment.CenterVertically
         ) {
             if (!msg.isMine) {
-                val mediumColor = if (msg.receiveMedium.contains("Wi-Fi")) com.example.testresqmesh.core.ui.theme.SuccessGreen else InboxAccentBlue
+                val mediumColor = if (msg.receiveMedium.contains("Wi-Fi")) com.example.testresqmesh.core.ui.theme.SuccessGreen else MaterialTheme.colorScheme.primary
                 Text("📶 ${msg.receiveMedium}", style = MaterialTheme.typography.labelSmall, color = mediumColor.copy(alpha = 0.8f), fontSize = 10.sp, fontWeight = FontWeight.Bold)
                 DotSeparator()
                 Text(msg.time, style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.5f), fontSize = 10.sp, fontWeight = FontWeight.Bold)
                 DotSeparator()
                 Icon(Icons.Outlined.Lock, contentDescription = null, tint = Color.White.copy(alpha = 0.3f), modifier = Modifier.size(10.dp))
                 Spacer(modifier = Modifier.width(4.dp))
-                val hopsColor = if (msg.hops.contains("HOPPED")) Color(0xFFF59E0B) else Color.White.copy(alpha = 0.5f)
+                val hopsColor = if (msg.hops.contains("HOPPED")) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
                 Text(msg.hops, style = MaterialTheme.typography.labelSmall, color = hopsColor, fontSize = 10.sp, fontWeight = FontWeight.Bold)
             } else {
                 val statusText = when {
@@ -397,7 +394,7 @@ fun HighFidelityChatBubble(msg: ChatMessageData, mediaHelper: MediaHelper, onVie
                     .padding(top = 4.dp)
                     .clickable { showRoute = !showRoute },
                 style = MaterialTheme.typography.labelSmall,
-                color = InboxAccentBlue.copy(alpha = 0.8f),
+                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.8f),
                 fontWeight = FontWeight.Bold
             )
 
@@ -413,9 +410,9 @@ fun HighFidelityChatBubble(msg: ChatMessageData, mediaHelper: MediaHelper, onVie
                         val outboundStr = if (msg.outboundRoute.isNotEmpty()) msg.outboundRoute.joinToString(" -> ") else "Unknown"
                         Text(outboundStr, color = Color.White, fontSize = 11.sp, modifier = Modifier.padding(bottom = 6.dp))
 
-                        Text("Return Receipt Path:", color = Color.White.copy(alpha = 0.5f), fontSize = 9.sp, fontWeight = FontWeight.Black)
+                        Text("Return Receipt Path:", color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f), fontSize = 9.sp, fontWeight = FontWeight.Black)
                         val returnStr = if (msg.returnRoute.isNotEmpty()) msg.returnRoute.joinToString(" -> ") else "Pending..."
-                        Text(returnStr, color = Color(0xFF10B981), fontSize = 11.sp)
+                        Text(returnStr, color = com.example.testresqmesh.core.ui.theme.SuccessGreen, fontSize = 11.sp)
                     }
                 }
             }

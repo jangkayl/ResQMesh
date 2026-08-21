@@ -20,7 +20,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.testresqmesh.core.ui.components.buttons.ResQButton
+import com.example.testresqmesh.core.ui.components.ResQButton
 import com.example.testresqmesh.core.ui.theme.Spacing
 import com.example.testresqmesh.core.ui.theme.TestResQMeshTheme
 
@@ -36,7 +36,6 @@ fun PermissionsScreen(
     requestPermissions: () -> Unit,
     checkHardware: () -> Boolean
 ) {
-    val pinkBackground = Color(0xFFFEE2E2)
     val scrollState = rememberScrollState()
     val lifecycleOwner = LocalLifecycleOwner.current
 
@@ -66,7 +65,7 @@ fun PermissionsScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(pinkBackground)
+            .background(MaterialTheme.colorScheme.background)
             .verticalScroll(scrollState)
             .padding(Spacing.Large),
         horizontalAlignment = Alignment.CenterHorizontally
@@ -78,7 +77,7 @@ fun PermissionsScreen(
                 .width(40.dp)
                 .height(4.dp)
                 .clip(CircleShape)
-                .background(Color.Black.copy(alpha = 0.1f))
+                .background(MaterialTheme.colorScheme.onBackground.copy(alpha = 0.1f))
         )
 
         Spacer(modifier = Modifier.height(32.dp))
@@ -88,7 +87,7 @@ fun PermissionsScreen(
             style = MaterialTheme.typography.displaySmall,
             fontWeight = FontWeight.Black,
             textAlign = TextAlign.Center,
-            color = Color.Black
+            color = MaterialTheme.colorScheme.onBackground
         )
 
         Spacer(modifier = Modifier.height(Spacing.Small))
@@ -99,7 +98,7 @@ fun PermissionsScreen(
                 else "Permissions granted! Now please ensure your Bluetooth, GPS, and Wi-Fi are turned ON.",
             style = MaterialTheme.typography.bodyLarge,
             textAlign = TextAlign.Center,
-            color = Color.Black.copy(alpha = 0.6f)
+            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f)
         )
 
         Spacer(modifier = Modifier.height(48.dp))
@@ -134,18 +133,19 @@ fun PermissionsScreen(
         Surface(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(16.dp),
-            color = Color.White.copy(alpha = 0.4f),
-            border = androidx.compose.foundation.BorderStroke(1.dp, Color.Black.copy(alpha = 0.05f))
+            color = MaterialTheme.colorScheme.surfaceVariant,
+            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
         ) {
             Row(
                 modifier = Modifier.padding(Spacing.Medium),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(Icons.Default.Lock, contentDescription = null, modifier = Modifier.size(16.dp))
+                Icon(Icons.Default.Lock, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(16.dp))
                 Spacer(modifier = Modifier.width(Spacing.Small))
                 Text(
                     "Data stays local and never touches the cloud.",
                     style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     fontSize = 10.sp
                 )
             }
@@ -167,21 +167,20 @@ fun PermissionsScreen(
                 }
             },
             modifier = Modifier.fillMaxWidth(),
-            contentPadding = PaddingValues(Spacing.Medium)
-        ) {
-            Text(
-                text = if (!hasPermissions) "Grant Hardware Access" 
-                       else if (!isHardwareOn) "Check Hardware Again" 
-                       else "All Set! Continue",
-                fontWeight = FontWeight.Bold
-            )
-        }
+            content = {
+                Text(
+                    text = if (!hasPermissions) "Grant Hardware Access" 
+                           else if (!isHardwareOn) "Check Hardware Again" 
+                           else "All Set! Continue",
+                    fontWeight = FontWeight.Bold
+                )
+            }
         
         if (hasPermissions && !isHardwareOn) {
             Text(
                 text = "Please enable Bluetooth, GPS, and Wi-Fi in your system settings to proceed.",
                 style = MaterialTheme.typography.bodySmall,
-                color = Color.Red.copy(alpha = 0.7f),
+                color = MaterialTheme.colorScheme.error,
                 textAlign = TextAlign.Center,
                 modifier = Modifier.padding(top = 8.dp)
             )
@@ -220,11 +219,11 @@ fun PermissionCard(
                     text = title,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Black,
-                    color = Color.Black
+                    color = MaterialTheme.colorScheme.onBackground
                 )
                 Spacer(modifier = Modifier.width(Spacing.Small))
                 Surface(
-                    color = Color.Black.copy(alpha = 0.05f),
+                    color = MaterialTheme.colorScheme.surfaceVariant,
                     shape = RoundedCornerShape(4.dp)
                 ) {
                     Text(
@@ -232,21 +231,21 @@ fun PermissionCard(
                         style = MaterialTheme.typography.labelSmall,
                         modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
                         fontSize = 8.sp,
-                        color = Color.Black.copy(alpha = 0.4f)
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
             Text(
                 text = description,
                 style = MaterialTheme.typography.bodySmall,
-                color = Color.Black.copy(alpha = 0.6f)
+                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f)
             )
         }
         
         Icon(
             Icons.Default.ChevronRight,
             contentDescription = null,
-            tint = Color.Black.copy(alpha = 0.2f)
+            tint = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.2f)
         )
     }
 }

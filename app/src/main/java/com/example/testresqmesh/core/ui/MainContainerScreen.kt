@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -163,42 +164,33 @@ fun MainContainerScreen(
     Scaffold(
         contentWindowInsets = WindowInsets.systemBars,
         bottomBar = {
-            NavigationBar(
-                containerColor = MaterialTheme.colorScheme.background,
-                tonalElevation = 0.dp
-            ) {
-                items.forEach { item ->
-                    NavigationBarItem(
-                        icon = { Icon(item.icon, contentDescription = item.label) },
-                        label = { Text(item.label) },
-                        selected = currentItem == item,
-                        onClick = { 
-                            if (item == NavItem.SOS) {
-                                isSOSActive = true
-                            } else {
-                                currentItem = item 
-                            }
-                        },
-                        colors = NavigationBarItemDefaults.colors(
-                            selectedIconColor = MaterialTheme.colorScheme.primary,
-                            selectedTextColor = MaterialTheme.colorScheme.primary,
-                            unselectedIconColor = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
-                            unselectedTextColor = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
-                            indicatorColor = androidx.compose.ui.graphics.Color.Transparent
-                        )
-                    )
+            com.example.testresqmesh.core.ui.components.ResQNavBar(
+                items = items.map { 
+                    com.example.testresqmesh.core.ui.components.NavItemData(it.route, it.icon, it.label) 
+                },
+                selectedId = currentItem.route,
+                onItemSelected = { route ->
+                    val selectedItem = items.find { it.route == route }
+                    if (selectedItem != null) {
+                        if (selectedItem == NavItem.SOS) {
+                            isSOSActive = true
+                        } else {
+                            currentItem = selectedItem
+                        }
+                    }
                 }
-            }
+            )
         }
     ) { innerPadding ->
         AnimatedContent(
             targetState = currentItem,
             modifier = Modifier
+                .fillMaxSize()
                 .padding(innerPadding)
                 .consumeWindowInsets(innerPadding)
                 .imePadding(),
             transitionSpec = {
-                fadeIn(animationSpec = tween(220, delayMillis = 90)) togetherWith
+                fadeIn(animationSpec = spring(stiffness = androidx.compose.animation.core.Spring.StiffnessLow)) togetherWith
                 fadeOut(animationSpec = tween(90))
             },
             label = "ScreenTransition"

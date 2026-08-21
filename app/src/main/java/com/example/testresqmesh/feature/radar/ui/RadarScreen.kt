@@ -28,11 +28,11 @@ import androidx.compose.ui.unit.sp
 import java.util.Locale
 import androidx.compose.ui.tooling.preview.Preview
 import com.example.testresqmesh.core.ui.theme.TestResQMeshTheme
-import com.example.testresqmesh.core.ui.theme.InboxBackground
-import com.example.testresqmesh.core.ui.theme.InboxAccentBlue
 import com.example.testresqmesh.core.ui.theme.Spacing
 import com.example.testresqmesh.feature.radar.viewmodel.RadarViewModel
 import com.example.testresqmesh.core.utils.AppLogger
+import com.example.testresqmesh.core.ui.components.ResQCard
+import com.example.testresqmesh.core.ui.components.ResQButton
 
 @Composable
 fun RadarScreen(viewModel: RadarViewModel) {
@@ -110,29 +110,29 @@ fun RadarScreenContent(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("ResQMesh", fontWeight = FontWeight.Black, color = Color.White) },
+                title = { Text("ResQMesh", fontWeight = FontWeight.Black, color = MaterialTheme.colorScheme.onBackground) },
                 actions = {
                     IconButton(onClick = { AppLogger.toggleTerminal() }) {
-                        Icon(Icons.Outlined.Shield, contentDescription = "Debug Terminal", tint = Color.White)
+                        Icon(Icons.Outlined.Shield, contentDescription = "Debug Terminal", tint = MaterialTheme.colorScheme.onBackground)
                     }
                     IconButton(onClick = { /* Mesh settings */ }) {
-                        Icon(Icons.Default.Wifi, contentDescription = null, tint = InboxAccentBlue)
+                        Icon(Icons.Default.Wifi, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = InboxBackground)
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background)
             )
         },
         floatingActionButton = {
             LargeFloatingActionButton(
                 onClick = { /* Quick SOS */ },
-                containerColor = Color(0xFFEF4444),
+                containerColor = MaterialTheme.colorScheme.error,
                 shape = CircleShape,
-                modifier = Modifier.padding(bottom = 16.dp)
+                modifier = Modifier.padding(bottom = 96.dp) // Adjusted for floating nav bar
             ) {
-                Icon(Icons.Default.Notifications, contentDescription = "SOS", tint = Color.White, modifier = Modifier.size(32.dp))
+                Icon(Icons.Default.Notifications, contentDescription = "SOS", tint = MaterialTheme.colorScheme.onError, modifier = Modifier.size(32.dp))
             }
         },
-        containerColor = InboxBackground
+        containerColor = MaterialTheme.colorScheme.background
     ) { innerPadding ->
         Column(
             modifier = Modifier
@@ -149,44 +149,47 @@ fun RadarScreenContent(
             ) {
                 // Active Nodes Counter Badge
                 Surface(
-                    color = Color.Black.copy(alpha = 0.5f),
+                    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.5f),
                     shape = RoundedCornerShape(16.dp),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)),
                     modifier = Modifier.align(Alignment.TopStart).padding(Spacing.Medium)
                 ) {
                     Row(
                         modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(Color(0xFFF97316)))
+                        Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primary))
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("$activeNodesCount ACTIVE NODES", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Black, color = Color.White)
+                        Text("$activeNodesCount ACTIVE NODES", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Black, color = MaterialTheme.colorScheme.onSurface)
                     }
                 }
+
+                val primaryColor = MaterialTheme.colorScheme.primary
 
                 Canvas(modifier = Modifier.size(240.dp)) {
                     val center = size.center
                     val radius = size.minDimension / 2
                     
                     // Circles
-                    drawCircle(color = Color.White.copy(alpha = 0.05f), radius = radius)
-                    drawCircle(color = Color.White.copy(alpha = 0.05f), radius = radius * 0.75f, style = Stroke(1.dp.toPx()))
-                    drawCircle(color = Color.White.copy(alpha = 0.05f), radius = radius * 0.5f, style = Stroke(1.dp.toPx()))
-                    drawCircle(color = Color.White.copy(alpha = 0.05f), radius = radius * 0.25f, style = Stroke(1.dp.toPx()))
+                    drawCircle(color = primaryColor.copy(alpha = 0.05f), radius = radius)
+                    drawCircle(color = primaryColor.copy(alpha = 0.1f), radius = radius * 0.75f, style = Stroke(1.dp.toPx()))
+                    drawCircle(color = primaryColor.copy(alpha = 0.1f), radius = radius * 0.5f, style = Stroke(1.dp.toPx()))
+                    drawCircle(color = primaryColor.copy(alpha = 0.1f), radius = radius * 0.25f, style = Stroke(1.dp.toPx()))
                     
                     // Crosshair lines
-                    drawLine(color = Color.White.copy(alpha = 0.1f), start = androidx.compose.ui.geometry.Offset(0f, center.y), end = androidx.compose.ui.geometry.Offset(size.width, center.y))
-                    drawLine(color = Color.White.copy(alpha = 0.1f), start = androidx.compose.ui.geometry.Offset(center.x, 0f), end = androidx.compose.ui.geometry.Offset(center.x, size.height))
+                    drawLine(color = primaryColor.copy(alpha = 0.1f), start = androidx.compose.ui.geometry.Offset(0f, center.y), end = androidx.compose.ui.geometry.Offset(size.width, center.y))
+                    drawLine(color = primaryColor.copy(alpha = 0.1f), start = androidx.compose.ui.geometry.Offset(center.x, 0f), end = androidx.compose.ui.geometry.Offset(center.x, size.height))
 
                     // Sweep
                     drawArc(
-                        color = InboxAccentBlue.copy(alpha = 0.3f),
+                        color = primaryColor.copy(alpha = 0.3f),
                         startAngle = radarSweep,
                         sweepAngle = 60f,
                         useCenter = true,
                         size = size
                     )
                     
-                    // Dynamic Nodes (the orange dots)
+                    // Dynamic Nodes (the primary colored dots)
                     nodes.forEach { node ->
                         // Deterministic position based on name
                         val random = java.util.Random(node.name.hashCode().toLong())
@@ -197,7 +200,7 @@ fun RadarScreenContent(
                         val y = center.y + distance * kotlin.math.sin(Math.toRadians(angle.toDouble())).toFloat()
                         
                         drawCircle(
-                            color = Color(0xFFF97316), 
+                            color = if (node.isBlocked) Color.Gray else primaryColor, 
                             radius = 5.dp.toPx(), 
                             center = androidx.compose.ui.geometry.Offset(x, y)
                         )
@@ -205,40 +208,37 @@ fun RadarScreenContent(
 
                     // Center point (Me)
                     drawCircle(color = Color.White, radius = 4.dp.toPx(), center = center)
-                    drawCircle(color = InboxAccentBlue, radius = 8.dp.toPx(), center = center, style = Stroke(2.dp.toPx()))
+                    drawCircle(color = primaryColor, radius = 8.dp.toPx(), center = center, style = Stroke(2.dp.toPx()))
                 }
                 
                 Text(
                     "SCAN RANGE: 1.2KM",
                     style = MaterialTheme.typography.labelSmall,
-                    color = Color.White.copy(alpha = 0.3f),
+                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.3f),
                     modifier = Modifier.align(Alignment.BottomEnd).padding(Spacing.Medium)
                 )
             }
 
             // Network Status Card
-            Surface(
+            ResQCard(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = Spacing.Medium),
-                color = Color.White.copy(alpha = 0.05f),
-                shape = RoundedCornerShape(16.dp),
-                border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.1f))
+                    .padding(horizontal = Spacing.Medium)
             ) {
-                Column(modifier = Modifier.padding(Spacing.Medium)) {
+                Column {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.AutoMirrored.Filled.TrendingUp, contentDescription = null, tint = Color.White, modifier = Modifier.size(20.dp))
+                        Icon(Icons.AutoMirrored.Filled.TrendingUp, contentDescription = null, tint = MaterialTheme.colorScheme.onSurface, modifier = Modifier.size(20.dp))
                         Spacer(modifier = Modifier.width(12.dp))
                         Column(modifier = Modifier.weight(1f)) {
-                            Text("Network Status", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = Color.White)
-                            Text("Mesh Protocol: v2.4 Active", style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.6f))
+                            Text("Network Status", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                            Text("Mesh Protocol: v2.4 Active", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
-                        Surface(color = Color.White.copy(alpha = 0.1f), shape = RoundedCornerShape(12.dp)) {
-                            Text("Healthy", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = Color.White, modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp))
+                        Surface(color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f), shape = RoundedCornerShape(12.dp)) {
+                            Text("Healthy", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp))
                         }
                     }
                     
-                    HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), color = Color.White.copy(alpha = 0.1f))
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), color = MaterialTheme.colorScheme.outline)
                     
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                         StatusMetric("NODES", String.format(Locale.getDefault(), "%02d", activeNodesCount))
@@ -250,7 +250,6 @@ fun RadarScreenContent(
 
             Spacer(modifier = Modifier.height(Spacing.Large))
 
-            // Nearby Nodes List Header
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -258,10 +257,10 @@ fun RadarScreenContent(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text("NEARBY NODES", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Black, color = Color.White)
+                Text("NEARBY NODES", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Black, color = MaterialTheme.colorScheme.onBackground)
                 TextButton(onClick = onRefresh) {
-                    Text("Refresh", color = InboxAccentBlue, style = MaterialTheme.typography.labelMedium)
-                    Icon(Icons.Default.ChevronRight, contentDescription = null, tint = InboxAccentBlue, modifier = Modifier.size(16.dp))
+                    Text("Refresh", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.labelMedium)
+                    Icon(Icons.Default.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
                 }
             }
 
@@ -277,7 +276,7 @@ fun RadarScreenContent(
                 
                 if (nodes.isEmpty()) {
                     Box(modifier = Modifier.fillMaxWidth().height(100.dp), contentAlignment = Alignment.Center) {
-                        Text("No nodes detected nearby.", color = Color.White.copy(alpha = 0.4f), style = MaterialTheme.typography.bodyMedium)
+                        Text("No nodes detected nearby.", color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.4f), style = MaterialTheme.typography.bodyMedium)
                     }
                 }
 
@@ -290,14 +289,14 @@ fun RadarScreenContent(
                     Icon(
                         Icons.Default.SignalCellularAlt,
                         contentDescription = null,
-                        tint = Color.White.copy(alpha = 0.2f),
+                        tint = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.2f),
                         modifier = Modifier.size(14.dp)
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
                         "AES-256 MESH-TUNNEL ESTABLISHED",
                         style = MaterialTheme.typography.labelSmall,
-                        color = Color.White.copy(alpha = 0.2f),
+                        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.2f),
                         fontSize = 8.sp
                     )
                 }
@@ -310,8 +309,8 @@ fun RadarScreenContent(
 @Composable
 fun StatusMetric(label: String, value: String) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(label, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = Color.White.copy(alpha = 0.4f))
-        Text(value, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Black, color = Color.White)
+        Text(label, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.4f))
+        Text(value, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Black, color = MaterialTheme.colorScheme.onBackground)
     }
 }
 
@@ -323,20 +322,17 @@ fun NearbyNodeItem(
     onBlock: (String) -> Unit,
     onUnblock: (String) -> Unit
 ) {
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        color = Color.White.copy(alpha = 0.05f),
-        shape = RoundedCornerShape(12.dp)
+    ResQCard(
+        modifier = Modifier.fillMaxWidth()
     ) {
         Row(
-            modifier = Modifier.padding(Spacing.Medium),
             verticalAlignment = Alignment.CenterVertically
         ) {
             // Avatar
             Box {
-                Surface(modifier = Modifier.size(44.dp), shape = CircleShape, color = Color.White.copy(alpha = 0.1f)) {
+                Surface(modifier = Modifier.size(44.dp), shape = CircleShape, color = MaterialTheme.colorScheme.surfaceVariant) {
                     Box(contentAlignment = Alignment.Center) {
-                        Icon(Icons.Default.Person, contentDescription = null, tint = Color.White.copy(alpha = 0.5f))
+                        Icon(Icons.Default.Person, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
                 if (node.isActiveRelay) {
@@ -344,11 +340,11 @@ fun NearbyNodeItem(
                         modifier = Modifier
                             .size(16.dp)
                             .clip(CircleShape)
-                            .background(InboxAccentBlue)
+                            .background(MaterialTheme.colorScheme.primary)
                             .align(Alignment.TopEnd)
-                            .border(2.dp, Color(0xFF1E293B), CircleShape)
+                            .border(2.dp, MaterialTheme.colorScheme.surface, CircleShape)
                     ) {
-                        Icon(Icons.Default.Wifi, contentDescription = null, tint = Color.White, modifier = Modifier.padding(2.dp))
+                        Icon(Icons.Default.Wifi, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.padding(2.dp))
                     }
                 }
             }
@@ -356,9 +352,9 @@ fun NearbyNodeItem(
             Spacer(modifier = Modifier.width(Spacing.Medium))
 
             Column(modifier = Modifier.weight(1f)) {
-                Text(node.name, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Black, color = if (node.isBlocked) Color.Gray else Color.White)
+                Text(node.name, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Black, color = if (node.isBlocked) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface)
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    val statusColor = if (node.isBlocked) Color.Red else if (node.status.contains("MASTER") || node.isConnected) InboxAccentBlue else Color.White.copy(alpha = 0.4f)
+                    val statusColor = if (node.isBlocked) MaterialTheme.colorScheme.error else if (node.status.contains("MASTER") || node.isConnected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
                     Icon(
                         if (node.isBlocked) Icons.Default.Block else if (node.status.contains("MASTER") || node.isConnected) Icons.Default.Bolt else Icons.Default.Info, 
                         contentDescription = null, 
@@ -371,9 +367,10 @@ fun NearbyNodeItem(
             }
 
             if (node.isBlocked) {
-                TextButton(
+                ResQButton(
                     onClick = { onUnblock(node.name) },
-                    colors = ButtonDefaults.textButtonColors(contentColor = Color(0xFF10B981))
+                    containerColor = MaterialTheme.colorScheme.errorContainer,
+                    contentColor = MaterialTheme.colorScheme.onErrorContainer
                 ) {
                     Text("UNBLOCK", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Black)
                 }
@@ -382,14 +379,14 @@ fun NearbyNodeItem(
                     Icon(
                         imageVector = Icons.Default.Block,
                         contentDescription = "Block Device",
-                        tint = Color.Gray
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
                 IconButton(onClick = { onDisconnect(node.endpointId) }) {
                     Icon(
                         imageVector = Icons.Outlined.LinkOff,
                         contentDescription = "Unlink Device",
-                        tint = Color(0xFFEF4444)
+                        tint = MaterialTheme.colorScheme.error
                     )
                 }
             } else {
@@ -397,12 +394,12 @@ fun NearbyNodeItem(
                     Icon(
                         imageVector = Icons.Default.Block,
                         contentDescription = "Block Device",
-                        tint = Color.Gray
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
                 TextButton(
                     onClick = { onForceConnect(node.endpointId, node.name) },
-                    colors = ButtonDefaults.textButtonColors(contentColor = InboxAccentBlue)
+                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.primary)
                 ) {
                     Icon(Icons.Default.Bolt, contentDescription = null, modifier = Modifier.size(16.dp))
                     Spacer(modifier = Modifier.width(4.dp))

@@ -39,7 +39,7 @@ fun ChatContainerScreen(
         val uiState by viewModel.uiState.collectAsState()
         ModalBottomSheet(
             onDismissRequest = { showNewMessageModal = false },
-            containerColor = Color(0xFF232E35),
+            containerColor = MaterialTheme.colorScheme.surface,
             dragHandle = { BottomSheetDefaults.DragHandle() }
         ) {
             NewMessageModal(
@@ -87,7 +87,7 @@ fun ChatContainerScreenContent(
                         Icon(
                             Icons.Outlined.Shield,
                             contentDescription = "Debug Terminal",
-                            tint = Color.White,
+                            tint = MaterialTheme.colorScheme.onBackground,
                             modifier = Modifier.size(28.dp)
                         )
                     }
@@ -103,7 +103,7 @@ fun ChatContainerScreenContent(
                         Icon(
                             Icons.Default.MoreVert,
                             contentDescription = "More",
-                            tint = Color.White
+                            tint = MaterialTheme.colorScheme.onBackground
                         )
                     }
                 },
@@ -126,7 +126,7 @@ fun ChatContainerScreenContent(
                     .fillMaxWidth()
                     .height(56.dp)
                     .clip(RoundedCornerShape(12.dp)),
-                color = Color.Black.copy(alpha = 0.3f)
+                color = MaterialTheme.colorScheme.surfaceVariant
             ) {
                 Row(modifier = Modifier.fillMaxSize()) {
                     // Private Tab
@@ -169,8 +169,8 @@ fun SegmentedTabItem(
     modifier: Modifier = Modifier,
     onClick: () -> Unit
 ) {
-    val backgroundColor = if (isSelected) MaterialTheme.colorScheme.secondary else Color.Transparent
-    val contentColor = if (isSelected) Color.White else Color.White.copy(alpha = 0.6f)
+    val backgroundColor = if (isSelected) MaterialTheme.colorScheme.surface else Color.Transparent
+    val contentColor = if (isSelected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant
 
     Box(
         modifier = modifier

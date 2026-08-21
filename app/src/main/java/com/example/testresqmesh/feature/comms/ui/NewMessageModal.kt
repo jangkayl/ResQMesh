@@ -19,8 +19,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.testresqmesh.core.ui.theme.InboxBackground
-import com.example.testresqmesh.core.ui.theme.InboxAccentBlue
 import com.example.testresqmesh.core.ui.theme.Spacing
 
 import com.example.testresqmesh.ui.state.ChatUiState
@@ -32,7 +30,7 @@ fun NewMessageModal(uiState: ChatUiState, onDismiss: () -> Unit, onNodeSelected:
         modifier = Modifier
             .fillMaxWidth()
             .fillMaxHeight(0.9f)
-            .background(Color(0xFF232E35)) // Surface color
+            .background(MaterialTheme.colorScheme.surface) // Surface color
             .padding(Spacing.Medium)
     ) {
         // Header
@@ -42,14 +40,14 @@ fun NewMessageModal(uiState: ChatUiState, onDismiss: () -> Unit, onNodeSelected:
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column {
-                Text("New Mesh Thread", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Black, color = Color.White)
-                Text("Select a node to establish a link", style = MaterialTheme.typography.labelMedium, color = Color.White.copy(alpha = 0.6f))
+                Text("New Mesh Thread", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Black, color = MaterialTheme.colorScheme.onSurface)
+                Text("Select a node to establish a link", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
             }
             IconButton(
                 onClick = onDismiss,
-                modifier = Modifier.background(Color.Black.copy(alpha = 0.3f), CircleShape)
+                modifier = Modifier.background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f), CircleShape)
             ) {
-                Icon(Icons.Default.Close, contentDescription = "Close", tint = Color.White)
+                Icon(Icons.Default.Close, contentDescription = "Close", tint = MaterialTheme.colorScheme.onSurface)
             }
         }
 
@@ -57,16 +55,16 @@ fun NewMessageModal(uiState: ChatUiState, onDismiss: () -> Unit, onNodeSelected:
 
         // Search Bar
         Surface(
-            color = Color.Black.copy(alpha = 0.4f),
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),
             shape = RoundedCornerShape(12.dp)
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(Icons.Default.Search, contentDescription = null, tint = Color.White.copy(alpha = 0.4f))
+                Icon(Icons.Default.Search, contentDescription = null, tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f))
                 Spacer(modifier = Modifier.width(12.dp))
-                Text("Search Mesh ID or Name...", color = Color.White.copy(alpha = 0.4f), style = MaterialTheme.typography.bodyMedium)
+                Text("Search Mesh ID or Name...", color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f), style = MaterialTheme.typography.bodyMedium)
             }
         }
 
@@ -76,7 +74,7 @@ fun NewMessageModal(uiState: ChatUiState, onDismiss: () -> Unit, onNodeSelected:
             Button(
                 onClick = {},
                 modifier = Modifier.weight(1f).height(48.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = InboxAccentBlue),
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
                 shape = RoundedCornerShape(10.dp)
             ) {
                 Icon(Icons.Default.Wifi, contentDescription = null, modifier = Modifier.size(18.dp))
@@ -87,11 +85,11 @@ fun NewMessageModal(uiState: ChatUiState, onDismiss: () -> Unit, onNodeSelected:
                 onClick = {},
                 modifier = Modifier.size(48.dp),
                 shape = RoundedCornerShape(10.dp),
-                color = Color.White.copy(alpha = 0.05f),
-                border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.1f))
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.05f),
+                border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f))
             ) {
                 Box(contentAlignment = Alignment.Center) {
-                    Icon(Icons.Default.Refresh, contentDescription = null, tint = InboxAccentBlue)
+                    Icon(Icons.Default.Refresh, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                 }
             }
         }

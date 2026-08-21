@@ -21,7 +21,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.tooling.preview.Preview
 import com.example.testresqmesh.core.ui.components.buttons.ResQButton
-import com.example.testresqmesh.core.ui.theme.*
+import com.example.testresqmesh.core.ui.theme.Spacing
 import android.os.Build
 import androidx.compose.ui.platform.LocalContext
 import com.example.testresqmesh.feature.setup.viewmodel.SetupViewModel
@@ -46,7 +46,7 @@ fun IdentitySetupContent(connectionStatus: String, onIdentityGenerated: () -> Un
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(InboxBackground)
+            .background(MaterialTheme.colorScheme.background)
             .verticalScroll(scrollState)
             .padding(Spacing.Large),
         horizontalAlignment = Alignment.CenterHorizontally
@@ -56,11 +56,11 @@ fun IdentitySetupContent(connectionStatus: String, onIdentityGenerated: () -> Un
         Text(
             text = "Step 2: Identity Setup",
             style = MaterialTheme.typography.labelMedium,
-            color = InboxAccentBlue,
+            color = MaterialTheme.colorScheme.primary,
             modifier = Modifier
                 .align(Alignment.Start)
                 .clip(RoundedCornerShape(12.dp))
-                .background(InboxAccentBlue.copy(alpha = 0.1f))
+                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f))
                 .padding(horizontal = 12.dp, vertical = 4.dp)
         )
 
@@ -70,7 +70,7 @@ fun IdentitySetupContent(connectionStatus: String, onIdentityGenerated: () -> Un
             text = "No Signal?\nNo Problem.",
             style = MaterialTheme.typography.displayMedium,
             fontWeight = FontWeight.Black,
-            color = Color.White,
+            color = MaterialTheme.colorScheme.onBackground,
             modifier = Modifier.align(Alignment.Start),
             lineHeight = 44.sp
         )
@@ -80,7 +80,7 @@ fun IdentitySetupContent(connectionStatus: String, onIdentityGenerated: () -> Un
         Text(
             text = "ResQMesh creates a secure, private identity that works entirely without cellular or internet connectivity.",
             style = MaterialTheme.typography.bodyLarge,
-            color = Color.White.copy(alpha = 0.6f),
+            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
             modifier = Modifier.align(Alignment.Start)
         )
 
@@ -90,13 +90,13 @@ fun IdentitySetupContent(connectionStatus: String, onIdentityGenerated: () -> Un
         Surface(
             modifier = Modifier.size(120.dp),
             shape = CircleShape,
-            color = Color.White.copy(alpha = 0.1f)
+            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.1f)
         ) {
             Box(contentAlignment = Alignment.Center) {
                 Surface(
                     modifier = Modifier.size(80.dp),
                     shape = RoundedCornerShape(20.dp),
-                    color = Color.White
+                    color = MaterialTheme.colorScheme.surfaceVariant
                 ) {
                     Box(contentAlignment = Alignment.Center) {
                         Text("⚡", fontSize = 32.sp)
@@ -108,16 +108,16 @@ fun IdentitySetupContent(connectionStatus: String, onIdentityGenerated: () -> Un
         Spacer(modifier = Modifier.height(Spacing.Medium))
 
         Surface(
-            color = if (connectionStatus.contains("ERROR")) Color.Red.copy(alpha = 0.4f) else Color.Black.copy(alpha = 0.4f),
+            color = if (connectionStatus.contains("ERROR")) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.surfaceVariant,
             shape = RoundedCornerShape(16.dp),
-            border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.2f))
+            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
         ) {
             Text(
                 if (connectionStatus.contains("ERROR")) "SYSTEM ERROR" else "READY TO SYNC",
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
                 style = MaterialTheme.typography.labelSmall,
                 fontWeight = FontWeight.Bold,
-                color = Color.White
+                color = if (connectionStatus.contains("ERROR")) MaterialTheme.colorScheme.onErrorContainer else MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
 
@@ -128,9 +128,9 @@ fun IdentitySetupContent(connectionStatus: String, onIdentityGenerated: () -> Un
             modifier = Modifier
                 .fillMaxWidth()
                 .height(160.dp),
-            color = Color(0xFF1E293B), // Darker slate
+            color = MaterialTheme.colorScheme.surface, // Darker slate
             shape = RoundedCornerShape(12.dp),
-            border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.1f))
+            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
         ) {
             Column(modifier = Modifier.padding(Spacing.Medium)) {
                 Row(
@@ -139,23 +139,23 @@ fun IdentitySetupContent(connectionStatus: String, onIdentityGenerated: () -> Un
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(">_", color = Color.White, fontWeight = FontWeight.Bold)
+                        Text(">_", color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold)
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
                             "SECURE TERMINAL OUTPUT",
                             style = MaterialTheme.typography.labelSmall,
                             fontWeight = FontWeight.Bold,
-                            color = Color.White
+                            color = MaterialTheme.colorScheme.onSurface
                         )
                     }
-                    Icon(Icons.Default.Lock, contentDescription = null, modifier = Modifier.size(14.dp), tint = Color.White.copy(alpha = 0.3f))
+                    Icon(Icons.Default.Lock, contentDescription = null, modifier = Modifier.size(14.dp), tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f))
                 }
-                HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = Color.White.copy(alpha = 0.1f))
+                HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = MaterialTheme.colorScheme.outline)
                 Text(
                     text = connectionStatus,
                     style = MaterialTheme.typography.bodySmall,
                     fontFamily = FontFamily.Monospace,
-                    color = if (connectionStatus.contains("ERROR")) Color.Red.copy(alpha = 0.7f) else Color.White.copy(alpha = 0.5f)
+                    color = if (connectionStatus.contains("ERROR")) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
                 )
             }
         }
@@ -191,7 +191,7 @@ fun IdentitySetupContent(connectionStatus: String, onIdentityGenerated: () -> Un
             style = MaterialTheme.typography.labelSmall,
             fontSize = 9.sp,
             textAlign = TextAlign.Center,
-            color = Color.White.copy(alpha = 0.4f),
+            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.4f),
             letterSpacing = 0.5.sp
         )
     }
@@ -212,9 +212,9 @@ fun IdentitySetupScreenPreview() {
 fun TechnicalInfoCard(icon: String, title: String, modifier: Modifier = Modifier) {
     Surface(
         modifier = modifier,
-        color = Color.White.copy(alpha = 0.05f),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
         shape = RoundedCornerShape(12.dp),
-        border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.1f))
+        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
     ) {
         Row(
             modifier = Modifier.padding(Spacing.Small),
@@ -226,7 +226,7 @@ fun TechnicalInfoCard(icon: String, title: String, modifier: Modifier = Modifier
                 title,
                 style = MaterialTheme.typography.labelSmall,
                 fontWeight = FontWeight.Bold,
-                color = Color.White.copy(alpha = 0.8f),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 lineHeight = 12.sp
             )
         }

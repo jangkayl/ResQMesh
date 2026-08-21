@@ -31,7 +31,7 @@ import com.example.testresqmesh.core.utils.MediaHelper
 fun FullScreenSosAlarm(alertMessage: ChatMessage, onDismiss: () -> Unit, onViewMap: () -> Unit = {}) {
     val context = LocalContext.current
     val mediaHelper = remember { MediaHelper(context) }
-    val sosRed = Color(0xFFFF1744)
+    val sosRed = MaterialTheme.colorScheme.error
     val infiniteTransition = rememberInfiniteTransition()
     val pulseScale by infiniteTransition.animateFloat(
         initialValue = 1f,
@@ -179,7 +179,7 @@ fun FullScreenSosAlarm(alertMessage: ChatMessage, onDismiss: () -> Unit, onViewM
                         onDismiss()
                         onViewMap()
                     },
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2196F3)),
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
                     modifier = Modifier
                         .fillMaxWidth(0.8f)
                         .height(56.dp),

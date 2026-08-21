@@ -29,8 +29,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.testresqmesh.core.ui.theme.InboxAccentBlue
-import com.example.testresqmesh.core.ui.theme.InboxBackground
 import com.example.testresqmesh.core.ui.theme.Spacing
 import com.example.testresqmesh.core.utils.MediaHelper
 
@@ -59,14 +57,14 @@ fun ChatInput(
 
     Column(
         modifier = Modifier
-            .background(InboxBackground)
+            .background(MaterialTheme.colorScheme.background)
             .padding(horizontal = Spacing.Medium, vertical = 16.dp)
     ) {
         // Audio Preview Area
         if (pendingAudio != null) {
             Surface(
                 onClick = { mediaHelper.playVoiceMail(pendingAudio) },
-                color = InboxAccentBlue.copy(alpha = 0.2f),
+                color = MaterialTheme.colorScheme.primaryContainer,
                 shape = RoundedCornerShape(12.dp),
                 modifier = Modifier.fillMaxWidth().padding(bottom = Spacing.Small)
             ) {
@@ -79,7 +77,7 @@ fun ChatInput(
                     Text(
                         "Review Voice Note", 
                         style = MaterialTheme.typography.bodyMedium,
-                        color = Color.White,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
                         fontWeight = FontWeight.Bold
                     )
                     Spacer(modifier = Modifier.weight(1f))
@@ -112,7 +110,7 @@ fun ChatInput(
                     Box(
                         modifier = Modifier
                             .size(80.dp)
-                            .background(Color.White.copy(alpha = 0.1f), RoundedCornerShape(12.dp))
+                            .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(12.dp))
                     )
                 }
                 
@@ -144,8 +142,8 @@ fun ChatInput(
             Surface(
                 modifier = Modifier.weight(1f).height(48.dp),
                 shape = RoundedCornerShape(12.dp),
-                color = Color.White.copy(alpha = 0.08f),
-                border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.15f))
+                color = MaterialTheme.colorScheme.surfaceVariant,
+                border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = 16.dp)) {
                     BasicTextField(
@@ -153,10 +151,10 @@ fun ChatInput(
                         onValueChange = onTextChange,
                         modifier = Modifier.weight(1f),
                         enabled = !isRecording,
-                        textStyle = MaterialTheme.typography.bodyMedium.copy(color = Color.White),
+                        textStyle = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onSurface),
                         decorationBox = { innerTextField ->
                             if (inputText.isEmpty() && !isRecording) {
-                                Text("Secure Mesh Message...", color = Color.White.copy(alpha = 0.5f), style = MaterialTheme.typography.bodyMedium)
+                                Text("Secure Mesh Message...", color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f), style = MaterialTheme.typography.bodyMedium)
                             }
                             innerTextField()
                         }
@@ -168,7 +166,7 @@ fun ChatInput(
                             onSend()
                         }
                     }) {
-                        Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "Send", tint = if (canSend) InboxAccentBlue else Color.White.copy(alpha = 0.3f), modifier = Modifier.size(20.dp))
+                        Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "Send", tint = if (canSend) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f), modifier = Modifier.size(20.dp))
                     }
                 }
             }

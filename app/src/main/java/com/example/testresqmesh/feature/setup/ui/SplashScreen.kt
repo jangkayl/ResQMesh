@@ -15,8 +15,6 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.testresqmesh.core.ui.theme.InboxBackground
-import com.example.testresqmesh.core.ui.theme.InboxAccentBlue
 import kotlinx.coroutines.delay
 
 @Composable
@@ -29,7 +27,7 @@ fun SplashScreen(onTimeout: () -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(InboxBackground),
+            .background(MaterialTheme.colorScheme.background),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
@@ -48,7 +46,7 @@ fun SplashScreen(onTimeout: () -> Unit) {
             style = MaterialTheme.typography.labelLarge,
             fontWeight = FontWeight.Black,
             letterSpacing = 2.sp,
-            color = Color.White
+            color = MaterialTheme.colorScheme.onBackground
         )
 
         Spacer(modifier = Modifier.height(180.dp))
@@ -59,7 +57,7 @@ fun SplashScreen(onTimeout: () -> Unit) {
                 .width(280.dp)
                 .height(4.dp)
                 .clip(RoundedCornerShape(2.dp))
-                .background(Color.White.copy(alpha = 0.1f))
+                .background(MaterialTheme.colorScheme.onBackground.copy(alpha = 0.1f))
         ) {
             var progress by remember { mutableStateOf(0f) }
             val animatedProgress by animateFloatAsState(
@@ -75,7 +73,7 @@ fun SplashScreen(onTimeout: () -> Unit) {
                 modifier = Modifier
                     .fillMaxHeight()
                     .fillMaxWidth(animatedProgress)
-                    .background(InboxAccentBlue)
+                    .background(MaterialTheme.colorScheme.primary)
             )
         }
 
@@ -85,12 +83,12 @@ fun SplashScreen(onTimeout: () -> Unit) {
             text = "INITIALIZING P2P PROTOCOL",
             style = MaterialTheme.typography.labelSmall,
             fontWeight = FontWeight.Bold,
-            color = Color.White.copy(alpha = 0.4f)
+            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.4f)
         )
         Text(
             text = "Scanning local nodes...",
             style = MaterialTheme.typography.labelSmall,
-            color = Color.White.copy(alpha = 0.3f)
+            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.3f)
         )
 
         Spacer(modifier = Modifier.height(48.dp))
@@ -99,7 +97,7 @@ fun SplashScreen(onTimeout: () -> Unit) {
             text = "v1.0.4-BETA • SECURE OFFLINE NODES",
             style = MaterialTheme.typography.labelSmall,
             fontWeight = FontWeight.Bold,
-            color = Color.White.copy(alpha = 0.3f),
+            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.3f),
             fontSize = 10.sp
         )
     }
