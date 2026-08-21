@@ -1,0 +1,211 @@
+{
+  "main": {
+    "id": "322553987b51de42",
+    "type": "split",
+    "children": [
+      {
+        "id": "0afed1145e4dd1fe",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "371e10f6b0c448ac",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "skills/ui-ux-pro-max/SKILL.md",
+                "mode": "source",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "SKILL"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "vertical"
+  },
+  "left": {
+    "id": "8b889f3d6e379be9",
+    "type": "split",
+    "children": [
+      {
+        "id": "d1646b41ea5f70a8",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "4c81be8f41aef8e9",
+            "type": "leaf",
+            "state": {
+              "type": "file-explorer",
+              "state": {
+                "sortOrder": "alphabetical",
+                "autoReveal": false,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-folder-closed",
+              "title": "Files"
+            }
+          },
+          {
+            "id": "833ebfaf228d886f",
+            "type": "leaf",
+            "state": {
+              "type": "search",
+              "state": {
+                "query": "",
+                "matchingCase": false,
+                "explainSearch": false,
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical"
+              },
+              "icon": "lucide-search",
+              "title": "Search"
+            }
+          },
+          {
+            "id": "65c5839f9c1bc9ef",
+            "type": "leaf",
+            "state": {
+              "type": "bookmarks",
+              "state": {
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-bookmark",
+              "title": "Bookmarks"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300
+  },
+  "right": {
+    "id": "693d733c5ce38735",
+    "type": "split",
+    "children": [
+      {
+        "id": "21a9f609fa7ace57",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "066c06a375a4cd0f",
+            "type": "leaf",
+            "state": {
+              "type": "backlink",
+              "state": {
+                "file": "skills/ui-ux-pro-max/SKILL.md",
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical",
+                "showSearch": false,
+                "searchQuery": "",
+                "backlinkCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-coming-in",
+              "title": "Backlinks"
+            }
+          },
+          {
+            "id": "c92175ecf2eb543d",
+            "type": "leaf",
+            "state": {
+              "type": "outgoing-link",
+              "state": {
+                "file": "skills/ui-ux-pro-max/SKILL.md",
+                "linksCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-going-out",
+              "title": "Outgoing links"
+            }
+          },
+          {
+            "id": "f5313c5b13d99d10",
+            "type": "leaf",
+            "state": {
+              "type": "tag",
+              "state": {
+                "sortOrder": "frequency",
+                "useHierarchy": true,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-tags",
+              "title": "Tags"
+            }
+          },
+          {
+            "id": "4acb6dfeabc1f232",
+            "type": "leaf",
+            "state": {
+              "type": "all-properties",
+              "state": {
+                "sortOrder": "frequency",
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-archive",
+              "title": "All properties"
+            }
+          },
+          {
+            "id": "b50edb75192f0e04",
+            "type": "leaf",
+            "state": {
+              "type": "outline",
+              "state": {
+                "file": "skills/ui-ux-pro-max/SKILL.md",
+                "followCursor": false,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-list",
+              "title": "Outline"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300,
+    "collapsed": true
+  },
+  "left-ribbon": {
+    "hiddenItems": {
+      "switcher:Open quick switcher": false,
+      "graph:Open graph view": false,
+      "canvas:Create new canvas": false,
+      "daily-notes:Open today's daily note": false,
+      "templates:Insert template": false,
+      "command-palette:Open command palette": false,
+      "bases:Create new base": false
+    }
+  },
+  "active": "371e10f6b0c448ac",
+  "lastOpenFiles": [
+    "skills/ui-ux-pro-max/references/quick-reference.md",
+    "skills/ui-ux-pro-max/references/pro-rules.md",
+    "skills/ui-ux-pro-max/SKILL.md",
+    "skills/ui-ux-pro-max/scripts/tests/fixtures/catalogs/phosphor-package.json",
+    "skills/ui-ux-pro-max/scripts/tests/fixtures/catalogs/phosphor-react-exports.json",
+    "skills/ui-ux-pro-max/scripts/tests/fixtures/catalogs/phosphor-react-package.json",
+    "skills/ui-ux-pro-max/scripts/tests/fixtures/catalogs/google-overrides.json",
+    "skills/ui-ux-pro-max/scripts/tests/fixtures/catalogs/phosphor-core.json",
+    "skills/ui-ux-pro-max/scripts/tests/fixtures/catalogs/icons-curated.csv",
+    "skills/ui-ux-pro-max/scripts/tests/fixtures/catalogs/google-metadata.json",
+    "skills/ui-ux-pro-max/scripts/tests/fixtures/catalogs/google-existing.csv",
+    "skills/ui-ux-pro-max/scripts/tests/fixtures/catalogs/google-catalog.json",
+    "skills/ui-ux-pro-max/scripts/tests/fixtures/catalogs/google-api.json",
+    "skills/mobile-android-design/SKILL.md",
+    "skills/troubleshoot-mesh/SKILL.md",
+    "skills/compose-shadcn-ui/SKILL.md",
+    "rules/project_summary.md"
+  ]
+}
