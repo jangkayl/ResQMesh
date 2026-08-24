@@ -58,7 +58,7 @@ fun ResQCard(
     val clickableModifier = if (onClick != null) {
         baseModifier.clickable(
             interactionSource = interactionSource,
-            indication = androidx.compose.material.ripple.rememberRipple(color = MaterialTheme.colorScheme.primary),
+            indication = androidx.compose.material3.ripple(color = MaterialTheme.colorScheme.primary),
             onClick = {
                 haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                 onClick()

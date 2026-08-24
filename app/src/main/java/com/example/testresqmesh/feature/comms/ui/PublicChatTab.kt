@@ -16,9 +16,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.border
 import com.example.testresqmesh.core.ui.theme.Spacing
-import com.example.testresqmesh.core.ui.theme.WarningAmber
+import com.example.testresqmesh.core.ui.components.GlassSurface
+import androidx.compose.ui.text.font.FontFamily
 import com.example.testresqmesh.core.utils.MediaHelper
+import androidx.compose.ui.graphics.Color
 import com.example.testresqmesh.feature.comms.ui.components.ChatBubble
 import com.example.testresqmesh.feature.comms.ui.components.ChatInput
 import com.example.testresqmesh.feature.comms.ui.components.EndOfMeshIndicator
@@ -49,7 +53,7 @@ fun PublicChatTab(
             .background(MaterialTheme.colorScheme.background)
     ) {
         // Dynamic Sticky Header
-        val infiniteTransition = rememberInfiniteTransition()
+        val infiniteTransition = rememberInfiniteTransition(label = "pulse")
         val pulseAlpha by infiniteTransition.animateFloat(
             initialValue = 0.2f,
             targetValue = 0.8f,
@@ -60,10 +64,9 @@ fun PublicChatTab(
             label = "pulseAlpha"
         )
         
-        Surface(
-            color = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f),
-            shadowElevation = 4.dp,
-            modifier = Modifier.fillMaxWidth()
+        GlassSurface(
+            intensity = 0.5f,
+            modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.Medium, vertical = Spacing.Small)
         ) {
             Row(
                 modifier = Modifier.padding(16.dp),
@@ -71,23 +74,25 @@ fun PublicChatTab(
             ) {
                 // Pulsing Live Indicator
                 Box(contentAlignment = Alignment.Center) {
-                    Box(modifier = Modifier.size(16.dp).background(ErrorRed.copy(alpha = pulseAlpha), CircleShape))
-                    Box(modifier = Modifier.size(8.dp).background(ErrorRed, CircleShape))
+                    Box(modifier = Modifier.size(16.dp).background(MaterialTheme.colorScheme.primary.copy(alpha = pulseAlpha), CircleShape))
+                    Box(modifier = Modifier.size(8.dp).background(MaterialTheme.colorScheme.primary, CircleShape))
                 }
                 
                 Spacer(modifier = Modifier.width(16.dp))
                 Column {
                     Text(
-                        "LIVE PUBLIC BROADCAST", 
+                        "PUBLIC FREQUENCY", 
                         style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.onSurface,
+                        color = MaterialTheme.colorScheme.primary,
+                        fontFamily = FontFamily.Monospace,
                         fontWeight = FontWeight.Black,
                         letterSpacing = 1.sp
                     )
                     Text(
-                        "Messages are visible to all connected mesh nodes. SOS keywords automatically trigger emergency alerts.",
+                        text = "Broadcasted to all available mesh nodes.",
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = Color.White.copy(alpha = 0.6f),
+                        fontFamily = FontFamily.Monospace,
                         lineHeight = 14.sp
                     )
                 }
@@ -98,7 +103,11 @@ fun PublicChatTab(
         LazyColumn(
             modifier = Modifier
                 .fillMaxWidth()
-                .weight(1f),
+                .weight(1f)
+                .padding(Spacing.Medium)
+                .background(color = MaterialTheme.colorScheme.surfaceVariant, shape = RoundedCornerShape(12.dp))
+                .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(12.dp))
+                .padding(Spacing.Medium),
             reverseLayout = true,
             contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
         ) {

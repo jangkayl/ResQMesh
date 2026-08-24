@@ -175,6 +175,7 @@ fun PermissionsScreen(
                     fontWeight = FontWeight.Bold
                 )
             }
+        )
         
         if (hasPermissions && !isHardwareOn) {
             Text(

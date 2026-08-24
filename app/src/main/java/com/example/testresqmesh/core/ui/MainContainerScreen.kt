@@ -1,45 +1,16 @@
 package com.example.testresqmesh.core.ui
 
 import androidx.activity.compose.BackHandler
-import androidx.compose.animation.*
-import androidx.compose.animation.core.tween
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.consumeWindowInsets
-import androidx.compose.foundation.layout.imePadding
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.systemBars
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.unit.dp
-import androidx.compose.runtime.collectAsState
 import com.example.testresqmesh.feature.comms.ui.ActiveChatScreen
-import com.example.testresqmesh.feature.comms.ui.ChatContainerScreen
-import com.example.testresqmesh.feature.radar.ui.RadarScreen
-import com.example.testresqmesh.feature.radar.ui.ResponderTrackerScreen
-import com.example.testresqmesh.feature.sos.ui.SOSBroadcastScreen
-import com.example.testresqmesh.feature.sos.ui.FullScreenSosAlarm
 import com.example.testresqmesh.feature.sos.ui.ActiveSOSMonitoringScreen
 import com.example.testresqmesh.feature.sos.ui.SosMapScreen
-import com.example.testresqmesh.feature.sos.ui.OfflineMapPromptModal
-import com.example.testresqmesh.feature.sos.utils.MapDownloadManager
-import com.example.testresqmesh.feature.profile.ui.ProfileScreen
+import com.example.testresqmesh.feature.sos.ui.FullScreenSosAlarm
 import com.example.testresqmesh.feature.comms.viewmodel.CommunicationViewModel
 import com.example.testresqmesh.feature.radar.viewmodel.RadarViewModel
 import com.example.testresqmesh.feature.setup.viewmodel.SetupViewModel
 import com.example.testresqmesh.core.utils.MediaHelper
-
-sealed class NavItem(val route: String, val icon: ImageVector, val label: String) {
-    object Radar : NavItem("radar", Icons.Default.Adjust, "Radar")
-    object Messages : NavItem("messages", Icons.Default.ChatBubble, "Messages")
-    object SOS : NavItem("sos", Icons.Default.Notifications, "SOS")
-    object Settings : NavItem("settings", Icons.Default.Settings, "Settings")
-}
 
 @Composable
 fun MainContainerScreen(
@@ -48,39 +19,25 @@ fun MainContainerScreen(
     commsViewModel: CommunicationViewModel,
     mediaHelper: MediaHelper
 ) {
-    var currentItem by remember { mutableStateOf<NavItem>(NavItem.Radar) }
-    
-    // Sub-navigation state for prototype
     var activeChatNode by remember { mutableStateOf<String?>(null) }
-    var trackingNode by remember { mutableStateOf<String?>(null) }
-    var isSOSActive by remember { mutableStateOf(false) }
     var mapSosAlert by remember { mutableStateOf<com.example.testresqmesh.core.model.ChatMessage?>(null) }
     
     val context = LocalContext.current
-    val mapDownloadManager = remember { MapDownloadManager(context) }
-    var showMapDownloadPrompt by remember { mutableStateOf(!mapDownloadManager.isMapDownloaded()) }
-    
     val incomingSosAlert by commsViewModel.incomingSosAlert.collectAsState()
     val activeSosMessageId by commsViewModel.activeSosMessageId.collectAsState()
 
     DisposableEffect(Unit) {
-        // Start passive location tracking when the node is active
         commsViewModel.startLocationTracking(context)
         onDispose {
-            // Cleanup when the node is shut down or the app closes
             commsViewModel.stopLocationTracking()
         }
     }
-
-    val items = listOf(NavItem.Radar, NavItem.Messages, NavItem.SOS, NavItem.Settings)
 
     if (incomingSosAlert != null) {
         FullScreenSosAlarm(
             alertMessage = incomingSosAlert!!,
             onDismiss = { commsViewModel.clearSosAlert() },
-            onViewMap = { 
-                mapSosAlert = incomingSosAlert
-            }
+            onViewMap = { mapSosAlert = incomingSosAlert }
         )
         BackHandler { commsViewModel.clearSosAlert() }
         return
@@ -102,26 +59,6 @@ fun MainContainerScreen(
         )
         BackHandler { }
         return
-    }
-
-    if (isSOSActive) {
-        val context = LocalContext.current
-        SOSBroadcastScreen(
-            onCancel = { isSOSActive = false },
-            onSosTriggered = { type ->
-                commsViewModel.sendEmergencySOS(context, type)
-                isSOSActive = false
-            }
-        )
-        BackHandler { isSOSActive = false }
-        return
-    }
-
-    if (showMapDownloadPrompt) {
-        OfflineMapPromptModal(
-            downloadManager = mapDownloadManager,
-            onDismiss = { showMapDownloadPrompt = false }
-        )
     }
 
     if (activeChatNode != null) {
@@ -148,63 +85,12 @@ fun MainContainerScreen(
         return
     }
 
-    if (trackingNode != null) {
-        ResponderTrackerScreen(
-            nodeName = trackingNode!!, 
-            onBack = { trackingNode = null },
-            onChat = { 
-                activeChatNode = trackingNode
-                trackingNode = null 
-            }
-        )
-        BackHandler { trackingNode = null }
-        return
-    }
-
-    Scaffold(
-        contentWindowInsets = WindowInsets.systemBars,
-        bottomBar = {
-            com.example.testresqmesh.core.ui.components.ResQNavBar(
-                items = items.map { 
-                    com.example.testresqmesh.core.ui.components.NavItemData(it.route, it.icon, it.label) 
-                },
-                selectedId = currentItem.route,
-                onItemSelected = { route ->
-                    val selectedItem = items.find { it.route == route }
-                    if (selectedItem != null) {
-                        if (selectedItem == NavItem.SOS) {
-                            isSOSActive = true
-                        } else {
-                            currentItem = selectedItem
-                        }
-                    }
-                }
-            )
-        }
-    ) { innerPadding ->
-        AnimatedContent(
-            targetState = currentItem,
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-                .consumeWindowInsets(innerPadding)
-                .imePadding(),
-            transitionSpec = {
-                fadeIn(animationSpec = spring(stiffness = androidx.compose.animation.core.Spring.StiffnessLow)) togetherWith
-                fadeOut(animationSpec = tween(90))
-            },
-            label = "ScreenTransition"
-        ) { targetScreen ->
-            when (targetScreen) {
-                NavItem.Radar -> RadarScreen(radarViewModel)
-                NavItem.Messages -> ChatContainerScreen(
-                    viewModel = commsViewModel, 
-                    mediaHelper = mediaHelper, 
-                    onChatSelected = { activeChatNode = it }
-                ) 
-                NavItem.Settings -> ProfileScreen(setupViewModel)
-                else -> {}
-            }
-        }
-    }
+    // The entire old Scaffold / BottomNavBar is completely replaced by this revolutionary design
+    MeshCanvasScreen(
+        setupViewModel = setupViewModel,
+        radarViewModel = radarViewModel,
+        commsViewModel = commsViewModel,
+        mediaHelper = mediaHelper,
+        onActiveChatSet = { activeChatNode = it }
+    )
 }

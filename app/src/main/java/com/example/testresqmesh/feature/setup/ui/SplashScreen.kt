@@ -1,17 +1,13 @@
 package com.example.testresqmesh.feature.setup.ui
 
-import androidx.compose.animation.core.*
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -19,86 +15,75 @@ import kotlinx.coroutines.delay
 
 @Composable
 fun SplashScreen(onTimeout: () -> Unit) {
+    var step by remember { mutableStateOf(0) }
+    
+    val terminalLines = listOf(
+        "INIT RESQMESH KERNEL v2.0.4...",
+        "MOUNTING ENCRYPTED SECURE STORAGE... [OK]",
+        "CHECKING HARDWARE INTERFACES...",
+        "   > BLUETOOTH LE (PAwR) ... [OK]",
+        "   > WI-FI DIRECT PHY ... [OK]",
+        "LOADING MESH ROUTING PROTOCOL...",
+        "   > ECDH KEY EXCHANGE READY",
+        "SYSTEM ONLINE. OFF-GRID MODE ENGAGED."
+    )
+
     LaunchedEffect(Unit) {
-        delay(3000)
+        for (i in terminalLines.indices) {
+            delay((200..600).random().toLong()) // Simulate loading times
+            step = i
+        }
+        delay(1000)
         onTimeout()
     }
 
-    Column(
+    Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
+            .background(Color.Black)
+            .padding(24.dp),
+        contentAlignment = Alignment.CenterStart
     ) {
-        Image(
-            painter = painterResource(id = com.example.testresqmesh.R.drawable.resqmesh_sublogo),
-            contentDescription = "App Logo",
-            modifier = Modifier
-                .size(100.dp)
-                .clip(RoundedCornerShape(24.dp))
-        )
-
-        Spacer(modifier = Modifier.height(48.dp))
-
-        Text(
-            text = "OFFLINE EMERGENCY MESH",
-            style = MaterialTheme.typography.labelLarge,
-            fontWeight = FontWeight.Black,
-            letterSpacing = 2.sp,
-            color = MaterialTheme.colorScheme.onBackground
-        )
-
-        Spacer(modifier = Modifier.height(180.dp))
-
-        // Progress Bar
-        Box(
-            modifier = Modifier
-                .width(280.dp)
-                .height(4.dp)
-                .clip(RoundedCornerShape(2.dp))
-                .background(MaterialTheme.colorScheme.onBackground.copy(alpha = 0.1f))
+        Column(
+            modifier = Modifier.fillMaxWidth()
         ) {
-            var progress by remember { mutableStateOf(0f) }
-            val animatedProgress by animateFloatAsState(
-                targetValue = progress,
-                animationSpec = tween(durationMillis = 2500, easing = LinearEasing)
+            Text(
+                text = "ResQMesh Terminal // SECURE BOOT",
+                color = MaterialTheme.colorScheme.primary,
+                fontFamily = FontFamily.Monospace,
+                fontWeight = FontWeight.Bold,
+                fontSize = 14.sp
             )
+            Spacer(modifier = Modifier.height(24.dp))
             
-            LaunchedEffect(Unit) {
-                progress = 1f
+            for (i in 0..step) {
+                Text(
+                    text = "> ${terminalLines[i]}",
+                    color = if (i == terminalLines.size - 1) MaterialTheme.colorScheme.tertiary else Color.White,
+                    fontFamily = FontFamily.Monospace,
+                    fontSize = 12.sp,
+                    modifier = Modifier.padding(vertical = 4.dp)
+                )
             }
 
-            Box(
-                modifier = Modifier
-                    .fillMaxHeight()
-                    .fillMaxWidth(animatedProgress)
-                    .background(MaterialTheme.colorScheme.primary)
-            )
+            // Blinking cursor
+            var cursorVisible by remember { mutableStateOf(true) }
+            LaunchedEffect(Unit) {
+                while (true) {
+                    delay(500)
+                    cursorVisible = !cursorVisible
+                }
+            }
+
+            if (step < terminalLines.size - 1) {
+                Text(
+                    text = if (cursorVisible) "> _" else ">",
+                    color = Color.White,
+                    fontFamily = FontFamily.Monospace,
+                    fontSize = 12.sp,
+                    modifier = Modifier.padding(vertical = 4.dp)
+                )
+            }
         }
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        Text(
-            text = "INITIALIZING P2P PROTOCOL",
-            style = MaterialTheme.typography.labelSmall,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.4f)
-        )
-        Text(
-            text = "Scanning local nodes...",
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.3f)
-        )
-
-        Spacer(modifier = Modifier.height(48.dp))
-
-        Text(
-            text = "v1.0.4-BETA • SECURE OFFLINE NODES",
-            style = MaterialTheme.typography.labelSmall,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.3f),
-            fontSize = 10.sp
-        )
     }
 }

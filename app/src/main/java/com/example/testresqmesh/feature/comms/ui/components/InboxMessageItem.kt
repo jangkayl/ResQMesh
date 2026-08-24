@@ -19,6 +19,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.testresqmesh.core.ui.theme.Spacing
+import androidx.compose.ui.text.font.FontFamily
 
 @Composable
 fun InboxMessageItem(
@@ -33,7 +34,6 @@ fun InboxMessageItem(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .background(MaterialTheme.colorScheme.background)
             .clickable { onClick() }
     ) {
         Row(
@@ -51,7 +51,7 @@ fun InboxMessageItem(
                 ) {
                     // Placeholder for avatar image or icon
                     Box(contentAlignment = Alignment.Center) {
-                        Text(name.take(1).uppercase(), fontWeight = FontWeight.Bold)
+                        Text(name.take(1).uppercase(), fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold, color = Color.White)
                     }
                 }
                 if (hasNotification) {
@@ -78,22 +78,23 @@ fun InboxMessageItem(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
                             text = name,
-                            style = MaterialTheme.typography.bodyLarge,
+                            fontFamily = FontFamily.Monospace,
                             fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onBackground
+                            color = Color.White
                         )
                         Spacer(modifier = Modifier.width(4.dp))
                         Icon(
                             Icons.Default.Lock,
                             contentDescription = "Secure",
                             modifier = Modifier.size(14.dp),
-                            tint = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f)
+                            tint = Color.White.copy(alpha = 0.6f)
                         )
                     }
                     Text(
                         text = timestamp,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f)
+                        fontFamily = FontFamily.Monospace,
+                        fontSize = 12.sp,
+                        color = Color.White.copy(alpha = 0.6f)
                     )
                 }
 
@@ -102,8 +103,9 @@ fun InboxMessageItem(
                 // Message Preview
                 Text(
                     text = message,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.8f),
+                    fontFamily = FontFamily.Monospace,
+                    fontSize = 14.sp,
+                    color = Color.White.copy(alpha = 0.8f),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -130,7 +132,7 @@ fun InboxMessageItem(
                             Spacer(modifier = Modifier.width(4.dp))
                             Text(
                                 text = hops,
-                                style = MaterialTheme.typography.labelSmall,
+                                fontFamily = FontFamily.Monospace,
                                 fontWeight = FontWeight.Black,
                                 color = MaterialTheme.colorScheme.primary,
                                 fontSize = 10.sp
@@ -147,14 +149,14 @@ fun InboxMessageItem(
                                 Icons.Default.Lock,
                                 contentDescription = null,
                                 modifier = Modifier.size(12.dp),
-                                tint = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f)
+                                tint = Color.White.copy(alpha = 0.6f)
                             )
                             Spacer(modifier = Modifier.width(2.dp))
                             Text(
                                 text = "ENCRYPTED",
-                                style = MaterialTheme.typography.labelSmall,
+                                fontFamily = FontFamily.Monospace,
                                 fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
+                                color = Color.White.copy(alpha = 0.6f),
                                 fontSize = 10.sp
                             )
                         }
@@ -163,7 +165,7 @@ fun InboxMessageItem(
             }
         }
         // Divider
-        Divider(
+        HorizontalDivider(
             color = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f),
             thickness = 1.dp,
             modifier = Modifier.padding(horizontal = Spacing.Small)
@@ -179,17 +181,17 @@ fun EndOfMeshIndicator() {
             .padding(vertical = Spacing.Large),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Divider(
+        HorizontalDivider(
             modifier = Modifier.width(40.dp),
-            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.3f),
+            color = Color.White.copy(alpha = 0.3f),
             thickness = 2.dp
         )
         Spacer(modifier = Modifier.height(Spacing.Small))
         Text(
             text = "END OF LOCAL MESH",
-            style = MaterialTheme.typography.labelSmall,
+            fontFamily = FontFamily.Monospace,
             fontWeight = FontWeight.Black,
-            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.4f),
+            color = Color.White.copy(alpha = 0.4f),
             letterSpacing = 1.sp
         )
     }

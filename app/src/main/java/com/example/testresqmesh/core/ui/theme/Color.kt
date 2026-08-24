@@ -3,37 +3,32 @@ package com.example.testresqmesh.core.ui.theme
 import androidx.compose.ui.graphics.Color
 
 // =========================================
-// LINEAR AESTHETIC PRIMITIVES
+// TACTICAL GLASS AESTHETIC PRIMITIVES
 // =========================================
 
 // Backgrounds
-val LinearBackground = Color(0xFF000000) // Pure OLED Black
-val LinearSurface = Color(0xFF121212)    // Base elevated surface
-val LinearSurfaceRaised = Color(0xFF1E1E1E) // Second elevation
-val LinearSurfaceOverlay = Color(0xFF2A2A2A) // Modals, menus
+val TacticalBackground = Color(0xFF000000) // Pure OLED Black
+val TacticalSurface = Color(0xFF0F0F13)    // Extremely dark tactical gray/blue
+val TacticalSurfaceRaised = Color(0xFF16161B) // For elevated cards
+val TacticalSurfaceOverlay = Color(0xFF202026) // Modals, bottom sheets
 
 // Text
-val LinearTextPrimary = Color(0xFFFFFFFF) // Pure White
-val LinearTextSecondary = Color(0xFFA1A1AA) // Zinc 400
-val LinearTextMuted = Color(0xFF71717A) // Zinc 500
+val TacticalTextPrimary = Color(0xFFFFFFFF) // Pure White
+val TacticalTextSecondary = Color(0xFFA1A1AA) // Zinc 400
+val TacticalTextMuted = Color(0xFF52525B) // Zinc 600
 
 // Borders (Glowing/Glass)
-val LinearBorder = Color(0xFF27272A) // Zinc 800
-val LinearBorderLight = Color(0xFF3F3F46) // Zinc 700
+val TacticalBorder = Color(0xFF27272A) // Zinc 800
+val TacticalBorderLight = Color(0xFF3F3F46) // Zinc 700
 
-// Accents
-val LinearPrimary = Color(0xFF3FA2F6) // Accent Blue
-val LinearPrimaryHover = Color(0xFF60A5FA)
-val LinearSuccess = Color(0xFF10B981)
-val LinearWarning = Color(0xFFF59E0B)
-val LinearError = Color(0xFFEF4444)
-val LinearErrorMuted = Color(0xFF7F1D1D)
+// Accents (Neon Tactical)
+val TacticalCyberBlue = Color(0xFF00E5FF) // Main network activity
+val TacticalNeonGreen = Color(0xFF00FF41) // E2E Security / Direct Peer
+val TacticalWarning = Color(0xFFFFB300)   // Warning
+val TacticalCrimsonRed = Color(0xFFFF2A2A) // SOS / Critical
+val TacticalErrorMuted = Color(0xFF4A0E0E) // For background of error states
 
-// Legacy Fallbacks (DO NOT USE IN NEW COMPONENTS)
-val InboxBackground = Color(0xFF2A343B)
-val InboxSurface = Color(0xFF232E35)
-val InboxDivider = Color(0xFF2D3748)
-val InboxTextPrimary = Color(0xFFFFFFFF)
-val InboxTextSecondary = Color(0xFFA0AEC0)
-val InboxAccentBlue = Color(0xFF3FA2F6)
-val InboxActiveTab = Color(0xFF38444D)
+// Status Colors
+val SuccessGreen = TacticalNeonGreen
+val ErrorRed = TacticalCrimsonRed
+val WarningAmber = TacticalWarning

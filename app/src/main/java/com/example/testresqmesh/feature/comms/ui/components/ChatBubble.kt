@@ -16,8 +16,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.testresqmesh.core.model.ChatMessage
 import com.example.testresqmesh.core.ui.theme.Spacing
-import com.example.testresqmesh.core.ui.theme.SuccessGreen
-import com.example.testresqmesh.core.ui.theme.ErrorRed
 import com.example.testresqmesh.core.utils.MediaHelper
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -33,7 +31,7 @@ fun ChatBubble(message: ChatMessage, mediaHelper: MediaHelper) {
 
     // Base Colors
     val bubbleColor = when {
-        isSOS -> ErrorRed
+        isSOS -> MaterialTheme.colorScheme.error
         isMine -> MaterialTheme.colorScheme.primary
         else -> MaterialTheme.colorScheme.surfaceVariant
     }
@@ -113,7 +111,7 @@ fun ChatBubble(message: ChatMessage, mediaHelper: MediaHelper) {
                     
                     // Security and Medium indicators
                     Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                        val mediumColor = if (message.receiveMedium.contains("Wi-Fi")) SuccessGreen else MaterialTheme.colorScheme.primary
+                        val mediumColor = if (message.receiveMedium.contains("Wi-Fi")) Color(0xFF10B981) else MaterialTheme.colorScheme.primary
                         Text(
                             text = if (isMine) "" else "📶 ${message.receiveMedium}",
                             style = MaterialTheme.typography.labelSmall,
@@ -123,7 +121,7 @@ fun ChatBubble(message: ChatMessage, mediaHelper: MediaHelper) {
                         )
 
                         val securityText = if (message.isPrivate) "🔒 E2EE" else "🌐 PUBLIC"
-                        val securityColor = if (message.isPrivate) contentColor.copy(alpha = 0.6f) else if (isSOS) Color.White else SuccessGreen
+                        val securityColor = if (message.isPrivate) contentColor.copy(alpha = 0.6f) else if (isSOS) Color.White else Color(0xFF10B981)
                         Text(
                             text = securityText,
                             style = MaterialTheme.typography.labelSmall,
@@ -243,7 +241,7 @@ fun ChatBubble(message: ChatMessage, mediaHelper: MediaHelper) {
                         }
                         
                         val statusColor = when {
-                            message.seenBy.isNotEmpty() -> SuccessGreen
+                            message.seenBy.isNotEmpty() -> Color(0xFF10B981)
                             else -> contentColor.copy(alpha = 0.6f)
                         }
                         

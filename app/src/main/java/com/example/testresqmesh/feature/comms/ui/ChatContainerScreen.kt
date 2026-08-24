@@ -5,7 +5,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.AddBox
 import androidx.compose.material.icons.outlined.Shield
 import androidx.compose.material.icons.outlined.SettingsInputAntenna
@@ -15,15 +14,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.tooling.preview.Preview
-import com.example.testresqmesh.core.ui.theme.TestResQMeshTheme
+import androidx.compose.ui.unit.sp
 import com.example.testresqmesh.core.ui.theme.Spacing
+import com.example.testresqmesh.core.ui.components.GlassSurface
 import com.example.testresqmesh.core.utils.MediaHelper
-
 import com.example.testresqmesh.feature.comms.viewmodel.CommunicationViewModel
-import com.example.testresqmesh.core.utils.AppLogger
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -39,7 +37,7 @@ fun ChatContainerScreen(
         val uiState by viewModel.uiState.collectAsState()
         ModalBottomSheet(
             onDismissRequest = { showNewMessageModal = false },
-            containerColor = MaterialTheme.colorScheme.surface,
+            containerColor = Color(0xFF121212), // Very dark
             dragHandle = { BottomSheetDefaults.DragHandle() }
         ) {
             NewMessageModal(
@@ -62,7 +60,6 @@ fun ChatContainerScreen(
     )
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ChatContainerScreenContent(
     selectedTabIndex: Int,
@@ -71,91 +68,70 @@ fun ChatContainerScreenContent(
     privateTabContent: @Composable () -> Unit,
     publicTabContent: @Composable () -> Unit
 ) {
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        "Inbox",
-                        style = MaterialTheme.typography.headlineMedium,
-                        fontWeight = FontWeight.Black,
-                        color = Color.White
-                    )
-                },
-                actions = {
-                    IconButton(onClick = { AppLogger.toggleTerminal() }) {
-                        Icon(
-                            Icons.Outlined.Shield,
-                            contentDescription = "Debug Terminal",
-                            tint = MaterialTheme.colorScheme.onBackground,
-                            modifier = Modifier.size(28.dp)
-                        )
-                    }
-                    IconButton(onClick = onNewMessageClick) {
-                        Icon(
-                            Icons.Outlined.AddBox,
-                            contentDescription = "New Message",
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(28.dp)
-                        )
-                    }
-                    IconButton(onClick = { /* TODO: More */ }) {
-                        Icon(
-                            Icons.Default.MoreVert,
-                            contentDescription = "More",
-                            tint = MaterialTheme.colorScheme.onBackground
-                        )
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.background
-                )
-            )
-        }
-    ) { innerPadding ->
-        Column(
+    Column(
+        modifier = Modifier.fillMaxSize()
+    ) {
+        // PEEK HEADER (Always visible when collapsed)
+        Row(
             modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-                .background(MaterialTheme.colorScheme.background)
+                .fillMaxWidth()
+                .padding(horizontal = 24.dp, vertical = 12.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            // Custom Segmented Control
-            Surface(
-                modifier = Modifier
-                    .padding(Spacing.Medium)
-                    .fillMaxWidth()
-                    .height(56.dp)
-                    .clip(RoundedCornerShape(12.dp)),
-                color = MaterialTheme.colorScheme.surfaceVariant
-            ) {
-                Row(modifier = Modifier.fillMaxSize()) {
-                    // Private Tab
-                    SegmentedTabItem(
-                        title = "Private",
-                        icon = Icons.Outlined.Shield,
-                        isSelected = selectedTabIndex == 0,
-                        modifier = Modifier.weight(1f),
-                        onClick = { onTabSelected(0) }
-                    )
-                    // Broadcast Tab
-                    SegmentedTabItem(
-                        title = "Broadcast",
-                        icon = Icons.Outlined.SettingsInputAntenna,
-                        isSelected = selectedTabIndex == 1,
-                        modifier = Modifier.weight(1f),
-                        onClick = { onTabSelected(1) }
-                    )
-                }
+            Text(
+                text = "COMMUNICATION LINK",
+                fontFamily = FontFamily.Monospace,
+                fontWeight = FontWeight.Black,
+                color = Color.White.copy(alpha = 0.8f),
+                letterSpacing = 1.sp,
+                fontSize = 14.sp
+            )
+            IconButton(onClick = onNewMessageClick, modifier = Modifier.size(24.dp)) {
+                Icon(
+                    Icons.Outlined.AddBox,
+                    contentDescription = "New Message",
+                    tint = MaterialTheme.colorScheme.primary
+                )
             }
+        }
 
-            Spacer(modifier = Modifier.height(Spacing.Small))
+        // Custom Segmented Control
+        GlassSurface(
+            modifier = Modifier
+                .padding(horizontal = Spacing.Medium)
+                .fillMaxWidth()
+                .height(48.dp),
+            shape = RoundedCornerShape(12.dp),
+            intensity = 0.1f
+        ) {
+            Row(modifier = Modifier.fillMaxSize()) {
+                // Private Tab
+                SegmentedTabItem(
+                    title = "SECURE E2E",
+                    icon = Icons.Outlined.Shield,
+                    isSelected = selectedTabIndex == 0,
+                    modifier = Modifier.weight(1f),
+                    onClick = { onTabSelected(0) }
+                )
+                // Broadcast Tab
+                SegmentedTabItem(
+                    title = "BROADCAST",
+                    icon = Icons.Outlined.SettingsInputAntenna,
+                    isSelected = selectedTabIndex == 1,
+                    modifier = Modifier.weight(1f),
+                    onClick = { onTabSelected(1) }
+                )
+            }
+        }
 
-            // Content Area
-            Box(modifier = Modifier.weight(1f)) {
-                when (selectedTabIndex) {
-                    0 -> privateTabContent()
-                    1 -> publicTabContent()
-                }
+        Spacer(modifier = Modifier.height(Spacing.Small))
+
+        // Content Area
+        Box(modifier = Modifier.weight(1f)) {
+            when (selectedTabIndex) {
+                0 -> privateTabContent()
+                1 -> publicTabContent()
             }
         }
     }
@@ -169,8 +145,8 @@ fun SegmentedTabItem(
     modifier: Modifier = Modifier,
     onClick: () -> Unit
 ) {
-    val backgroundColor = if (isSelected) MaterialTheme.colorScheme.surface else Color.Transparent
-    val contentColor = if (isSelected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant
+    val backgroundColor = if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.2f) else Color.Transparent
+    val contentColor = if (isSelected) MaterialTheme.colorScheme.primary else Color.White.copy(alpha = 0.5f)
 
     Box(
         modifier = modifier
@@ -186,37 +162,16 @@ fun SegmentedTabItem(
                 icon,
                 contentDescription = null,
                 tint = contentColor,
-                modifier = Modifier.size(18.dp)
+                modifier = Modifier.size(14.dp)
             )
-            Spacer(modifier = Modifier.width(8.dp))
+            Spacer(modifier = Modifier.width(6.dp))
             Text(
                 text = title,
-                style = MaterialTheme.typography.bodyLarge,
+                fontFamily = FontFamily.Monospace,
+                fontSize = 10.sp,
                 fontWeight = FontWeight.Bold,
                 color = contentColor
             )
         }
-    }
-}
-
-@Preview(showBackground = true)
-@Composable
-fun ChatContainerScreenPreview() {
-    TestResQMeshTheme {
-        ChatContainerScreenContent(
-            selectedTabIndex = 0,
-            onTabSelected = {},
-            onNewMessageClick = {},
-            privateTabContent = {
-                Column {
-                    // Previews updated to be empty (Production state)
-                }
-            },
-            publicTabContent = {
-                Column {
-                    // Previews updated to be empty (Production state)
-                }
-            }
-        )
     }
 }

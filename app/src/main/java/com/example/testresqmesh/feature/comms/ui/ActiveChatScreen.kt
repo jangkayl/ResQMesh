@@ -353,7 +353,7 @@ fun HighFidelityChatBubble(msg: ChatMessageData, mediaHelper: MediaHelper, onVie
             verticalAlignment = Alignment.CenterVertically
         ) {
             if (!msg.isMine) {
-                val mediumColor = if (msg.receiveMedium.contains("Wi-Fi")) com.example.testresqmesh.core.ui.theme.SuccessGreen else MaterialTheme.colorScheme.primary
+                val mediumColor = if (msg.receiveMedium.contains("Wi-Fi")) Color(0xFF10B981) else MaterialTheme.colorScheme.primary
                 Text("📶 ${msg.receiveMedium}", style = MaterialTheme.typography.labelSmall, color = mediumColor.copy(alpha = 0.8f), fontSize = 10.sp, fontWeight = FontWeight.Bold)
                 DotSeparator()
                 Text(msg.time, style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.5f), fontSize = 10.sp, fontWeight = FontWeight.Bold)
@@ -370,7 +370,7 @@ fun HighFidelityChatBubble(msg: ChatMessageData, mediaHelper: MediaHelper, onVie
                 }
                 
                 val statusColor = when {
-                    msg.seenBy.isNotEmpty() -> com.example.testresqmesh.core.ui.theme.SuccessGreen
+                    msg.seenBy.isNotEmpty() -> Color(0xFF10B981)
                     else -> Color.White.copy(alpha = 0.7f)
                 }
                 
@@ -412,7 +412,7 @@ fun HighFidelityChatBubble(msg: ChatMessageData, mediaHelper: MediaHelper, onVie
 
                         Text("Return Receipt Path:", color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f), fontSize = 9.sp, fontWeight = FontWeight.Black)
                         val returnStr = if (msg.returnRoute.isNotEmpty()) msg.returnRoute.joinToString(" -> ") else "Pending..."
-                        Text(returnStr, color = com.example.testresqmesh.core.ui.theme.SuccessGreen, fontSize = 11.sp)
+                        Text(returnStr, color = Color(0xFF10B981), fontSize = 11.sp)
                     }
                 }
             }

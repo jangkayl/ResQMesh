@@ -20,12 +20,14 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.testresqmesh.core.ui.theme.Spacing
+import com.example.testresqmesh.core.ui.components.GlassSurface
 import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -75,6 +77,7 @@ fun SOSBroadcastScreen(onCancel: () -> Unit, onSosTriggered: (String) -> Unit = 
         Text(
             text = "EMERGENCY\nSOS",
             style = MaterialTheme.typography.displayMedium,
+            fontFamily = FontFamily.Monospace,
             fontWeight = FontWeight.Black,
             color = Color.White,
             textAlign = TextAlign.Center,
@@ -86,6 +89,7 @@ fun SOSBroadcastScreen(onCancel: () -> Unit, onSosTriggered: (String) -> Unit = 
         Text(
             text = "Select context and slide to flood the local mesh network.",
             style = MaterialTheme.typography.bodyLarge,
+            fontFamily = FontFamily.Monospace,
             color = Color.White.copy(alpha = 0.9f),
             textAlign = TextAlign.Center
         )
@@ -112,10 +116,10 @@ fun SOSBroadcastScreen(onCancel: () -> Unit, onSosTriggered: (String) -> Unit = 
         Spacer(modifier = Modifier.height(32.dp))
 
         // Warning Box
-        Surface(
+        GlassSurface(
             modifier = Modifier.fillMaxWidth(),
-            color = Color.Black.copy(alpha = 0.2f),
-            shape = RoundedCornerShape(12.dp)
+            shape = RoundedCornerShape(12.dp),
+            intensity = 0.4f
         ) {
             Row(
                 modifier = Modifier.padding(Spacing.Medium),
@@ -125,7 +129,7 @@ fun SOSBroadcastScreen(onCancel: () -> Unit, onSosTriggered: (String) -> Unit = 
                 Spacer(modifier = Modifier.width(16.dp))
                 Text(
                     text = "WARNING: BYPASSES ROUTING LIMITS TO FLOOD LOCAL MESH. CURRENT SIGNAL HOPS: ∞ (UNLIMITED)",
-                    style = MaterialTheme.typography.labelSmall,
+                    fontFamily = FontFamily.Monospace,
                     color = Color.White,
                     fontWeight = FontWeight.Bold,
                     fontSize = 9.sp
@@ -157,9 +161,9 @@ fun SOSBroadcastScreen(onCancel: () -> Unit, onSosTriggered: (String) -> Unit = 
             Box(modifier = Modifier.size(4.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.4f)))
             Spacer(modifier = Modifier.width(16.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(MaterialTheme.colorScheme.onPrimary)) // Assuming onPrimary looks good on red
+                Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(Color.White))
                 Spacer(modifier = Modifier.width(8.dp))
-                Text("READY", style = MaterialTheme.typography.labelSmall, color = Color.White, fontWeight = FontWeight.Bold)
+                Text("READY", fontFamily = FontFamily.Monospace, fontSize = 10.sp, color = Color.White, fontWeight = FontWeight.Bold)
             }
         }
     }
@@ -173,19 +177,19 @@ fun SOSContextCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Surface(
+    GlassSurface(
         modifier = modifier.height(100.dp).clickable { onClick() },
-        color = if (isSelected) MaterialTheme.colorScheme.error else Color.White.copy(alpha = 0.1f),
         shape = MaterialTheme.shapes.medium,
-        border = androidx.compose.foundation.BorderStroke(1.dp, if (isSelected) MaterialTheme.colorScheme.error else Color.White.copy(alpha = 0.2f))
+        intensity = if (isSelected) 0.6f else 0.1f
     ) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
+            verticalArrangement = Arrangement.Center,
+            modifier = Modifier.background(if (isSelected) MaterialTheme.colorScheme.error.copy(alpha = 0.8f) else Color.Transparent)
         ) {
             Icon(icon, contentDescription = null, tint = Color.White, modifier = Modifier.size(32.dp))
             Spacer(modifier = Modifier.height(8.dp))
-            Text(label, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Black, color = Color.White)
+            Text(label, fontFamily = FontFamily.Monospace, fontSize = 12.sp, fontWeight = FontWeight.Black, color = Color.White)
         }
     }
 }
@@ -202,16 +206,16 @@ fun SOSSlider(onSlideComplete: () -> Unit) {
     
     var offsetX by remember { mutableStateOf(0f) }
     
-    Surface(
+    GlassSurface(
         modifier = Modifier.width(sliderWidth).height(thumbSize + 8.dp),
-        color = Color.White.copy(alpha = 0.2f),
         shape = CircleShape,
-        border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.3f))
+        intensity = 0.3f
     ) {
         Box(contentAlignment = Alignment.Center) {
             Text(
                 "SLIDE TO BROADCAST SOS",
-                style = MaterialTheme.typography.labelLarge,
+                fontFamily = FontFamily.Monospace,
+                fontSize = 12.sp,
                 fontWeight = FontWeight.Black,
                 color = Color.White.copy(alpha = 0.6f),
                 letterSpacing = 1.sp
@@ -255,6 +259,6 @@ fun FooterStatusItem(icon: ImageVector, label: String) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Icon(icon, contentDescription = null, tint = Color.White.copy(alpha = 0.6f), modifier = Modifier.size(14.dp))
         Spacer(modifier = Modifier.width(8.dp))
-        Text(label, style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.6f), fontWeight = FontWeight.Bold, fontSize = 8.sp)
+        Text(label, fontFamily = FontFamily.Monospace, color = Color.White.copy(alpha = 0.6f), fontWeight = FontWeight.Bold, fontSize = 8.sp)
     }
 }

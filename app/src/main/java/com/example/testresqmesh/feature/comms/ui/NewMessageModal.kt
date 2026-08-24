@@ -158,7 +158,7 @@ fun ModalNodeItem(node: RangeNode, onClick: (String) -> Unit) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(node.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Black, color = Color.White)
                     Spacer(modifier = Modifier.width(8.dp))
-                    Icon(Icons.Outlined.Shield, contentDescription = null, tint = InboxAccentBlue, modifier = Modifier.size(14.dp))
+                    Icon(Icons.Outlined.Shield, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(14.dp))
                 }
                 Text("ID: ${node.id}", style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.4f))
                 Row(verticalAlignment = Alignment.CenterVertically) {

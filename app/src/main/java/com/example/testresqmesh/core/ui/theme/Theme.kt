@@ -15,28 +15,33 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
 
-// The ultimate Linear Aesthetic Dark Mode Theme
-private val LinearDarkColorScheme = darkColorScheme(
-    primary = LinearPrimary,
-    onPrimary = LinearTextPrimary,
+// The ultimate Tactical Glass Dark Mode Theme
+private val TacticalDarkColorScheme = darkColorScheme(
+    primary = TacticalCyberBlue,
+    onPrimary = TacticalTextPrimary,
     
-    background = LinearBackground,
-    onBackground = LinearTextPrimary,
+    tertiary = TacticalNeonGreen, // Used for E2E secure indicators
+    onTertiary = TacticalBackground,
+
+    background = TacticalBackground,
+    onBackground = TacticalTextPrimary,
     
-    surface = LinearSurface,
-    onSurface = LinearTextPrimary,
-    surfaceVariant = LinearSurfaceRaised,
-    onSurfaceVariant = LinearTextSecondary,
+    surface = TacticalSurface,
+    onSurface = TacticalTextPrimary,
+    surfaceVariant = TacticalSurfaceRaised,
+    onSurfaceVariant = TacticalTextSecondary,
     
-    error = LinearError,
-    onError = LinearTextPrimary,
+    error = TacticalCrimsonRed,
+    onError = TacticalTextPrimary,
+    errorContainer = TacticalErrorMuted,
+    onErrorContainer = TacticalTextPrimary,
     
-    outline = LinearBorder,
-    outlineVariant = LinearBorderLight
+    outline = TacticalBorder,
+    outlineVariant = TacticalBorderLight
 )
 
 // We force Dark Mode as the primary aesthetic for this app
-private val LinearLightColorScheme = LinearDarkColorScheme
+private val TacticalLightColorScheme = TacticalDarkColorScheme
 
 @Composable
 fun TestResQMeshTheme(
@@ -50,8 +55,8 @@ fun TestResQMeshTheme(
             val context = LocalContext.current
             if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
         }
-        darkTheme -> LinearDarkColorScheme
-        else -> LinearLightColorScheme
+        darkTheme -> TacticalDarkColorScheme
+        else -> TacticalLightColorScheme
     }
     
     val view = LocalView.current
