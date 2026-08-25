@@ -96,7 +96,7 @@ fun PermissionsScreen(
         Text(
             text = if (!hasPermissions) 
                 "ResQMesh needs hardware permissions to build your local mesh network." 
-                else "Permissions granted! Now please ensure your Bluetooth, GPS, and Wi-Fi are turned ON.",
+                else "Permissions granted! Now please ensure your Bluetooth and GPS are turned ON.",
             style = MaterialTheme.typography.bodyLarge,
             textAlign = TextAlign.Center,
             color = Color.Black.copy(alpha = 0.6f)
@@ -118,15 +118,6 @@ fun PermissionsScreen(
             description = "Plots relative positions on the Radar.",
             icon = Icons.Default.LocationOn,
             iconColor = Color(0xFF10B981)
-        )
-
-        Spacer(modifier = Modifier.height(Spacing.Medium))
-
-        PermissionCard(
-            title = "Wi-Fi Networking",
-            description = "Relays high-bandwidth mesh packets.",
-            icon = Icons.Default.Wifi,
-            iconColor = Color(0xFFF59E0B)
         )
 
         Spacer(modifier = Modifier.height(48.dp))
@@ -179,7 +170,7 @@ fun PermissionsScreen(
         
         if (hasPermissions && !isHardwareOn) {
             Text(
-                text = "Please enable Bluetooth, GPS, and Wi-Fi in your system settings to proceed.",
+                text = "Please enable Bluetooth and GPS in your system settings to proceed.",
                 style = MaterialTheme.typography.bodySmall,
                 color = Color.Red.copy(alpha = 0.7f),
                 textAlign = TextAlign.Center,

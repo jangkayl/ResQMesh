@@ -22,7 +22,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.testresqmesh.data.repository.MeshRepository
-import com.example.testresqmesh.core.network.MeshNetworkManager
+import com.example.testresqmesh.core.network.NativeBleManager
 import com.example.testresqmesh.core.ui.MainContainerScreen
 import com.example.testresqmesh.feature.setup.ui.IdentitySetupScreen
 import com.example.testresqmesh.feature.setup.ui.PermissionsScreen
@@ -62,7 +62,7 @@ class MainActivity : ComponentActivity() {
         var isAppInForeground = false
     }
 
-    private lateinit var networkManager: MeshNetworkManager
+    private lateinit var networkManager: NativeBleManager
     private lateinit var repository: MeshRepository
     private lateinit var mediaHelper: MediaHelper
 
@@ -88,7 +88,7 @@ class MainActivity : ComponentActivity() {
             applicationContext.getSharedPreferences("osmdroid", android.content.Context.MODE_PRIVATE)
         )
 
-        networkManager = MeshNetworkManager(applicationContext)
+        networkManager = NativeBleManager(applicationContext)
         repository = MeshRepository(networkManager)
         mediaHelper = MediaHelper(applicationContext)
 
@@ -170,14 +170,12 @@ class MainActivity : ComponentActivity() {
             val bluetoothManager = getSystemService(Context.BLUETOOTH_SERVICE) as? android.bluetooth.BluetoothManager
             val bluetoothAdapter = bluetoothManager?.adapter
             val locationManager = getSystemService(Context.LOCATION_SERVICE) as? android.location.LocationManager
-            val wifiManager = applicationContext.getSystemService(Context.WIFI_SERVICE) as? android.net.wifi.WifiManager
 
             val isBluetoothOn = try { bluetoothAdapter?.isEnabled == true } catch (e: SecurityException) { false }
             val isLocationOn = locationManager?.isProviderEnabled(android.location.LocationManager.GPS_PROVIDER) == true ||
                     locationManager?.isProviderEnabled(android.location.LocationManager.NETWORK_PROVIDER) == true
-            val isWifiOn = wifiManager?.isWifiEnabled == true
 
-            isBluetoothOn && isLocationOn && isWifiOn
+            isBluetoothOn && isLocationOn
         } catch (e: Exception) {
             false
         }
@@ -192,7 +190,7 @@ class MainActivity : ComponentActivity() {
     private fun getRequiredPermissions(): Array<String> {
         val perms = mutableListOf<String>()
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            perms.addAll(listOf(Manifest.permission.BLUETOOTH_SCAN, Manifest.permission.BLUETOOTH_ADVERTISE, Manifest.permission.BLUETOOTH_CONNECT, Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.NEARBY_WIFI_DEVICES, Manifest.permission.RECORD_AUDIO, Manifest.permission.POST_NOTIFICATIONS))
+            perms.addAll(listOf(Manifest.permission.BLUETOOTH_SCAN, Manifest.permission.BLUETOOTH_ADVERTISE, Manifest.permission.BLUETOOTH_CONNECT, Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.RECORD_AUDIO, Manifest.permission.POST_NOTIFICATIONS))
         } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             perms.addAll(listOf(Manifest.permission.BLUETOOTH_SCAN, Manifest.permission.BLUETOOTH_ADVERTISE, Manifest.permission.BLUETOOTH_CONNECT, Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.RECORD_AUDIO))
         } else {

@@ -4,7 +4,7 @@ import com.example.testresqmesh.core.model.ChatMessage
 import com.example.testresqmesh.core.model.ConnectedDevice
 import com.example.testresqmesh.core.model.ScannedDevice
 import com.example.testresqmesh.core.model.KnownNode
-import com.example.testresqmesh.core.network.MeshNetworkManager
+import com.example.testresqmesh.core.network.NativeBleManager
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -13,7 +13,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import java.util.UUID
 
-class MeshRepository(private val networkManager: MeshNetworkManager) {
+class MeshRepository(private val networkManager: NativeBleManager) {
 
     private val _connectionStatus = MutableStateFlow("Ready to deploy Mesh Node.")
     val connectionStatus = _connectionStatus.asStateFlow()

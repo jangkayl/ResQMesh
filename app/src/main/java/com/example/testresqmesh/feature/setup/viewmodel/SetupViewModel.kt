@@ -3,7 +3,7 @@ package com.example.testresqmesh.feature.setup.viewmodel
 import android.bluetooth.BluetoothManager
 import android.content.Context
 import android.location.LocationManager
-import android.net.wifi.WifiManager
+// Removed WifiManager import
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.testresqmesh.data.repository.MeshRepository
@@ -36,12 +36,9 @@ class SetupViewModel(private val repository: MeshRepository) : ViewModel() {
         val bluetoothManager = context.getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
         val bluetoothAdapter = bluetoothManager.adapter
         val locationManager = context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
-        val wifiManager = context.applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
-
         val missing = mutableListOf<String>()
         if (bluetoothAdapter == null || !bluetoothAdapter.isEnabled) missing.add("Bluetooth")
-        if (!locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER)) missing.add("Location/GPS")
-        if (!wifiManager.isWifiEnabled) missing.add("Wi-Fi")
+        if (!locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER) && !locationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER)) missing.add("Location/GPS")
 
         if (missing.isNotEmpty()) {
             val errorMsg = "HARDWARE ERROR: Please turn on ${missing.joinToString(", ")} to deploy Mesh Node."
