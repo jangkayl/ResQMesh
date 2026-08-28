@@ -1,10 +1,42 @@
 package com.example.testresqmesh.data.repository
 
+import com.example.testresqmesh.core.network.MeshPayload
 import com.example.testresqmesh.core.network.CryptoManager
-import org.json.JSONArray
-import org.json.JSONObject
+import kotlinx.serialization.encodeToByteArray
+import kotlinx.serialization.protobuf.ProtoBuf
 
 object PayloadFactory {
+
+    fun buildPublicPayload(
+        msgId: String,
+        timestamp: Long,
+        senderName: String,
+        text: String,
+        imageBase64: String?,
+        audioBase64: String?,
+        locationLat: Double?,
+        locationLng: Double?,
+        isSOS: Boolean,
+        isSOSCancel: Boolean
+    ): ByteArray {
+        val payload = MeshPayload(
+            id = msgId,
+            type = "MESSAGE",
+            senderName = senderName,
+            text = text,
+            image = imageBase64,
+            audio = audioBase64,
+            locationLat = locationLat,
+            locationLng = locationLng,
+            isPrivate = false,
+            isEncrypted = false,
+            isSOS = isSOS,
+            isSOSCancel = isSOSCancel,
+            routePath = listOf(senderName)
+        )
+        return ProtoBuf.encodeToByteArray(payload)
+    }
+
     fun buildPrivatePayload(
         msgId: String,
         timestamp: Long,
@@ -17,76 +49,66 @@ object PayloadFactory {
         locationLng: Double?,
         directedRoute: List<String>,
         targetPubKey: String?
-    ): String {
-        return JSONObject().apply {
-            put("id", msgId)
-            put("timestamp", timestamp)
-            put("senderName", senderName)
-            put("targetName", targetName)
-            put("isPrivate", true)
-            put("isSystem", false)
-            
-            if (targetPubKey != null) {
-                val innerPayload = JSONObject().apply {
-                    put("text", text)
-                    if (imageBase64 != null) put("image", imageBase64)
-                    if (audioBase64 != null) put("audio", audioBase64)
-                }.toString()
-                
-                val encryptedPair = CryptoManager.encryptHybrid(innerPayload, targetPubKey)
-                if (encryptedPair != null) {
-                    put("isEncrypted", true)
-                    put("encryptedData", encryptedPair.first)
-                    put("encryptedKey", encryptedPair.second)
-                } else {
-                    put("isEncrypted", false)
-                    put("text", text)
-                    if (imageBase64 != null) put("image", imageBase64)
-                    if (audioBase64 != null) put("audio", audioBase64)
-                }
-            } else {
-                put("isEncrypted", false)
+    ): ByteArray {
+        if (targetPubKey != null) {
+            val innerPayloadJson = org.json.JSONObject().apply {
                 put("text", text)
                 if (imageBase64 != null) put("image", imageBase64)
                 if (audioBase64 != null) put("audio", audioBase64)
-            }
-
-            if (locationLat != null) put("locationLat", locationLat)
-            if (locationLng != null) put("locationLng", locationLng)
-            put("routePath", JSONArray().apply { put(senderName) })
+            }.toString()
             
-            if (directedRoute.isNotEmpty()) {
-                put("directedRoute", JSONArray(directedRoute))
-            }
-        }.toString()
+            val encrypted = CryptoManager.encryptHybrid(innerPayloadJson, targetPubKey)
+            val encryptedDataStr = encrypted?.first
+            val encryptedKeyStr = encrypted?.second
+            
+            val payload = MeshPayload(
+                id = msgId,
+                type = "MESSAGE",
+                senderName = senderName,
+                targetName = targetName,
+                isPrivate = true,
+                isEncrypted = true,
+                encryptedData = encryptedDataStr,
+                encryptedKey = encryptedKeyStr,
+                locationLat = locationLat,
+                locationLng = locationLng,
+                directedRoute = directedRoute,
+                routePath = listOf(senderName)
+            )
+            return ProtoBuf.encodeToByteArray(payload)
+        } else {
+            val payload = MeshPayload(
+                id = msgId,
+                type = "MESSAGE",
+                senderName = senderName,
+                targetName = targetName,
+                text = text,
+                image = imageBase64,
+                audio = audioBase64,
+                isPrivate = true,
+                isEncrypted = false,
+                locationLat = locationLat,
+                locationLng = locationLng,
+                directedRoute = directedRoute,
+                routePath = listOf(senderName)
+            )
+            return ProtoBuf.encodeToByteArray(payload)
+        }
     }
-    
-    fun buildPublicPayload(
+
+    fun buildSystemPulse(
         msgId: String,
-        timestamp: Long,
         senderName: String,
-        text: String,
-        imageBase64: String?,
-        audioBase64: String?,
-        locationLat: Double?,
-        locationLng: Double?,
-        isSOS: Boolean,
-        isSOSCancel: Boolean
-    ): String {
-        return JSONObject().apply {
-            put("id", msgId)
-            put("timestamp", timestamp)
-            put("senderName", senderName)
-            put("text", text)
-            put("isPrivate", false)
-            put("isSystem", false)
-            if (imageBase64 != null) put("image", imageBase64)
-            if (audioBase64 != null) put("audio", audioBase64)
-            if (locationLat != null) put("locationLat", locationLat)
-            if (locationLng != null) put("locationLng", locationLng)
-            if (isSOS) put("isSOS", true)
-            if (isSOSCancel) put("isSOSCancel", true)
-            put("routePath", JSONArray().apply { put(senderName) })
-        }.toString()
+        publicKey: String,
+        connectedNodes: List<String>
+    ): ByteArray {
+        val payload = MeshPayload(
+            id = msgId,
+            type = "SYSTEM",
+            senderName = senderName,
+            publicKey = publicKey,
+            connectedNodes = connectedNodes
+        )
+        return ProtoBuf.encodeToByteArray(payload)
     }
 }

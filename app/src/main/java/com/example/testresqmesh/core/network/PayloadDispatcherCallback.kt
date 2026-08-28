@@ -6,8 +6,8 @@ interface PayloadDispatcherCallback {
     fun getEndpointMedium(endpointId: String): String
     fun getConnectedEndpointIdByName(name: String): String?
     
-    fun sendDirectPayload(endpointId: String, payload: String)
-    fun broadcastPayload(payload: String, excludeEndpointId: String?)
+    fun sendDirectPayload(endpointId: String, payload: ByteArray)
+    fun broadcastPayload(payload: ByteArray, excludeEndpointId: String?)
     
     fun onMessageSeen(msgId: String, readerName: String)
     fun onMessageDelivered(msgId: String, readerName: String, returnRoute: List<String>)

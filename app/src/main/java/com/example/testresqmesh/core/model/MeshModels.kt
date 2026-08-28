@@ -22,7 +22,8 @@ data class ChatMessage(
 
 data class ConnectedDevice(
     val endpointId: String,
-    val name: String
+    val name: String,
+    val isClassicConnected: Boolean = false
 )
 
 data class KnownNode(

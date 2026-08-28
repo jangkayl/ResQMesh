@@ -81,18 +81,7 @@ class MeshRepository(private val networkManager: NativeBleManager) {
             meshRouter.recalculateKnownNodes(myNodeName, _connectedDevices.value)
         }
 
-        networkManager.onConnectionFailed = { id ->
-            _scannedDevices.update { current ->
-                val currentScanned = current.toMutableList()
-                val existingIndex = currentScanned.indexOfFirst { it.endpointId == id }
-                if (existingIndex != -1) {
-                    currentScanned[existingIndex] = currentScanned[existingIndex].copy(
-                        isConnecting = false
-                    )
-                }
-                currentScanned
-            }
-        }
+
 
         networkManager.onDeviceScanned = { id, name, score, role, isConnecting ->
             if (name != myNodeName) {
@@ -246,14 +235,15 @@ class MeshRepository(private val networkManager: NativeBleManager) {
         networkManager.disconnectFromEndpoint(endpointId)
     }
     
-    val blockedDeviceNames: StateFlow<Set<String>> = networkManager.blockedDeviceNames
+    private val _blockedDeviceNames = MutableStateFlow<Set<String>>(emptySet())
+    val blockedDeviceNames: StateFlow<Set<String>> = _blockedDeviceNames.asStateFlow()
 
     fun blockDevice(deviceName: String) {
-        networkManager.blockDevice(deviceName)
+        _blockedDeviceNames.value = _blockedDeviceNames.value + deviceName
     }
 
     fun unblockDevice(deviceName: String) {
-        networkManager.unblockDevice(deviceName)
+        _blockedDeviceNames.value = _blockedDeviceNames.value - deviceName
     }
 
     fun forceConnect(endpointId: String, endpointName: String) {
@@ -268,7 +258,7 @@ class MeshRepository(private val networkManager: NativeBleManager) {
         val msgId = UUID.randomUUID().toString()
         val timestamp = System.currentTimeMillis()
         
-        val jsonString = PayloadFactory.buildPublicPayload(
+        val payloadBytes = PayloadFactory.buildPublicPayload(
             msgId = msgId,
             timestamp = timestamp,
             senderName = myNodeName,
@@ -283,7 +273,7 @@ class MeshRepository(private val networkManager: NativeBleManager) {
 
         val message = ChatMessage(msgId, "Me", text, imageBase64, audioBase64, locationLat, locationLng, true, false, timestamp, isSOS = isSOS)
         _publicMessages.value = _publicMessages.value + message
-        networkManager.broadcastPayload(jsonString)
+        networkManager.broadcastPayload(payloadBytes)
         return msgId
     }
 
@@ -294,7 +284,7 @@ class MeshRepository(private val networkManager: NativeBleManager) {
         val directedRouteList = meshRouter.findShortestPath(myNodeName, targetName, _connectedDevices.value)
         val targetPubKey = publicKeys[targetName]
 
-        val jsonString = PayloadFactory.buildPrivatePayload(
+        val payloadBytes = PayloadFactory.buildPrivatePayload(
             msgId = msgId,
             timestamp = timestamp,
             senderName = myNodeName,
@@ -319,18 +309,18 @@ class MeshRepository(private val networkManager: NativeBleManager) {
         val directEndpointId = _connectedDevices.value.find { it.name == targetName }?.endpointId
 
         if (isDirect && directEndpointId != null) {
-            networkManager.sendDirectPayload(directEndpointId, jsonString)
+            networkManager.sendDirectPayload(directEndpointId, payloadBytes)
         } else {
             if (directedRouteList.size > 1) {
                 val nextHopName = directedRouteList[1]
                 val nextHopEndpointId = _connectedDevices.value.find { it.name == nextHopName }?.endpointId
                 if (nextHopEndpointId != null) {
-                    networkManager.sendDirectPayload(nextHopEndpointId, jsonString)
+                    networkManager.sendDirectPayload(nextHopEndpointId, payloadBytes)
                 } else {
-                    networkManager.broadcastPayload(jsonString)
+                    networkManager.broadcastPayload(payloadBytes)
                 }
             } else {
-                networkManager.broadcastPayload(jsonString)
+                networkManager.broadcastPayload(payloadBytes)
             }
         }
     }

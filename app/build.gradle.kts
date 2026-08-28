@@ -1,6 +1,7 @@
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.kotlin.serialization)
 }
 
 android {
@@ -63,4 +64,5 @@ dependencies {
     implementation("com.google.android.gms:play-services-nearby:19.3.0") // Updated to latest stable version
     implementation("com.google.android.gms:play-services-location:21.3.0") // Fused Location for indoor accuracy
     implementation("org.osmdroid:osmdroid-android:6.1.18") // Offline-capable map rendering
+    implementation(libs.kotlinx.serialization.protobuf)
 }

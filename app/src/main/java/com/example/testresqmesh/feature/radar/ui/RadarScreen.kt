@@ -42,7 +42,8 @@ fun RadarScreen(viewModel: RadarViewModel) {
     val connectedNames = uiState.connectedDevices.map { it.name }.toSet()
 
     val connectedNodes = uiState.connectedDevices.map { 
-        NodeItemData(it.endpointId, it.name, "Connected • Mesh Peer", isConnected = true, isActiveRelay = true)
+        val statusText = if (it.isClassicConnected) "CONNECTED (Classic BT)" else "ONLINE (BLE Mesh)"
+        NodeItemData(it.endpointId, it.name, statusText, isConnected = true, isActiveRelay = true)
     }
     
     // VISUAL-ONLY FILTER: Hide any scanned node that has the same name as a connected one

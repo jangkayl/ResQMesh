@@ -1,64 +1,51 @@
 package com.example.testresqmesh.core.network
 
 import com.example.testresqmesh.core.utils.AppLogger
-import org.json.JSONObject
+import kotlinx.serialization.decodeFromByteArray
+import kotlinx.serialization.encodeToByteArray
+import kotlinx.serialization.protobuf.ProtoBuf
 
 class PayloadDispatcher(private val callback: PayloadDispatcherCallback) {
 
-    fun dispatch(endpointId: String, jsonString: String) {
+    fun dispatch(endpointId: String, payloadBytes: ByteArray) {
         try {
-            val jsonObject = JSONObject(jsonString)
+            val payload = ProtoBuf.decodeFromByteArray<MeshPayload>(payloadBytes)
             
             // 1. DUPLICATE MESSAGE CHECK (THE BOUNCER)
-            if (!jsonObject.has("id")) return
-            val msgId = jsonObject.getString("id")
+            if (payload.id.isEmpty()) return
+            val msgId = payload.id
             val seenMessageIds = callback.getSeenMessageIds()
 
             if (seenMessageIds.contains(msgId)) return
             seenMessageIds.add(msgId)
             if (seenMessageIds.size > 500) {
-                seenMessageIds.remove(seenMessageIds.first())
+                val iterator = seenMessageIds.iterator()
+                if (iterator.hasNext()) {
+                    iterator.next()
+                    iterator.remove()
+                }
             }
 
-            // 2. GOSSIP PROTOCOL SEEN/DELIVERED RECEIPTS
-            if (jsonObject.has("type") && (jsonObject.getString("type") == "SEEN" || jsonObject.getString("type") == "DELIVERED")) {
-                handleReceipt(endpointId, jsonObject)
-                return
-            }
-
-            val sender = jsonObject.getString("senderName")
+            val sender = payload.senderName
             if (sender == callback.getMyDeviceName()) return
 
-            val isSystem = jsonObject.optBoolean("isSystem", false)
-            if (isSystem) {
-                handleSystemPulse(endpointId, msgId, sender, jsonString, jsonObject)
-                return
+            // 2. ROUTING LOGIC
+            when (payload.type) {
+                "SYSTEM" -> handleSystemPulse(endpointId, msgId, sender, payloadBytes, payload)
+                "SEEN", "DELIVERED" -> handleReceipt(endpointId, payload.type, msgId, sender, payloadBytes, payload)
+                else -> handleStandardMessage(endpointId, msgId, sender, payloadBytes, payload)
             }
-
-            // 3. NORMAL OR PRIVATE MESSAGES
-            handleStandardMessage(endpointId, msgId, sender, jsonObject)
-
         } catch (e: Exception) {
-            AppLogger.d("PayloadDispatcher", "Failed to parse payload: ${e.message}")
+            AppLogger.d("PAYLOAD_DISPATCHER", "Error parsing Protobuf payload: ${e.message}")
         }
     }
 
-    private fun handleReceipt(endpointId: String, jsonObject: JSONObject) {
-        val payloadType = jsonObject.getString("type")
-        val targetMessageId = jsonObject.getString("targetMessageId")
-        val reader = jsonObject.getString("reader")
+    private fun handleReceipt(endpointId: String, payloadType: String, msgId: String, sender: String, payloadBytes: ByteArray, payload: MeshPayload) {
+        val targetMessageId = payload.targetMessageId
+        val reader = payload.reader
         
-        val returnRoute = mutableListOf<String>()
-        if (jsonObject.has("returnRoute")) {
-            val arr = jsonObject.getJSONArray("returnRoute")
-            for (i in 0 until arr.length()) returnRoute.add(arr.getString(i))
-        }
-
-        val directedRoute = mutableListOf<String>()
-        if (jsonObject.has("directedRoute")) {
-            val arr = jsonObject.getJSONArray("directedRoute")
-            for (i in 0 until arr.length()) directedRoute.add(arr.getString(i))
-        }
+        val returnRoute = payload.returnRoute.toMutableList()
+        val directedRoute = payload.directedRoute.toMutableList()
         
         if (payloadType == "SEEN") {
             callback.onMessageSeen(targetMessageId, reader)
@@ -67,7 +54,7 @@ class PayloadDispatcher(private val callback: PayloadDispatcherCallback) {
         }
         
         returnRoute.add(callback.getMyDeviceName())
-        jsonObject.put("returnRoute", org.json.JSONArray(returnRoute))
+        val updatedPayload = payload.copy(returnRoute = returnRoute)
         
         if (directedRoute.isNotEmpty()) {
             val myIndex = directedRoute.indexOf(callback.getMyDeviceName())
@@ -75,66 +62,67 @@ class PayloadDispatcher(private val callback: PayloadDispatcherCallback) {
                 val nextHopName = directedRoute[myIndex + 1]
                 val nextHopEndpointId = callback.getConnectedEndpointIdByName(nextHopName)
                 if (nextHopEndpointId != null) {
-                    callback.sendDirectPayload(nextHopEndpointId, jsonObject.toString())
+                    val bytes = ProtoBuf.encodeToByteArray(updatedPayload)
+                    callback.sendDirectPayload(nextHopEndpointId, bytes)
                     return
                 }
             }
         }
         
-        callback.broadcastPayload(jsonObject.toString(), endpointId)
+        val bytes = ProtoBuf.encodeToByteArray(updatedPayload)
+        callback.broadcastPayload(bytes, endpointId)
     }
 
-    private fun handleSystemPulse(endpointId: String, msgId: String, sender: String, jsonString: String, jsonObject: JSONObject) {
-        if (jsonObject.has("publicKey")) {
-            callback.onPublicKeyReceived(sender, jsonObject.getString("publicKey"))
+    private fun handleSystemPulse(endpointId: String, msgId: String, sender: String, payloadBytes: ByteArray, payload: MeshPayload) {
+        if (payload.publicKey.isNotEmpty()) {
+            callback.onPublicKeyReceived(sender, payload.publicKey)
         }
-        if (jsonObject.has("connectedNodes")) {
-            val nodesArray = jsonObject.getJSONArray("connectedNodes")
-            val connectedList = mutableListOf<String>()
-            for (i in 0 until nodesArray.length()) {
-                connectedList.add(nodesArray.getString(i))
-            }
-            callback.onRoutingTableReceived(sender, connectedList)
+        if (payload.connectedNodes.isNotEmpty()) {
+            callback.onRoutingTableReceived(sender, payload.connectedNodes)
         }
         
         callback.onMessageReceived(endpointId, msgId, sender, "", false, true, null, null, null, null, "LOCAL", emptyList())
-        callback.broadcastPayload(jsonString, endpointId)
+        callback.broadcastPayload(payloadBytes, endpointId)
     }
 
-    private fun handleStandardMessage(endpointId: String, msgId: String, sender: String, jsonObject: JSONObject) {
-        val targetName = jsonObject.optString("targetName", "")
-        val isPrivate = jsonObject.optBoolean("isPrivate", false)
-        val isEncrypted = jsonObject.optBoolean("isEncrypted", false)
+    private fun handleStandardMessage(endpointId: String, msgId: String, sender: String, payloadBytes: ByteArray, payload: MeshPayload) {
+        val targetName = payload.targetName
+        val isPrivate = payload.isPrivate
+        val isEncrypted = payload.isEncrypted
 
-        var text = jsonObject.optString("text", "")
-        var imageBase64 = if (jsonObject.has("image")) jsonObject.getString("image") else null
-        var audioBase64 = if (jsonObject.has("audio")) jsonObject.getString("audio") else null
+        var text = payload.text
+        var imageBase64 = payload.image
+        var audioBase64 = payload.audio
         
         // PROOF OF ENCRYPTION LOGGING
         if (isEncrypted) {
-            val encryptedData = jsonObject.optString("encryptedData", "MISSING")
-            val previewData = if (encryptedData.length > 20) encryptedData.substring(0, 20) + "..." else encryptedData
-            AppLogger.d("MeshNetwork_E2EE", "INBOUND ENCRYPTED PAYLOAD DETECTED from $sender. Raw Ciphertext preview: [$previewData]")
+            val previewData = payload.encryptedData?.take(20) ?: "MISSING"
+            AppLogger.d("MeshNetwork_E2EE", "INBOUND ENCRYPTED PAYLOAD DETECTED from $sender. Raw Ciphertext preview: [$previewData...]")
         } else {
             AppLogger.d("MeshNetwork_E2EE", "INBOUND PUBLIC PAYLOAD DETECTED from $sender. No encryption applied.")
         }
 
         if (isEncrypted && targetName == callback.getMyDeviceName()) {
-            val encryptedData = jsonObject.getString("encryptedData")
-            val encryptedKey = jsonObject.getString("encryptedKey")
+            val encryptedData = payload.encryptedData
+            val encryptedKey = payload.encryptedKey
             
             AppLogger.d("MeshNetwork_E2EE", "Message is addressed to ME. Attempting RSA+AES Hybrid Decryption...")
-            val decryptedJsonString = CryptoManager.decryptHybrid(encryptedData, encryptedKey)
-            
-            if (decryptedJsonString != null) {
-                val innerPayload = JSONObject(decryptedJsonString)
-                text = innerPayload.optString("text", text)
-                if (innerPayload.has("image")) imageBase64 = innerPayload.getString("image")
-                if (innerPayload.has("audio")) audioBase64 = innerPayload.getString("audio")
-                AppLogger.d("MeshNetwork_E2EE", "E2EE SUCCESS: Decrypted private payload! Plaintext: [$text]")
-            } else {
-                text = "[ENCRYPTED CONTENT: Decryption Failed]"
-                AppLogger.d("MeshNetwork_E2EE", "E2EE FAILED: Could not decrypt payload. Keys do not match.")
+            if (encryptedData != null && encryptedKey != null) {
+                val decryptedJsonString = CryptoManager.decryptHybrid(encryptedData, encryptedKey)
+                if (decryptedJsonString != null) {
+                    try {
+                        val innerPayload = org.json.JSONObject(decryptedJsonString)
+                        text = innerPayload.optString("text", text)
+                        if (innerPayload.has("image")) imageBase64 = innerPayload.getString("image")
+                        if (innerPayload.has("audio")) audioBase64 = innerPayload.getString("audio")
+                        AppLogger.d("MeshNetwork_E2EE", "E2EE SUCCESS: Decrypted private payload! Plaintext: [$text]")
+                    } catch (e: Exception) {
+                        text = "[ENCRYPTED CONTENT: Inner JSON Parse Failed]"
+                    }
+                } else {
+                    text = "[ENCRYPTED CONTENT: Decryption Failed]"
+                    AppLogger.d("MeshNetwork_E2EE", "E2EE FAILED: Could not decrypt payload. Keys do not match.")
+                }
             }
         } else if (isEncrypted) {
             text = "[ENCRYPTED CONTENT: Routing...]"
@@ -146,32 +134,18 @@ class PayloadDispatcher(private val callback: PayloadDispatcherCallback) {
         val medium = callback.getEndpointMedium(endpointId)
         AppLogger.d("PayloadDispatcher", "ROUTE (Received): Message from [$sender] arrived physically via endpoint [$endpointId] using $medium")
 
-        val locationLat = if (jsonObject.has("locationLat")) jsonObject.getDouble("locationLat") else null
-        val locationLng = if (jsonObject.has("locationLng")) jsonObject.getDouble("locationLng") else null
-
-        val routePath = mutableListOf<String>()
-        if (jsonObject.has("routePath")) {
-            val arr = jsonObject.getJSONArray("routePath")
-            for (i in 0 until arr.length()) routePath.add(arr.getString(i))
-        }
-
-        val directedRoute = mutableListOf<String>()
-        if (jsonObject.has("directedRoute")) {
-            val arr = jsonObject.getJSONArray("directedRoute")
-            for (i in 0 until arr.length()) directedRoute.add(arr.getString(i))
-        }
-
-        val isSOS = jsonObject.optBoolean("isSOS", false)
-        val isSOSCancel = jsonObject.optBoolean("isSOSCancel", false)
+        val routePath = payload.routePath.toMutableList()
+        val directedRoute = payload.directedRoute
 
         if (isPrivate) {
             if (targetName == callback.getMyDeviceName()) {
                 callback.showNotification(sender, text)
-                callback.onMessageReceived(endpointId, msgId, sender, text, isPrivate, false, imageBase64, audioBase64, locationLat, locationLng, medium, routePath)
+                callback.onMessageReceived(endpointId, msgId, sender, text, isPrivate, false, imageBase64, audioBase64, payload.locationLat, payload.locationLng, medium, routePath)
             } else {
                 AppLogger.d("PayloadDispatcher", "ROUTE (Relay): Forwarding Private message meant for [$targetName] securely across the mesh.")
                 routePath.add(callback.getMyDeviceName())
-                jsonObject.put("routePath", org.json.JSONArray(routePath))
+                val updatedPayload = payload.copy(routePath = routePath)
+                val updatedBytes = ProtoBuf.encodeToByteArray(updatedPayload)
                 
                 if (directedRoute.isNotEmpty()) {
                     val myIndex = directedRoute.indexOf(callback.getMyDeviceName())
@@ -179,27 +153,28 @@ class PayloadDispatcher(private val callback: PayloadDispatcherCallback) {
                         val nextHopName = directedRoute[myIndex + 1]
                         val nextHopEndpointId = callback.getConnectedEndpointIdByName(nextHopName)
                         if (nextHopEndpointId != null) {
-                            callback.sendDirectPayload(nextHopEndpointId, jsonObject.toString())
+                            callback.sendDirectPayload(nextHopEndpointId, updatedBytes)
                             return
                         }
                     }
                 }
                 
-                callback.broadcastPayload(jsonObject.toString(), endpointId)
+                callback.broadcastPayload(updatedBytes, endpointId)
             }
         } else {
-            if (isSOSCancel) {
+            if (payload.isSOSCancel) {
                 callback.onSosCancelled()
             }
-            if (isSOS && sender != callback.getMyDeviceName()) {
-                // We use a callback so the dispatcher doesn't need to know about UI lifecycle
+            if (payload.isSOS && sender != callback.getMyDeviceName()) {
                 callback.showSosEmergencyNotification(sender, text)
             }
             
             routePath.add(callback.getMyDeviceName())
-            jsonObject.put("routePath", org.json.JSONArray(routePath))
-            callback.onMessageReceived(endpointId, msgId, sender, text, isPrivate, false, imageBase64, audioBase64, locationLat, locationLng, medium, routePath)
-            callback.broadcastPayload(jsonObject.toString(), endpointId)
+            val updatedPayload = payload.copy(routePath = routePath)
+            val updatedBytes = ProtoBuf.encodeToByteArray(updatedPayload)
+            
+            callback.onMessageReceived(endpointId, msgId, sender, text, isPrivate, false, imageBase64, audioBase64, payload.locationLat, payload.locationLng, medium, routePath)
+            callback.broadcastPayload(updatedBytes, endpointId)
         }
     }
 }

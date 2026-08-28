@@ -79,8 +79,8 @@ class MeshNetworkManager(private val context: Context) {
         override fun getSeenMessageIds() = seenMessageIds
         override fun getEndpointMedium(endpointId: String) = endpointMedium[endpointId] ?: "Bluetooth 5.4"
         override fun getConnectedEndpointIdByName(name: String) = connectedEndpointNames.entries.find { it.value == name }?.key
-        override fun sendDirectPayload(endpointId: String, payload: String) = this@MeshNetworkManager.sendDirectPayload(endpointId, payload)
-        override fun broadcastPayload(payload: String, excludeEndpointId: String?) = this@MeshNetworkManager.broadcastPayload(payload, excludeEndpointId)
+        override fun sendDirectPayload(endpointId: String, payload: ByteArray) = this@MeshNetworkManager.sendDirectPayload(endpointId, payload)
+        override fun broadcastPayload(payload: ByteArray, excludeEndpointId: String?) = this@MeshNetworkManager.broadcastPayload(payload, excludeEndpointId)
         override fun onMessageSeen(msgId: String, readerName: String) { onMessageSeen?.invoke(msgId, readerName) }
         override fun onMessageDelivered(msgId: String, readerName: String, returnRoute: List<String>) { onMessageDelivered?.invoke(msgId, readerName, returnRoute) }
         override fun onPublicKeyReceived(senderName: String, key: String) { onPublicKeyReceived?.invoke(senderName, key) }
@@ -276,14 +276,13 @@ class MeshNetworkManager(private val context: Context) {
         }, 1500 + jitter)
     }
 
-    fun broadcastPayload(jsonString: String, excludeEndpointId: String? = null) {
+    fun broadcastPayload(jsonString: ByteArray, excludeEndpointId: String? = null) {
         // --- THE SENDER FIX ---
         // Add our OWN message ID to the memory cache before sending it out
         try {
-            val jsonObject = JSONObject(jsonString)
-            if (jsonObject.has("id")) {
-                val msgId = jsonObject.getString("id")
-                seenMessageIds.add(msgId)
+            val payloadObj = kotlinx.serialization.protobuf.ProtoBuf.decodeFromByteArray(com.example.testresqmesh.core.network.MeshPayload.serializer(), jsonString)
+            if (payloadObj.id.isNotEmpty()) {
+                seenMessageIds.add(payloadObj.id)
             }
         } catch (e: Exception) {
             AppLogger.d("MeshNetwork_ERROR", "Failed to cache outbound message ID: ${e.message}")
@@ -293,7 +292,7 @@ class MeshNetworkManager(private val context: Context) {
         val targets = connectedEndpointIds.filter { it != excludeEndpointId }
         if (targets.isNotEmpty()) {
 //            AppLogger.d("MeshNetwork_Routing", "ROUTE (Broadcast): Flooding message to ${targets.size} physical connections.")
-            val payload = com.google.android.gms.nearby.connection.Payload.fromBytes(jsonString.toByteArray(Charsets.UTF_8))
+            val payload = com.google.android.gms.nearby.connection.Payload.fromBytes(jsonString)
             connectionsClient.sendPayload(targets.toList(), payload)
         } else {
             // Use a verbose/routing specific tag so it doesn't spam the main console
@@ -301,13 +300,12 @@ class MeshNetworkManager(private val context: Context) {
         }
     }
 
-    fun sendDirectPayload(targetId: String, jsonString: String) {
+    fun sendDirectPayload(targetId: String, jsonString: ByteArray) {
         // --- THE SENDER FIX ---
         try {
-            val jsonObject = JSONObject(jsonString)
-            if (jsonObject.has("id")) {
-                val msgId = jsonObject.getString("id")
-                seenMessageIds.add(msgId)
+            val payloadObj = kotlinx.serialization.protobuf.ProtoBuf.decodeFromByteArray(com.example.testresqmesh.core.network.MeshPayload.serializer(), jsonString)
+            if (payloadObj.id.isNotEmpty()) {
+                seenMessageIds.add(payloadObj.id)
             }
         } catch (e: Exception) {
             AppLogger.d("MeshNetwork_ERROR", "Failed to cache outbound message ID: ${e.message}")
@@ -315,60 +313,58 @@ class MeshNetworkManager(private val context: Context) {
         // ----------------------
 
         AppLogger.d("MeshNetwork_ROUTING", "ROUTE (Direct): Sending private payload to physical endpoint -> $targetId")
-        val payload = com.google.android.gms.nearby.connection.Payload.fromBytes(jsonString.toByteArray(Charsets.UTF_8))
+        val payload = com.google.android.gms.nearby.connection.Payload.fromBytes(jsonString)
         connectionsClient.sendPayload(targetId, payload)
     }
 
     private fun sendSystemPulse() {
+        if (!isNodeActive.get()) return
         val pulseId = java.util.UUID.randomUUID().toString()
-        val nodesArray = org.json.JSONArray(connectedEndpointNames.values.toList())
-        
-        val jsonString = JSONObject().apply {
-            put("id", pulseId)
-            put("senderName", myDeviceName)
-            put("isSystem", true)
-            put("connectedNodes", nodesArray)
-            put("publicKey", CryptoManager.getMyPublicKeyBase64()) // Share RSA Public Key
-        }.toString()
-        broadcastPayload(jsonString)
+        val payload = com.example.testresqmesh.core.network.MeshPayload(
+            id = pulseId,
+            type = "SYSTEM",
+            senderName = myDeviceName,
+            connectedNodes = connectedEndpointNames.values.toList(),
+            publicKey = com.example.testresqmesh.core.network.CryptoManager.getMyPublicKeyBase64()
+        )
+        val payloadBytes = kotlinx.serialization.protobuf.ProtoBuf.encodeToByteArray(com.example.testresqmesh.core.network.MeshPayload.serializer(), payload)
+        broadcastPayload(payloadBytes)
     }
 
     fun broadcastSeenReceipt(targetMessageId: String, isPrivate: Boolean, targetId: String? = null) {
-        val jsonString = JSONObject().apply {
-            put("id", java.util.UUID.randomUUID().toString()) // Bouncer needs unique ID for the payload itself
-            put("type", "SEEN")
-            put("targetMessageId", targetMessageId)
-            put("reader", myDeviceName)
-            put("isPrivate", isPrivate)
-        }.toString()
-
-        // Send it via broadcast so it can traverse the mesh if needed
-        broadcastPayload(jsonString)
+        val payload = com.example.testresqmesh.core.network.MeshPayload(
+            id = java.util.UUID.randomUUID().toString(),
+            type = "SEEN",
+            targetMessageId = targetMessageId,
+            reader = myDeviceName,
+            isPrivate = isPrivate
+        )
+        val payloadBytes = kotlinx.serialization.protobuf.ProtoBuf.encodeToByteArray(com.example.testresqmesh.core.network.MeshPayload.serializer(), payload)
+        broadcastPayload(payloadBytes)
     }
 
     fun broadcastDeliveredReceipt(targetMessageId: String, isPrivate: Boolean, targetId: String? = null, directedReturnRoute: List<String> = emptyList()) {
-        val jsonString = JSONObject().apply {
-            put("id", java.util.UUID.randomUUID().toString())
-            put("type", "DELIVERED")
-            put("targetMessageId", targetMessageId)
-            put("reader", myDeviceName)
-            put("isPrivate", isPrivate)
-            put("returnRoute", org.json.JSONArray().apply { put(myDeviceName) })
-            if (directedReturnRoute.isNotEmpty()) {
-                put("directedRoute", org.json.JSONArray(directedReturnRoute))
-            }
-        }.toString()
+        val payload = com.example.testresqmesh.core.network.MeshPayload(
+            id = java.util.UUID.randomUUID().toString(),
+            type = "DELIVERED",
+            targetMessageId = targetMessageId,
+            reader = myDeviceName,
+            isPrivate = isPrivate,
+            returnRoute = listOf(myDeviceName),
+            directedRoute = directedReturnRoute
+        )
+        val payloadBytes = kotlinx.serialization.protobuf.ProtoBuf.encodeToByteArray(com.example.testresqmesh.core.network.MeshPayload.serializer(), payload)
 
         if (isPrivate && directedReturnRoute.size > 1) {
             val nextHopName = directedReturnRoute[1]
             val nextHopEndpointId = connectedEndpointNames.entries.find { it.value == nextHopName }?.key
             if (nextHopEndpointId != null) {
-                sendDirectPayload(nextHopEndpointId, jsonString)
+                sendDirectPayload(nextHopEndpointId, payloadBytes)
             } else {
-                broadcastPayload(jsonString)
+                broadcastPayload(payloadBytes)
             }
         } else {
-            broadcastPayload(jsonString)
+            broadcastPayload(payloadBytes)
         }
     }
 
@@ -610,16 +606,16 @@ class MeshNetworkManager(private val context: Context) {
     private val payloadCallback = object : PayloadCallback() {
         override fun onPayloadReceived(endpointId: String, payload: com.google.android.gms.nearby.connection.Payload) {
             if (payload.type == com.google.android.gms.nearby.connection.Payload.Type.BYTES) {
-                val jsonString = String(payload.asBytes()!!, Charsets.UTF_8)
-                processJsonPayload(endpointId, jsonString)
+                processBinaryPayload(endpointId, payload.asBytes()!!)
             }
         }
         override fun onPayloadTransferUpdate(endpointId: String, update: PayloadTransferUpdate) {}
     }
 
-    private fun processJsonPayload(endpointId: String, jsonString: String) {
+    private fun processBinaryPayload(endpointId: String, payloadBytes: ByteArray) {
         try {
-            val json = JSONObject(jsonString)
+            val jsonString = String(payloadBytes, Charsets.UTF_8)
+            val json = org.json.JSONObject(jsonString)
             if (json.has("type") && json.getString("type") == "BLOCK_NOTIFICATION") {
                 val blockerName = json.getString("name")
                 AppLogger.d("MeshNetwork_PAIRING", "Received BLOCK_NOTIFICATION from $blockerName. Automatically blocking them.")
@@ -627,8 +623,11 @@ class MeshNetworkManager(private val context: Context) {
                 return
             }
         } catch (e: Exception) {
-            AppLogger.d("MeshNetwork_ERROR", "Failed to parse potential control payload: ${e.message}")
+            // Fall through, it's a Protobuf payload
         }
-        payloadDispatcher.dispatch(endpointId, jsonString)
+        payloadDispatcher.dispatch(endpointId, payloadBytes)
     }
 }
+
+
+

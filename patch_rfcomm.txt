@@ -1,0 +1,57 @@
+        var rfcommSocket: BluetoothSocket? = null
+        var rfcommOut: java.io.OutputStream? = null
+        var rfcommIn: java.io.InputStream? = null
+        var readThread: Thread? = null
+
+        fun setRfcommSocket(socket: BluetoothSocket) {
+            try { rfcommSocket?.close() } catch(e:Exception){}
+            rfcommSocket = socket
+            rfcommOut = socket.outputStream
+            rfcommIn = socket.inputStream
+            isConnected = true
+            
+            readThread = Thread {
+                val buffer = ByteArray(4096)
+                while (isConnected) {
+                    try {
+                        val bytes = rfcommIn?.read(buffer) ?: -1
+                        if (bytes > 0) {
+                            val payload = buffer.copyOf(bytes)
+                            val jsonString = payload.toString(Charsets.UTF_8)
+                            AppLogger.d("CLASSIC_BT", "Received via RFCOMM: ${jsonString.take(50)}")
+                            
+                            val jsonObject = JSONObject(jsonString)
+                            if (jsonObject.has("id")) {
+                                val msgId = jsonObject.getString("id")
+                                if (seenMessageIds.contains(msgId)) continue
+                                seenMessageIds.add(msgId)
+                            }
+                            processJsonPayload(macAddress, jsonString)
+                        }
+                    } catch (e: Exception) {
+                        break
+                    }
+                }
+            }
+            readThread?.start()
+        }
+
+        fun forceConnect() {
+            if (rfcommSocket != null || isConnected) return
+            AppLogger.d("CLASSIC_BT", "Attempting RFCOMM Auto-Pairing to $macAddress")
+            val device = bluetoothAdapter.getRemoteDevice(macAddress)
+            
+            Thread {
+                try {
+                    val socket = device.createInsecureRfcommSocketToServiceRecord(RFCOMM_UUID)
+                    socket.connect()
+                    handler.post {
+                        AppLogger.d("CLASSIC_BT", "RFCOMM Socket Connected to $macAddress!")
+                        setRfcommSocket(socket)
+                        if (!outboundQueue.isEmpty() && !isConnecting.get()) processQueue()
+                    }
+                } catch (e: Exception) {
+                    AppLogger.d("CLASSIC_BT", "RFCOMM failed to $macAddress: ${e.message}")
+                }
+            }.start()
+        }
