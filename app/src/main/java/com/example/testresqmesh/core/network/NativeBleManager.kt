@@ -77,6 +77,17 @@ class NativeBleManager(private val context: Context) {
         override fun onMessageReceived(endpointId: String, msgId: String, senderName: String, text: String, isPrivate: Boolean, isSystem: Boolean, imageBase64: String?, audioBase64: String?, locationLat: Double?, locationLng: Double?, medium: String, routePath: List<String>) {
             this@NativeBleManager.onMessageReceived?.invoke(endpointId, msgId, senderName, text, isPrivate, isSystem, imageBase64, audioBase64, locationLat, locationLng, medium, routePath)
         }
+        override fun onDeviceNameSync(endpointId: String, realName: String) {
+            val oldName = connectedEndpointNames[endpointId]
+            if (oldName == null || oldName == "Unknown" || oldName == "Unknown Peer") {
+                AppLogger.d("BLE_MESH", "Name Sync: Resolving $endpointId to $realName")
+                connectedEndpointNames[endpointId] = realName
+                val isClient = activeConnections.containsKey(endpointId)
+                handler.post {
+                    onDeviceConnected?.invoke(ConnectedDevice(endpointId, realName, isClassicConnected = isClient))
+                }
+            }
+        }
         override fun onDeviceGoodbye(endpointId: String) {
             AppLogger.d("BLE_MESH", "Received GOODBYE packet from $endpointId. Disconnecting instantly.")
             this@NativeBleManager.disconnectFromEndpoint(endpointId)
@@ -94,6 +105,7 @@ class NativeBleManager(private val context: Context) {
     })
 
     private val endpointLastSeen = mutableMapOf<String, Long>()
+    private val endpointFirstSeen = mutableMapOf<String, Long>()
     private val handler = Handler(Looper.getMainLooper())
     private val timeoutRunnable = object : Runnable {
         override fun run() {
@@ -178,9 +190,6 @@ class NativeBleManager(private val context: Context) {
             )
             val bytes = kotlinx.serialization.protobuf.ProtoBuf.encodeToByteArray(goodbyePayload)
             broadcastPayload(bytes)
-            
-            // Give the BLE controller 200ms to flush the queued packet before severing the socket
-            Thread.sleep(200)
         } catch (e: Exception) {}
         
         activeServerConnections.values.forEach { gattServer?.cancelConnection(it) }
@@ -194,6 +203,7 @@ class NativeBleManager(private val context: Context) {
         connectedEndpointIds.clear()
         connectedEndpointNames.clear()
         endpointLastSeen.clear()
+        endpointFirstSeen.clear()
         instance = null
         onStatusChanged?.invoke("Offline")
     }
@@ -241,7 +251,11 @@ class NativeBleManager(private val context: Context) {
             val macAddress = device.address
 
             if (peerName != myDeviceName && peerName != myDeviceName.take(20)) {
-                endpointLastSeen[macAddress] = System.currentTimeMillis()
+                val now = System.currentTimeMillis()
+                endpointLastSeen[macAddress] = now
+                if (!endpointFirstSeen.containsKey(macAddress)) {
+                    endpointFirstSeen[macAddress] = now
+                }
 
                 if (!connectedEndpointIds.contains(macAddress)) {
                     connectedEndpointIds.add(macAddress)
@@ -251,14 +265,12 @@ class NativeBleManager(private val context: Context) {
                     onDeviceConnected?.invoke(ConnectedDevice(macAddress, peerName, isClassicConnected = false))
                 }
 
-                if (!activeConnections.containsKey(macAddress) && !activeServerConnections.containsKey(macAddress) && activeConnections.size < MAX_CONNECTIONS) {
-                    if (myDeviceName > peerName) {
-                        val lastAttempt = connectionAttempts[macAddress] ?: 0L
-                        if (System.currentTimeMillis() - lastAttempt > 5000) {
-                            connectionAttempts[macAddress] = System.currentTimeMillis()
-                            AppLogger.d("BLE_MESH", "Auto-connecting Persistent GATT to ${peerName}")
-                            connectToPersistentGatt(macAddress, peerName)
-                        }
+                if (!activeConnections.containsKey(macAddress) && activeConnections.size < MAX_CONNECTIONS) {
+                    val lastAttempt = connectionAttempts[macAddress] ?: 0L
+                    if (now - lastAttempt > 5000) {
+                        connectionAttempts[macAddress] = now
+                        AppLogger.d("BLE_MESH", "Auto-connecting Persistent GATT to ${peerName}")
+                        connectToPersistentGatt(macAddress, peerName)
                     }
                 }
             }

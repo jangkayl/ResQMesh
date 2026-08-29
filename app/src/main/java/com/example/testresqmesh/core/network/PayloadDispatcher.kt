@@ -80,6 +80,8 @@ class PayloadDispatcher(private val callback: PayloadDispatcherCallback) {
     }
 
     private fun handleSystemPulse(endpointId: String, msgId: String, sender: String, payloadBytes: ByteArray, payload: MeshPayload) {
+        callback.onDeviceNameSync(endpointId, sender)
+        
         if (payload.publicKey.isNotEmpty()) {
             callback.onPublicKeyReceived(sender, payload.publicKey)
         }
