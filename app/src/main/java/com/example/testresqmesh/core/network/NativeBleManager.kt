@@ -37,8 +37,8 @@ class NativeBleManager(private val context: Context) {
 
     private val bluetoothManager = context.getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
     private val bluetoothAdapter = bluetoothManager.adapter
-    private val bleAdvertiser = bluetoothAdapter?.bluetoothLeAdvertiser
-    private val bleScanner = bluetoothAdapter?.bluetoothLeScanner
+    private val bleAdvertiser get() = bluetoothAdapter?.bluetoothLeAdvertiser
+    private val bleScanner get() = bluetoothAdapter?.bluetoothLeScanner
 
     private val SERVICE_UUID = UUID.fromString("0000180F-0000-1000-8000-00805F9B34FB")
     private val RX_CHARACTERISTIC_UUID = UUID.fromString("00002A19-0000-1000-8000-00805F9B34FB")
@@ -131,6 +131,25 @@ class NativeBleManager(private val context: Context) {
         onStatusChanged?.invoke("Mesh Active [Persistent GATT/Protobuf]. Seeking peers...")
     }
     
+    
+    private fun sendSystemPulse() {
+        if (!isNodeActive.get()) return
+        try {
+            val pulseId = java.util.UUID.randomUUID().toString()
+            val payload = com.example.testresqmesh.core.network.MeshPayload(
+                id = pulseId,
+                type = "SYSTEM",
+                senderName = myDeviceName,
+                connectedNodes = connectedEndpointNames.values.toList(),
+                publicKey = com.example.testresqmesh.core.network.CryptoManager.getMyPublicKeyBase64()
+            )
+            val payloadBytes = kotlinx.serialization.protobuf.ProtoBuf.encodeToByteArray(com.example.testresqmesh.core.network.MeshPayload.serializer(), payload)
+            broadcastPayload(payloadBytes)
+        } catch (e: Exception) {
+            AppLogger.d("BLE_MESH", "Failed to send system pulse: ${e.message}")
+        }
+    }
+
     fun stopMeshNode() {
         isNodeActive.set(false)
         bleAdvertiser?.stopAdvertising(advertiseCallback)
@@ -249,6 +268,7 @@ val macAddress = device.address
             override fun onServicesDiscovered(gatt: BluetoothGatt, status: Int) {
                 if (status == BluetoothGatt.GATT_SUCCESS) {
                     AppLogger.d("BLE_MESH", "GATT Services discovered for ${macAddress}. Ready to transmit.")
+                    sendSystemPulse()
                     processNextPayload(macAddress)
                 } else {
                     gatt.disconnect()

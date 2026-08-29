@@ -39,7 +39,7 @@ fun RadarScreen(viewModel: RadarViewModel) {
     val uiState by viewModel.uiState.collectAsState()
     
     // Create a set of names that are already connected for visual filtering
-    val connectedNames = uiState.connectedDevices.map { it.name }.toSet()
+    val connectedIds = uiState.connectedDevices.map { it.endpointId }.toSet()
 
     val connectedNodes = uiState.connectedDevices.map { 
         val statusText = if (it.isClassicConnected) "Connected (Bluetooth)" else "Online"
@@ -48,7 +48,7 @@ fun RadarScreen(viewModel: RadarViewModel) {
     
     // VISUAL-ONLY FILTER: Hide any scanned node that has the same name as a connected one
     val scannedNodes = uiState.scannedDevices
-        .filter { it.name !in connectedNames }
+        .filter { it.endpointId !in connectedIds }
         .map {
             val displayStatus = if (it.isConnecting) "SYNCING..." else "Offline"
             NodeItemData(
@@ -62,7 +62,7 @@ fun RadarScreen(viewModel: RadarViewModel) {
         }
 
     // Include blocked devices that are completely out of range so the user can still unblock them
-    val scannedAndConnectedNames = connectedNames + scannedNodes.map { it.name }
+    val scannedAndConnectedNames = uiState.connectedDevices.map { it.name }.toSet() + scannedNodes.map { it.name }
     val offlineBlockedNodes = uiState.blockedDeviceNames
         .filter { it !in scannedAndConnectedNames }
         .map { name ->
