@@ -163,7 +163,7 @@ class NativeBleManager(private val context: Context) {
             
         val scanResponse = AdvertiseData.Builder()
             .setIncludeDeviceName(false)
-            .addManufacturerData(1024, nameBytes)
+            .addServiceData(ParcelUuid(SERVICE_UUID), nameBytes)
             .build()
             
         bleAdvertiser?.startAdvertising(settings, data, scanResponse, advertiseCallback)
@@ -183,9 +183,9 @@ class NativeBleManager(private val context: Context) {
     private val scanCallback = object : ScanCallback() {
         override fun onScanResult(callbackType: Int, result: ScanResult) {
             val device = result.device
-            val manufacturerData = result.scanRecord?.getManufacturerSpecificData(1024)
-            val peerName = manufacturerData?.let { String(it, Charsets.UTF_8) } ?: "Unknown Node"
-            val macAddress = device.address
+            val serviceData = result.scanRecord?.getServiceData(ParcelUuid(SERVICE_UUID))
+            val peerName = serviceData?.let { String(it, Charsets.UTF_8) } ?: device.name ?: "Unknown Node"
+val macAddress = device.address
 
             if (peerName != myDeviceName) {
                 endpointLastSeen[macAddress] = System.currentTimeMillis()
@@ -349,6 +349,19 @@ class NativeBleManager(private val context: Context) {
     }
 
     private fun processBinaryPayload(endpointId: String, payloadBytes: ByteArray) {
+        try {
+            val payload = kotlinx.serialization.protobuf.ProtoBuf.decodeFromByteArray(com.example.testresqmesh.core.network.MeshPayload.serializer(), payloadBytes)
+            val currentName = connectedEndpointNames[endpointId]
+            if (payload.senderName.isNotEmpty() && currentName != payload.senderName) {
+                connectedEndpointNames[endpointId] = payload.senderName
+                handler.post {
+                    onDeviceConnected?.invoke(com.example.testresqmesh.core.model.ConnectedDevice(endpointId, payload.senderName, true))
+                }
+            }
+        } catch (e: Exception) {
+            AppLogger.d("BLE_MESH", "Failed to decode payload for auto-rename: ${e.message}")
+        }
+        
         payloadDispatcher.dispatch(endpointId, payloadBytes)
     }
 
@@ -361,6 +374,8 @@ class NativeBleManager(private val context: Context) {
     }
 
     fun sendDirectPayload(targetMacAddress: String, payloadBytes: ByteArray) {
+        if (!BluetoothAdapter.checkBluetoothAddress(targetMacAddress)) return
+        
         cacheOutgoingMessageId(payloadBytes)
         
         val fullData = ByteArray(4 + payloadBytes.size)
@@ -454,3 +469,5 @@ class NativeBleManager(private val context: Context) {
         }
     }
 }
+
+

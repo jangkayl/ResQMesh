@@ -42,7 +42,7 @@ fun RadarScreen(viewModel: RadarViewModel) {
     val connectedNames = uiState.connectedDevices.map { it.name }.toSet()
 
     val connectedNodes = uiState.connectedDevices.map { 
-        val statusText = if (it.isClassicConnected) "CONNECTED (Classic BT)" else "ONLINE (BLE Mesh)"
+        val statusText = if (it.isClassicConnected) "Connected (Bluetooth)" else "Online"
         NodeItemData(it.endpointId, it.name, statusText, isConnected = true, isActiveRelay = true)
     }
     
@@ -50,7 +50,7 @@ fun RadarScreen(viewModel: RadarViewModel) {
     val scannedNodes = uiState.scannedDevices
         .filter { it.name !in connectedNames }
         .map {
-            val displayStatus = if (it.isConnecting) "SYNCING..." else "Score: ${it.powerScore} • Role: ${it.myRole}"
+            val displayStatus = if (it.isConnecting) "SYNCING..." else "Offline"
             NodeItemData(
                 it.endpointId,
                 it.name, 
