@@ -60,6 +60,7 @@ class NativeBleManager(private val context: Context) {
     private val pendingQueues = ConcurrentHashMap<String, ConcurrentLinkedQueue<ByteArray>>()
     private val isWriting = ConcurrentHashMap<String, AtomicBoolean>()
     private val chunkBuffers = ConcurrentHashMap<String, ByteArray>() // Stores incomplete binary payloads
+    private val connectionAttempts = ConcurrentHashMap<String, Long>()
 
     private val payloadDispatcher = PayloadDispatcher(object : PayloadDispatcherCallback {
         override fun getMyDeviceName() = myDeviceName
@@ -74,6 +75,13 @@ class NativeBleManager(private val context: Context) {
         override fun onRoutingTableReceived(senderName: String, connectedNodes: List<String>) { onRoutingTableReceived?.invoke(senderName, connectedNodes) }
         override fun onMessageReceived(endpointId: String, msgId: String, senderName: String, text: String, isPrivate: Boolean, isSystem: Boolean, imageBase64: String?, audioBase64: String?, locationLat: Double?, locationLng: Double?, medium: String, routePath: List<String>) {
             this@NativeBleManager.onMessageReceived?.invoke(endpointId, msgId, senderName, text, isPrivate, isSystem, imageBase64, audioBase64, locationLat, locationLng, medium, routePath)
+        }
+        override fun onDeviceGoodbye(endpointId: String) {
+            AppLogger.d("BLE_MESH", "Received GOODBYE packet from $endpointId. Disconnecting instantly.")
+            this@NativeBleManager.disconnectFromEndpoint(endpointId)
+            handler.post {
+                this@NativeBleManager.onDeviceDisconnected?.invoke(endpointId)
+            }
         }
         override fun onSosCancelled() { this@NativeBleManager.onSosCancelled?.invoke() }
         override fun showNotification(sender: String, text: String) { notificationHelper.showPrivateMessageNotification(sender, text) }
@@ -100,7 +108,7 @@ class NativeBleManager(private val context: Context) {
                     continue
                 }
                 
-                if (now - entry.value > 15000) { 
+                if (now - entry.value > 8000) { 
                     connectedEndpointIds.remove(macAddress)
                     connectedEndpointNames.remove(macAddress)
                     iterator.remove()
@@ -115,6 +123,8 @@ class NativeBleManager(private val context: Context) {
 
     companion object {
         var activeAdvertiseCallback: AdvertiseCallback? = null
+        @SuppressLint("StaticFieldLeak")
+        var instance: NativeBleManager? = null
     }
 
     fun startMeshNode(teamKey: String) {
@@ -124,6 +134,7 @@ class NativeBleManager(private val context: Context) {
         }
         isNodeActive.set(true)
         activeAdvertiseCallback = advertiseCallback
+        instance = this
         
         context.startService(android.content.Intent(context, BleCleanupService::class.java))
         
@@ -157,6 +168,22 @@ class NativeBleManager(private val context: Context) {
         isNodeActive.set(false)
         bleAdvertiser?.stopAdvertising(advertiseCallback)
         bleScanner?.stopScan(scanCallback)
+        
+        try {
+            val goodbyePayload = MeshPayload(
+                id = java.util.UUID.randomUUID().toString(),
+                type = "GOODBYE",
+                senderName = myDeviceName
+            )
+            val bytes = kotlinx.serialization.protobuf.ProtoBuf.encodeToByteArray(goodbyePayload)
+            broadcastPayload(bytes)
+            
+            // Give the BLE controller 200ms to flush the queued packet before severing the socket
+            Thread.sleep(200)
+        } catch (e: Exception) {}
+        
+        activeServerConnections.values.forEach { gattServer?.cancelConnection(it) }
+        activeServerConnections.clear()
         gattServer?.close()
         activeConnections.values.forEach { it.disconnect(); it.close() }
         activeConnections.clear()
@@ -166,6 +193,7 @@ class NativeBleManager(private val context: Context) {
         connectedEndpointIds.clear()
         connectedEndpointNames.clear()
         endpointLastSeen.clear()
+        instance = null
         onStatusChanged?.invoke("Offline")
     }
 
@@ -206,10 +234,12 @@ class NativeBleManager(private val context: Context) {
         override fun onScanResult(callbackType: Int, result: ScanResult) {
             val device = result.device
             val serviceData = result.scanRecord?.getServiceData(ParcelUuid(SERVICE_UUID))
-            val peerName = serviceData?.let { String(it, Charsets.UTF_8) } ?: device.name ?: "Unknown Node"
-val macAddress = device.address
+            if (serviceData == null) return
+            
+            val peerName = String(serviceData, Charsets.UTF_8).replace("\u0000", "").trim()
+            val macAddress = device.address
 
-            if (peerName != myDeviceName) {
+            if (peerName != myDeviceName && peerName != myDeviceName.take(20)) {
                 endpointLastSeen[macAddress] = System.currentTimeMillis()
 
                 if (!connectedEndpointIds.contains(macAddress)) {
@@ -218,9 +248,13 @@ val macAddress = device.address
                     
                     onDeviceScanned?.invoke(macAddress, peerName, 50, "MEMBER", false)
                     onDeviceConnected?.invoke(ConnectedDevice(macAddress, peerName, isClassicConnected = false))
-                    
-                    if (!activeConnections.containsKey(macAddress) && activeConnections.size < MAX_CONNECTIONS) {
-                        if (myDeviceName > peerName) {
+                }
+
+                if (!activeConnections.containsKey(macAddress) && !activeServerConnections.containsKey(macAddress) && activeConnections.size < MAX_CONNECTIONS) {
+                    if (myDeviceName > peerName) {
+                        val lastAttempt = connectionAttempts[macAddress] ?: 0L
+                        if (System.currentTimeMillis() - lastAttempt > 5000) {
+                            connectionAttempts[macAddress] = System.currentTimeMillis()
                             AppLogger.d("BLE_MESH", "Auto-connecting Persistent GATT to ${peerName}")
                             connectToPersistentGatt(macAddress, peerName)
                         }

@@ -27,10 +27,7 @@ fun PrivateChatTab(
     val conversationItems = uiState.privateMessages.map { (id, messages) ->
         val lastMsg = messages.lastOrNull()
         
-        // Prioritize connected device name, then look for a message not from "Me"
-        val peerName = uiState.connectedDevices.find { it.endpointId == id }?.name 
-            ?: messages.firstOrNull { it.senderName != "Me" }?.senderName 
-            ?: id
+        val peerName = id
 
         val isDirectNode = uiState.knownNodes.find { it.name == peerName }?.isDirect ?: false
 

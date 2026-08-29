@@ -89,7 +89,8 @@ class MainActivity : ComponentActivity() {
         )
 
         networkManager = NativeBleManager(applicationContext)
-        repository = MeshRepository(networkManager)
+        val appDb = com.example.testresqmesh.data.local.AppDatabase.getDatabase(applicationContext)
+        repository = MeshRepository(networkManager, appDb)
         mediaHelper = MediaHelper(applicationContext)
 
         lifecycle.addObserver(LifecycleEventObserver { _, event ->

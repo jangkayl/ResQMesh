@@ -94,7 +94,7 @@ fun RadarScreen(viewModel: RadarViewModel) {
         }
 
     RadarScreenContent(
-        activeNodesCount = uiState.connectedDevices.size + scannedNodes.size,
+        activeNodesCount = connectedNodes.size + scannedNodes.size,
         nodes = connectedNodes + scannedNodes + offlineBlockedNodes + offlineTrackedNodes,
         onRefresh = { viewModel.rescan() },
         onDisconnect = { viewModel.disconnectDevice(it) },

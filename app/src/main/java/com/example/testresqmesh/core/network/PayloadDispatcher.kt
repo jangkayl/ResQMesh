@@ -33,11 +33,17 @@ class PayloadDispatcher(private val callback: PayloadDispatcherCallback) {
             when (payload.type) {
                 "SYSTEM" -> handleSystemPulse(endpointId, msgId, sender, payloadBytes, payload)
                 "SEEN", "DELIVERED" -> handleReceipt(endpointId, payload.type, msgId, sender, payloadBytes, payload)
+                "GOODBYE" -> handleGoodbye(endpointId, sender, payloadBytes)
                 else -> handleStandardMessage(endpointId, msgId, sender, payloadBytes, payload)
             }
         } catch (e: Exception) {
             AppLogger.d("PAYLOAD_DISPATCHER", "Error parsing Protobuf payload: ${e.message}")
         }
+    }
+
+    private fun handleGoodbye(endpointId: String, sender: String, payloadBytes: ByteArray) {
+        callback.onDeviceGoodbye(endpointId)
+        callback.broadcastPayload(payloadBytes, endpointId)
     }
 
     private fun handleReceipt(endpointId: String, payloadType: String, msgId: String, sender: String, payloadBytes: ByteArray, payload: MeshPayload) {

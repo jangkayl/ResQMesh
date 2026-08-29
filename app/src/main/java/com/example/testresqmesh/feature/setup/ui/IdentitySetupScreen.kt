@@ -30,18 +30,31 @@ import com.example.testresqmesh.feature.setup.viewmodel.SetupViewModel
 fun IdentitySetupScreen(viewModel: SetupViewModel, onIdentityGenerated: () -> Unit) {
     val context = LocalContext.current
     val uiState by viewModel.uiState.collectAsState()
+    var customName by remember { mutableStateOf(viewModel.getSavedName(context)) }
+    var nodeTag by remember { mutableStateOf(viewModel.getSavedTag(context)) }
     
     IdentitySetupContent(
         connectionStatus = uiState.connectionStatus,
+        customName = customName,
+        onCustomNameChange = { customName = it },
+        nodeTag = nodeTag,
+        onNodeTagChange = { nodeTag = it },
         onIdentityGenerated = {
-            viewModel.checkHardwareAndGoOnline(context, Build.MODEL, "NODE", "PUBLIC")
+            viewModel.checkHardwareAndGoOnline(context, customName.ifEmpty { android.os.Build.MODEL }, nodeTag.ifEmpty { "NODE" }, "PUBLIC")
             onIdentityGenerated()
         }
     )
 }
 
 @Composable
-fun IdentitySetupContent(connectionStatus: String, onIdentityGenerated: () -> Unit) {
+fun IdentitySetupContent(
+    connectionStatus: String,
+    customName: String,
+    onCustomNameChange: (String) -> Unit,
+    nodeTag: String,
+    onNodeTagChange: (String) -> Unit,
+    onIdentityGenerated: () -> Unit
+) {
     val scrollState = rememberScrollState()
     Column(
         modifier = Modifier
@@ -175,6 +188,38 @@ fun IdentitySetupContent(connectionStatus: String, onIdentityGenerated: () -> Un
             )
         }
 
+        Spacer(modifier = Modifier.height(24.dp))
+        
+        OutlinedTextField(
+            value = customName,
+            onValueChange = onCustomNameChange,
+            label = { Text("Display Name", color = Color.White.copy(alpha = 0.7f)) },
+            modifier = Modifier.fillMaxWidth(),
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedTextColor = Color.White,
+                unfocusedTextColor = Color.White,
+                focusedBorderColor = InboxAccentBlue,
+                unfocusedBorderColor = Color.White.copy(alpha = 0.3f)
+            ),
+            singleLine = true
+        )
+        
+        Spacer(modifier = Modifier.height(12.dp))
+
+        OutlinedTextField(
+            value = nodeTag,
+            onValueChange = { if (it.length <= 6) onNodeTagChange(it.uppercase()) },
+            label = { Text("Node Tag (Max 6 chars)", color = Color.White.copy(alpha = 0.7f)) },
+            modifier = Modifier.fillMaxWidth(),
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedTextColor = Color.White,
+                unfocusedTextColor = Color.White,
+                focusedBorderColor = InboxAccentBlue,
+                unfocusedBorderColor = Color.White.copy(alpha = 0.3f)
+            ),
+            singleLine = true
+        )
+
         Spacer(modifier = Modifier.height(48.dp))
 
         ResQButton(
@@ -203,6 +248,10 @@ fun IdentitySetupScreenPreview() {
     TestResQMeshTheme {
         IdentitySetupContent(
             connectionStatus = "READY TO SYNC",
+            customName = "John Doe",
+            onCustomNameChange = {},
+            nodeTag = "NODE",
+            onNodeTagChange = {},
             onIdentityGenerated = {}
         )
     }

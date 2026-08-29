@@ -132,6 +132,10 @@ class CommunicationViewModel(private val repository: MeshRepository) : ViewModel
         repository.sendPublicMessage("✅ SOS Cancelled & Resolved", null, null, null, null, isSOS = false, isSOSCancel = true)
     }
 
+    fun deleteConversationWith(peerName: String) {
+        repository.deleteConversationWith(peerName)
+    }
+
     fun sendPrivateMessage(targetName: String, text: String, imageBase64: String? = null, audioBase64: String? = null) {
         repository.sendPrivateMessage(targetName, text, imageBase64, audioBase64)
     }

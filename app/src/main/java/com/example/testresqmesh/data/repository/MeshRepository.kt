@@ -11,9 +11,17 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
+import com.example.testresqmesh.data.local.entity.toMessageEntity
 import java.util.UUID
 
-class MeshRepository(private val networkManager: NativeBleManager) {
+class MeshRepository(
+    private val networkManager: NativeBleManager,
+    private val appDatabase: com.example.testresqmesh.data.local.AppDatabase
+) {
 
     private val _connectionStatus = MutableStateFlow("Ready to deploy Mesh Node.")
     val connectionStatus = _connectionStatus.asStateFlow()
@@ -34,18 +42,25 @@ class MeshRepository(private val networkManager: NativeBleManager) {
     private val meshRouter = MeshRouter()
     val knownNodes = meshRouter.knownNodes
 
-    private val _publicMessages = MutableStateFlow<List<ChatMessage>>(emptyList())
-    val publicMessages = _publicMessages.asStateFlow()
+    private val repositoryScope = CoroutineScope(Dispatchers.Default)
 
-    private val _privateMessages = MutableStateFlow<Map<String, List<ChatMessage>>>(emptyMap())
-    val privateMessages = _privateMessages.asStateFlow()
+    val publicMessages = appDatabase.messageDao().getPublicMessages().map { list ->
+        list.map { it.toChatMessage() }
+    }.stateIn(repositoryScope, SharingStarted.Eagerly, emptyList())
+
+    val privateMessages = appDatabase.messageDao().getAllPrivateMessages().map { list ->
+        list.groupBy {
+            if (it.isMine) it.targetName ?: it.senderName else it.senderName
+        }.mapValues { entry ->
+            entry.value.map { it.toChatMessage() }
+        }
+    }.stateIn(repositoryScope, SharingStarted.Eagerly, emptyMap())
 
     private val _isOnline = MutableStateFlow(false)
     val isOnline = _isOnline.asStateFlow()
 
     private var myNodeName: String = ""
     private val publicKeys = mutableMapOf<String, String>()
-    private val repositoryScope = CoroutineScope(Dispatchers.Default)
 
     init {
         setupCallbacks()
@@ -75,7 +90,11 @@ class MeshRepository(private val networkManager: NativeBleManager) {
         }
 
         networkManager.onDeviceDisconnected = { endpointId ->
+            val disconnectedDevice = _connectedDevices.value.find { it.endpointId == endpointId }
             _connectedDevices.value = _connectedDevices.value.filter { it.endpointId != endpointId }
+            if (disconnectedDevice != null) {
+                meshRouter.removeNode(disconnectedDevice.name)
+            }
             meshRouter.recalculateKnownNodes(myNodeName, _connectedDevices.value)
         }
         
@@ -91,7 +110,7 @@ class MeshRepository(private val networkManager: NativeBleManager) {
 
 
         networkManager.onDeviceScanned = { id, name, score, role, isConnecting ->
-            if (name != myNodeName) {
+            if (name != myNodeName && name != myNodeName.take(20)) {
                 val isNotConnected = _connectedDevices.value.none { it.endpointId == id || it.name == name }
                 
                 if (isNotConnected) {
@@ -146,10 +165,9 @@ class MeshRepository(private val networkManager: NativeBleManager) {
                         isSOS = text.contains("🚨 CRITICAL SOS")
                     )
                     if (isPrivate) {
-                        val currentMap = _privateMessages.value.toMutableMap()
-                        val log = currentMap[sender] ?: emptyList()
-                        currentMap[sender] = log + message
-                        _privateMessages.value = currentMap
+                        repositoryScope.launch {
+                            appDatabase.messageDao().insertMessage(message.toMessageEntity(targetName = sender))
+                        }
                         
                         val reversedRoute = routePath.reversed().toMutableList()
                         if (reversedRoute.isNotEmpty() && reversedRoute.first() != myNodeName) {
@@ -157,7 +175,9 @@ class MeshRepository(private val networkManager: NativeBleManager) {
                         }
                         networkManager.broadcastDeliveredReceipt(msgId, isPrivate = true, targetId = endpointId, directedReturnRoute = reversedRoute)
                     } else {
-                        _publicMessages.value = _publicMessages.value + message
+                        repositoryScope.launch {
+                            appDatabase.messageDao().insertMessage(message.toMessageEntity(targetName = null))
+                        }
                         networkManager.broadcastDeliveredReceipt(msgId, isPrivate = false)
                         
                         if (message.isSOS) {
@@ -174,52 +194,41 @@ class MeshRepository(private val networkManager: NativeBleManager) {
                 _incomingSosAlert.value = currentSos.copy(deliveredTo = currentSos.deliveredTo + readerName)
             }
 
-            val updatedPublic = _publicMessages.value.map { msg ->
-                if (msg.id == msgId && !msg.deliveredTo.contains(readerName)) {
-                    msg.copy(deliveredTo = msg.deliveredTo + readerName, returnRoute = returnRoute)
-                } else {
-                    msg
+            repositoryScope.launch {
+                val msg = appDatabase.messageDao().getMessageById(msgId)
+                if (msg != null && !msg.deliveredTo.split(",").contains(readerName)) {
+                    val newDelivered = if (msg.deliveredTo.isEmpty()) readerName else "${msg.deliveredTo},$readerName"
+                    appDatabase.messageDao().updateDeliveredTo(msgId, newDelivered)
                 }
             }
-            _publicMessages.value = updatedPublic
-
-            val updatedPrivate = _privateMessages.value.mapValues { entry ->
-                entry.value.map { msg ->
-                    if (msg.id == msgId && !msg.deliveredTo.contains(readerName)) {
-                        msg.copy(deliveredTo = msg.deliveredTo + readerName, returnRoute = returnRoute)
-                    } else {
-                        msg
-                    }
-                }
-            }
-            _privateMessages.value = updatedPrivate
         }
         
         networkManager.onMessageSeen = { msgId, readerName ->
-            val updatedPublic = _publicMessages.value.map { msg ->
-                if (msg.id == msgId && !msg.seenBy.contains(readerName)) {
-                    msg.copy(seenBy = msg.seenBy + readerName)
-                } else {
-                    msg
+            repositoryScope.launch {
+                val msg = appDatabase.messageDao().getMessageById(msgId)
+                if (msg != null && !msg.seenBy.split(",").contains(readerName)) {
+                    val newSeen = if (msg.seenBy.isEmpty()) readerName else "${msg.seenBy},$readerName"
+                    appDatabase.messageDao().updateSeenBy(msgId, newSeen)
                 }
             }
-            _publicMessages.value = updatedPublic
-
-            val updatedPrivate = _privateMessages.value.mapValues { entry ->
-                entry.value.map { msg ->
-                    if (msg.id == msgId && !msg.seenBy.contains(readerName)) {
-                        msg.copy(seenBy = msg.seenBy + readerName)
-                    } else {
-                        msg
-                    }
-                }
-            }
-            _privateMessages.value = updatedPrivate
         }
     }
 
-    fun broadcastSeenReceipt(messageId: String, isPrivate: Boolean, targetId: String? = null) {
-        networkManager.broadcastSeenReceipt(messageId, isPrivate, targetId)
+    fun broadcastSeenReceipt(messageId: String, isPrivate: Boolean, targetName: String? = null) {
+        repositoryScope.launch {
+            val msg = appDatabase.messageDao().getMessageById(messageId)
+            if (msg != null && !msg.seenBy.split(",").contains("Me")) {
+                val newSeen = if (msg.seenBy.isEmpty()) "Me" else "${msg.seenBy},Me"
+                appDatabase.messageDao().updateSeenBy(messageId, newSeen)
+            }
+        }
+        
+        val directEndpointId = _connectedDevices.value.find { it.name == targetName }?.endpointId
+        if (directEndpointId != null) {
+            networkManager.broadcastSeenReceipt(messageId, isPrivate, directEndpointId)
+        } else {
+            networkManager.broadcastSeenReceipt(messageId, isPrivate, null)
+        }
     }
 
     fun startNode(customName: String, nodeTag: String, teamKey: String) {
@@ -234,8 +243,6 @@ class MeshRepository(private val networkManager: NativeBleManager) {
         _isOnline.value = false
         _connectedDevices.value = emptyList()
         _scannedDevices.value = emptyList()
-        _publicMessages.value = emptyList()
-        _privateMessages.value = emptyMap()
     }
 
     fun disconnectDevice(endpointId: String) {
@@ -278,10 +285,18 @@ class MeshRepository(private val networkManager: NativeBleManager) {
             isSOSCancel = isSOSCancel
         )
 
-        val message = ChatMessage(msgId, "Me", text, imageBase64, audioBase64, locationLat, locationLng, true, false, timestamp, isSOS = isSOS)
-        _publicMessages.value = _publicMessages.value + message
+        val message = ChatMessage(msgId, myNodeName, text, imageBase64, audioBase64, locationLat, locationLng, true, false, timestamp, isSOS = isSOS)
+        repositoryScope.launch {
+            appDatabase.messageDao().insertMessage(message.toMessageEntity(targetName = null))
+        }
         networkManager.broadcastPayload(payloadBytes)
         return msgId
+    }
+
+    fun deleteConversationWith(peerName: String) {
+        repositoryScope.launch {
+            appDatabase.messageDao().deleteConversationWith(peerName)
+        }
     }
 
     fun sendPrivateMessage(targetName: String, text: String, imageBase64: String?, audioBase64: String?, locationLat: Double? = null, locationLng: Double? = null) {
@@ -306,12 +321,11 @@ class MeshRepository(private val networkManager: NativeBleManager) {
         )
 
         val isDirect = _connectedDevices.value.any { it.name == targetName }
-        val message = ChatMessage(msgId, "Me", text, imageBase64, audioBase64, locationLat, locationLng, true, true, timestamp, isHopped = !isDirect, outboundRoute = directedRouteList)
+        val message = ChatMessage(msgId, myNodeName, text, imageBase64, audioBase64, locationLat, locationLng, true, true, timestamp, isHopped = !isDirect, outboundRoute = directedRouteList)
         
-        val currentMap = _privateMessages.value.toMutableMap()
-        val log = currentMap[targetName] ?: emptyList()
-        currentMap[targetName] = log + message
-        _privateMessages.value = currentMap
+        repositoryScope.launch {
+            appDatabase.messageDao().insertMessage(message.toMessageEntity(targetName = targetName))
+        }
 
         val directEndpointId = _connectedDevices.value.find { it.name == targetName }?.endpointId
 

@@ -32,7 +32,26 @@ class SetupViewModel(private val repository: MeshRepository) : ViewModel() {
         }
     }
 
+    fun saveIdentity(context: Context, name: String, tag: String) {
+        context.getSharedPreferences("resqmesh_prefs", Context.MODE_PRIVATE)
+            .edit()
+            .putString("custom_name", name)
+            .putString("node_tag", tag)
+            .apply()
+    }
+
+    fun getSavedName(context: Context): String {
+        return context.getSharedPreferences("resqmesh_prefs", Context.MODE_PRIVATE)
+            .getString("custom_name", android.os.Build.MODEL) ?: android.os.Build.MODEL
+    }
+
+    fun getSavedTag(context: Context): String {
+        return context.getSharedPreferences("resqmesh_prefs", Context.MODE_PRIVATE)
+            .getString("node_tag", "NODE") ?: "NODE"
+    }
+
     fun checkHardwareAndGoOnline(context: Context, customName: String, nodeTag: String, teamKey: String) {
+        saveIdentity(context, customName, nodeTag)
         val bluetoothManager = context.getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
         val bluetoothAdapter = bluetoothManager.adapter
         val locationManager = context.getSystemService(Context.LOCATION_SERVICE) as LocationManager

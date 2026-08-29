@@ -15,11 +15,8 @@ class BleCleanupService : Service() {
         super.onTaskRemoved(rootIntent)
         
         // This is triggered exactly when the user swipes the app away from the Recent Apps list.
-        // We must cleanly stop the BLE advertisement so we don't leave a "ghost" node on the network.
-        NativeBleManager.activeAdvertiseCallback?.let { callback ->
-            val manager = getSystemService(BLUETOOTH_SERVICE) as? android.bluetooth.BluetoothManager
-            manager?.adapter?.bluetoothLeAdvertiser?.stopAdvertising(callback)
-        }
+        // We must cleanly stop the BLE advertisement and disconnect GATT connections so peers update correctly.
+        NativeBleManager.instance?.stopMeshNode()
         
         stopSelf()
     }

@@ -78,11 +78,32 @@ fun ActiveChatScreen(
     var pendingImage by remember { mutableStateOf<String?>(null) }
     var pendingAudio by remember { mutableStateOf<String?>(null) }
     var isRecording by remember { mutableStateOf(false) }
+    var showDeleteDialog by remember { mutableStateOf(false) }
 
     // Fix: Prioritize connected device name, then look for the first message not sent by "Me"
-    val displayName = uiState.connectedDevices.find { it.endpointId == name }?.name 
-        ?: messages.firstOrNull { it.senderName != "Me" }?.senderName 
-        ?: name
+    val displayName = name
+
+    if (showDeleteDialog) {
+        AlertDialog(
+            onDismissRequest = { showDeleteDialog = false },
+            title = { Text("Delete Conversation") },
+            text = { Text("Are you sure you want to delete the entire conversation with $displayName? This action cannot be undone.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    showDeleteDialog = false
+                    viewModel.deleteConversationWith(displayName)
+                    onBack()
+                }) {
+                    Text("Delete", color = Color.Red)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteDialog = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
 
     Scaffold(
         topBar = {
@@ -117,8 +138,8 @@ fun ActiveChatScreen(
                         }
                     },
                     actions = {
-                        IconButton(onClick = {}) {
-                            Icon(Icons.Default.MoreHoriz, contentDescription = null, tint = Color.White)
+                        IconButton(onClick = { showDeleteDialog = true }) {
+                            Icon(Icons.Default.Delete, contentDescription = "Delete Conversation", tint = Color.White)
                         }
                     },
                     colors = TopAppBarDefaults.topAppBarColors(containerColor = InboxBackground)

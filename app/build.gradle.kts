@@ -2,6 +2,11 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.kotlin.serialization)
+    id("com.google.devtools.ksp") version "2.2.10-2.0.2"
+}
+
+ksp {
+    arg("room.generateKotlin", "true")
 }
 
 android {
@@ -64,4 +69,9 @@ dependencies {
     implementation("com.google.android.gms:play-services-location:21.3.0") // Fused Location for indoor accuracy
     implementation("org.osmdroid:osmdroid-android:6.1.18") // Offline-capable map rendering
     implementation(libs.kotlinx.serialization.protobuf)
+
+    val roomVersion = "2.6.1"
+    implementation("androidx.room:room-runtime:$roomVersion")
+    implementation("androidx.room:room-ktx:$roomVersion")
+    ksp("androidx.room:room-compiler:$roomVersion")
 }
