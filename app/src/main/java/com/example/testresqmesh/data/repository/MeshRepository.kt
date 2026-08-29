@@ -58,7 +58,14 @@ class MeshRepository(private val networkManager: NativeBleManager) {
         }
 
         networkManager.onDeviceConnected = { device ->
-            if (_connectedDevices.value.none { it.endpointId == device.endpointId }) {
+            val existing = _connectedDevices.value.find { it.endpointId == device.endpointId }
+            if (existing != null) {
+                if (device.isClassicConnected != existing.isClassicConnected) {
+                    _connectedDevices.value = _connectedDevices.value.map {
+                        if (it.endpointId == device.endpointId) device else it
+                    }
+                }
+            } else {
                 _connectedDevices.value = _connectedDevices.value + device
                 _scannedDevices.value = _scannedDevices.value.filter { it.endpointId != device.endpointId }
                 

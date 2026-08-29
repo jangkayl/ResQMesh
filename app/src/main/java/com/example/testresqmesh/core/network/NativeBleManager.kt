@@ -42,6 +42,8 @@ class NativeBleManager(private val context: Context) {
 
     private val SERVICE_UUID = UUID.fromString("0000180F-0000-1000-8000-00805F9B34FB")
     private val RX_CHARACTERISTIC_UUID = UUID.fromString("00002A19-0000-1000-8000-00805F9B34FB")
+    private val TX_CHARACTERISTIC_UUID = UUID.fromString("00002A1A-0000-1000-8000-00805F9B34FB")
+    private val CCC_DESCRIPTOR_UUID = UUID.fromString("00002902-0000-1000-8000-00805F9B34FB")
 
     private var gattServer: BluetoothGattServer? = null
     
@@ -54,6 +56,7 @@ class NativeBleManager(private val context: Context) {
     
     private val MAX_CONNECTIONS = 4
     private val activeConnections = ConcurrentHashMap<String, BluetoothGatt>()
+    private val activeServerConnections = ConcurrentHashMap<String, BluetoothDevice>()
     private val pendingQueues = ConcurrentHashMap<String, ConcurrentLinkedQueue<ByteArray>>()
     private val isWriting = ConcurrentHashMap<String, AtomicBoolean>()
     private val chunkBuffers = ConcurrentHashMap<String, ByteArray>() // Stores incomplete binary payloads
@@ -92,7 +95,7 @@ class NativeBleManager(private val context: Context) {
                 val entry = iterator.next()
                 val macAddress = entry.key
                 
-                if (activeConnections.containsKey(macAddress)) {
+                if (activeConnections.containsKey(macAddress) || activeServerConnections.containsKey(macAddress)) {
                     entry.setValue(now)
                     continue
                 }
@@ -268,11 +271,72 @@ val macAddress = device.address
             override fun onServicesDiscovered(gatt: BluetoothGatt, status: Int) {
                 if (status == BluetoothGatt.GATT_SUCCESS) {
                     AppLogger.d("BLE_MESH", "GATT Services discovered for ${macAddress}. Ready to transmit.")
-                    sendSystemPulse()
-                    processNextPayload(macAddress)
+                    
+                    val service = gatt.getService(SERVICE_UUID)
+                    val txChar = service?.getCharacteristic(TX_CHARACTERISTIC_UUID)
+                    var descriptorWritePending = false
+                    if (txChar != null) {
+                        gatt.setCharacteristicNotification(txChar, true)
+                        val descriptor = txChar.getDescriptor(CCC_DESCRIPTOR_UUID)
+                        if (descriptor != null) {
+                            descriptorWritePending = true
+                            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+                                gatt.writeDescriptor(descriptor, BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE)
+                            } else {
+                                descriptor.value = BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE
+                                gatt.writeDescriptor(descriptor)
+                            }
+                        }
+                    }
+                    
+                    if (!descriptorWritePending) {
+                        handler.postDelayed({
+                            sendSystemPulse()
+                            processNextPayload(macAddress)
+                        }, 500)
+                    }
                 } else {
                     gatt.disconnect()
                 }
+            }
+
+            override fun onDescriptorWrite(gatt: BluetoothGatt, descriptor: BluetoothGattDescriptor, status: Int) {
+                if (status == BluetoothGatt.GATT_SUCCESS) {
+                    handler.postDelayed({
+                        sendSystemPulse()
+                        processNextPayload(gatt.device.address)
+                    }, 500)
+                } else {
+                    gatt.disconnect()
+                }
+            }
+
+            override fun onCharacteristicChanged(gatt: BluetoothGatt, characteristic: BluetoothGattCharacteristic) {
+                val value = characteristic.value ?: return
+                
+                val currentBuffer = chunkBuffers[macAddress] ?: ByteArray(0)
+                val newBuffer = ByteArray(currentBuffer.size + value.size)
+                System.arraycopy(currentBuffer, 0, newBuffer, 0, currentBuffer.size)
+                System.arraycopy(value, 0, newBuffer, currentBuffer.size, value.size)
+                
+                var workingBuffer = newBuffer
+                while (workingBuffer.size >= 4) {
+                    val lengthBuffer = ByteBuffer.wrap(workingBuffer.sliceArray(0..3))
+                    val expectedLength = lengthBuffer.int
+                    
+                    if (workingBuffer.size >= 4 + expectedLength) {
+                        val payloadBytes = workingBuffer.sliceArray(4 until 4 + expectedLength)
+                        processBinaryPayload(macAddress, payloadBytes)
+                        
+                        val remaining = workingBuffer.size - (4 + expectedLength)
+                        val nextBuffer = ByteArray(remaining)
+                        System.arraycopy(workingBuffer, 4 + expectedLength, nextBuffer, 0, remaining)
+                        workingBuffer = nextBuffer
+                    } else {
+                        break
+                    }
+                }
+                chunkBuffers[macAddress] = workingBuffer
             }
 
             override fun onCharacteristicWrite(gatt: BluetoothGatt, char: BluetoothGattCharacteristic, status: Int) {
@@ -288,26 +352,51 @@ val macAddress = device.address
     }
 
     private fun processNextPayload(macAddress: String) {
-        val gatt = activeConnections[macAddress] ?: return
         val writing = isWriting[macAddress] ?: return
         val queue = pendingQueues[macAddress] ?: return
 
         if (writing.compareAndSet(false, true)) {
             val payload = queue.poll()
             if (payload != null) {
-                val service = gatt.getService(SERVICE_UUID)
-                val characteristic = service?.getCharacteristic(RX_CHARACTERISTIC_UUID)
-                if (characteristic != null) {
-                    characteristic.value = payload
-                    val success = gatt.writeCharacteristic(characteristic)
-                    if (!success) {
+                // Check if we are connected as a Client
+                val gatt = activeConnections[macAddress]
+                if (gatt != null) {
+                    val service = gatt.getService(SERVICE_UUID)
+                    val characteristic = service?.getCharacteristic(RX_CHARACTERISTIC_UUID)
+                    if (characteristic != null) {
+                        characteristic.value = payload
+                        val success = gatt.writeCharacteristic(characteristic)
+                        if (!success) {
+                            writing.set(false)
+                            gatt.disconnect()
+                        }
+                    } else {
                         writing.set(false)
                         gatt.disconnect()
                     }
-                } else {
-                    writing.set(false)
-                    gatt.disconnect()
+                    return
                 }
+                
+                // Check if we are connected as a Server
+                val serverDevice = activeServerConnections[macAddress]
+                val txChar = gattServer?.getService(SERVICE_UUID)?.getCharacteristic(TX_CHARACTERISTIC_UUID)
+                if (serverDevice != null && txChar != null) {
+                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+                        gattServer?.notifyCharacteristicChanged(serverDevice, txChar, false, payload)
+                    } else {
+                        txChar.value = payload
+                        gattServer?.notifyCharacteristicChanged(serverDevice, txChar, false)
+                    }
+                    // Notifications don't get an immediate callback for WRITE_NO_RESPONSE on all versions easily in this setup without onNotificationSent.
+                    // We artificially delay slightly to prevent buffer overflow, then process next.
+                    handler.postDelayed({
+                        writing.set(false)
+                        processNextPayload(macAddress)
+                    }, 20)
+                    return
+                }
+                
+                writing.set(false)
             } else {
                 writing.set(false)
             }
@@ -316,6 +405,27 @@ val macAddress = device.address
 
     private fun startGattServer() {
         val serverCallback = object : BluetoothGattServerCallback() {
+            
+            override fun onConnectionStateChange(device: BluetoothDevice, status: Int, newState: Int) {
+                val macAddress = device.address
+                if (newState == BluetoothProfile.STATE_CONNECTED) {
+                    AppLogger.d("BLE_MESH", "Server: Device ${macAddress} connected.")
+                    activeServerConnections[macAddress] = device
+                } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
+                    AppLogger.d("BLE_MESH", "Server: Device ${macAddress} disconnected.")
+                    activeServerConnections.remove(macAddress)
+                    handler.post {
+                        onDeviceDisconnected?.invoke(macAddress)
+                    }
+                }
+            }
+
+            override fun onDescriptorWriteRequest(device: BluetoothDevice, requestId: Int, descriptor: BluetoothGattDescriptor, preparedWrite: Boolean, responseNeeded: Boolean, offset: Int, value: ByteArray?) {
+                if (responseNeeded) {
+                    gattServer?.sendResponse(device, requestId, BluetoothGatt.GATT_SUCCESS, offset, value)
+                }
+            }
+
             override fun onCharacteristicWriteRequest(
                 device: BluetoothDevice, requestId: Int, characteristic: BluetoothGattCharacteristic,
                 preparedWrite: Boolean, responseNeeded: Boolean, offset: Int, value: ByteArray?
@@ -359,20 +469,30 @@ val macAddress = device.address
         gattServer = bluetoothManager.openGattServer(context, serverCallback)
         
         val service = BluetoothGattService(SERVICE_UUID, BluetoothGattService.SERVICE_TYPE_PRIMARY)
+        
         val rxChar = BluetoothGattCharacteristic(
             RX_CHARACTERISTIC_UUID,
             BluetoothGattCharacteristic.PROPERTY_WRITE or BluetoothGattCharacteristic.PROPERTY_WRITE_NO_RESPONSE,
             BluetoothGattCharacteristic.PERMISSION_WRITE
         )
         service.addCharacteristic(rxChar)
+
+        val txChar = BluetoothGattCharacteristic(
+            TX_CHARACTERISTIC_UUID,
+            BluetoothGattCharacteristic.PROPERTY_NOTIFY,
+            BluetoothGattCharacteristic.PERMISSION_READ
+        )
+        val cccDescriptor = BluetoothGattDescriptor(CCC_DESCRIPTOR_UUID, BluetoothGattDescriptor.PERMISSION_WRITE)
+        txChar.addDescriptor(cccDescriptor)
+        service.addCharacteristic(txChar)
+
         gattServer?.addService(service)
     }
 
     private fun processBinaryPayload(endpointId: String, payloadBytes: ByteArray) {
         try {
             val payload = kotlinx.serialization.protobuf.ProtoBuf.decodeFromByteArray(com.example.testresqmesh.core.network.MeshPayload.serializer(), payloadBytes)
-            val currentName = connectedEndpointNames[endpointId]
-            if (payload.senderName.isNotEmpty() && currentName != payload.senderName) {
+            if (payload.senderName.isNotEmpty()) {
                 connectedEndpointNames[endpointId] = payload.senderName
                 handler.post {
                     onDeviceConnected?.invoke(com.example.testresqmesh.core.model.ConnectedDevice(endpointId, payload.senderName, true))
@@ -387,7 +507,11 @@ val macAddress = device.address
 
     fun broadcastPayload(payloadBytes: ByteArray, excludeEndpointId: String? = null) {
         cacheOutgoingMessageId(payloadBytes)
-        val targets = connectedEndpointIds.filter { it != excludeEndpointId }
+        val targets = mutableSetOf<String>()
+        targets.addAll(activeConnections.keys)
+        targets.addAll(activeServerConnections.keys)
+        targets.remove(excludeEndpointId)
+        
         targets.forEach { targetId ->
             sendDirectPayload(targetId, payloadBytes)
         }
@@ -413,14 +537,18 @@ val macAddress = device.address
             offset += length
         }
         
-        val queue = pendingQueues[targetMacAddress]
-        if (queue != null && activeConnections.containsKey(targetMacAddress)) {
-            chunks.forEach { queue.add(it) }
+        val isServerConnected = activeServerConnections.containsKey(targetMacAddress)
+        val isClientConnected = activeConnections.containsKey(targetMacAddress)
+        
+        val queue = pendingQueues.getOrPut(targetMacAddress) { ConcurrentLinkedQueue<ByteArray>() }
+        chunks.forEach { queue.add(it) }
+        
+        isWriting.putIfAbsent(targetMacAddress, AtomicBoolean(false))
+
+        if (isServerConnected || isClientConnected) {
             processNextPayload(targetMacAddress)
         } else {
             if (activeConnections.size < MAX_CONNECTIONS) {
-                val newQueue = pendingQueues.getOrPut(targetMacAddress) { ConcurrentLinkedQueue<ByteArray>() }
-                chunks.forEach { newQueue.add(it) }
                 connectToPersistentGatt(targetMacAddress, connectedEndpointNames[targetMacAddress] ?: "Unknown")
             } else {
                 AppLogger.d("BLE_MESH", "Dropped payload for ${targetMacAddress} because GATT Mesh is at MAX_CONNECTIONS capacity.")

@@ -31,6 +31,11 @@ class RadarViewModel(private val repository: MeshRepository) : ViewModel() {
                 _uiState.update { it.copy(blockedDeviceNames = blocked) }
             }
         }
+        viewModelScope.launch {
+            repository.knownNodes.collect { known ->
+                _uiState.update { it.copy(knownNodes = known) }
+            }
+        }
     }
 
     fun rescan() {

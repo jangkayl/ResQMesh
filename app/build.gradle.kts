@@ -61,7 +61,6 @@ dependencies {
     debugImplementation(libs.androidx.compose.ui.test.manifest)
     debugImplementation(libs.androidx.compose.ui.tooling)
 
-    implementation("com.google.android.gms:play-services-nearby:19.3.0") // Updated to latest stable version
     implementation("com.google.android.gms:play-services-location:21.3.0") // Fused Location for indoor accuracy
     implementation("org.osmdroid:osmdroid-android:6.1.18") // Offline-capable map rendering
     implementation(libs.kotlinx.serialization.protobuf)

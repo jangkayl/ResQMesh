@@ -15,6 +15,7 @@ data class ConnectionUiState(
 data class RadarUiState(
     val scannedDevices: List<ScannedDevice> = emptyList(),
     val connectedDevices: List<ConnectedDevice> = emptyList(),
+    val knownNodes: List<KnownNode> = emptyList(),
     val blockedDeviceNames: Set<String> = emptySet()
 )
 

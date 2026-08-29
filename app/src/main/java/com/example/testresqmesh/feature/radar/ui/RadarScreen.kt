@@ -39,16 +39,19 @@ fun RadarScreen(viewModel: RadarViewModel) {
     val uiState by viewModel.uiState.collectAsState()
     
     // Create a set of names that are already connected for visual filtering
-    val connectedIds = uiState.connectedDevices.map { it.endpointId }.toSet()
+    val connectedNames = uiState.connectedDevices.map { it.name }.toSet()
 
-    val connectedNodes = uiState.connectedDevices.map { 
-        val statusText = if (it.isClassicConnected) "Connected (Bluetooth)" else "Online"
-        NodeItemData(it.endpointId, it.name, statusText, isConnected = true, isActiveRelay = true)
-    }
+    val connectedNodes = uiState.connectedDevices
+        .distinctBy { it.name }
+        .map { 
+            val statusText = if (it.isClassicConnected) "Connected (Bluetooth)" else "Online"
+            NodeItemData(it.endpointId, it.name, statusText, isConnected = true, isActiveRelay = true)
+        }
     
     // VISUAL-ONLY FILTER: Hide any scanned node that has the same name as a connected one
     val scannedNodes = uiState.scannedDevices
-        .filter { it.endpointId !in connectedIds }
+        .filter { it.name !in connectedNames }
+        .distinctBy { it.name }
         .map {
             val displayStatus = if (it.isConnecting) "SYNCING..." else "Offline"
             NodeItemData(
@@ -63,6 +66,7 @@ fun RadarScreen(viewModel: RadarViewModel) {
 
     // Include blocked devices that are completely out of range so the user can still unblock them
     val scannedAndConnectedNames = uiState.connectedDevices.map { it.name }.toSet() + scannedNodes.map { it.name }
+    
     val offlineBlockedNodes = uiState.blockedDeviceNames
         .filter { it !in scannedAndConnectedNames }
         .map { name ->
@@ -76,9 +80,22 @@ fun RadarScreen(viewModel: RadarViewModel) {
             )
         }
 
+    val offlineTrackedNodes = uiState.knownNodes
+        .filter { it.name !in scannedAndConnectedNames && !uiState.blockedDeviceNames.contains(it.name) }
+        .map { node ->
+            NodeItemData(
+                endpointId = "",
+                name = node.name,
+                status = "OFFLINE (Last Seen: ${java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault()).format(java.util.Date(node.lastSeen))})",
+                isConnected = false,
+                isActiveRelay = false,
+                isBlocked = false
+            )
+        }
+
     RadarScreenContent(
         activeNodesCount = uiState.connectedDevices.size + scannedNodes.size,
-        nodes = connectedNodes + scannedNodes + offlineBlockedNodes,
+        nodes = connectedNodes + scannedNodes + offlineBlockedNodes + offlineTrackedNodes,
         onRefresh = { viewModel.rescan() },
         onDisconnect = { viewModel.disconnectDevice(it) },
         onForceConnect = { id, name -> viewModel.forceConnect(id, name) },
@@ -272,8 +289,29 @@ fun RadarScreenContent(
                     .padding(horizontal = Spacing.Medium),
                 verticalArrangement = Arrangement.spacedBy(Spacing.Small)
             ) {
-                nodes.forEach { node ->
-                    NearbyNodeItem(node, onDisconnect, onForceConnect, onBlock, onUnblock)
+                val connectedNodesList = nodes.filter { it.status.contains("Connected", ignoreCase = true) }
+                val onlineNodesList = nodes.filter { it.status.contains("Online", ignoreCase = true) || it.status.contains("SYNCING") }
+                val offlineNodesList = nodes.filter { it.status.contains("OFFLINE", ignoreCase = true) }
+
+                if (connectedNodesList.isNotEmpty()) {
+                    Text("CONNECTED", style = MaterialTheme.typography.labelSmall, color = InboxAccentBlue, modifier = Modifier.padding(top = Spacing.Small))
+                    connectedNodesList.forEach { node ->
+                        NearbyNodeItem(node, onDisconnect, onForceConnect, onBlock, onUnblock)
+                    }
+                }
+
+                if (onlineNodesList.isNotEmpty()) {
+                    Text("ONLINE", style = MaterialTheme.typography.labelSmall, color = Color(0xFF10B981), modifier = Modifier.padding(top = Spacing.Small))
+                    onlineNodesList.forEach { node ->
+                        NearbyNodeItem(node, onDisconnect, onForceConnect, onBlock, onUnblock)
+                    }
+                }
+                
+                if (offlineNodesList.isNotEmpty()) {
+                    Text("BLOCKED", style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.4f), modifier = Modifier.padding(top = Spacing.Small))
+                    offlineNodesList.forEach { node ->
+                        NearbyNodeItem(node, onDisconnect, onForceConnect, onBlock, onUnblock)
+                    }
                 }
                 
                 if (nodes.isEmpty()) {

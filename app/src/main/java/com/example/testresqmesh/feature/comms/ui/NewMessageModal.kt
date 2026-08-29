@@ -110,7 +110,7 @@ fun NewMessageModal(uiState: ChatUiState, onDismiss: () -> Unit, onNodeSelected:
 
         Spacer(modifier = Modifier.height(Spacing.Medium))
 
-        val nodesInRange = uiState.knownNodes.map { node ->
+        val nodesInRange = uiState.knownNodes.distinctBy { it.name }.map { node ->
             RangeNode(
                 name = node.name, 
                 id = "NODE",
