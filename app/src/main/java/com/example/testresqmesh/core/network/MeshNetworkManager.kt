@@ -18,7 +18,20 @@ import kotlinx.coroutines.flow.asStateFlow
 class MeshNetworkManager(private val context: Context) {
 
     private val notificationHelper = NotificationHelper(context)
-    private val connectionsClient = Nearby.getConnectionsClient(context)
+    // Google Nearby Connections is disabled. Running purely on Native BLE.
+    // private val connectionsClient = Nearby.getConnectionsClient(context)
+    private val connectionsClient = object {
+        fun stopAllEndpoints() {}
+        fun stopAdvertising() {}
+        fun stopDiscovery() {}
+        fun startAdvertising(a:Any,b:Any,c:Any,d:Any) = com.google.android.gms.tasks.Tasks.forResult<Void>(null)
+        fun startDiscovery(a:Any,b:Any,c:Any) = com.google.android.gms.tasks.Tasks.forResult<Void>(null)
+        fun disconnectFromEndpoint(a:Any) {}
+        fun sendPayload(a:Any,b:Any) {}
+        fun requestConnection(a:Any,b:Any,c:Any) = com.google.android.gms.tasks.Tasks.forResult<Void>(null)
+        fun rejectConnection(a:Any) {}
+        fun acceptConnection(a:Any,b:Any) {}
+    }
     var myDeviceName: String = ""
     private var myPowerScore: Int = 0
     private val pendingNames = mutableMapOf<String, String>()
