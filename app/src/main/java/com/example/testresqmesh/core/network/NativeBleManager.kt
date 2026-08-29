@@ -61,6 +61,7 @@ class NativeBleManager(private val context: Context) {
     private val isWriting = ConcurrentHashMap<String, AtomicBoolean>()
     private val chunkBuffers = ConcurrentHashMap<String, ByteArray>() // Stores incomplete binary payloads
     private val connectionAttempts = ConcurrentHashMap<String, Long>()
+    private val connectionInteractionTimes = ConcurrentHashMap<String, Long>()
 
     private val payloadDispatcher = PayloadDispatcher(object : PayloadDispatcherCallback {
         override fun getMyDeviceName() = myDeviceName
@@ -272,9 +273,10 @@ class NativeBleManager(private val context: Context) {
                 if (newState == BluetoothProfile.STATE_CONNECTED) {
                     AppLogger.d("BLE_MESH", "GATT Socket locked with ${peerName}. Requesting MTU 512...")
                     activeConnections[macAddress] = gatt
-                    pendingQueues[macAddress] = ConcurrentLinkedQueue<ByteArray>()
-                    isWriting[macAddress] = AtomicBoolean(false)
-                    chunkBuffers[macAddress] = ByteArray(0)
+                    pendingQueues.putIfAbsent(macAddress, ConcurrentLinkedQueue<ByteArray>())
+                    isWriting.putIfAbsent(macAddress, AtomicBoolean(false))
+                    chunkBuffers.putIfAbsent(macAddress, ByteArray(0))
+                    connectionInteractionTimes.putIfAbsent(macAddress, System.currentTimeMillis())
                     
                     handler.post {
                         onDeviceConnected?.invoke(ConnectedDevice(macAddress, peerName, isClassicConnected = true))
@@ -347,6 +349,7 @@ class NativeBleManager(private val context: Context) {
 
             override fun onCharacteristicChanged(gatt: BluetoothGatt, characteristic: BluetoothGattCharacteristic) {
                 val value = characteristic.value ?: return
+                connectionInteractionTimes[macAddress] = System.currentTimeMillis()
                 
                 val currentBuffer = chunkBuffers[macAddress] ?: ByteArray(0)
                 val newBuffer = ByteArray(currentBuffer.size + value.size)
@@ -392,6 +395,8 @@ class NativeBleManager(private val context: Context) {
         if (writing.compareAndSet(false, true)) {
             val payload = queue.poll()
             if (payload != null) {
+                connectionInteractionTimes[macAddress] = System.currentTimeMillis()
+                
                 // Check if we are connected as a Client
                 val gatt = activeConnections[macAddress]
                 if (gatt != null) {
@@ -445,6 +450,10 @@ class NativeBleManager(private val context: Context) {
                 if (newState == BluetoothProfile.STATE_CONNECTED) {
                     AppLogger.d("BLE_MESH", "Server: Device ${macAddress} connected.")
                     activeServerConnections[macAddress] = device
+                    pendingQueues.putIfAbsent(macAddress, ConcurrentLinkedQueue<ByteArray>())
+                    isWriting.putIfAbsent(macAddress, AtomicBoolean(false))
+                    chunkBuffers.putIfAbsent(macAddress, ByteArray(0))
+                    connectionInteractionTimes.putIfAbsent(macAddress, System.currentTimeMillis())
                 } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
                     AppLogger.d("BLE_MESH", "Server: Device ${macAddress} disconnected.")
                     activeServerConnections.remove(macAddress)
@@ -470,6 +479,7 @@ class NativeBleManager(private val context: Context) {
                 }
                 value?.let {
                     val macAddress = device.address
+                    connectionInteractionTimes[macAddress] = System.currentTimeMillis()
                     
                     val currentBuffer = chunkBuffers[macAddress] ?: ByteArray(0)
                     val newBuffer = ByteArray(currentBuffer.size + it.size)
@@ -582,11 +592,29 @@ class NativeBleManager(private val context: Context) {
         if (isServerConnected || isClientConnected) {
             processNextPayload(targetMacAddress)
         } else {
-            if (activeConnections.size < MAX_CONNECTIONS) {
-                connectToPersistentGatt(targetMacAddress, connectedEndpointNames[targetMacAddress] ?: "Unknown")
-            } else {
-                AppLogger.d("BLE_MESH", "Dropped payload for ${targetMacAddress} because GATT Mesh is at MAX_CONNECTIONS capacity.")
+            if (activeConnections.size >= MAX_CONNECTIONS) {
+                // VIP BOUNCER (LRU EVICTION)
+                val lruMac = connectionInteractionTimes
+                    .filterKeys { activeConnections.containsKey(it) }
+                    .minByOrNull { it.value }?.key
+                    
+                val macToEvict = lruMac ?: activeConnections.keys.firstOrNull()
+                
+                if (macToEvict != null) {
+                    AppLogger.d("BLE_MESH", "Evicting $macToEvict to make room for VIP connection to $targetMacAddress")
+                    activeConnections[macToEvict]?.disconnect()
+                    activeConnections[macToEvict]?.close()
+                    activeConnections.remove(macToEvict)
+                    pendingQueues.remove(macToEvict)
+                    isWriting.remove(macToEvict)
+                    chunkBuffers.remove(macToEvict)
+                    connectionInteractionTimes.remove(macToEvict)
+                    handler.post {
+                        onDeviceDisconnected?.invoke(macToEvict)
+                    }
+                }
             }
+            connectToPersistentGatt(targetMacAddress, connectedEndpointNames[targetMacAddress] ?: "Unknown")
         }
     }
 
