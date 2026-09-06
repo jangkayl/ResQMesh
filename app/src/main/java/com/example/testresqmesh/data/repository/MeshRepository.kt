@@ -41,6 +41,7 @@ class MeshRepository(
 
     private val meshRouter = MeshRouter()
     val knownNodes = meshRouter.knownNodes
+    val topology = meshRouter.topology
 
     private val repositoryScope = CoroutineScope(Dispatchers.Default)
 
@@ -105,6 +106,16 @@ class MeshRepository(
         networkManager.onRoutingTableReceived = { senderName, connectedNodes ->
             meshRouter.updateTopology(senderName, connectedNodes, myNodeName)
             meshRouter.recalculateKnownNodes(myNodeName, _connectedDevices.value)
+        }
+
+        networkManager.onDeviceBlocked = { senderName ->
+            _blockedDeviceNames.value = _blockedDeviceNames.value + senderName
+            networkManager.blockDevice(senderName)
+        }
+
+        networkManager.onDeviceUnblocked = { senderName ->
+            _blockedDeviceNames.value = _blockedDeviceNames.value - senderName
+            networkManager.unblockDevice(senderName)
         }
 
 
@@ -254,10 +265,37 @@ class MeshRepository(
 
     fun blockDevice(deviceName: String) {
         _blockedDeviceNames.value = _blockedDeviceNames.value + deviceName
+        networkManager.blockDevice(deviceName)
+        sendSystemCommand(deviceName, "BLOCK")
     }
 
     fun unblockDevice(deviceName: String) {
         _blockedDeviceNames.value = _blockedDeviceNames.value - deviceName
+        networkManager.unblockDevice(deviceName)
+        sendSystemCommand(deviceName, "UNBLOCK")
+    }
+
+    private fun sendSystemCommand(targetName: String, commandType: String) {
+        val payloadBytes = PayloadFactory.buildPrivatePayload(
+            msgId = UUID.randomUUID().toString(),
+            timestamp = System.currentTimeMillis(),
+            senderName = myNodeName,
+            targetName = targetName,
+            text = "",
+            imageBase64 = null,
+            audioBase64 = null,
+            locationLat = null,
+            locationLng = null,
+            directedRoute = meshRouter.findShortestPath(myNodeName, targetName, _connectedDevices.value),
+            targetPubKey = publicKeys[targetName]
+        ).let {
+            // We need to override the type in the byte array or construct a custom payload.
+            // Since PayloadFactory builds ChatMessage payloads, we'll decode, change type, encode.
+            val decoded = kotlinx.serialization.protobuf.ProtoBuf.decodeFromByteArray(com.example.testresqmesh.core.network.MeshPayload.serializer(), it)
+            val updated = decoded.copy(type = commandType)
+            kotlinx.serialization.protobuf.ProtoBuf.encodeToByteArray(com.example.testresqmesh.core.network.MeshPayload.serializer(), updated)
+        }
+        networkManager.broadcastPayload(payloadBytes)
     }
 
     fun forceConnect(endpointId: String, endpointName: String) {

@@ -37,6 +37,11 @@ import com.example.testresqmesh.core.utils.AppLogger
 @Composable
 fun RadarScreen(viewModel: RadarViewModel) {
     val uiState by viewModel.uiState.collectAsState()
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val prefs = context.getSharedPreferences("resqmesh_prefs", android.content.Context.MODE_PRIVATE)
+    val customName = prefs.getString("custom_name", android.os.Build.MODEL) ?: android.os.Build.MODEL
+    val tag = prefs.getString("node_tag", "NODE") ?: "NODE"
+    val myDeviceName = "$customName [$tag]"
     
     // Create a set of names that are already connected for visual filtering
     val connectedNames = uiState.connectedDevices.map { it.name }.toSet()
@@ -96,6 +101,8 @@ fun RadarScreen(viewModel: RadarViewModel) {
     RadarScreenContent(
         activeNodesCount = connectedNodes.size + scannedNodes.size,
         nodes = connectedNodes + scannedNodes + offlineBlockedNodes + offlineTrackedNodes,
+        topology = uiState.topology,
+        myDeviceName = myDeviceName,
         onRefresh = { viewModel.rescan() },
         onDisconnect = { viewModel.disconnectDevice(it) },
         onForceConnect = { id, name -> viewModel.forceConnect(id, name) },
@@ -109,22 +116,14 @@ fun RadarScreen(viewModel: RadarViewModel) {
 fun RadarScreenContent(
     activeNodesCount: Int,
     nodes: List<NodeItemData>,
+    topology: Map<String, Set<String>>,
+    myDeviceName: String,
     onRefresh: () -> Unit,
     onDisconnect: (String) -> Unit,
     onForceConnect: (String, String) -> Unit,
     onBlock: (String) -> Unit,
     onUnblock: (String) -> Unit
 ) {
-    val infiniteTransition = rememberInfiniteTransition()
-    val radarSweep by infiniteTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = 360f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(4000, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart
-        )
-    )
-
     Scaffold(
         topBar = {
             TopAppBar(
@@ -181,50 +180,7 @@ fun RadarScreenContent(
                     }
                 }
 
-                Canvas(modifier = Modifier.size(240.dp)) {
-                    val center = size.center
-                    val radius = size.minDimension / 2
-                    
-                    // Circles
-                    drawCircle(color = Color.White.copy(alpha = 0.05f), radius = radius)
-                    drawCircle(color = Color.White.copy(alpha = 0.05f), radius = radius * 0.75f, style = Stroke(1.dp.toPx()))
-                    drawCircle(color = Color.White.copy(alpha = 0.05f), radius = radius * 0.5f, style = Stroke(1.dp.toPx()))
-                    drawCircle(color = Color.White.copy(alpha = 0.05f), radius = radius * 0.25f, style = Stroke(1.dp.toPx()))
-                    
-                    // Crosshair lines
-                    drawLine(color = Color.White.copy(alpha = 0.1f), start = androidx.compose.ui.geometry.Offset(0f, center.y), end = androidx.compose.ui.geometry.Offset(size.width, center.y))
-                    drawLine(color = Color.White.copy(alpha = 0.1f), start = androidx.compose.ui.geometry.Offset(center.x, 0f), end = androidx.compose.ui.geometry.Offset(center.x, size.height))
-
-                    // Sweep
-                    drawArc(
-                        color = InboxAccentBlue.copy(alpha = 0.3f),
-                        startAngle = radarSweep,
-                        sweepAngle = 60f,
-                        useCenter = true,
-                        size = size
-                    )
-                    
-                    // Dynamic Nodes (the orange dots)
-                    nodes.forEach { node ->
-                        // Deterministic position based on name
-                        val random = java.util.Random(node.name.hashCode().toLong())
-                        val angle = random.nextFloat() * 360f
-                        val distance = (0.3f + random.nextFloat() * 0.6f) * radius
-                        
-                        val x = center.x + distance * kotlin.math.cos(Math.toRadians(angle.toDouble())).toFloat()
-                        val y = center.y + distance * kotlin.math.sin(Math.toRadians(angle.toDouble())).toFloat()
-                        
-                        drawCircle(
-                            color = Color(0xFFF97316), 
-                            radius = 5.dp.toPx(), 
-                            center = androidx.compose.ui.geometry.Offset(x, y)
-                        )
-                    }
-
-                    // Center point (Me)
-                    drawCircle(color = Color.White, radius = 4.dp.toPx(), center = center)
-                    drawCircle(color = InboxAccentBlue, radius = 8.dp.toPx(), center = center, style = Stroke(2.dp.toPx()))
-                }
+                NetworkGraphVisualizer(topology = topology, myDeviceName = myDeviceName, connectedNodes = nodes.filter { it.isConnected }.map { it.name })
                 
                 Text(
                     "SCAN RANGE: 1.2KM",
@@ -475,6 +431,8 @@ fun RadarScreenPreview() {
         RadarScreenContent(
             activeNodesCount = 6,
             nodes = mockNodes,
+            topology = emptyMap(),
+            myDeviceName = "Me",
             onRefresh = {},
             onDisconnect = {},
             onForceConnect = { _, _ -> },

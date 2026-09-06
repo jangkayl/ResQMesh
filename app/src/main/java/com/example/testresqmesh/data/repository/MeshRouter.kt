@@ -13,6 +13,9 @@ class MeshRouter {
     private val networkGraph = mutableMapOf<String, Set<String>>()
     private val lastSeenMap = mutableMapOf<String, Long>()
     
+    private val _topology = MutableStateFlow<Map<String, Set<String>>>(emptyMap())
+    val topology: StateFlow<Map<String, Set<String>>> = _topology.asStateFlow()
+    
     private val _knownNodes = MutableStateFlow<List<KnownNode>>(emptyList())
     val knownNodes: StateFlow<List<KnownNode>> = _knownNodes.asStateFlow()
 
@@ -20,6 +23,7 @@ class MeshRouter {
         if (senderName != myNodeName) {
             lastSeenMap[senderName] = System.currentTimeMillis()
             networkGraph[senderName] = connectedNodes.toSet()
+            _topology.value = networkGraph.toMap()
             
             connectedNodes.forEach { node ->
                 if (node != myNodeName) {
@@ -35,6 +39,7 @@ class MeshRouter {
 
     fun removeNode(nodeName: String) {
         networkGraph.remove(nodeName)
+        _topology.value = networkGraph.toMap()
         lastSeenMap.remove(nodeName)
     }
 
@@ -106,6 +111,7 @@ class MeshRouter {
                 }
                 
                 if (changed) {
+                    _topology.value = networkGraph.toMap()
                     recalculateKnownNodes(myNodeName(), connectedDevices())
                 }
             }

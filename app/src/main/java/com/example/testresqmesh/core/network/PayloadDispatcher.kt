@@ -34,10 +34,30 @@ class PayloadDispatcher(private val callback: PayloadDispatcherCallback) {
                 "SYSTEM" -> handleSystemPulse(endpointId, msgId, sender, payloadBytes, payload)
                 "SEEN", "DELIVERED" -> handleReceipt(endpointId, payload.type, msgId, sender, payloadBytes, payload)
                 "GOODBYE" -> handleGoodbye(endpointId, sender, payloadBytes)
+                "BLOCK" -> handleBlock(endpointId, payload, payloadBytes)
+                "UNBLOCK" -> handleUnblock(endpointId, payload, payloadBytes)
                 else -> handleStandardMessage(endpointId, msgId, sender, payloadBytes, payload)
             }
         } catch (e: Exception) {
             AppLogger.d("PAYLOAD_DISPATCHER", "Error parsing Protobuf payload: ${e.message}")
+        }
+    }
+
+    private fun handleBlock(endpointId: String, payload: MeshPayload, payloadBytes: ByteArray) {
+        val targetName = payload.targetName
+        if (targetName == callback.getMyDeviceName()) {
+            callback.onDeviceBlocked(payload.senderName)
+        } else if (targetName.isNotEmpty()) {
+            callback.broadcastPayload(payloadBytes, endpointId)
+        }
+    }
+
+    private fun handleUnblock(endpointId: String, payload: MeshPayload, payloadBytes: ByteArray) {
+        val targetName = payload.targetName
+        if (targetName == callback.getMyDeviceName()) {
+            callback.onDeviceUnblocked(payload.senderName)
+        } else if (targetName.isNotEmpty()) {
+            callback.broadcastPayload(payloadBytes, endpointId)
         }
     }
 

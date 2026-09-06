@@ -19,6 +19,10 @@ interface PayloadDispatcherCallback {
     fun onDeviceGoodbye(endpointId: String)
     fun onSosCancelled()
     
+    fun isDeviceBlocked(deviceName: String): Boolean
+    fun onDeviceBlocked(deviceName: String)
+    fun onDeviceUnblocked(deviceName: String)
+    
     fun showNotification(sender: String, text: String)
     fun showSosEmergencyNotification(sender: String, text: String)
 }

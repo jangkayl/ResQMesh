@@ -32,6 +32,8 @@ class NativeBleManager(private val context: Context) {
     var onRoutingTableReceived: ((String, List<String>) -> Unit)? = null
     var onSosCancelled: (() -> Unit)? = null
     var onStatusChanged: ((String) -> Unit)? = null
+    var onDeviceBlocked: ((String) -> Unit)? = null
+    var onDeviceUnblocked: ((String) -> Unit)? = null
 
     var myDeviceName: String = "ResQMesh_Node"
 
@@ -53,15 +55,20 @@ class NativeBleManager(private val context: Context) {
     
     private val isNodeActive = java.util.concurrent.atomic.AtomicBoolean(false)
     private val notificationHelper = NotificationHelper(context)
-    
+    private var currentTeamKey: String = ""
+    private var isCloaked = false
+    private val MAX_TOTAL_CONNECTIONS = 3
+    private val isConnecting = java.util.concurrent.atomic.AtomicBoolean(false)
     private val MAX_CONNECTIONS = 4
     private val activeConnections = ConcurrentHashMap<String, BluetoothGatt>()
     private val activeServerConnections = ConcurrentHashMap<String, BluetoothDevice>()
     private val pendingQueues = ConcurrentHashMap<String, ConcurrentLinkedQueue<ByteArray>>()
     private val isWriting = ConcurrentHashMap<String, AtomicBoolean>()
-    private val chunkBuffers = ConcurrentHashMap<String, ByteArray>() // Stores incomplete binary payloads
+    private val chunkBuffers = ConcurrentHashMap<String, ByteArray>()
+    private val connectionMtu = ConcurrentHashMap<String, Int>() // Stores incomplete binary payloads
     private val connectionAttempts = ConcurrentHashMap<String, Long>()
     private val connectionInteractionTimes = ConcurrentHashMap<String, Long>()
+    private val blockedDevices = ConcurrentHashMap<String, Boolean>()
 
     private val payloadDispatcher = PayloadDispatcher(object : PayloadDispatcherCallback {
         override fun getMyDeviceName() = myDeviceName
@@ -85,6 +92,7 @@ class NativeBleManager(private val context: Context) {
                 val isClient = activeConnections.containsKey(endpointId)
                 handler.post {
                     onDeviceConnected?.invoke(ConnectedDevice(endpointId, realName, isClassicConnected = isClient))
+                    sendSystemPulse()
                 }
             }
         }
@@ -96,6 +104,9 @@ class NativeBleManager(private val context: Context) {
             }
         }
         override fun onSosCancelled() { this@NativeBleManager.onSosCancelled?.invoke() }
+        override fun isDeviceBlocked(deviceName: String) = blockedDevices[deviceName] == true
+        override fun onDeviceBlocked(deviceName: String) { this@NativeBleManager.onDeviceBlocked?.invoke(deviceName) }
+        override fun onDeviceUnblocked(deviceName: String) { this@NativeBleManager.onDeviceUnblocked?.invoke(deviceName) }
         override fun showNotification(sender: String, text: String) { notificationHelper.showPrivateMessageNotification(sender, text) }
         override fun showSosEmergencyNotification(sender: String, text: String) {
             if (!com.example.testresqmesh.MainActivity.isAppInForeground) {
@@ -128,6 +139,7 @@ class NativeBleManager(private val context: Context) {
                     AppLogger.d("BLE_MESH", "Node Timed Out: ${macAddress}")
                     onDeviceDisconnected?.invoke(macAddress)
                     onDeviceScanRemoved?.invoke(macAddress)
+                    sendSystemPulse()
                 }
             }
             handler.postDelayed(this, 5000)
@@ -141,6 +153,8 @@ class NativeBleManager(private val context: Context) {
     }
 
     fun startMeshNode(teamKey: String) {
+        currentTeamKey = teamKey
+        isCloaked = false
         if (bleAdvertiser == null || bleScanner == null) {
             onStatusChanged?.invoke("Hardware not fully supported")
             return
@@ -148,8 +162,6 @@ class NativeBleManager(private val context: Context) {
         isNodeActive.set(true)
         activeAdvertiseCallback = advertiseCallback
         instance = this
-        
-        context.startService(android.content.Intent(context, BleCleanupService::class.java))
         
         startGattServer()
         startAdvertising(teamKey)
@@ -232,6 +244,23 @@ class NativeBleManager(private val context: Context) {
 
     private val advertiseCallback = object : AdvertiseCallback() {}
 
+    private fun updateInvisibilityCloak() {
+        if (!isNodeActive.get()) return
+        val totalConnections = activeConnections.size + activeServerConnections.size
+        
+        if (totalConnections >= MAX_TOTAL_CONNECTIONS && !isCloaked) {
+            AppLogger.d("BLE_MESH", "Max connections reached (). Engaging Invisibility Cloak (Stopping Advertiser).")
+            try { bleAdvertiser?.stopAdvertising(advertiseCallback) } catch (e: Exception) {}
+            isCloaked = true
+        } else if (totalConnections < MAX_TOTAL_CONNECTIONS && isCloaked) {
+            AppLogger.d("BLE_MESH", "Connections dropped to . Dropping Cloak (Restarting Advertiser).")
+            if (currentTeamKey.isNotEmpty()) {
+                startAdvertising(currentTeamKey)
+            }
+            isCloaked = false
+        }
+    }
+
     private fun startScanning() {
         val filters = listOf(ScanFilter.Builder().setServiceUuid(ParcelUuid(SERVICE_UUID)).build())
         val settings = ScanSettings.Builder()
@@ -250,6 +279,10 @@ class NativeBleManager(private val context: Context) {
             val peerName = String(serviceData, Charsets.UTF_8).replace("\u0000", "").trim()
             val macAddress = device.address
 
+            if (blockedDevices[peerName] == true) {
+                return
+            }
+
             if (peerName != myDeviceName && peerName != myDeviceName.take(20)) {
                 val now = System.currentTimeMillis()
                 endpointLastSeen[macAddress] = now
@@ -265,12 +298,22 @@ class NativeBleManager(private val context: Context) {
                     onDeviceConnected?.invoke(ConnectedDevice(macAddress, peerName, isClassicConnected = false))
                 }
 
-                if (!activeConnections.containsKey(macAddress) && activeConnections.size < MAX_CONNECTIONS) {
-                    val lastAttempt = connectionAttempts[macAddress] ?: 0L
-                    if (now - lastAttempt > 5000) {
-                        connectionAttempts[macAddress] = now
-                        AppLogger.d("BLE_MESH", "Auto-connecting Persistent GATT to ${peerName}")
-                        connectToPersistentGatt(macAddress, peerName)
+                val isConnectedAsClient = activeConnections.containsKey(macAddress)
+                val isConnectedAsServer = activeServerConnections.containsKey(macAddress)
+                
+                if (!isConnectedAsClient && !isConnectedAsServer) {
+                    val totalConnections = activeConnections.size + activeServerConnections.size
+                    if (totalConnections < MAX_TOTAL_CONNECTIONS) {
+                        val lastAttempt = connectionAttempts[macAddress] ?: 0L
+                        if (now - lastAttempt > 5000) {
+                            connectionAttempts[macAddress] = now
+                            if (myDeviceName > peerName) {
+                                AppLogger.d("BLE_MESH", "Alphabetical Mesh Rule: $myDeviceName > $peerName. Initiating connection.")
+                                connectToPersistentGatt(macAddress, peerName)
+                            } else {
+                                AppLogger.d("BLE_MESH", "Alphabetical Mesh Rule: $myDeviceName <= $peerName. Waiting for peer to connect.")
+                            }
+                        }
                     }
                 }
             }
@@ -278,6 +321,11 @@ class NativeBleManager(private val context: Context) {
     }
 
     private fun connectToPersistentGatt(macAddress: String, peerName: String) {
+        if (!isConnecting.compareAndSet(false, true)) {
+            AppLogger.d("BLE_MESH", "Already connecting to another device. Queuing connection to  for later.")
+            return
+        }
+
         val device = bluetoothAdapter.getRemoteDevice(macAddress)
         
         device.connectGatt(context, false, object : BluetoothGattCallback() {
@@ -289,6 +337,7 @@ class NativeBleManager(private val context: Context) {
                     isWriting.putIfAbsent(macAddress, AtomicBoolean(false))
                     chunkBuffers.putIfAbsent(macAddress, ByteArray(0))
                     connectionInteractionTimes.putIfAbsent(macAddress, System.currentTimeMillis())
+                    updateInvisibilityCloak()
                     
                     handler.post {
                         onDeviceConnected?.invoke(ConnectedDevice(macAddress, peerName, isClassicConnected = true))
@@ -296,23 +345,33 @@ class NativeBleManager(private val context: Context) {
                     gatt.requestMtu(512)
                 } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
                     AppLogger.d("BLE_MESH", "GATT Socket disconnected from ${peerName}.")
+                    isConnecting.set(false)
                     activeConnections.remove(macAddress)
                     pendingQueues.remove(macAddress)
                     isWriting.remove(macAddress)
                     chunkBuffers.remove(macAddress)
+                    updateInvisibilityCloak()
+                    connectedEndpointIds.remove(macAddress)
+                    connectedEndpointNames.remove(macAddress)
                     
                     handler.post {
-                        onDeviceConnected?.invoke(ConnectedDevice(macAddress, peerName, isClassicConnected = false))
+                        onDeviceDisconnected?.invoke(macAddress)
+                        sendSystemPulse()
                     }
                     gatt.close()
                 }
             }
 
             override fun onMtuChanged(gatt: BluetoothGatt, mtu: Int, status: Int) {
+                val mac = gatt.device.address
                 if (status == BluetoothGatt.GATT_SUCCESS) {
+                    AppLogger.d("BLE_MESH", "MTU Expanded to .")
+                    connectionMtu[mac] = mtu - 3
                     gatt.discoverServices()
                 } else {
-                    gatt.disconnect()
+                    AppLogger.d("BLE_MESH", "MTU Expansion failed. Samsung Fallback to 23 bytes.")
+                    connectionMtu[mac] = 20
+                    gatt.discoverServices()
                 }
             }
 
@@ -351,10 +410,12 @@ class NativeBleManager(private val context: Context) {
             override fun onDescriptorWrite(gatt: BluetoothGatt, descriptor: BluetoothGattDescriptor, status: Int) {
                 if (status == BluetoothGatt.GATT_SUCCESS) {
                     handler.postDelayed({
+                        isConnecting.set(false)
                         sendSystemPulse()
                         processNextPayload(gatt.device.address)
                     }, 500)
                 } else {
+                    isConnecting.set(false)
                     gatt.disconnect()
                 }
             }
@@ -460,17 +521,27 @@ class NativeBleManager(private val context: Context) {
             override fun onConnectionStateChange(device: BluetoothDevice, status: Int, newState: Int) {
                 val macAddress = device.address
                 if (newState == BluetoothProfile.STATE_CONNECTED) {
+                    val peerName = connectedEndpointNames[macAddress]
+                    if (peerName != null && blockedDevices[peerName] == true) {
+                        AppLogger.d("BLE_MESH", "Server: Rejected blocked device ${peerName}.")
+                        gattServer?.cancelConnection(device)
+                        return
+                    }
                     AppLogger.d("BLE_MESH", "Server: Device ${macAddress} connected.")
                     activeServerConnections[macAddress] = device
                     pendingQueues.putIfAbsent(macAddress, ConcurrentLinkedQueue<ByteArray>())
                     isWriting.putIfAbsent(macAddress, AtomicBoolean(false))
                     chunkBuffers.putIfAbsent(macAddress, ByteArray(0))
                     connectionInteractionTimes.putIfAbsent(macAddress, System.currentTimeMillis())
+                    updateInvisibilityCloak()
                 } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
                     AppLogger.d("BLE_MESH", "Server: Device ${macAddress} disconnected.")
                     activeServerConnections.remove(macAddress)
+                    connectedEndpointIds.remove(macAddress)
+                    connectedEndpointNames.remove(macAddress)
                     handler.post {
                         onDeviceDisconnected?.invoke(macAddress)
+                        sendSystemPulse()
                     }
                 }
             }
@@ -586,7 +657,8 @@ class NativeBleManager(private val context: Context) {
         val chunks = mutableListOf<ByteArray>()
         var offset = 0
         while (offset < fullData.size) {
-            val length = Math.min(500, fullData.size - offset)
+            val chunkSize = connectionMtu[targetMacAddress] ?: 20
+            val length = Math.min(chunkSize, fullData.size - offset)
             val chunk = ByteArray(length)
             System.arraycopy(fullData, offset, chunk, 0, length)
             chunks.add(chunk)
@@ -641,8 +713,17 @@ class NativeBleManager(private val context: Context) {
         activeConnections[endpointId]?.disconnect()
     }
     
-    fun blockDevice(deviceName: String, sendNotification: Boolean = true) {}
-    fun unblockDevice(deviceName: String) {}
+    fun blockDevice(deviceName: String, sendNotification: Boolean = true) {
+        blockedDevices[deviceName] = true
+        // Find and disconnect if currently connected
+        val macAddress = connectedEndpointNames.entries.find { it.value == deviceName }?.key
+        if (macAddress != null) {
+            disconnectFromEndpoint(macAddress)
+        }
+    }
+    fun unblockDevice(deviceName: String) {
+        blockedDevices.remove(deviceName)
+    }
     
     fun rescan() {
         bleScanner?.stopScan(scanCallback)

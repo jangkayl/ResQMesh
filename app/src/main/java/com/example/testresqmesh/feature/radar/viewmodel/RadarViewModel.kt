@@ -36,6 +36,11 @@ class RadarViewModel(private val repository: MeshRepository) : ViewModel() {
                 _uiState.update { it.copy(knownNodes = known) }
             }
         }
+        viewModelScope.launch {
+            repository.topology.collect { top ->
+                _uiState.update { it.copy(topology = top) }
+            }
+        }
     }
 
     fun rescan() {

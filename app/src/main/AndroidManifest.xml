@@ -39,9 +39,6 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
-        
-        <!-- Cleanup service for BLE ghost nodes -->
-        <service android:name=".core.network.BleCleanupService" android:exported="false" />
     </application>
 
 </manifest>
