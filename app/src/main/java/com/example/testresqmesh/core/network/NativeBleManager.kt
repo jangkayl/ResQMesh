@@ -47,9 +47,13 @@ class NativeBleManager(private val context: Context) {
     private val SERVICE_UUID = UUID.fromString("B9A34F5C-7462-4C61-8935-7C2D4A15A3E4") // ResQMesh Custom Service
     private val RX_CHARACTERISTIC_UUID = UUID.fromString("6A81C2E5-309F-4D88-B270-4A9A65D8B6C7")
     private val TX_CHARACTERISTIC_UUID = UUID.fromString("1E4D9C7B-6F2A-4B9E-981D-F8A32C5B4E10")
+    private val L2CAP_PSM_CHARACTERISTIC_UUID = UUID.fromString("8C91321D-4A22-4215-99A1-3E2A15C81F4B") // Exposes dynamic L2CAP Port
     private val CCC_DESCRIPTOR_UUID = UUID.fromString("00002902-0000-1000-8000-00805F9B34FB") // Standard CCCD (Required for Notifications)
 
     private var gattServer: BluetoothGattServer? = null
+    private var l2capServerSocket: android.bluetooth.BluetoothServerSocket? = null
+    private var myL2capPsm: Int = 0
+    private var l2capAcceptThread: Thread? = null
     
     private val connectedEndpointIds = mutableSetOf<String>()
     private val connectedEndpointNames = mutableMapOf<String, String>()
@@ -64,6 +68,7 @@ class NativeBleManager(private val context: Context) {
     private val MAX_CONNECTIONS = 4
     private val activeConnections = ConcurrentHashMap<String, BluetoothGatt>()
     private val activeServerConnections = ConcurrentHashMap<String, BluetoothDevice>()
+    private val activeL2capSockets = ConcurrentHashMap<String, android.bluetooth.BluetoothSocket>()
     private val pendingQueues = ConcurrentHashMap<String, ConcurrentLinkedQueue<ByteArray>>()
     private val isWriting = ConcurrentHashMap<String, AtomicBoolean>()
     private val chunkBuffers = ConcurrentHashMap<String, ByteArray>()
@@ -207,6 +212,12 @@ class NativeBleManager(private val context: Context) {
         activeServerConnections.values.forEach { gattServer?.cancelConnection(it) }
         activeServerConnections.clear()
         gattServer?.close()
+        
+        try {
+            l2capServerSocket?.close()
+            l2capAcceptThread?.interrupt()
+        } catch (e: Exception) {}
+        
         activeConnections.values.forEach { it.disconnect(); it.close() }
         activeConnections.clear()
         pendingQueues.clear()
@@ -539,6 +550,13 @@ class NativeBleManager(private val context: Context) {
                 override fun onDescriptorWrite(gatt: BluetoothGatt, descriptor: BluetoothGattDescriptor, status: Int) {
                     if (status == BluetoothGatt.GATT_SUCCESS) {
                         AppLogger.d("BLE_MESH", "GATT descriptor written successfully for ${macAddress}.")
+                        
+                        // Proceed to read the L2CAP PSM port
+                        val psmChar = gatt.getService(SERVICE_UUID)?.getCharacteristic(L2CAP_PSM_CHARACTERISTIC_UUID)
+                        if (psmChar != null) {
+                            gatt.readCharacteristic(psmChar)
+                        }
+                        
                         if (connectingMacAddress == macAddress) {
                             connectingMacAddress = null
                             handler.post { onDeviceScanned?.invoke(macAddress, "", 0, "", false) }
@@ -555,6 +573,32 @@ class NativeBleManager(private val context: Context) {
                     }
                 }
     
+                override fun onCharacteristicRead(
+                    gatt: BluetoothGatt,
+                    characteristic: BluetoothGattCharacteristic,
+                    status: Int
+                ) {
+                    if (status == BluetoothGatt.GATT_SUCCESS && characteristic.uuid == L2CAP_PSM_CHARACTERISTIC_UUID) {
+                        val psmBytes = characteristic.value
+                        if (psmBytes != null && psmBytes.size == 4) {
+                            val psm = java.nio.ByteBuffer.wrap(psmBytes).int
+                            if (psm > 0 && android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+                                AppLogger.d("BLE_MESH", "Discovered Peer PSM: $psm for $macAddress. Opening L2CAP Socket...")
+                                Thread {
+                                    try {
+                                        val l2capSocket = gatt.device.createInsecureL2capChannel(psm)
+                                        l2capSocket.connect()
+                                        AppLogger.d("BLE_MESH", "Successfully connected L2CAP to $macAddress!")
+                                        handleL2capConnection(macAddress, l2capSocket)
+                                    } catch (e: Exception) {
+                                        AppLogger.d("BLE_MESH", "L2CAP Connection failed to $macAddress: ${e.message}")
+                                    }
+                                }.start()
+                            }
+                        }
+                    }
+                }
+
                 override fun onCharacteristicChanged(gatt: BluetoothGatt, characteristic: BluetoothGattCharacteristic) {
                     val value = characteristic.value ?: return
                     val now = System.currentTimeMillis()
@@ -811,6 +855,20 @@ class NativeBleManager(private val context: Context) {
                 connectionMtu[device.address] = mtu - 3
             }
 
+            override fun onCharacteristicReadRequest(
+                device: BluetoothDevice,
+                requestId: Int,
+                offset: Int,
+                characteristic: BluetoothGattCharacteristic
+            ) {
+                if (characteristic.uuid == L2CAP_PSM_CHARACTERISTIC_UUID) {
+                    val psmBytes = java.nio.ByteBuffer.allocate(4).putInt(myL2capPsm).array()
+                    gattServer?.sendResponse(device, requestId, BluetoothGatt.GATT_SUCCESS, offset, psmBytes)
+                } else {
+                    gattServer?.sendResponse(device, requestId, BluetoothGatt.GATT_READ_NOT_PERMITTED, offset, null)
+                }
+            }
+
             override fun onCharacteristicWriteRequest(
                 device: BluetoothDevice, requestId: Int, characteristic: BluetoothGattCharacteristic,
                 preparedWrite: Boolean, responseNeeded: Boolean, offset: Int, value: ByteArray?
@@ -877,8 +935,72 @@ class NativeBleManager(private val context: Context) {
         val cccDescriptor = BluetoothGattDescriptor(CCC_DESCRIPTOR_UUID, BluetoothGattDescriptor.PERMISSION_WRITE)
         txChar.addDescriptor(cccDescriptor)
         service.addCharacteristic(txChar)
+        
+        val psmChar = BluetoothGattCharacteristic(
+            L2CAP_PSM_CHARACTERISTIC_UUID,
+            BluetoothGattCharacteristic.PROPERTY_READ,
+            BluetoothGattCharacteristic.PERMISSION_READ
+        )
+        service.addCharacteristic(psmChar)
 
         gattServer?.addService(service)
+        startL2capServer()
+    }
+
+    private fun startL2capServer() {
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+            try {
+                l2capServerSocket = bluetoothAdapter?.listenUsingInsecureL2capChannel()
+                myL2capPsm = l2capServerSocket?.psm ?: 0
+                AppLogger.d("BLE_MESH", "L2CAP Server started on PSM: $myL2capPsm")
+                
+                l2capAcceptThread = Thread {
+                    while (isNodeActive.get()) {
+                        try {
+                            val socket = l2capServerSocket?.accept()
+                            if (socket != null) {
+                                AppLogger.d("BLE_MESH", "L2CAP Connection Accepted from ${socket.remoteDevice.address}")
+                                handleL2capConnection(socket.remoteDevice.address, socket)
+                            }
+                        } catch (e: Exception) {
+                            if (isNodeActive.get()) {
+                                AppLogger.d("BLE_MESH", "L2CAP Accept Thread error: ${e.message}")
+                            }
+                            break
+                        }
+                    }
+                }
+                l2capAcceptThread?.start()
+            } catch (e: Exception) {
+                AppLogger.d("BLE_MESH", "Failed to start L2CAP server: ${e.message}")
+            }
+        } else {
+            AppLogger.d("BLE_MESH", "L2CAP CoC not supported on this Android version. Falling back to GATT exclusively.")
+            myL2capPsm = 0
+        }
+    }
+
+    private fun handleL2capConnection(macAddress: String, socket: BluetoothSocket) {
+        activeL2capSockets[macAddress] = socket
+        Thread {
+            try {
+                val din = java.io.DataInputStream(socket.inputStream)
+                while (isNodeActive.get() && socket.isConnected) {
+                    val length = din.readInt()
+                    if (length > 0 && length < 10 * 1024 * 1024) { // Max 10MB sanity check
+                        val payloadBytes = ByteArray(length)
+                        din.readFully(payloadBytes)
+                        AppLogger.d("BLE_MESH", "L2CAP Received ${length} bytes from $macAddress")
+                        processBinaryPayload(macAddress, payloadBytes)
+                    }
+                }
+            } catch (e: Exception) {
+                AppLogger.d("BLE_MESH", "L2CAP stream disconnected for $macAddress: ${e.message}")
+            } finally {
+                activeL2capSockets.remove(macAddress)
+                try { socket.close() } catch (e: Exception) {}
+            }
+        }.start()
     }
 
     private fun processBinaryPayload(endpointId: String, payloadBytes: ByteArray) {
@@ -926,6 +1048,25 @@ class NativeBleManager(private val context: Context) {
         val lengthBuffer = ByteBuffer.allocate(4).putInt(payloadBytes.size).array()
         System.arraycopy(lengthBuffer, 0, fullData, 0, 4)
         System.arraycopy(payloadBytes, 0, fullData, 4, payloadBytes.size)
+
+        // PHASE 2 L2CAP ROUTING: Bypass GATT entirely if high-speed socket is available
+        val l2capSocket = activeL2capSockets[targetMacAddress]
+        if (l2capSocket != null && l2capSocket.isConnected) {
+            Thread {
+                try {
+                    synchronized(l2capSocket) {
+                        val dout = java.io.DataOutputStream(l2capSocket.outputStream)
+                        dout.writeInt(payloadBytes.size)
+                        dout.write(payloadBytes)
+                        dout.flush()
+                    }
+                    AppLogger.d("BLE_MESH", "L2CAP Sent ${payloadBytes.size} bytes directly to $targetMacAddress")
+                } catch (e: Exception) {
+                    AppLogger.d("BLE_MESH", "L2CAP write failed to $targetMacAddress: ${e.message}")
+                }
+            }.start()
+            return
+        }
         
         val chunks = mutableListOf<ByteArray>()
         var offset = 0
