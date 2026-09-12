@@ -36,6 +36,7 @@ import com.example.testresqmesh.core.utils.MediaHelper
 sealed class NavItem(val route: String, val icon: ImageVector, val label: String) {
     object Radar : NavItem("radar", Icons.Default.Adjust, "Radar")
     object Messages : NavItem("messages", Icons.Default.ChatBubble, "Messages")
+    object Walkie : NavItem("walkie", Icons.Default.Mic, "Walkie")
     object SOS : NavItem("sos", Icons.Default.Notifications, "SOS")
     object Settings : NavItem("settings", Icons.Default.Settings, "Settings")
 }
@@ -45,6 +46,7 @@ fun MainContainerScreen(
     setupViewModel: SetupViewModel,
     radarViewModel: RadarViewModel,
     commsViewModel: CommunicationViewModel,
+    walkieTalkieViewModel: com.example.testresqmesh.feature.comms.viewmodel.WalkieTalkieViewModel,
     mediaHelper: MediaHelper
 ) {
     var currentItem by remember { mutableStateOf<NavItem>(NavItem.Radar) }
@@ -71,7 +73,7 @@ fun MainContainerScreen(
         }
     }
 
-    val items = listOf(NavItem.Radar, NavItem.Messages, NavItem.SOS, NavItem.Settings)
+    val items = listOf(NavItem.Radar, NavItem.Messages, NavItem.Walkie, NavItem.SOS, NavItem.Settings)
 
     if (incomingSosAlert != null) {
         FullScreenSosAlarm(
@@ -207,9 +209,15 @@ fun MainContainerScreen(
                 NavItem.Radar -> RadarScreen(radarViewModel)
                 NavItem.Messages -> ChatContainerScreen(
                     viewModel = commsViewModel, 
+                    walkieTalkieViewModel = walkieTalkieViewModel,
                     mediaHelper = mediaHelper, 
                     onChatSelected = { activeChatNode = it }
                 ) 
+                NavItem.Walkie -> com.example.testresqmesh.feature.comms.ui.WalkieTalkieScreen(
+                    commsViewModel = commsViewModel,
+                    walkieTalkieViewModel = walkieTalkieViewModel,
+                    mediaHelper = mediaHelper
+                )
                 NavItem.Settings -> ProfileScreen(setupViewModel)
                 else -> {}
             }

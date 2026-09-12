@@ -29,6 +29,7 @@ import com.example.testresqmesh.core.utils.AppLogger
 @Composable
 fun ChatContainerScreen(
     viewModel: CommunicationViewModel, 
+    walkieTalkieViewModel: com.example.testresqmesh.feature.comms.viewmodel.WalkieTalkieViewModel,
     mediaHelper: MediaHelper,
     onChatSelected: (String) -> Unit
 ) {
@@ -57,6 +58,7 @@ fun ChatContainerScreen(
         selectedTabIndex = selectedTabIndex.intValue,
         onTabSelected = { selectedTabIndex.intValue = it },
         onNewMessageClick = { showNewMessageModal = true },
+        walkieTalkieViewModel = walkieTalkieViewModel,
         privateTabContent = { PrivateChatTab(viewModel, mediaHelper, onChatSelected) },
         publicTabContent = { PublicChatTab(viewModel, mediaHelper, onChatSelected) }
     )
@@ -68,9 +70,12 @@ fun ChatContainerScreenContent(
     selectedTabIndex: Int,
     onTabSelected: (Int) -> Unit,
     onNewMessageClick: () -> Unit,
+    walkieTalkieViewModel: com.example.testresqmesh.feature.comms.viewmodel.WalkieTalkieViewModel = androidx.lifecycle.viewmodel.compose.viewModel(),
     privateTabContent: @Composable () -> Unit,
     publicTabContent: @Composable () -> Unit
 ) {
+    val isWalkieTalkieMode by walkieTalkieViewModel.isWalkieTalkieMode.collectAsState()
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -83,6 +88,14 @@ fun ChatContainerScreenContent(
                     )
                 },
                 actions = {
+                    IconButton(onClick = { walkieTalkieViewModel.toggleWalkieTalkieMode() }) {
+                        Icon(
+                            Icons.Outlined.SettingsInputAntenna,
+                            contentDescription = "Toggle Walkie Talkie Auto-Play",
+                            tint = if (isWalkieTalkieMode) com.example.testresqmesh.core.ui.theme.SuccessGreen else Color.White.copy(alpha = 0.5f),
+                            modifier = Modifier.size(28.dp)
+                        )
+                    }
                     IconButton(onClick = { AppLogger.toggleTerminal() }) {
                         Icon(
                             Icons.Outlined.Shield,

@@ -34,6 +34,7 @@ class NativeBleManager(private val context: Context) {
     var onStatusChanged: ((String) -> Unit)? = null
     var onDeviceBlocked: ((String) -> Unit)? = null
     var onDeviceUnblocked: ((String) -> Unit)? = null
+    var checkRouteExists: ((String) -> Boolean)? = null
 
     var myDeviceName: String = "ResQMesh_Node"
     val myHex = java.util.UUID.randomUUID().toString().substring(0, 4).uppercase()
@@ -328,8 +329,9 @@ class NativeBleManager(private val context: Context) {
                 val isClient = activeConnections.keys.any { connectedEndpointNames[it] == peerName }
                 val isServer = activeServerConnections.keys.any { connectedEndpointNames[it] == peerName }
                 val isAlreadyConnected = isClient || isServer || activeConnections.containsKey(macAddress) || activeServerConnections.containsKey(macAddress)
+                val hasIndirectRoute = checkRouteExists?.invoke(peerName) == true
 
-                if (!isAlreadyConnected) {
+                if (!isAlreadyConnected && !hasIndirectRoute) {
                     val totalConnections = activeConnections.size + activeServerConnections.size
                     
                     if (totalConnections >= MAX_TOTAL_CONNECTIONS || (totalConnections >= 2 && peerConnections > 0)) {
@@ -555,7 +557,13 @@ class NativeBleManager(private val context: Context) {
     
                 override fun onCharacteristicChanged(gatt: BluetoothGatt, characteristic: BluetoothGattCharacteristic) {
                     val value = characteristic.value ?: return
-                    connectionInteractionTimes[macAddress] = System.currentTimeMillis()
+                    val now = System.currentTimeMillis()
+                    val lastInteraction = connectionInteractionTimes[macAddress] ?: 0L
+                    if (now - lastInteraction > 5000 && (chunkBuffers[macAddress]?.size ?: 0) > 0) {
+                        AppLogger.d("BLE_MESH", "Client Buffer timeout! Clearing corrupted chunk buffer for $macAddress")
+                        chunkBuffers[macAddress] = ByteArray(0)
+                    }
+                    connectionInteractionTimes[macAddress] = now
                     
                     val currentBuffer = chunkBuffers[macAddress] ?: ByteArray(0)
                     val newBuffer = ByteArray(currentBuffer.size + value.size)
@@ -813,7 +821,13 @@ class NativeBleManager(private val context: Context) {
                 }
                 value?.let {
                     val macAddress = device.address
-                    connectionInteractionTimes[macAddress] = System.currentTimeMillis()
+                    val now = System.currentTimeMillis()
+                    val lastInteraction = connectionInteractionTimes[macAddress] ?: 0L
+                    if (now - lastInteraction > 5000 && (chunkBuffers[macAddress]?.size ?: 0) > 0) {
+                        AppLogger.d("BLE_MESH", "Server Buffer timeout! Clearing corrupted chunk buffer for $macAddress")
+                        chunkBuffers[macAddress] = ByteArray(0)
+                    }
+                    connectionInteractionTimes[macAddress] = now
                     
                     val currentBuffer = chunkBuffers[macAddress] ?: ByteArray(0)
                     val newBuffer = ByteArray(currentBuffer.size + it.size)

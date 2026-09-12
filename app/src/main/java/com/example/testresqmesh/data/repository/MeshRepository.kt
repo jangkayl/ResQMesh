@@ -36,6 +36,8 @@ class MeshRepository(
     private val _incomingSosAlert = MutableStateFlow<ChatMessage?>(null)
     val incomingSosAlert: StateFlow<ChatMessage?> = _incomingSosAlert.asStateFlow()
 
+    val incomingVoiceMessage = kotlinx.coroutines.flow.MutableSharedFlow<ChatMessage>(extraBufferCapacity = 10)
+
     fun clearSosAlert() {
         _incomingSosAlert.value = null
     }
@@ -136,7 +138,9 @@ class MeshRepository(
             networkManager.unblockDevice(senderName)
         }
 
-
+        networkManager.checkRouteExists = { targetName ->
+            meshRouter.knownNodes.value.any { it.name == targetName }
+        }
 
         networkManager.onDeviceScanned = { id, name, score, role, isConnecting ->
             if (name != myNodeName && name != myNodeName.take(20)) {
@@ -212,6 +216,10 @@ class MeshRepository(
                         if (message.isSOS) {
                             _incomingSosAlert.value = message
                         }
+                    }
+
+                    if (message.audioBase64 != null) {
+                        incomingVoiceMessage.tryEmit(message)
                     }
                 }
             }

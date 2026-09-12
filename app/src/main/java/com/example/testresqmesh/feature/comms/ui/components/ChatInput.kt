@@ -5,7 +5,9 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -24,6 +26,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -138,8 +141,10 @@ fun ChatInput(
             // Utility Buttons
             UtilityButton(Icons.Default.LocationOn, onClick = onSendLocation)
             UtilityButton(Icons.Default.CameraAlt, onClick = { imagePickerLauncher.launch("image/*") })
-            UtilityButton(if (isRecording) Icons.Default.Stop else Icons.Outlined.Mic, onClick = onToggleRecord)
             
+            // Walkie-Talkie PTT Button
+            PttButton(isRecording = isRecording, onToggleRecord = onToggleRecord)
+
             // Message Input
             Surface(
                 modifier = Modifier.weight(1f).height(48.dp),
@@ -216,6 +221,40 @@ fun QuickReplyChip(text: String, onClick: (String) -> Unit) {
             style = MaterialTheme.typography.labelMedium,
             fontWeight = FontWeight.Bold,
             color = Color.White
+        )
+    }
+}
+
+@Composable
+fun PttButton(isRecording: Boolean, onToggleRecord: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .size(36.dp)
+            .clip(RoundedCornerShape(8.dp))
+            .background(if (isRecording) com.example.testresqmesh.core.ui.theme.ErrorRed else Color.White.copy(alpha = 0.08f))
+            .border(
+                1.dp,
+                if (isRecording) com.example.testresqmesh.core.ui.theme.ErrorRed else Color.White.copy(alpha = 0.1f),
+                RoundedCornerShape(8.dp)
+            )
+            .pointerInput(Unit) {
+                detectTapGestures(
+                    onPress = {
+                        onToggleRecord() // Start recording
+                        kotlinx.coroutines.withTimeoutOrNull(10000L) {
+                            tryAwaitRelease()
+                        }
+                        onToggleRecord() // Stop recording
+                    }
+                )
+            },
+        contentAlignment = Alignment.Center
+    ) {
+        Icon(
+            if (isRecording) Icons.Default.Stop else Icons.Outlined.Mic,
+            contentDescription = "Walkie Talkie",
+            tint = if (isRecording) Color.White else Color.White.copy(alpha = 0.7f),
+            modifier = Modifier.size(18.dp)
         )
     }
 }

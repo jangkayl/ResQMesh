@@ -44,13 +44,17 @@ enum class AppState {
     Splash, Permissions, IdentitySetup, Main
 }
 
-class MeshViewModelFactory(private val repository: MeshRepository) : ViewModelProvider.Factory {
+class MeshViewModelFactory(
+    private val repository: MeshRepository,
+    private val mediaHelper: MediaHelper
+) : ViewModelProvider.Factory {
     @Suppress("UNCHECKED_CAST")
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         return when {
             modelClass.isAssignableFrom(SetupViewModel::class.java) -> SetupViewModel(repository) as T
             modelClass.isAssignableFrom(RadarViewModel::class.java) -> RadarViewModel(repository) as T
             modelClass.isAssignableFrom(CommunicationViewModel::class.java) -> CommunicationViewModel(repository) as T
+            modelClass.isAssignableFrom(com.example.testresqmesh.feature.comms.viewmodel.WalkieTalkieViewModel::class.java) -> com.example.testresqmesh.feature.comms.viewmodel.WalkieTalkieViewModel(repository, mediaHelper) as T
             else -> throw IllegalArgumentException("Unknown ViewModel class")
         }
     }
@@ -101,12 +105,13 @@ class MainActivity : ComponentActivity() {
             }
         })
 
-        val factory = MeshViewModelFactory(repository)
+        val factory = MeshViewModelFactory(repository, mediaHelper)
 
         setContent {
             val setupViewModel: SetupViewModel = viewModel(factory = factory)
             val radarViewModel: RadarViewModel = viewModel(factory = factory)
             val commsViewModel: CommunicationViewModel = viewModel(factory = factory)
+            val walkieTalkieViewModel: com.example.testresqmesh.feature.comms.viewmodel.WalkieTalkieViewModel = viewModel(factory = factory)
 
             TestResQMeshTheme {
                 val setupState by setupViewModel.uiState.collectAsState()
@@ -154,6 +159,7 @@ class MainActivity : ComponentActivity() {
                                 setupViewModel = setupViewModel,
                                 radarViewModel = radarViewModel,
                                 commsViewModel = commsViewModel,
+                                walkieTalkieViewModel = walkieTalkieViewModel,
                                 mediaHelper = mediaHelper
                             )
                         }

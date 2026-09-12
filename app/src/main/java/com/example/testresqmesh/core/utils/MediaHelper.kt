@@ -51,21 +51,39 @@ class MediaHelper(private val context: Context) {
         }
     }
 
+    private val playbackQueue = java.util.concurrent.ConcurrentLinkedQueue<String>()
+    private var isPlaying = false
+
     fun playVoiceMail(base64Audio: String) {
+        playbackQueue.offer(base64Audio)
+        playNextInQueue()
+    }
+
+    private fun playNextInQueue() {
+        if (isPlaying) return
+        val nextAudio = playbackQueue.poll() ?: return
+
         try {
-            mediaPlayer?.release() // Stop previous playback if running
-            val decodedBytes = Base64.decode(base64Audio, Base64.NO_WRAP)
-            val tempPlayFile = File(context.cacheDir, "temp_audio_play.amr")
+            this.isPlaying = true
+            val decodedBytes = Base64.decode(nextAudio, Base64.NO_WRAP)
+            val tempPlayFile = File(context.cacheDir, "temp_audio_play_${System.currentTimeMillis()}.amr")
             tempPlayFile.writeBytes(decodedBytes)
 
             mediaPlayer = MediaPlayer().apply {
                 setDataSource(tempPlayFile.absolutePath)
                 prepare()
                 start()
-                setOnCompletionListener { it.release() }
+                setOnCompletionListener { 
+                    it.release()
+                    tempPlayFile.delete()
+                    this@MediaHelper.isPlaying = false
+                    playNextInQueue() 
+                }
             }
         } catch (e: Exception) {
             Log.e("MediaHelper", "Playback failed", e)
+            this.isPlaying = false
+            playNextInQueue()
         }
     }
 
