@@ -60,7 +60,7 @@ class CommunicationViewModel(private val repository: MeshRepository) : ViewModel
     @androidx.annotation.RequiresPermission(anyOf = ["android.permission.ACCESS_FINE_LOCATION", "android.permission.ACCESS_COARSE_LOCATION"])
     fun startLocationTracking(context: android.content.Context) {
         if (fusedLocationClient == null) {
-            fusedLocationClient = com.google.android.gms.location.LocationServices.getFusedLocationProviderClient(context)
+            fusedLocationClient = com.google.android.gms.location.LocationServices.getFusedLocationProviderClient(context.applicationContext)
         }
         
         // Smart battery-efficient request: 30s interval, but only triggers if moved 20+ meters
@@ -106,7 +106,7 @@ class CommunicationViewModel(private val repository: MeshRepository) : ViewModel
         
         // 2. Start a background fetch for a high-accuracy pinpoint lock
         try {
-            val client = fusedLocationClient ?: com.google.android.gms.location.LocationServices.getFusedLocationProviderClient(context)
+            val client = fusedLocationClient ?: com.google.android.gms.location.LocationServices.getFusedLocationProviderClient(context.applicationContext)
             client.getCurrentLocation(
                 com.google.android.gms.location.Priority.PRIORITY_HIGH_ACCURACY, 
                 null
@@ -151,7 +151,7 @@ class CommunicationViewModel(private val repository: MeshRepository) : ViewModel
     @androidx.annotation.RequiresPermission(anyOf = ["android.permission.ACCESS_FINE_LOCATION", "android.permission.ACCESS_COARSE_LOCATION"])
     fun broadcastLocation(context: android.content.Context, isPrivate: Boolean, targetName: String? = null) {
         // The BEST way to get location on Android (Handles indoors via Wi-Fi/Cell + outdoors via GPS seamlessly)
-        val fusedLocationClient = com.google.android.gms.location.LocationServices.getFusedLocationProviderClient(context)
+        val fusedLocationClient = com.google.android.gms.location.LocationServices.getFusedLocationProviderClient(context.applicationContext)
         
         try {
             fusedLocationClient.getCurrentLocation(

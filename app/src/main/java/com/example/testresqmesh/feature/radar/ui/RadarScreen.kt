@@ -58,13 +58,13 @@ fun RadarScreen(viewModel: RadarViewModel) {
         .filter { it.name !in connectedNames }
         .distinctBy { it.name }
         .map {
-            val displayStatus = if (it.isConnecting) "SYNCING..." else "Offline"
+            val displayStatus = if (it.isConnecting) "SYNCING..." else "Online"
             NodeItemData(
                 it.endpointId,
                 it.name, 
                 displayStatus,
                 isConnected = false,
-                isActiveRelay = it.myRole == "MASTER" || it.isConnecting,
+                isActiveRelay = false,
                 isBlocked = uiState.blockedDeviceNames.contains(it.name)
             )
         }
@@ -85,22 +85,22 @@ fun RadarScreen(viewModel: RadarViewModel) {
             )
         }
 
-    val offlineTrackedNodes = uiState.knownNodes
+    val hoppedNodes = uiState.knownNodes
         .filter { it.name !in scannedAndConnectedNames && !uiState.blockedDeviceNames.contains(it.name) }
         .map { node ->
             NodeItemData(
                 endpointId = "",
                 name = node.name,
-                status = "OFFLINE (Last Seen: ${java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault()).format(java.util.Date(node.lastSeen))})",
+                status = "Hopped via Mesh",
                 isConnected = false,
-                isActiveRelay = false,
+                isActiveRelay = true,
                 isBlocked = false
             )
         }
 
     RadarScreenContent(
-        activeNodesCount = connectedNodes.size + scannedNodes.size,
-        nodes = connectedNodes + scannedNodes + offlineBlockedNodes + offlineTrackedNodes,
+        activeNodesCount = connectedNodes.size + scannedNodes.size + hoppedNodes.size,
+        nodes = connectedNodes + scannedNodes + offlineBlockedNodes + hoppedNodes,
         topology = uiState.topology,
         myDeviceName = myDeviceName,
         onRefresh = { viewModel.rescan() },
@@ -246,12 +246,20 @@ fun RadarScreenContent(
                 verticalArrangement = Arrangement.spacedBy(Spacing.Small)
             ) {
                 val connectedNodesList = nodes.filter { it.status.contains("Connected", ignoreCase = true) }
+                val hoppedNodesList = nodes.filter { it.status.contains("Hopped", ignoreCase = true) }
                 val onlineNodesList = nodes.filter { it.status.contains("Online", ignoreCase = true) || it.status.contains("SYNCING") }
                 val offlineNodesList = nodes.filter { it.status.contains("OFFLINE", ignoreCase = true) }
 
                 if (connectedNodesList.isNotEmpty()) {
                     Text("CONNECTED", style = MaterialTheme.typography.labelSmall, color = InboxAccentBlue, modifier = Modifier.padding(top = Spacing.Small))
                     connectedNodesList.forEach { node ->
+                        NearbyNodeItem(node, onDisconnect, onForceConnect, onBlock, onUnblock)
+                    }
+                }
+
+                if (hoppedNodesList.isNotEmpty()) {
+                    Text("MESH HOPPED", style = MaterialTheme.typography.labelSmall, color = Color(0xFFF59E0B), modifier = Modifier.padding(top = Spacing.Small))
+                    hoppedNodesList.forEach { node ->
                         NearbyNodeItem(node, onDisconnect, onForceConnect, onBlock, onUnblock)
                     }
                 }
@@ -395,13 +403,15 @@ fun NearbyNodeItem(
                         tint = Color.Gray
                     )
                 }
-                TextButton(
-                    onClick = { onForceConnect(node.endpointId, node.name) },
-                    colors = ButtonDefaults.textButtonColors(contentColor = InboxAccentBlue)
-                ) {
-                    Icon(Icons.Default.Bolt, contentDescription = null, modifier = Modifier.size(16.dp))
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text("FORCE", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Black)
+                if (node.endpointId.isNotEmpty()) {
+                    TextButton(
+                        onClick = { onForceConnect(node.endpointId, node.name) },
+                        colors = ButtonDefaults.textButtonColors(contentColor = InboxAccentBlue)
+                    ) {
+                        Icon(Icons.Default.Bolt, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("FORCE", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Black)
+                    }
                 }
             }
         }

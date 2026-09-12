@@ -76,10 +76,13 @@ class MeshRepository(
         networkManager.onDeviceConnected = { device ->
             val existing = _connectedDevices.value.find { it.endpointId == device.endpointId }
             if (existing != null) {
-                if (device.isClassicConnected != existing.isClassicConnected) {
+                if (device.isClassicConnected != existing.isClassicConnected || existing.name == "Unknown Node" || device.name != existing.name) {
                     _connectedDevices.value = _connectedDevices.value.map {
                         if (it.endpointId == device.endpointId) device else it
                     }
+                    meshRouter.removeNode(existing.name)
+                    meshRouter.markNodeSeen(device.name)
+                    meshRouter.recalculateKnownNodes(myNodeName, _connectedDevices.value)
                 }
             } else {
                 _connectedDevices.value = _connectedDevices.value + device

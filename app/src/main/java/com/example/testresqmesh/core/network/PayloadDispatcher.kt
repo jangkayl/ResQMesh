@@ -110,7 +110,13 @@ class PayloadDispatcher(private val callback: PayloadDispatcherCallback) {
         }
         
         callback.onMessageReceived(endpointId, msgId, sender, "", false, true, null, null, null, null, "LOCAL", emptyList())
-        callback.broadcastPayload(payloadBytes, endpointId)
+        
+        val routePath = payload.routePath.toMutableList()
+        routePath.add(callback.getMyDeviceName())
+        val updatedPayload = payload.copy(routePath = routePath)
+        val updatedBytes = ProtoBuf.encodeToByteArray(updatedPayload)
+        
+        callback.broadcastPayload(updatedBytes, endpointId)
     }
 
     private fun handleStandardMessage(endpointId: String, msgId: String, sender: String, payloadBytes: ByteArray, payload: MeshPayload) {

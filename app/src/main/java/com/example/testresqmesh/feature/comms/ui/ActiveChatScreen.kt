@@ -409,7 +409,7 @@ fun HighFidelityChatBubble(msg: ChatMessageData, mediaHelper: MediaHelper, onVie
         }
 
         // --- Visual Mesh Route Tracer UI ---
-        if (msg.hops.contains("HOPPED") && msg.isMine) {
+        if (msg.hops.contains("HOPPED")) {
             var showRoute by remember { mutableStateOf(false) }
 
             Text(
