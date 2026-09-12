@@ -41,6 +41,29 @@ fun WalkieTalkieScreen(
                     Text("Walkie-Talkie", fontWeight = FontWeight.Bold, color = Color.White)
                 },
                 actions = {
+                    val currentChannel by walkieTalkieViewModel.currentChannelId.collectAsState()
+                    var expanded by remember { mutableStateOf(false) }
+
+                    Box {
+                        TextButton(onClick = { expanded = true }) {
+                            Text("CH $currentChannel", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+                        }
+                        DropdownMenu(
+                            expanded = expanded,
+                            onDismissRequest = { expanded = false }
+                        ) {
+                            for (i in 1..5) {
+                                DropdownMenuItem(
+                                    text = { Text("Channel $i") },
+                                    onClick = {
+                                        walkieTalkieViewModel.setChannel(i.toString())
+                                        expanded = false
+                                    }
+                                )
+                            }
+                        }
+                    }
+
                     IconButton(onClick = { walkieTalkieViewModel.toggleWalkieTalkieMode() }) {
                         Icon(
                             Icons.Outlined.SettingsInputAntenna,

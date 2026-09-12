@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.testresqmesh.core.utils.MediaHelper
 import com.example.testresqmesh.data.repository.MeshRepository
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
@@ -15,6 +16,12 @@ class WalkieTalkieViewModel(
 
     private val _isWalkieTalkieMode = MutableStateFlow(false)
     val isWalkieTalkieMode = _isWalkieTalkieMode.asStateFlow()
+
+    val currentChannelId: StateFlow<String> = repository.currentChannelId
+    
+    fun setChannel(channelId: String) {
+        repository.setChannel(channelId)
+    }
 
     init {
         viewModelScope.launch {

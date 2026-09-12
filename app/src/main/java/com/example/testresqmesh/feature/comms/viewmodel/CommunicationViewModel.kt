@@ -24,6 +24,12 @@ class CommunicationViewModel(private val repository: MeshRepository) : ViewModel
     fun clearSosAlert() {
         repository.clearSosAlert()
     }
+    
+    val currentChannelId: StateFlow<String> = repository.currentChannelId
+    
+    fun setChannel(channelId: String) {
+        repository.setChannel(channelId)
+    }
 
     private var cachedLocation: android.location.Location? = null
     private var locationCallback: com.google.android.gms.location.LocationCallback? = null

@@ -109,7 +109,7 @@ class PayloadDispatcher(private val callback: PayloadDispatcherCallback) {
             callback.onRoutingTableReceived(sender, payload.connectedNodes)
         }
         
-        callback.onMessageReceived(endpointId, msgId, sender, "", false, true, null, null, null, null, "LOCAL", emptyList())
+        callback.onMessageReceived(endpointId, msgId, sender, "", false, true, null, null, null, null, "LOCAL", emptyList(), payload.channelId)
         
         val routePath = payload.routePath.toMutableList()
         routePath.add(callback.getMyDeviceName())
@@ -174,7 +174,7 @@ class PayloadDispatcher(private val callback: PayloadDispatcherCallback) {
         if (isPrivate) {
             if (targetName == callback.getMyDeviceName()) {
                 callback.showNotification(sender, text)
-                callback.onMessageReceived(endpointId, msgId, sender, text, isPrivate, false, imageBase64, audioBase64, payload.locationLat, payload.locationLng, medium, routePath)
+                callback.onMessageReceived(endpointId, msgId, sender, text, isPrivate, false, imageBase64, audioBase64, payload.locationLat, payload.locationLng, medium, routePath, payload.channelId)
             } else {
                 AppLogger.d("PayloadDispatcher", "ROUTE (Relay): Forwarding Private message meant for [$targetName] securely across the mesh.")
                 routePath.add(callback.getMyDeviceName())
@@ -207,7 +207,7 @@ class PayloadDispatcher(private val callback: PayloadDispatcherCallback) {
             val updatedPayload = payload.copy(routePath = routePath)
             val updatedBytes = ProtoBuf.encodeToByteArray(updatedPayload)
             
-            callback.onMessageReceived(endpointId, msgId, sender, text, isPrivate, false, imageBase64, audioBase64, payload.locationLat, payload.locationLng, medium, routePath)
+            callback.onMessageReceived(endpointId, msgId, sender, text, isPrivate, false, imageBase64, audioBase64, payload.locationLat, payload.locationLng, medium, routePath, payload.channelId)
             callback.broadcastPayload(updatedBytes, endpointId)
         }
     }

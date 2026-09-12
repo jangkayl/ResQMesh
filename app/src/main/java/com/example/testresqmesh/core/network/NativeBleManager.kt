@@ -25,7 +25,7 @@ class NativeBleManager(private val context: Context) {
     var onDeviceDisconnected: ((String) -> Unit)? = null
     var onDeviceScanned: ((String, String, Int, String, Boolean) -> Unit)? = null
     var onDeviceScanRemoved: ((String) -> Unit)? = null
-    var onMessageReceived: ((String, String, String, String, Boolean, Boolean, String?, String?, Double?, Double?, String, List<String>) -> Unit)? = null
+    var onMessageReceived: ((String, String, String, String, Boolean, Boolean, String?, String?, Double?, Double?, String, List<String>, String) -> Unit)? = null
     var onMessageSeen: ((String, String) -> Unit)? = null
     var onMessageDelivered: ((String, String, List<String>) -> Unit)? = null
     var onPublicKeyReceived: ((String, String) -> Unit)? = null
@@ -89,8 +89,8 @@ class NativeBleManager(private val context: Context) {
         override fun onMessageDelivered(msgId: String, readerName: String, returnRoute: List<String>) { onMessageDelivered?.invoke(msgId, readerName, returnRoute) }
         override fun onPublicKeyReceived(senderName: String, key: String) { onPublicKeyReceived?.invoke(senderName, key) }
         override fun onRoutingTableReceived(senderName: String, connectedNodes: List<String>) { onRoutingTableReceived?.invoke(senderName, connectedNodes) }
-        override fun onMessageReceived(endpointId: String, msgId: String, senderName: String, text: String, isPrivate: Boolean, isSystem: Boolean, imageBase64: String?, audioBase64: String?, locationLat: Double?, locationLng: Double?, medium: String, routePath: List<String>) {
-            this@NativeBleManager.onMessageReceived?.invoke(endpointId, msgId, senderName, text, isPrivate, isSystem, imageBase64, audioBase64, locationLat, locationLng, medium, routePath)
+        override fun onMessageReceived(endpointId: String, msgId: String, senderName: String, text: String, isPrivate: Boolean, isSystem: Boolean, imageBase64: String?, audioBase64: String?, locationLat: Double?, locationLng: Double?, medium: String, routePath: List<String>, channelId: String) {
+            this@NativeBleManager.onMessageReceived?.invoke(endpointId, msgId, senderName, text, isPrivate, isSystem, imageBase64, audioBase64, locationLat, locationLng, medium, routePath, channelId)
         }
         override fun onDeviceNameSync(endpointId: String, realName: String) {
             // Deprecated: We now handle this safely in processBinaryPayload 
@@ -130,8 +130,19 @@ class NativeBleManager(private val context: Context) {
                 val entry = iterator.next()
                 val macAddress = entry.key
                 
-                if (activeConnections.containsKey(macAddress) || activeServerConnections.containsKey(macAddress)) {
-                    entry.setValue(now)
+                val isClient = activeConnections.containsKey(macAddress)
+                val isServer = activeServerConnections.containsKey(macAddress)
+                
+                if (isClient || isServer) {
+                    val lastInteraction = connectionInteractionTimes[macAddress] ?: now
+                    if (now - lastInteraction > 20000) { // 20s without a SYSTEM pulse means dead link
+                        AppLogger.d("BLE_MESH", "Zombie Socket Detected! No data from $macAddress for 20s. Forcing disconnect.")
+                        if (isClient) forceGattDisconnect(macAddress, activeConnections[macAddress])
+                        if (isServer) gattServer?.cancelConnection(activeServerConnections[macAddress])
+                        // Let the disconnect callbacks handle the cleanup
+                    } else {
+                        entry.setValue(now) // Keep alive in discovery list
+                    }
                     continue
                 }
                 
@@ -988,6 +999,7 @@ class NativeBleManager(private val context: Context) {
                 while (isNodeActive.get() && socket.isConnected) {
                     val length = din.readInt()
                     if (length > 0 && length < 10 * 1024 * 1024) { // Max 10MB sanity check
+                        connectionInteractionTimes[macAddress] = System.currentTimeMillis()
                         val payloadBytes = ByteArray(length)
                         din.readFully(payloadBytes)
                         AppLogger.d("BLE_MESH", "L2CAP Received ${length} bytes from $macAddress")
@@ -1052,6 +1064,7 @@ class NativeBleManager(private val context: Context) {
         // PHASE 2 L2CAP ROUTING: Bypass GATT entirely if high-speed socket is available
         val l2capSocket = activeL2capSockets[targetMacAddress]
         if (l2capSocket != null && l2capSocket.isConnected) {
+            connectionInteractionTimes[targetMacAddress] = System.currentTimeMillis()
             Thread {
                 try {
                     synchronized(l2capSocket) {

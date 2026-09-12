@@ -54,11 +54,15 @@ fun ChatContainerScreen(
         }
     }
 
+    val currentChannel by viewModel.currentChannelId.collectAsState()
+
     ChatContainerScreenContent(
         selectedTabIndex = selectedTabIndex.intValue,
         onTabSelected = { selectedTabIndex.intValue = it },
         onNewMessageClick = { showNewMessageModal = true },
         walkieTalkieViewModel = walkieTalkieViewModel,
+        currentChannel = currentChannel,
+        onChannelSelected = { viewModel.setChannel(it) },
         privateTabContent = { PrivateChatTab(viewModel, mediaHelper, onChatSelected) },
         publicTabContent = { PublicChatTab(viewModel, mediaHelper, onChatSelected) }
     )
@@ -71,23 +75,48 @@ fun ChatContainerScreenContent(
     onTabSelected: (Int) -> Unit,
     onNewMessageClick: () -> Unit,
     walkieTalkieViewModel: com.example.testresqmesh.feature.comms.viewmodel.WalkieTalkieViewModel = androidx.lifecycle.viewmodel.compose.viewModel(),
+    currentChannel: String,
+    onChannelSelected: (String) -> Unit,
     privateTabContent: @Composable () -> Unit,
     publicTabContent: @Composable () -> Unit
 ) {
     val isWalkieTalkieMode by walkieTalkieViewModel.isWalkieTalkieMode.collectAsState()
+    var expanded by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
             TopAppBar(
                 title = {
-                    Text(
-                        "Inbox",
-                        style = MaterialTheme.typography.headlineMedium,
-                        fontWeight = FontWeight.Black,
-                        color = Color.White
-                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            "Inbox",
+                            style = MaterialTheme.typography.headlineMedium,
+                            fontWeight = FontWeight.Black,
+                            color = Color.White
+                        )
+                    }
                 },
                 actions = {
+                    Box {
+                        TextButton(onClick = { expanded = true }) {
+                            Text("CH $currentChannel", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+                        }
+                        DropdownMenu(
+                            expanded = expanded,
+                            onDismissRequest = { expanded = false }
+                        ) {
+                            for (i in 1..5) {
+                                DropdownMenuItem(
+                                    text = { Text("Channel $i") },
+                                    onClick = {
+                                        onChannelSelected(i.toString())
+                                        expanded = false
+                                    }
+                                )
+                            }
+                        }
+                    }
+
                     IconButton(onClick = { walkieTalkieViewModel.toggleWalkieTalkieMode() }) {
                         Icon(
                             Icons.Outlined.SettingsInputAntenna,
@@ -110,13 +139,6 @@ fun ChatContainerScreenContent(
                             contentDescription = "New Message",
                             tint = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.size(28.dp)
-                        )
-                    }
-                    IconButton(onClick = { /* TODO: More */ }) {
-                        Icon(
-                            Icons.Default.MoreVert,
-                            contentDescription = "More",
-                            tint = Color.White
                         )
                     }
                 },
@@ -220,6 +242,8 @@ fun ChatContainerScreenPreview() {
             selectedTabIndex = 0,
             onTabSelected = {},
             onNewMessageClick = {},
+            currentChannel = "1",
+            onChannelSelected = {},
             privateTabContent = {
                 Column {
                     // Previews updated to be empty (Production state)

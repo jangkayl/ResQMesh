@@ -22,9 +22,10 @@ data class MeshPayload(
     @ProtoNumber(15) val directedRoute: List<String> = emptyList(),
     @ProtoNumber(16) val returnRoute: List<String> = emptyList(),
     @ProtoNumber(17) val isSOS: Boolean = false,
-    @ProtoNumber(18) val isSOSCancel: Boolean = false,
-    @ProtoNumber(19) val publicKey: String = "",
-    @ProtoNumber(20) val connectedNodes: List<String> = emptyList(),
-    @ProtoNumber(21) val targetMessageId: String = "",
-    @ProtoNumber(22) val reader: String = ""
+    @ProtoNumber(18) val channelId: String = "1",
+    @ProtoNumber(19) val isSOSCancel: Boolean = false,
+    @ProtoNumber(20) val publicKey: String = "",
+    @ProtoNumber(21) val connectedNodes: List<String> = emptyList(),
+    @ProtoNumber(22) val targetMessageId: String = "",
+    @ProtoNumber(23) val reader: String = ""
 )

@@ -27,6 +27,13 @@ class MeshRepository(
     private val _connectionStatus = MutableStateFlow("Ready to deploy Mesh Node.")
     val connectionStatus = _connectionStatus.asStateFlow()
 
+    private val _currentChannelId = MutableStateFlow("1")
+    val currentChannelId: StateFlow<String> = _currentChannelId.asStateFlow()
+
+    fun setChannel(channelId: String) {
+        _currentChannelId.value = channelId
+    }
+
     private val _connectedDevices = MutableStateFlow<List<ConnectedDevice>>(emptyList())
     val connectedDevices = _connectedDevices.asStateFlow()
 
@@ -174,12 +181,12 @@ class MeshRepository(
             clearSosAlert()
         }
 
-        networkManager.onMessageReceived = { endpointId, msgId, sender, text, isPrivate, isSystem, img, audio, lat, lng, medium, routePath ->
+        networkManager.onMessageReceived = { endpointId, msgId, sender, text, isPrivate, isSystem, img, audio, lat, lng, medium, routePath, channelId ->
             if (sender != myNodeName) {
                 meshRouter.markNodeSeen(sender)
                 meshRouter.recalculateKnownNodes(myNodeName, _connectedDevices.value)
 
-                if (!isSystem) {
+                if (!isSystem && (isPrivate || channelId == _currentChannelId.value)) {
                     val isDirect = _connectedDevices.value.any { it.name == sender }
                     val message = ChatMessage(
                         id = msgId,
@@ -313,7 +320,8 @@ class MeshRepository(
             locationLat = null,
             locationLng = null,
             directedRoute = meshRouter.findShortestPath(myNodeName, targetName, _connectedDevices.value),
-            targetPubKey = publicKeys[targetName]
+            targetPubKey = publicKeys[targetName],
+            channelId = _currentChannelId.value
         ).let {
             // We need to override the type in the byte array or construct a custom payload.
             // Since PayloadFactory builds ChatMessage payloads, we'll decode, change type, encode.
@@ -333,28 +341,31 @@ class MeshRepository(
     }
 
     fun sendPublicMessage(text: String, imageBase64: String?, audioBase64: String?, locationLat: Double? = null, locationLng: Double? = null, isSOS: Boolean = false, isSOSCancel: Boolean = false): String {
-        val msgId = UUID.randomUUID().toString()
+        val messageId = UUID.randomUUID().toString()
         val timestamp = System.currentTimeMillis()
         
-        val payloadBytes = PayloadFactory.buildPublicPayload(
-            msgId = msgId,
-            timestamp = timestamp,
+        val payload = com.example.testresqmesh.core.network.MeshPayload(
+            id = messageId,
+            type = "MESSAGE",
             senderName = myNodeName,
             text = text,
-            imageBase64 = imageBase64,
-            audioBase64 = audioBase64,
+            image = imageBase64,
+            audio = audioBase64,
+            isPrivate = false,
             locationLat = locationLat,
             locationLng = locationLng,
             isSOS = isSOS,
-            isSOSCancel = isSOSCancel
+            isSOSCancel = isSOSCancel,
+            channelId = _currentChannelId.value
         )
+        val payloadBytes = kotlinx.serialization.protobuf.ProtoBuf.encodeToByteArray(com.example.testresqmesh.core.network.MeshPayload.serializer(), payload)
 
-        val message = ChatMessage(msgId, myNodeName, text, imageBase64, audioBase64, locationLat, locationLng, true, false, timestamp, isSOS = isSOS)
+        val message = ChatMessage(messageId, myNodeName, text, imageBase64, audioBase64, locationLat, locationLng, true, false, timestamp, isSOS = isSOS)
         repositoryScope.launch {
             appDatabase.messageDao().insertMessage(message.toMessageEntity(targetName = null))
         }
         networkManager.broadcastPayload(payloadBytes)
-        return msgId
+        return messageId
     }
 
     fun deleteConversationWith(peerName: String) {
@@ -381,7 +392,8 @@ class MeshRepository(
             locationLat = locationLat,
             locationLng = locationLng,
             directedRoute = directedRouteList,
-            targetPubKey = targetPubKey
+            targetPubKey = targetPubKey,
+            channelId = _currentChannelId.value
         )
 
         val isDirect = _connectedDevices.value.any { it.name == targetName }

@@ -48,7 +48,8 @@ object PayloadFactory {
         locationLat: Double?,
         locationLng: Double?,
         directedRoute: List<String>,
-        targetPubKey: String?
+        targetPubKey: String?,
+        channelId: String
     ): ByteArray {
         if (targetPubKey != null) {
             val innerPayloadJson = org.json.JSONObject().apply {
@@ -58,8 +59,6 @@ object PayloadFactory {
             }.toString()
             
             val encrypted = CryptoManager.encryptHybrid(innerPayloadJson, targetPubKey)
-            val encryptedDataStr = encrypted?.first
-            val encryptedKeyStr = encrypted?.second
             
             val payload = MeshPayload(
                 id = msgId,
@@ -68,12 +67,11 @@ object PayloadFactory {
                 targetName = targetName,
                 isPrivate = true,
                 isEncrypted = true,
-                encryptedData = encryptedDataStr,
-                encryptedKey = encryptedKeyStr,
-                locationLat = locationLat,
-                locationLng = locationLng,
+                encryptedData = encrypted?.first,
+                encryptedKey = encrypted?.second,
+                routePath = listOf(senderName),
                 directedRoute = directedRoute,
-                routePath = listOf(senderName)
+                channelId = channelId
             )
             return ProtoBuf.encodeToByteArray(payload)
         } else {
@@ -85,12 +83,13 @@ object PayloadFactory {
                 text = text,
                 image = imageBase64,
                 audio = audioBase64,
-                isPrivate = true,
-                isEncrypted = false,
                 locationLat = locationLat,
                 locationLng = locationLng,
+                isPrivate = true,
+                isEncrypted = false,
+                routePath = listOf(senderName),
                 directedRoute = directedRoute,
-                routePath = listOf(senderName)
+                channelId = channelId
             )
             return ProtoBuf.encodeToByteArray(payload)
         }
