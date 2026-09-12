@@ -46,7 +46,8 @@ enum class AppState {
 
 class MeshViewModelFactory(
     private val repository: MeshRepository,
-    private val mediaHelper: MediaHelper
+    private val mediaHelper: MediaHelper,
+    private val liveAudioEngine: com.example.testresqmesh.core.utils.LiveAudioEngine
 ) : ViewModelProvider.Factory {
     @Suppress("UNCHECKED_CAST")
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
@@ -54,7 +55,7 @@ class MeshViewModelFactory(
             modelClass.isAssignableFrom(SetupViewModel::class.java) -> SetupViewModel(repository) as T
             modelClass.isAssignableFrom(RadarViewModel::class.java) -> RadarViewModel(repository) as T
             modelClass.isAssignableFrom(CommunicationViewModel::class.java) -> CommunicationViewModel(repository) as T
-            modelClass.isAssignableFrom(com.example.testresqmesh.feature.comms.viewmodel.WalkieTalkieViewModel::class.java) -> com.example.testresqmesh.feature.comms.viewmodel.WalkieTalkieViewModel(repository, mediaHelper) as T
+            modelClass.isAssignableFrom(com.example.testresqmesh.feature.comms.viewmodel.WalkieTalkieViewModel::class.java) -> com.example.testresqmesh.feature.comms.viewmodel.WalkieTalkieViewModel(repository, mediaHelper, liveAudioEngine) as T
             else -> throw IllegalArgumentException("Unknown ViewModel class")
         }
     }
@@ -97,6 +98,10 @@ class MainActivity : ComponentActivity() {
         repository = MeshRepository(networkManager, appDb)
         mediaHelper = MediaHelper(applicationContext)
 
+        val liveAudioEngine = com.example.testresqmesh.core.utils.LiveAudioEngine(applicationContext) { chunk ->
+            repository.broadcastLiveAudioChunk(chunk)
+        }
+
         lifecycle.addObserver(LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_START || event == Lifecycle.Event.ON_RESUME) {
                 isAppInForeground = true
@@ -105,7 +110,7 @@ class MainActivity : ComponentActivity() {
             }
         })
 
-        val factory = MeshViewModelFactory(repository, mediaHelper)
+        val factory = MeshViewModelFactory(repository, mediaHelper, liveAudioEngine)
 
         setContent {
             val setupViewModel: SetupViewModel = viewModel(factory = factory)

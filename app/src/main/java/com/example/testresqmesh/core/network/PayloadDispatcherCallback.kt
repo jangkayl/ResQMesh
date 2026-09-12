@@ -14,6 +14,7 @@ interface PayloadDispatcherCallback {
     fun onPublicKeyReceived(senderName: String, key: String)
     fun onRoutingTableReceived(senderName: String, connectedNodes: List<String>)
     fun onMessageReceived(endpointId: String, msgId: String, senderName: String, text: String, isPrivate: Boolean, isSystem: Boolean, imageBase64: String?, audioBase64: String?, locationLat: Double?, locationLng: Double?, medium: String, routePath: List<String>, channelId: String)
+    fun onLiveAudioChunk(sender: String, channelId: String, chunk: ByteArray)
     
     fun onDeviceNameSync(endpointId: String, realName: String)
     fun onDeviceGoodbye(endpointId: String)

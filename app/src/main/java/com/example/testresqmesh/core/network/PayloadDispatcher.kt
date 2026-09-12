@@ -36,6 +36,7 @@ class PayloadDispatcher(private val callback: PayloadDispatcherCallback) {
                 "GOODBYE" -> handleGoodbye(endpointId, sender, payloadBytes)
                 "BLOCK" -> handleBlock(endpointId, payload, payloadBytes)
                 "UNBLOCK" -> handleUnblock(endpointId, payload, payloadBytes)
+                "LIVE_AUDIO" -> handleLiveAudio(endpointId, payload, payloadBytes)
                 else -> handleStandardMessage(endpointId, msgId, sender, payloadBytes, payload)
             }
         } catch (e: Exception) {
@@ -210,5 +211,15 @@ class PayloadDispatcher(private val callback: PayloadDispatcherCallback) {
             callback.onMessageReceived(endpointId, msgId, sender, text, isPrivate, false, imageBase64, audioBase64, payload.locationLat, payload.locationLng, medium, routePath, payload.channelId)
             callback.broadcastPayload(updatedBytes, endpointId)
         }
+    }
+
+    private fun handleLiveAudio(endpointId: String, payload: MeshPayload, payloadBytes: ByteArray) {
+        val chunk = payload.liveAudioChunk ?: return
+        val channelId = payload.channelId
+        callback.onLiveAudioChunk(payload.senderName, channelId, chunk)
+        
+        // Rapid Relay: Live audio needs to be re-broadcast immediately to keep latency low.
+        // We do not modify the routePath to save processing time on live audio chunks.
+        callback.broadcastPayload(payloadBytes, endpointId)
     }
 }

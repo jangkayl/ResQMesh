@@ -44,6 +44,7 @@ class MeshRepository(
     val incomingSosAlert: StateFlow<ChatMessage?> = _incomingSosAlert.asStateFlow()
 
     val incomingVoiceMessage = kotlinx.coroutines.flow.MutableSharedFlow<ChatMessage>(extraBufferCapacity = 10)
+    val incomingLiveAudioChunk = kotlinx.coroutines.flow.MutableSharedFlow<Pair<String, ByteArray>>(extraBufferCapacity = 100)
 
     fun clearSosAlert() {
         _incomingSosAlert.value = null
@@ -179,6 +180,14 @@ class MeshRepository(
 
         networkManager.onSosCancelled = {
             clearSosAlert()
+        }
+
+        networkManager.onLiveAudioChunk = { sender, channelId, chunk ->
+            if (channelId == _currentChannelId.value) {
+                repositoryScope.launch {
+                    incomingLiveAudioChunk.emit(Pair(sender, chunk))
+                }
+            }
         }
 
         networkManager.onMessageReceived = { endpointId, msgId, sender, text, isPrivate, isSystem, img, audio, lat, lng, medium, routePath, channelId ->
@@ -329,6 +338,19 @@ class MeshRepository(
             val updated = decoded.copy(type = commandType)
             kotlinx.serialization.protobuf.ProtoBuf.encodeToByteArray(com.example.testresqmesh.core.network.MeshPayload.serializer(), updated)
         }
+        networkManager.broadcastPayload(payloadBytes)
+    }
+
+    fun broadcastLiveAudioChunk(chunk: ByteArray) {
+        val messageId = java.util.UUID.randomUUID().toString()
+        val payload = com.example.testresqmesh.core.network.MeshPayload(
+            id = messageId,
+            type = "LIVE_AUDIO",
+            senderName = myNodeName,
+            channelId = _currentChannelId.value,
+            liveAudioChunk = chunk
+        )
+        val payloadBytes = kotlinx.serialization.protobuf.ProtoBuf.encodeToByteArray(com.example.testresqmesh.core.network.MeshPayload.serializer(), payload)
         networkManager.broadcastPayload(payloadBytes)
     }
 

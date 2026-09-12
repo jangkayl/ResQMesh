@@ -27,6 +27,7 @@ class NativeBleManager(private val context: Context) {
     var onDeviceScanRemoved: ((String) -> Unit)? = null
     var onMessageReceived: ((String, String, String, String, Boolean, Boolean, String?, String?, Double?, Double?, String, List<String>, String) -> Unit)? = null
     var onMessageSeen: ((String, String) -> Unit)? = null
+    var onLiveAudioChunk: ((String, String, ByteArray) -> Unit)? = null
     var onMessageDelivered: ((String, String, List<String>) -> Unit)? = null
     var onPublicKeyReceived: ((String, String) -> Unit)? = null
     var onRoutingTableReceived: ((String, List<String>) -> Unit)? = null
@@ -91,6 +92,9 @@ class NativeBleManager(private val context: Context) {
         override fun onRoutingTableReceived(senderName: String, connectedNodes: List<String>) { onRoutingTableReceived?.invoke(senderName, connectedNodes) }
         override fun onMessageReceived(endpointId: String, msgId: String, senderName: String, text: String, isPrivate: Boolean, isSystem: Boolean, imageBase64: String?, audioBase64: String?, locationLat: Double?, locationLng: Double?, medium: String, routePath: List<String>, channelId: String) {
             this@NativeBleManager.onMessageReceived?.invoke(endpointId, msgId, senderName, text, isPrivate, isSystem, imageBase64, audioBase64, locationLat, locationLng, medium, routePath, channelId)
+        }
+        override fun onLiveAudioChunk(sender: String, channelId: String, chunk: ByteArray) {
+            this@NativeBleManager.onLiveAudioChunk?.invoke(sender, channelId, chunk)
         }
         override fun onDeviceNameSync(endpointId: String, realName: String) {
             // Deprecated: We now handle this safely in processBinaryPayload 

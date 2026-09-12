@@ -6,7 +6,7 @@ import kotlinx.serialization.protobuf.ProtoNumber
 @Serializable
 data class MeshPayload(
     @ProtoNumber(1) val id: String = "",
-    @ProtoNumber(2) val type: String = "MESSAGE", // MESSAGE, SYSTEM, SEEN, DELIVERED
+    @ProtoNumber(2) val type: String = "MESSAGE", // MESSAGE, SYSTEM, SEEN, DELIVERED, LIVE_AUDIO
     @ProtoNumber(3) val senderName: String = "",
     @ProtoNumber(4) val targetName: String = "",
     @ProtoNumber(5) val text: String = "",
@@ -27,5 +27,18 @@ data class MeshPayload(
     @ProtoNumber(20) val publicKey: String = "",
     @ProtoNumber(21) val connectedNodes: List<String> = emptyList(),
     @ProtoNumber(22) val targetMessageId: String = "",
-    @ProtoNumber(23) val reader: String = ""
-)
+    @ProtoNumber(23) val reader: String = "",
+    @ProtoNumber(24) val liveAudioChunk: ByteArray? = null
+) {
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (javaClass != other?.javaClass) return false
+        other as MeshPayload
+        if (id != other.id) return false
+        return true
+    }
+    
+    override fun hashCode(): Int {
+        return id.hashCode()
+    }
+}

@@ -9,9 +9,12 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
+import com.example.testresqmesh.core.utils.LiveAudioEngine
+
 class WalkieTalkieViewModel(
     private val repository: MeshRepository,
-    private val mediaHelper: MediaHelper
+    private val mediaHelper: MediaHelper,
+    private val liveAudioEngine: LiveAudioEngine
 ) : ViewModel() {
 
     private val _isWalkieTalkieMode = MutableStateFlow(false)
@@ -28,10 +31,7 @@ class WalkieTalkieViewModel(
             repository.incomingVoiceMessage.collect { message ->
                 if (_isWalkieTalkieMode.value) {
                     message.audioBase64?.let { base64 ->
-                        // Automatically play the voice note
                         mediaHelper.playVoiceMail(base64)
-                        
-                        // Mark it as seen since we listened to it automatically
                         repository.broadcastSeenReceipt(message.id, message.isPrivate, message.senderName)
                     }
                 }
@@ -39,7 +39,20 @@ class WalkieTalkieViewModel(
         }
     }
 
+    fun startLiveAudio() {
+        liveAudioEngine.startRecording()
+    }
+
+    fun stopLiveAudio() {
+        liveAudioEngine.stopRecording()
+    }
+
     fun toggleWalkieTalkieMode() {
         _isWalkieTalkieMode.value = !_isWalkieTalkieMode.value
+        if (_isWalkieTalkieMode.value) {
+            liveAudioEngine.startPlayback(repository.incomingLiveAudioChunk)
+        } else {
+            liveAudioEngine.stopPlayback()
+        }
     }
 }

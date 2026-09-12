@@ -92,6 +92,18 @@ fun WalkieTalkieScreen(
                 modifier = Modifier.padding(bottom = 64.dp)
             )
 
+            var isLiveMode by remember { mutableStateOf(false) }
+
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(bottom = 32.dp)) {
+                Text("Voice Note", color = if (!isLiveMode) Color.White else Color.Gray, fontWeight = FontWeight.Bold)
+                Switch(
+                    checked = isLiveMode,
+                    onCheckedChange = { isLiveMode = it },
+                    modifier = Modifier.padding(horizontal = 16.dp)
+                )
+                Text("Live Audio", color = if (isLiveMode) Color.White else Color.Gray, fontWeight = FontWeight.Bold)
+            }
+
             // BIG PTT BUTTON
             Box(
                 modifier = Modifier
@@ -103,26 +115,33 @@ fun WalkieTalkieScreen(
                         color = if (isRecording) ErrorRed.copy(alpha = 0.5f) else MaterialTheme.colorScheme.primary.copy(alpha = 0.5f), 
                         shape = CircleShape
                     )
-                    .pointerInput(Unit) {
+                    .pointerInput(isLiveMode) {
                         detectTapGestures(
                             onPress = {
                                 isRecording = true
-                                mediaHelper.startRecording()
+                                if (isLiveMode) {
+                                    walkieTalkieViewModel.startLiveAudio()
+                                } else {
+                                    mediaHelper.startRecording()
+                                }
                                 
-                                kotlinx.coroutines.withTimeoutOrNull(10000L) {
+                                kotlinx.coroutines.withTimeoutOrNull(if (isLiveMode) Long.MAX_VALUE else 10000L) {
                                     tryAwaitRelease()
                                 }
                                 
                                 if (isRecording) {
                                     isRecording = false
-                                    val audioBase64 = mediaHelper.stopRecording()
-                                    if (audioBase64 != null) {
-                                        // Send to broadcast (null target)
-                                        commsViewModel.sendPublicMessage(
-                                            text = "Voice Message",
-                                            imageBase64 = null,
-                                            audioBase64 = audioBase64
-                                        )
+                                    if (isLiveMode) {
+                                        walkieTalkieViewModel.stopLiveAudio()
+                                    } else {
+                                        val audioBase64 = mediaHelper.stopRecording()
+                                        if (audioBase64 != null) {
+                                            commsViewModel.sendPublicMessage(
+                                                text = "Voice Message",
+                                                imageBase64 = null,
+                                                audioBase64 = audioBase64
+                                            )
+                                        }
                                     }
                                 }
                             }
