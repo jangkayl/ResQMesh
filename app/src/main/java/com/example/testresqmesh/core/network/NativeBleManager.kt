@@ -112,6 +112,8 @@ class NativeBleManager(private val context: Context) {
     private val payloadDispatcher = PayloadDispatcher(payloadDispatcherCallback)
     private val endpointLastSeen = mutableMapOf<String, Long>()
     private val endpointFirstSeen = mutableMapOf<String, Long>()
+    private val endpointLastScore = mutableMapOf<String, String>()
+    private val connectionEstablishTime = mutableMapOf<String, Long>()
     private val handler = Handler(Looper.getMainLooper())
     private val timeoutRunnable = object : Runnable {
         override fun run() {
@@ -308,6 +310,7 @@ class NativeBleManager(private val context: Context) {
             if (peerName != myDeviceName && peerName != myDeviceName.take(20)) {
                 val now = System.currentTimeMillis()
                 endpointLastSeen[macAddress] = now
+                endpointLastScore[macAddress] = peerScore
                 if (!endpointFirstSeen.containsKey(macAddress)) {
                     endpointFirstSeen[macAddress] = now
                 }
@@ -377,12 +380,13 @@ class NativeBleManager(private val context: Context) {
                                 }
                             } else {
                                 AppLogger.d("BLE_MESH", "Battery Master Election: $myScore <= $peerScore. Yielding.")
-                                // QA FIX: If the Master fails to initiate, the Slave steps up after 3 seconds!
+                                // QA FIX: If the Master fails to initiate due to hardware bugs, the Slave seizes control after 10 seconds!
                                 handler.postDelayed({
                                     if (!activeServerConnections.containsKey(macAddress) && !activeConnections.containsKey(macAddress)) {
+                                        AppLogger.d("BLE_MESH", "Master-Slave Reversal! Designated Master failed. Initiating as Client.")
                                         connectToPersistentGatt(macAddress, peerName)
                                     }
-                                }, 3000)
+                                }, 10000)
                             }
                         }
                     }
@@ -425,11 +429,12 @@ class NativeBleManager(private val context: Context) {
                     if (newState == BluetoothProfile.STATE_CONNECTED) {
                         AppLogger.d("BLE_MESH", "GATT Socket locked with ${peerName}. Requesting MTU 512...")
                         activeConnections[macAddress] = gatt
-                        connectedEndpointNames[macAddress] = peerName // QA FIX: Register name instantly to prevent MAC rotation loops
+                        connectedEndpointNames[macAddress] = peerName
                         pendingQueues.putIfAbsent(macAddress, ConcurrentLinkedQueue<ByteArray>())
                         isWriting.putIfAbsent(macAddress, AtomicBoolean(false))
                         chunkBuffers.putIfAbsent(macAddress, ByteArray(0))
                         connectionInteractionTimes.putIfAbsent(macAddress, System.currentTimeMillis())
+                        connectionEstablishTime[macAddress] = System.currentTimeMillis()
                         
                         handler.postDelayed({
                             updateInvisibilityCloak()
@@ -720,6 +725,28 @@ class NativeBleManager(private val context: Context) {
                         gattServer?.cancelConnection(device)
                         return
                     }
+                    
+                    // COLLISION & ZOMBIE SOCKET RESOLUTION
+                    val clientGatt = activeConnections[macAddress]
+                    if (clientGatt != null) {
+                        val age = System.currentTimeMillis() - (connectionEstablishTime[macAddress] ?: 0L)
+                        if (age < 5000) {
+                            val myScore = getElectionScore()
+                            val theirScore = endpointLastScore[macAddress] ?: ""
+                            if (myScore > theirScore) {
+                                AppLogger.d("BLE_MESH", "Dual-Link Collision: We have superior score ($myScore > $theirScore). Rejecting incoming Server link.")
+                                gattServer?.cancelConnection(device)
+                                return
+                            } else {
+                                AppLogger.d("BLE_MESH", "Dual-Link Collision: We have inferior score. Killing our Client link and accepting Server link.")
+                                forceGattDisconnect(macAddress, clientGatt)
+                            }
+                        } else {
+                            AppLogger.d("BLE_MESH", "Zombie Socket Detected! Peer $macAddress is forcing a reconnection. Killing old Client link.")
+                            forceGattDisconnect(macAddress, clientGatt)
+                        }
+                    }
+
                     val totalConnections = activeConnections.size + activeServerConnections.size
                     if (totalConnections >= MAX_TOTAL_CONNECTIONS) {
                         AppLogger.d("BLE_MESH", "Server: Rejected connection from ${device.address}. Mesh node is full.")
