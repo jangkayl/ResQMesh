@@ -182,6 +182,10 @@ class MeshRepository(
             clearSosAlert()
         }
 
+        networkManager.stpNeighborsProvider = {
+            meshRouter.getSpanningTreeNeighbors(myNodeName, _connectedDevices.value)
+        }
+
         networkManager.onLiveAudioChunk = { sender, channelId, chunk ->
             if (channelId == _currentChannelId.value) {
                 repositoryScope.launch {
@@ -351,7 +355,16 @@ class MeshRepository(
             liveAudioChunk = chunk
         )
         val payloadBytes = kotlinx.serialization.protobuf.ProtoBuf.encodeToByteArray(com.example.testresqmesh.core.network.MeshPayload.serializer(), payload)
-        networkManager.broadcastPayload(payloadBytes)
+        
+        // STP Directed Routing: Only initiate stream to Spanning Tree neighbors
+        val stpNeighbors = meshRouter.getSpanningTreeNeighbors(myNodeName, _connectedDevices.value)
+        
+        // Better yet: just send to connected devices whose name is in stpNeighbors
+        _connectedDevices.value.forEach { device ->
+            if (stpNeighbors.contains(device.name)) {
+                networkManager.sendDirectPayload(device.endpointId, payloadBytes)
+            }
+        }
     }
 
     fun forceConnect(endpointId: String, endpointName: String) {

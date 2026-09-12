@@ -60,6 +60,72 @@ class MeshRouter {
         _knownNodes.value = newKnownNodes
     }
 
+    /**
+     * Spanning Tree Protocol (STP) equivalent.
+     * Deterministically calculates a Minimum Spanning Tree of the entire mesh using Kruskal's algorithm,
+     * sorting edges alphabetically to guarantee every node arrives at the exact same Tree structure.
+     * Returns the subset of our direct neighbors that are part of the Spanning Tree.
+     */
+    fun getSpanningTreeNeighbors(myNodeName: String, connectedDevices: List<ConnectedDevice>): Set<String> {
+        val allEdges = mutableListOf<Pair<String, String>>()
+        val allNodes = mutableSetOf(myNodeName)
+
+        // Add my direct edges
+        connectedDevices.forEach { device ->
+            allNodes.add(device.name)
+            val edge = if (myNodeName < device.name) Pair(myNodeName, device.name) else Pair(device.name, myNodeName)
+            if (!allEdges.contains(edge)) allEdges.add(edge)
+        }
+
+        // Add network graph edges
+        networkGraph.forEach { (node, neighbors) ->
+            allNodes.add(node)
+            neighbors.forEach { neighbor ->
+                allNodes.add(neighbor)
+                val edge = if (node < neighbor) Pair(node, neighbor) else Pair(neighbor, node)
+                if (!allEdges.contains(edge)) allEdges.add(edge)
+            }
+        }
+
+        // Sort edges deterministically (alphabetically)
+        allEdges.sortWith(compareBy({ it.first }, { it.second }))
+
+        // Kruskal's Algorithm (Disjoint Set)
+        val parent = mutableMapOf<String, String>()
+        allNodes.forEach { parent[it] = it }
+
+        fun find(i: String): String {
+            if (parent[i] == i) return i
+            parent[i] = find(parent[i]!!)
+            return parent[i]!!
+        }
+
+        fun union(i: String, j: String) {
+            val rootI = find(i)
+            val rootJ = find(j)
+            if (rootI != rootJ) {
+                parent[rootI] = rootJ
+            }
+        }
+
+        val mstEdges = mutableListOf<Pair<String, String>>()
+        for (edge in allEdges) {
+            if (find(edge.first) != find(edge.second)) {
+                union(edge.first, edge.second)
+                mstEdges.add(edge)
+            }
+        }
+
+        // Filter the MST edges to find which of OUR direct neighbors are in the tree
+        val stpNeighbors = mutableSetOf<String>()
+        for (edge in mstEdges) {
+            if (edge.first == myNodeName) stpNeighbors.add(edge.second)
+            else if (edge.second == myNodeName) stpNeighbors.add(edge.first)
+        }
+
+        return stpNeighbors
+    }
+
     fun findShortestPath(myNodeName: String, targetName: String, connectedDevices: List<ConnectedDevice>): List<String> {
         val queue = ArrayDeque<List<String>>()
         val visited = mutableSetOf<String>()

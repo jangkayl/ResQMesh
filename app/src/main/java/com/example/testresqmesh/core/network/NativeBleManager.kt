@@ -27,6 +27,7 @@ class NativeBleManager(private val context: Context) {
     var onDeviceScanRemoved: ((String) -> Unit)? = null
     var onMessageReceived: ((String, String, String, String, Boolean, Boolean, String?, String?, Double?, Double?, String, List<String>, String) -> Unit)? = null
     var onMessageSeen: ((String, String) -> Unit)? = null
+    var stpNeighborsProvider: (() -> Set<String>)? = null
     var onLiveAudioChunk: ((String, String, ByteArray) -> Unit)? = null
     var onMessageDelivered: ((String, String, List<String>) -> Unit)? = null
     var onPublicKeyReceived: ((String, String) -> Unit)? = null
@@ -84,6 +85,9 @@ class NativeBleManager(private val context: Context) {
         override fun getSeenMessageIds() = seenMessageIds
         override fun getEndpointMedium(endpointId: String) = "Persistent BLE Mesh"
         override fun getConnectedEndpointIdByName(name: String) = connectedEndpointNames.entries.find { it.value == name }?.key
+        override fun getStpNeighbors(): Set<String> {
+            return this@NativeBleManager.stpNeighborsProvider?.invoke() ?: emptySet()
+        }
         override fun sendDirectPayload(endpointId: String, payload: ByteArray) = this@NativeBleManager.sendDirectPayload(endpointId, payload)
         override fun broadcastPayload(payload: ByteArray, excludeEndpointId: String?) = this@NativeBleManager.broadcastPayload(payload, excludeEndpointId)
         override fun onMessageSeen(msgId: String, readerName: String) { onMessageSeen?.invoke(msgId, readerName) }

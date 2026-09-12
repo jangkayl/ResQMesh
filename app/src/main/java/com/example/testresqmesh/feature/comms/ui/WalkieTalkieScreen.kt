@@ -89,7 +89,33 @@ fun WalkieTalkieScreen(
                 color = if (isWalkieTalkieMode) SuccessGreen else Color.Gray,
                 fontWeight = FontWeight.Bold,
                 fontSize = 18.sp,
-                modifier = Modifier.padding(bottom = 64.dp)
+                modifier = Modifier.padding(bottom = 16.dp)
+            )
+
+            val currentSpeaker by walkieTalkieViewModel.currentSpeaker.collectAsState()
+            
+            if (currentSpeaker != null && isWalkieTalkieMode) {
+                Text(
+                    text = "🔊 $currentSpeaker is talking...",
+                    color = SuccessGreen,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 20.sp,
+                    modifier = Modifier.padding(bottom = 32.dp)
+                )
+            } else {
+                Spacer(modifier = Modifier.height(56.dp))
+            }
+            
+            var volumeGain by remember { mutableStateOf(1.0f) }
+            Text("Software Volume Boost: ${"%.1f".format(volumeGain)}x", color = Color.Gray, fontSize = 12.sp)
+            androidx.compose.material3.Slider(
+                value = volumeGain,
+                onValueChange = { 
+                    volumeGain = it
+                    walkieTalkieViewModel.setVolumeGain(it)
+                },
+                valueRange = 1.0f..5.0f,
+                modifier = Modifier.padding(horizontal = 64.dp, vertical = 8.dp)
             )
 
             var isLiveMode by remember { mutableStateOf(false) }

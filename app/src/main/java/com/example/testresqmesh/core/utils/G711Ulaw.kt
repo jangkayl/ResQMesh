@@ -54,14 +54,18 @@ object G711Ulaw {
         return ulawData
     }
 
-    fun decompress(ulawData: ByteArray): ByteArray {
+    fun decompress(ulawData: ByteArray, gainMultiplier: Float = 1.0f): ByteArray {
         val pcmData = ByteArray(ulawData.size * 2)
         var i = 0
         var j = 0
         while (i < ulawData.size) {
             val sample = ulawToLinear(ulawData[i])
-            pcmData[j] = (sample.toInt() and 0xFF).toByte()
-            pcmData[j + 1] = ((sample.toInt() shr 8) and 0xFF).toByte()
+            var amplified = (sample * gainMultiplier).toInt()
+            if (amplified > Short.MAX_VALUE) amplified = Short.MAX_VALUE.toInt()
+            if (amplified < Short.MIN_VALUE) amplified = Short.MIN_VALUE.toInt()
+            
+            pcmData[j] = (amplified and 0xFF).toByte()
+            pcmData[j + 1] = ((amplified shr 8) and 0xFF).toByte()
             i++
             j += 2
         }

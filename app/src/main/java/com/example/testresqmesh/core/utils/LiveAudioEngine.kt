@@ -10,7 +10,10 @@ import android.media.AudioTrack
 import android.media.MediaRecorder
 import androidx.core.app.ActivityCompat
 import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 
 class LiveAudioEngine(
     private val context: Context,
@@ -68,6 +71,11 @@ class LiveAudioEngine(
         audioRecord = null
     }
 
+    var volumeGain: Float = 1.0f
+    
+    private val _currentSpeaker = MutableStateFlow<String?>(null)
+    val currentSpeaker: StateFlow<String?> = _currentSpeaker.asStateFlow()
+
     fun startPlayback(incomingLiveAudioChunk: SharedFlow<Pair<String, ByteArray>>) {
         isPlaying = true
         
@@ -83,17 +91,18 @@ class LiveAudioEngine(
         )
 
         playbackJob = CoroutineScope(Dispatchers.IO).launch {
-            val jitterBuffer = java.util.concurrent.ConcurrentLinkedQueue<ByteArray>()
+            val jitterBuffer = java.util.concurrent.ConcurrentLinkedQueue<Pair<String, ByteArray>>()
             var isBuffering = true
             
             // Collect chunks from network
             launch {
-                incomingLiveAudioChunk.collect { (_, compressedChunk) ->
+                incomingLiveAudioChunk.collect { (sender, compressedChunk) ->
                     if (isPlaying) {
-                        val pcmChunk = G711Ulaw.decompress(compressedChunk)
-                        jitterBuffer.offer(pcmChunk)
-                        // If we have accumulated enough chunks (e.g., 5 chunks = ~200-300ms), start playing
-                        if (isBuffering && jitterBuffer.size >= 5) {
+                        val pcmChunk = G711Ulaw.decompress(compressedChunk, volumeGain)
+                        jitterBuffer.offer(Pair(sender, pcmChunk))
+                        
+                        // Wait until we have 20 chunks (~600ms) before starting to play to completely eliminate choppiness
+                        if (isBuffering && jitterBuffer.size >= 20) {
                             isBuffering = false
                             audioTrack?.play()
                         }
@@ -104,15 +113,18 @@ class LiveAudioEngine(
             // Play chunks from jitter buffer
             while (isPlaying && isActive) {
                 if (!isBuffering) {
-                    val chunk = jitterBuffer.poll()
-                    if (chunk != null) {
-                        audioTrack?.write(chunk, 0, chunk.size)
+                    val pair = jitterBuffer.poll()
+                    if (pair != null) {
+                        _currentSpeaker.value = pair.first
+                        audioTrack?.write(pair.second, 0, pair.second.size)
                     } else {
                         // Buffer underrun, pause playback and buffer again
                         isBuffering = true
+                        _currentSpeaker.value = null
                         audioTrack?.pause()
                     }
                 } else {
+                    _currentSpeaker.value = null
                     delay(10)
                 }
             }
@@ -122,6 +134,7 @@ class LiveAudioEngine(
     fun stopPlayback() {
         isPlaying = false
         playbackJob?.cancel()
+        _currentSpeaker.value = null
         audioTrack?.stop()
         audioTrack?.release()
         audioTrack = null

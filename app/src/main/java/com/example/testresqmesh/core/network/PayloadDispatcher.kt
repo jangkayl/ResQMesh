@@ -218,8 +218,16 @@ class PayloadDispatcher(private val callback: PayloadDispatcherCallback) {
         val channelId = payload.channelId
         callback.onLiveAudioChunk(payload.senderName, channelId, chunk)
         
-        // Rapid Relay: Live audio needs to be re-broadcast immediately to keep latency low.
-        // We do not modify the routePath to save processing time on live audio chunks.
-        callback.broadcastPayload(payloadBytes, endpointId)
+        // STP Directed Routing: Only forward live audio to endpoints that are part of our Spanning Tree.
+        // This mathematically eliminates broadcast storms and packet duplication for streams.
+        val stpNeighbors = callback.getStpNeighbors()
+        if (stpNeighbors.isEmpty()) return
+
+        for (neighborName in stpNeighbors) {
+            val neighborEndpointId = callback.getConnectedEndpointIdByName(neighborName)
+            if (neighborEndpointId != null && neighborEndpointId != endpointId) {
+                callback.sendDirectPayload(neighborEndpointId, payloadBytes)
+            }
+        }
     }
 }

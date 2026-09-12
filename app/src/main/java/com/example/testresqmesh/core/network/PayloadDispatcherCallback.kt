@@ -5,6 +5,7 @@ interface PayloadDispatcherCallback {
     fun getSeenMessageIds(): java.util.LinkedHashSet<String>
     fun getEndpointMedium(endpointId: String): String
     fun getConnectedEndpointIdByName(name: String): String?
+    fun getStpNeighbors(): Set<String>
     
     fun sendDirectPayload(endpointId: String, payload: ByteArray)
     fun broadcastPayload(payload: ByteArray, excludeEndpointId: String?)

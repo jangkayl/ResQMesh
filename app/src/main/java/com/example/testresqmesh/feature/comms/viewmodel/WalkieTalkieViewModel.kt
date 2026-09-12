@@ -22,8 +22,14 @@ class WalkieTalkieViewModel(
 
     val currentChannelId: StateFlow<String> = repository.currentChannelId
     
+    val currentSpeaker: StateFlow<String?> = liveAudioEngine.currentSpeaker
+    
     fun setChannel(channelId: String) {
         repository.setChannel(channelId)
+    }
+
+    fun setVolumeGain(gain: Float) {
+        liveAudioEngine.volumeGain = gain
     }
 
     init {
