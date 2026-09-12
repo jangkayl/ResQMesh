@@ -5,6 +5,7 @@ import com.example.testresqmesh.core.model.ConnectedDevice
 import com.example.testresqmesh.core.model.ScannedDevice
 import com.example.testresqmesh.core.model.KnownNode
 import com.example.testresqmesh.core.network.NativeBleManager
+import com.example.testresqmesh.core.utils.AppLogger
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -74,23 +75,37 @@ class MeshRepository(
         }
 
         networkManager.onDeviceConnected = { device ->
-            val existing = _connectedDevices.value.find { it.endpointId == device.endpointId }
-            if (existing != null) {
-                if (device.isClassicConnected != existing.isClassicConnected || existing.name == "Unknown Node" || device.name != existing.name) {
-                    _connectedDevices.value = _connectedDevices.value.map {
+            // Deduplicate by BOTH endpointId and name to prevent Ghost Sockets (Zombie MACs)
+            val existingById = _connectedDevices.value.find { it.endpointId == device.endpointId }
+            val existingByName = _connectedDevices.value.find { it.name == device.name && it.endpointId != device.endpointId }
+            
+            var updatedList = _connectedDevices.value
+            
+            // If this exact device name is already connected under an old Ghost MAC, kill the ghost!
+            if (existingByName != null && device.name != "Unknown Node") {
+                AppLogger.d("BLE_MESH", "Ghost Socket Detected! Replacing old MAC ${existingByName.endpointId} with new MAC ${device.endpointId} for ${device.name}")
+                networkManager.disconnectFromEndpoint(existingByName.endpointId)
+                updatedList = updatedList.filter { it.endpointId != existingByName.endpointId }
+            }
+
+            if (existingById != null) {
+                if (device.isClassicConnected != existingById.isClassicConnected || existingById.name == "Unknown Node" || device.name != existingById.name) {
+                    updatedList = updatedList.map {
                         if (it.endpointId == device.endpointId) device else it
                     }
-                    meshRouter.removeNode(existing.name)
+                    meshRouter.removeNode(existingById.name)
                     meshRouter.markNodeSeen(device.name)
-                    meshRouter.recalculateKnownNodes(myNodeName, _connectedDevices.value)
+                    meshRouter.recalculateKnownNodes(myNodeName, updatedList)
                 }
             } else {
-                _connectedDevices.value = _connectedDevices.value + device
+                updatedList = updatedList + device
                 _scannedDevices.value = _scannedDevices.value.filter { it.endpointId != device.endpointId }
                 
                 meshRouter.markNodeSeen(device.name)
-                meshRouter.recalculateKnownNodes(myNodeName, _connectedDevices.value)
+                meshRouter.recalculateKnownNodes(myNodeName, updatedList)
             }
+            
+            _connectedDevices.value = updatedList
         }
 
         networkManager.onDeviceDisconnected = { endpointId ->

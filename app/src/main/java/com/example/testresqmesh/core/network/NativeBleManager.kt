@@ -851,8 +851,8 @@ class NativeBleManager(private val context: Context) {
                     AppLogger.d("BLE_MESH", "Auto-rename: $endpointId is now ${payload.senderName}")
                     connectedEndpointNames[endpointId] = payload.senderName
                     handler.post {
-                        val isClient = activeConnections.containsKey(endpointId)
-                        onDeviceConnected?.invoke(com.example.testresqmesh.core.model.ConnectedDevice(endpointId, payload.senderName, isClient))
+                        val isDirectlyConnected = activeConnections.containsKey(endpointId) || activeServerConnections.containsKey(endpointId)
+                        onDeviceConnected?.invoke(com.example.testresqmesh.core.model.ConnectedDevice(endpointId, payload.senderName, isDirectlyConnected))
                         sendSystemPulse()
                     }
                 }
