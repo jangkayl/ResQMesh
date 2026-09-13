@@ -288,8 +288,8 @@ class MeshRepository(
         }
     }
 
-    fun startNode(customName: String, nodeTag: String, teamKey: String) {
-        myNodeName = "$customName [$nodeTag]"
+    fun startNode(customName: String, nodeTag: String, teamKey: String, nodeId: String) {
+        myNodeName = "$customName [$nodeTag]#$nodeId"
         networkManager.myDeviceName = myNodeName
         networkManager.startMeshNode(teamKey)
         _isOnline.value = true

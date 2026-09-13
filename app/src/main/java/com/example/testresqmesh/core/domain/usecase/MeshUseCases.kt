@@ -41,8 +41,8 @@ data class MeshUseCases(
 )
 
 class StartNodeUseCase(private val repository: MeshRepository) {
-    operator fun invoke(customName: String, nodeTag: String, teamKey: String) {
-        repository.startNode(customName, nodeTag, teamKey)
+    operator fun invoke(customName: String, nodeTag: String, teamKey: String, nodeId: String) {
+        repository.startNode(customName, nodeTag, teamKey, nodeId)
     }
 }
 

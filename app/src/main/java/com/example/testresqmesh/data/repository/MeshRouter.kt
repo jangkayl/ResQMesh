@@ -22,17 +22,34 @@ class MeshRouter {
     val knownNodes: StateFlow<List<KnownNode>> = _knownNodes.asStateFlow()
 
     fun updateTopology(senderName: String, connectedNodes: List<String>, myNodeName: String) {
-        if (senderName != myNodeName) {
-            lastSeenMap[senderName] = System.currentTimeMillis()
-            networkGraph[senderName] = connectedNodes.toSet()
-            _topology.value = networkGraph.toMap()
-            
-            connectedNodes.forEach { node ->
-                if (node != myNodeName) {
-                    lastSeenMap[node] = System.currentTimeMillis()
-                }
+        if (senderName == myNodeName || senderName == "Unknown Node") return
+
+        markNodeSeen(senderName)
+
+        val currentTopology = _topology.value.toMutableMap()
+        
+        // Filter out "Unknown Node" from the connectedNodes list to prevent ghost node pollution
+        val validNodes = connectedNodes.filter { it != "Unknown Node" }
+        
+        validNodes.forEach { node ->
+            if (node != myNodeName) {
+                markNodeSeen(node)
             }
         }
+        
+        currentTopology[senderName] = validNodes.toSet()
+
+        // Prune stale or self-referential routes
+        currentTopology.remove(myNodeName)
+        validNodes.forEach { node ->
+            if (currentTopology[node]?.contains(myNodeName) == true) {
+                currentTopology[node] = currentTopology[node]!!.minus(myNodeName)
+            }
+        }
+
+        _topology.value = currentTopology
+        networkGraph.clear()
+        networkGraph.putAll(currentTopology)
     }
 
     fun markNodeSeen(nodeName: String) {

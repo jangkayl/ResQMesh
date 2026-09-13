@@ -261,8 +261,8 @@ class NativeBleManager(val context: Context) {
         val electionScore = getElectionScore()
         val combinedName = "$electionScore|$totalConnections|$myDeviceName"
         var nameBytes = combinedName.toByteArray(Charsets.UTF_8)
-        if (nameBytes.size > 20) {
-            nameBytes = nameBytes.sliceArray(0 until 20)
+        if (nameBytes.size > 26) {
+            nameBytes = nameBytes.sliceArray(0 until 26)
         }
         val data = AdvertiseData.Builder()
             .setIncludeDeviceName(false)
@@ -320,7 +320,30 @@ class NativeBleManager(val context: Context) {
                 return
             }
 
-            if (peerName != myDeviceName && peerName != myDeviceName.take(20)) {
+            // GHOST NODE EVICTION & DUAL-MAC SPLIT-BRAIN FIX:
+            // Android uses different MACs for scanning (Central) vs advertising (Peripheral).
+            val oldMac = store.connectedEndpointNames.entries.find { it.value == peerName }?.key
+            if (oldMac != null && oldMac != macAddress) {
+                val isOldMacPhysicallyConnected = store.activeConnections.containsKey(oldMac) || store.activeServerConnections.containsKey(oldMac)
+                
+                if (isOldMacPhysicallyConnected) {
+                    // We are physically connected to this peer on oldMac. The macAddress we just scanned 
+                    // is simply their advertising MAC. If we evict it, we will destroy a perfectly healthy connection!
+                    // Just ignore the advertisement to prevent a split-brain loop.
+                    return
+                } else {
+                    // We are NOT physically connected. This is a true MAC rotation from a previously scanned device.
+                    AppLogger.d("BLE_MESH", "GHOST EVICTION: $peerName rotated MAC from $oldMac to $macAddress. Purging ghost.")
+                    store.connectedEndpointIds.remove(oldMac)
+                    store.connectedEndpointNames.remove(oldMac)
+                    store.endpointLastSeen.remove(oldMac)
+                    handler.post {
+                        onDeviceDisconnected?.invoke(oldMac)
+                    }
+                }
+            }
+
+            if (peerName != myDeviceName && peerName != myDeviceName.take(26)) {
                 val now = System.currentTimeMillis()
                 store.endpointLastSeen[macAddress] = now
                 store.endpointLastScore[macAddress] = peerScore
@@ -378,7 +401,8 @@ class NativeBleManager(val context: Context) {
                         }
                     } else {
                         val lastAttempt = store.connectionAttempts[macAddress] ?: 0L
-                        if (now - lastAttempt > 5000) {
+                        // WATCHDOG LIMIT: Enforce strict 15-second cool-down backoff timer to prevent GATT 133 Crash Loops!
+                        if (now - lastAttempt > 15000) {
                             store.connectionAttempts[macAddress] = now
                             
                             val myScore = getElectionScore()

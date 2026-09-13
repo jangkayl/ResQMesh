@@ -43,34 +43,43 @@ fun RadarScreen(viewModel: RadarViewModel) {
     val tag = prefs.getString("node_tag", "NODE") ?: "NODE"
     val myDeviceName = "$customName [$tag]"
     
-    // Create a set of names that are already connected for visual filtering
+    // Create a set of names that are physically connected via BLE
     val connectedNames = uiState.connectedDevices.map { it.name }.toSet()
 
+    // 1. Map directly connected nodes
     val connectedNodes = uiState.connectedDevices
         .distinctBy { it.name }
         .map { 
-            val statusText = if (it.isClassicConnected) "Connected (Bluetooth)" else "Online"
-            NodeItemData(it.endpointId, it.name, statusText, isConnected = true, isActiveRelay = true)
+            NodeItemData(it.endpointId, it.name, "Connected (Direct)", isConnected = true, isActiveRelay = true)
         }
     
-    // VISUAL-ONLY FILTER: Hide any scanned node that has the same name as a connected one
+    // 2. Map scanned nodes (and use topology to determine if they are indirect hops)
     val scannedNodes = uiState.scannedDevices
         .filter { it.name !in connectedNames }
         .distinctBy { it.name }
         .map {
-            val displayStatus = if (it.isConnecting) "SYNCING..." else "Online"
+            // Check if this node exists in the Mesh Routing Topology
+            val isIndirectRoute = uiState.topology.containsKey(it.name) || uiState.topology.values.any { nodes -> nodes.contains(it.name) }
+            val displayStatus = if (isIndirectRoute) {
+                "Connected (Via Relay)"
+            } else if (it.isConnecting) {
+                "SYNCING..."
+            } else {
+                "Discovered / Scanning..."
+            }
+            
             NodeItemData(
                 it.endpointId,
                 it.name, 
                 displayStatus,
-                isConnected = false,
+                isConnected = isIndirectRoute,
                 isActiveRelay = false,
                 isBlocked = uiState.blockedDeviceNames.contains(it.name)
             )
         }
 
     // Include blocked devices that are completely out of range so the user can still unblock them
-    val scannedAndConnectedNames = uiState.connectedDevices.map { it.name }.toSet() + scannedNodes.map { it.name }
+    val scannedAndConnectedNames = connectedNames + scannedNodes.map { it.name }
     
     val offlineBlockedNodes = uiState.blockedDeviceNames
         .filter { it !in scannedAndConnectedNames }
@@ -247,7 +256,7 @@ fun RadarScreenContent(
             ) {
                 val connectedNodesList = nodes.filter { it.status.contains("Connected", ignoreCase = true) }
                 val hoppedNodesList = nodes.filter { it.status.contains("Hopped", ignoreCase = true) }
-                val onlineNodesList = nodes.filter { it.status.contains("Online", ignoreCase = true) || it.status.contains("SYNCING") }
+                val onlineNodesList = nodes.filter { it.status.contains("Discovered", ignoreCase = true) || it.status.contains("SYNCING") }
                 val offlineNodesList = nodes.filter { it.status.contains("OFFLINE", ignoreCase = true) }
 
                 if (connectedNodesList.isNotEmpty()) {
@@ -265,7 +274,7 @@ fun RadarScreenContent(
                 }
 
                 if (onlineNodesList.isNotEmpty()) {
-                    Text("ONLINE", style = MaterialTheme.typography.labelSmall, color = Color(0xFF10B981), modifier = Modifier.padding(top = Spacing.Small))
+                    Text("DISCOVERED", style = MaterialTheme.typography.labelSmall, color = Color(0xFF10B981), modifier = Modifier.padding(top = Spacing.Small))
                     onlineNodesList.forEach { node ->
                         NearbyNodeItem(node, onDisconnect, onForceConnect, onBlock, onUnblock)
                     }

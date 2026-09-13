@@ -106,12 +106,11 @@ fun WalkieTalkieScreen(
                 Spacer(modifier = Modifier.height(56.dp))
             }
             
-            var volumeGain by remember { mutableStateOf(1.0f) }
+            val volumeGain by walkieTalkieViewModel.volumeGain.collectAsState()
             Text("Software Volume Boost: ${"%.1f".format(volumeGain)}x", color = Color.Gray, fontSize = 12.sp)
             androidx.compose.material3.Slider(
                 value = volumeGain,
                 onValueChange = { 
-                    volumeGain = it
                     walkieTalkieViewModel.setVolumeGain(it)
                 },
                 valueRange = 1.0f..5.0f,

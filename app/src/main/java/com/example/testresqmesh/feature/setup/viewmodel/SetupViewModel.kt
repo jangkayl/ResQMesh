@@ -50,6 +50,16 @@ class SetupViewModel(private val useCases: com.example.testresqmesh.core.domain.
             .getString("node_tag", "NODE") ?: "NODE"
     }
 
+    fun getSavedNodeId(context: Context): String {
+        val prefs = context.getSharedPreferences("resqmesh_prefs", Context.MODE_PRIVATE)
+        var nodeId = prefs.getString("node_id", null)
+        if (nodeId == null) {
+            nodeId = java.util.UUID.randomUUID().toString().substring(0, 4).uppercase()
+            prefs.edit().putString("node_id", nodeId).apply()
+        }
+        return nodeId
+    }
+
     fun checkHardwareAndGoOnline(context: Context, customName: String, nodeTag: String, teamKey: String) {
         saveIdentity(context, customName, nodeTag)
         val bluetoothManager = context.getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
@@ -63,14 +73,15 @@ class SetupViewModel(private val useCases: com.example.testresqmesh.core.domain.
             val errorMsg = "HARDWARE ERROR: Please turn on ${missing.joinToString(", ")} to deploy Mesh Node."
             _uiState.update { it.copy(connectionStatus = errorMsg, isOnline = false) }
         } else {
-            goOnline(customName, nodeTag, teamKey)
+            val nodeId = getSavedNodeId(context)
+            goOnline(customName, nodeTag, teamKey, nodeId)
         }
     }
 
-    private fun goOnline(customName: String, nodeTag: String, teamKey: String) {
-        val myNodeName = "$customName [$nodeTag]"
+    private fun goOnline(customName: String, nodeTag: String, teamKey: String, nodeId: String) {
+        val myNodeName = "$customName [$nodeTag]#$nodeId"
         _uiState.update { it.copy(myNodeName = myNodeName) }
-        useCases.startNode(customName, nodeTag, teamKey)
+        useCases.startNode(customName, nodeTag, teamKey, nodeId)
     }
 
     fun goOffline() {

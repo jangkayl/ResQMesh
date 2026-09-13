@@ -28,7 +28,11 @@ class WalkieTalkieViewModel(
         useCases.setChannel(channelId)
     }
 
+    private val _volumeGain = MutableStateFlow(1.0f)
+    val volumeGain = _volumeGain.asStateFlow()
+
     fun setVolumeGain(gain: Float) {
+        _volumeGain.value = gain
         liveAudioEngine.volumeGain = gain
     }
 

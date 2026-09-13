@@ -36,8 +36,8 @@ class BleAdvertiser(
         val electionScore = getElectionScore()
         val combinedName = "$electionScore|$totalConnections|${getMyDeviceName()}"
         var nameBytes = combinedName.toByteArray(Charsets.UTF_8)
-        if (nameBytes.size > 20) {
-            nameBytes = nameBytes.sliceArray(0 until 20)
+        if (nameBytes.size > 26) {
+            nameBytes = nameBytes.sliceArray(0 until 26)
         }
         val data = AdvertiseData.Builder()
             .setIncludeDeviceName(false)
