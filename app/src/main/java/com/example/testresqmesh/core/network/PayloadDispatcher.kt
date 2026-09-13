@@ -7,6 +7,7 @@ import com.example.testresqmesh.core.network.dispatch.PayloadHandler
 import com.example.testresqmesh.core.network.dispatch.ReceiptHandler
 import com.example.testresqmesh.core.network.dispatch.StandardMessageHandler
 import com.example.testresqmesh.core.network.dispatch.SystemPulseHandler
+import com.example.testresqmesh.core.network.dispatch.PingHandler
 import com.example.testresqmesh.core.network.dispatch.UnblockHandler
 import com.example.testresqmesh.core.utils.AppLogger
 import kotlinx.serialization.decodeFromByteArray
@@ -18,6 +19,7 @@ class PayloadDispatcher(private val callback: PayloadDispatcherCallback) {
 
     private val handlers: List<PayloadHandler> = listOf(
         SystemPulseHandler(),
+        PingHandler(),
         ReceiptHandler(),
         GoodbyeHandler(),
         BlockHandler(),

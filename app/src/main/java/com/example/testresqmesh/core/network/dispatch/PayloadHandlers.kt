@@ -37,8 +37,20 @@ class SystemPulseHandler : PayloadHandler {
         routePath.add(callback.getMyDeviceName())
         val updatedPayload = payload.copy(routePath = routePath)
         val updatedBytes = ProtoBuf.encodeToByteArray(updatedPayload)
-        
         callback.broadcastPayload(updatedBytes, endpointId)
+    }
+}
+
+@OptIn(ExperimentalSerializationApi::class)
+class PingHandler : PayloadHandler {
+    override fun canHandle(payloadType: String) = payloadType == "PING"
+
+    override fun handle(endpointId: String, payload: MeshPayload, payloadBytes: ByteArray, callback: PayloadDispatcherCallback) {
+        val sender = payload.senderName
+        callback.onDeviceNameSync(endpointId, sender)
+        
+        // PINGs exist purely to keep GATT sockets alive and refresh the Zombie Watchdog timer.
+        // We do NOT broadcast them to the rest of the Mesh, saving massive battery power.
     }
 }
 

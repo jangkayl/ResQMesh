@@ -147,6 +147,11 @@ class NativeBleManager(val context: Context) {
                     sendSystemPulse()
                 }
             }
+            
+            // HEARTBEAT FIX: Periodically send a SYSTEM pulse to keep connections alive and prevent
+            // the other side's Watchdog from aggressively killing the connection as a Zombie Socket.
+            sendSystemPulse()
+            
             handler.postDelayed(this, 5000)
         }
     }
@@ -176,16 +181,40 @@ class NativeBleManager(val context: Context) {
         onStatusChanged?.invoke("Mesh Active [Persistent GATT/Protobuf]. Seeking peers...")
     }
     
-    
+    private var lastSystemPulseHash: Int = 0
+    private var lastSystemPulseTime: Long = 0
+    private var pingCounter: Int = 0
+
     fun sendSystemPulse() {
         if (!store.isNodeActive.get()) return
         try {
+            val connectedNodesList = store.connectedEndpointNames.values.toList().sorted()
+            val currentHash = connectedNodesList.hashCode()
+            val now = System.currentTimeMillis()
+            
+            // DELTA PING FIX: If topology hasn't changed and it's been less than 60s, send a 10-byte MICRO-PING instead
+            if (currentHash == lastSystemPulseHash && (now - lastSystemPulseTime < 60000)) {
+                pingCounter++
+                val payload = com.example.testresqmesh.core.network.MeshPayload(
+                    id = "P$pingCounter",
+                    type = "PING",
+                    senderName = myDeviceName
+                )
+                val payloadBytes = kotlinx.serialization.protobuf.ProtoBuf.encodeToByteArray(com.example.testresqmesh.core.network.MeshPayload.serializer(), payload)
+                broadcastPayload(payloadBytes)
+                return
+            }
+            
+            // Topology changed or 60s passed! Send full 141-byte SYSTEM sync.
+            lastSystemPulseHash = currentHash
+            lastSystemPulseTime = now
+            
             val pulseId = java.util.UUID.randomUUID().toString()
             val payload = com.example.testresqmesh.core.network.MeshPayload(
                 id = pulseId,
                 type = "SYSTEM",
                 senderName = myDeviceName,
-                connectedNodes = store.connectedEndpointNames.values.toList(),
+                connectedNodes = connectedNodesList,
                 publicKey = com.example.testresqmesh.core.network.CryptoManager.getMyPublicKeyBase64()
             )
             val payloadBytes = kotlinx.serialization.protobuf.ProtoBuf.encodeToByteArray(com.example.testresqmesh.core.network.MeshPayload.serializer(), payload)
