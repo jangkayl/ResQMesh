@@ -79,6 +79,7 @@ class GattServerManager(
                     } else {
                         handler.post {
                             onDeviceConnected?.invoke(ConnectedDevice(macAddress, safePeerName, isClassicConnected = true))
+                            sendSystemPulse()
                         }
                     }
                 } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {

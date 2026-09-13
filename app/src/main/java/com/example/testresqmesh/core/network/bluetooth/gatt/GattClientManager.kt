@@ -63,6 +63,7 @@ class GattClientManager(
                         
                         handler.post {
                             onDeviceConnected?.invoke(ConnectedDevice(macAddress, peerName, isClassicConnected = true))
+                            sendSystemPulse()
                         }
                         gatt.requestConnectionPriority(BluetoothGatt.CONNECTION_PRIORITY_HIGH)
                         gatt.requestMtu(512)

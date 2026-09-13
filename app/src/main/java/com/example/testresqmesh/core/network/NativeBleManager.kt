@@ -64,7 +64,7 @@ class NativeBleManager(val context: Context) {
     val notificationHelper = NotificationHelper(context)
     var currentTeamKey: String = ""
     var isCloaked = false
-    val MAX_TOTAL_CONNECTIONS = 3 // MUST BE 3! If set to 1, it causes an infinite eviction loop.
+    var MAX_TOTAL_CONNECTIONS = 3 // Dynamically scales down in dense rooms
     val MAX_CONNECTIONS = 4
 
     val payloadDispatcherCallback = object : PayloadDispatcherCallback {
@@ -128,23 +128,39 @@ class NativeBleManager(val context: Context) {
                     val lastInteraction = store.connectionInteractionTimes[macAddress] ?: now
                     if (now - lastInteraction > 20000) { // 20s without a SYSTEM pulse means dead link
                         AppLogger.d("BLE_MESH", "Zombie Socket Detected! No data from $macAddress for 20s. Forcing disconnect.")
-                        if (isClient) forceGattDisconnect(macAddress, store.activeConnections[macAddress])
-                        if (isServer) gattServer?.cancelConnection(store.activeServerConnections[macAddress])
-                        // Let the disconnect callbacks handle the cleanup
+                        store.activeConnections[macAddress]?.let { forceGattDisconnect(macAddress, it) }
+                        store.activeServerConnections[macAddress]?.let { gattServer?.cancelConnection(it) }
                     } else {
-                        entry.setValue(now) // Keep alive in discovery list
+                        store.endpointLastSeen[macAddress] = now // Keep alive in discovery list
                     }
                     continue
                 }
                 
-                if (now - entry.value > 8000) { 
+                if (now - entry.value > 15000) { // Increased timeout to 15s to allow watchdog to rescue
                     store.connectedEndpointIds.remove(macAddress)
                     store.connectedEndpointNames.remove(macAddress)
-                    iterator.remove()
+                    store.endpointLastSeen.remove(macAddress)
                     AppLogger.d("BLE_MESH", "Node Timed Out: ${macAddress}")
                     onDeviceDisconnected?.invoke(macAddress)
                     onDeviceScanRemoved?.invoke(macAddress)
                     sendSystemPulse()
+                }
+            }
+
+            // WATCHDOG RECONNECTION LOOP: Bypass Scanner Throttling Deadlock
+            val totalConns = store.activeConnections.size + store.activeServerConnections.size
+            if (totalConns < MAX_TOTAL_CONNECTIONS) {
+                val disconnectedMacs = store.endpointLastSeen.keys.filter { 
+                    !store.activeConnections.containsKey(it) && !store.activeServerConnections.containsKey(it) && store.blockedDevices[store.connectedEndpointNames[it] ?: ""] != true
+                }
+                val bestMac = disconnectedMacs.maxByOrNull { store.endpointLastScore[it] ?: "" }
+                if (bestMac != null) {
+                    val lastAttempt = store.connectionAttempts[bestMac] ?: 0L
+                    if (now - lastAttempt > 6000) {
+                        AppLogger.d("BLE_MESH", "Watchdog: Bypassing Scanner Throttle to forcefully rescue $bestMac")
+                        store.connectionAttempts[bestMac] = now
+                        gattClientManager.connectToPersistentGatt(bestMac, store.connectedEndpointNames[bestMac] ?: "Unknown")
+                    }
                 }
             }
             handler.postDelayed(this, 5000)
@@ -344,9 +360,18 @@ class NativeBleManager(val context: Context) {
                 val hasIndirectRoute = checkRouteExists?.invoke(peerName) == true
 
                 if (!isAlreadyConnected && !hasIndirectRoute) {
-                    val totalConnections = store.activeConnections.size + store.activeServerConnections.size
-                    
-                    if (totalConnections >= MAX_TOTAL_CONNECTIONS || (totalConnections >= 2 && peerConnections > 0)) {
+                // SELF-LIMITING (LEAF NODE) TOPOLOGY: Prevent dense cluster cliques
+                val now = System.currentTimeMillis()
+                val activePeersNearby = store.endpointLastSeen.count { now - it.value < 20000 }
+                if (activePeersNearby >= 5) {
+                    MAX_TOTAL_CONNECTIONS = 2 // Restrict to a Spanning Tree Chain
+                } else {
+                    MAX_TOTAL_CONNECTIONS = 3 // Standard Scatternet Backbone
+                }
+
+                val totalConnections = store.activeConnections.size + store.activeServerConnections.size
+                
+                if (totalConnections >= MAX_TOTAL_CONNECTIONS || (totalConnections >= 2 && peerConnections > 0)) {
                         if (peerConnections == 0 && totalConnections >= MAX_TOTAL_CONNECTIONS) {
                             if (!store.orphanDetectionTime.containsKey(macAddress)) {
                                 store.orphanDetectionTime[macAddress] = now

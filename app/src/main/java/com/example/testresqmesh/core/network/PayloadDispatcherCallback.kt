@@ -2,7 +2,7 @@ package com.example.testresqmesh.core.network
 
 interface PayloadDispatcherCallback {
     fun getMyDeviceName(): String
-    fun getSeenMessageIds(): java.util.LinkedHashSet<String>
+    fun getSeenMessageIds(): MutableSet<String>
     fun getEndpointMedium(endpointId: String): String
     fun getConnectedEndpointIdByName(name: String): String?
     fun getStpNeighbors(): Set<String>

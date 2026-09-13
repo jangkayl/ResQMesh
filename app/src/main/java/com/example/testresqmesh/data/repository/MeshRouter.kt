@@ -9,9 +9,11 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
+import java.util.concurrent.ConcurrentHashMap
+
 class MeshRouter {
-    private val networkGraph = mutableMapOf<String, Set<String>>()
-    private val lastSeenMap = mutableMapOf<String, Long>()
+    private val networkGraph = ConcurrentHashMap<String, Set<String>>()
+    private val lastSeenMap = ConcurrentHashMap<String, Long>()
     
     private val _topology = MutableStateFlow<Map<String, Set<String>>>(emptyMap())
     val topology: StateFlow<Map<String, Set<String>>> = _topology.asStateFlow()
@@ -165,12 +167,12 @@ class MeshRouter {
                 val now = System.currentTimeMillis()
                 var changed = false
                 
-                val iterator = lastSeenMap.iterator()
+                val iterator = lastSeenMap.entries.iterator()
                 while (iterator.hasNext()) {
                     val entry = iterator.next()
                     if (now - entry.value > 10000) {
                         val deadNode = entry.key
-                        iterator.remove()
+                        lastSeenMap.remove(deadNode)
                         networkGraph.remove(deadNode)
                         changed = true
                     }
