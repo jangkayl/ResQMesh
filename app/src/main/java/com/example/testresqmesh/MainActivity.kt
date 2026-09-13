@@ -21,6 +21,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
+import org.koin.android.ext.android.inject
 import com.example.testresqmesh.data.repository.MeshRepository
 import com.example.testresqmesh.core.network.NativeBleManager
 import com.example.testresqmesh.core.ui.MainContainerScreen
@@ -44,32 +45,14 @@ enum class AppState {
     Splash, Permissions, IdentitySetup, Main
 }
 
-class MeshViewModelFactory(
-    private val repository: MeshRepository,
-    private val mediaHelper: MediaHelper,
-    private val liveAudioEngine: com.example.testresqmesh.core.utils.LiveAudioEngine
-) : ViewModelProvider.Factory {
-    @Suppress("UNCHECKED_CAST")
-    override fun <T : ViewModel> create(modelClass: Class<T>): T {
-        return when {
-            modelClass.isAssignableFrom(SetupViewModel::class.java) -> SetupViewModel(repository) as T
-            modelClass.isAssignableFrom(RadarViewModel::class.java) -> RadarViewModel(repository) as T
-            modelClass.isAssignableFrom(CommunicationViewModel::class.java) -> CommunicationViewModel(repository) as T
-            modelClass.isAssignableFrom(com.example.testresqmesh.feature.comms.viewmodel.WalkieTalkieViewModel::class.java) -> com.example.testresqmesh.feature.comms.viewmodel.WalkieTalkieViewModel(repository, mediaHelper, liveAudioEngine) as T
-            else -> throw IllegalArgumentException("Unknown ViewModel class")
-        }
-    }
-}
-
 class MainActivity : ComponentActivity() {
 
     companion object {
         var isAppInForeground = false
     }
 
-    private lateinit var networkManager: NativeBleManager
-    private lateinit var repository: MeshRepository
-    private lateinit var mediaHelper: MediaHelper
+    private val networkManager: NativeBleManager by inject()
+    private val mediaHelper: MediaHelper by inject()
 
     private var onPermissionsResult: ((Boolean) -> Unit)? = null
     private val sosDeepLinkTriggered = mutableStateOf(false)
@@ -93,15 +76,6 @@ class MainActivity : ComponentActivity() {
             applicationContext.getSharedPreferences("osmdroid", android.content.Context.MODE_PRIVATE)
         )
 
-        networkManager = NativeBleManager(applicationContext)
-        val appDb = com.example.testresqmesh.data.local.AppDatabase.getDatabase(applicationContext)
-        repository = MeshRepository(networkManager, appDb)
-        mediaHelper = MediaHelper(applicationContext)
-
-        val liveAudioEngine = com.example.testresqmesh.core.utils.LiveAudioEngine(applicationContext) { chunk ->
-            repository.broadcastLiveAudioChunk(chunk)
-        }
-
         lifecycle.addObserver(LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_START || event == Lifecycle.Event.ON_RESUME) {
                 isAppInForeground = true
@@ -110,13 +84,11 @@ class MainActivity : ComponentActivity() {
             }
         })
 
-        val factory = MeshViewModelFactory(repository, mediaHelper, liveAudioEngine)
-
         setContent {
-            val setupViewModel: SetupViewModel = viewModel(factory = factory)
-            val radarViewModel: RadarViewModel = viewModel(factory = factory)
-            val commsViewModel: CommunicationViewModel = viewModel(factory = factory)
-            val walkieTalkieViewModel: com.example.testresqmesh.feature.comms.viewmodel.WalkieTalkieViewModel = viewModel(factory = factory)
+            val setupViewModel: SetupViewModel = org.koin.androidx.compose.koinViewModel()
+            val radarViewModel: RadarViewModel = org.koin.androidx.compose.koinViewModel()
+            val commsViewModel: CommunicationViewModel = org.koin.androidx.compose.koinViewModel()
+            val walkieTalkieViewModel: com.example.testresqmesh.feature.comms.viewmodel.WalkieTalkieViewModel = org.koin.androidx.compose.koinViewModel()
 
             TestResQMeshTheme {
                 val setupState by setupViewModel.uiState.collectAsState()

@@ -14,19 +14,19 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
-class SetupViewModel(private val repository: MeshRepository) : ViewModel() {
+class SetupViewModel(private val useCases: com.example.testresqmesh.core.domain.usecase.MeshUseCases) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ConnectionUiState())
     val uiState: StateFlow<ConnectionUiState> = _uiState.asStateFlow()
 
     init {
         viewModelScope.launch {
-            repository.isOnline.collect { isOnline ->
+            useCases.observeIsOnline().collect { isOnline ->
                 _uiState.update { it.copy(isOnline = isOnline) }
             }
         }
         viewModelScope.launch {
-            repository.connectionStatus.collect { status ->
+            useCases.observeConnectionStatus().collect { status ->
                 _uiState.update { it.copy(connectionStatus = status) }
             }
         }
@@ -70,10 +70,10 @@ class SetupViewModel(private val repository: MeshRepository) : ViewModel() {
     private fun goOnline(customName: String, nodeTag: String, teamKey: String) {
         val myNodeName = "$customName [$nodeTag]"
         _uiState.update { it.copy(myNodeName = myNodeName) }
-        repository.startNode(customName, nodeTag, teamKey)
+        useCases.startNode(customName, nodeTag, teamKey)
     }
 
     fun goOffline() {
-        repository.stopNode()
+        useCases.stopNode()
     }
 }

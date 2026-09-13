@@ -11,7 +11,10 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
-class CommunicationViewModel(private val repository: MeshRepository) : ViewModel() {
+class CommunicationViewModel(
+    private val useCases: com.example.testresqmesh.core.domain.usecase.MeshUseCases,
+    private val locationClient: com.example.testresqmesh.core.location.LocationClient
+) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ChatUiState())
     val uiState: StateFlow<ChatUiState> = _uiState.asStateFlow()
@@ -19,139 +22,101 @@ class CommunicationViewModel(private val repository: MeshRepository) : ViewModel
     private val _activeSosMessageId = MutableStateFlow<String?>(null)
     val activeSosMessageId: StateFlow<String?> = _activeSosMessageId.asStateFlow()
     
-    val incomingSosAlert = repository.incomingSosAlert
+    val incomingSosAlert = useCases.observeIncomingSosAlert()
     
     fun clearSosAlert() {
-        repository.clearSosAlert()
+        useCases.clearSosAlert()
     }
     
-    val currentChannelId: StateFlow<String> = repository.currentChannelId
+    val currentChannelId: StateFlow<String> = useCases.observeCurrentChannelId()
     
     fun setChannel(channelId: String) {
-        repository.setChannel(channelId)
+        useCases.setChannel(channelId)
     }
-
-    private var cachedLocation: android.location.Location? = null
-    private var locationCallback: com.google.android.gms.location.LocationCallback? = null
-    private var fusedLocationClient: com.google.android.gms.location.FusedLocationProviderClient? = null
 
     init {
         viewModelScope.launch {
-            repository.publicMessages.collect { messages ->
+            useCases.observePublicMessages().collect { messages ->
                 _uiState.update { it.copy(publicMessages = messages) }
             }
         }
         viewModelScope.launch {
-            repository.privateMessages.collect { messagesMap ->
+            useCases.observePrivateMessages().collect { messagesMap ->
                 _uiState.update { it.copy(privateMessages = messagesMap) }
             }
         }
         viewModelScope.launch {
-            repository.connectedDevices.collect { devices ->
+            useCases.observeConnectedDevices().collect { devices ->
                 _uiState.update { it.copy(connectedDevices = devices) }
             }
 
         }
         viewModelScope.launch {
-            repository.knownNodes.collect { nodes ->
+            useCases.observeKnownNodes().collect { nodes ->
                 _uiState.update { it.copy(knownNodes = nodes) }
             }
         }
     }
 
     fun sendPublicMessage(text: String, imageBase64: String? = null, audioBase64: String? = null) {
-        repository.sendPublicMessage(text, imageBase64, audioBase64)
+        useCases.sendPublicMessage(text, imageBase64, audioBase64)
     }
 
-    @androidx.annotation.RequiresPermission(anyOf = ["android.permission.ACCESS_FINE_LOCATION", "android.permission.ACCESS_COARSE_LOCATION"])
-    fun startLocationTracking(context: android.content.Context) {
-        if (fusedLocationClient == null) {
-            fusedLocationClient = com.google.android.gms.location.LocationServices.getFusedLocationProviderClient(context.applicationContext)
-        }
-        
-        // Smart battery-efficient request: 30s interval, but only triggers if moved 20+ meters
-        val locationRequest = com.google.android.gms.location.LocationRequest.Builder(com.google.android.gms.location.Priority.PRIORITY_BALANCED_POWER_ACCURACY, 30000L)
-            .setMinUpdateDistanceMeters(20f)
-            .build()
-            
-        locationCallback = object : com.google.android.gms.location.LocationCallback() {
-            override fun onLocationResult(result: com.google.android.gms.location.LocationResult) {
-                result.lastLocation?.let { location ->
-                    cachedLocation = location
-                }
-            }
-        }
-        
-        try {
-            fusedLocationClient?.requestLocationUpdates(locationRequest, locationCallback!!, android.os.Looper.getMainLooper())
-        } catch (e: SecurityException) {
-            // Permission denied, ignore gracefully
-        }
+    fun startLocationTracking() {
+        locationClient.startTracking(30000L)
     }
     
     fun stopLocationTracking() {
-        locationCallback?.let {
-            fusedLocationClient?.removeLocationUpdates(it)
-        }
-        locationCallback = null
+        locationClient.stopTracking()
     }
 
-    @androidx.annotation.RequiresPermission(anyOf = ["android.permission.ACCESS_FINE_LOCATION", "android.permission.ACCESS_COARSE_LOCATION"])
-    fun sendEmergencySOS(context: android.content.Context, sosType: String) {
+    fun sendEmergencySOS(sosType: String) {
         val text = "🚨 CRITICAL SOS: $sosType EMERGENCY!"
+        val cachedLocation = locationClient.getLastKnownLocation()
         
         // 1. Instantly dispatch cached location with zero delay
         if (cachedLocation != null) {
-            val msgId = repository.sendPublicMessage(text, null, null, cachedLocation!!.latitude, cachedLocation!!.longitude, isSOS = true)
+            val msgId = useCases.sendPublicMessage(text, null, null, cachedLocation.latitude, cachedLocation.longitude, isSOS = true)
             _activeSosMessageId.value = msgId
         } else {
             // Fallback: send without location instantly
-            val msgId = repository.sendPublicMessage(text, null, null, null, null, isSOS = true)
+            val msgId = useCases.sendPublicMessage(text, null, null, null, null, isSOS = true)
             _activeSosMessageId.value = msgId
         }
         
         // 2. Start a background fetch for a high-accuracy pinpoint lock
-        try {
-            val client = fusedLocationClient ?: com.google.android.gms.location.LocationServices.getFusedLocationProviderClient(context.applicationContext)
-            client.getCurrentLocation(
-                com.google.android.gms.location.Priority.PRIORITY_HIGH_ACCURACY, 
-                null
-            ).addOnSuccessListener { location ->
-                if (location != null) {
-                    // Check if the fresh location is significantly better/newer than cache
-                    val isBetter = cachedLocation == null || location.accuracy < cachedLocation!!.accuracy || (location.time - cachedLocation!!.time > 60000)
-                    if (isBetter) {
-                        cachedLocation = location
-                        // Send a follow-up pinpoint update!
-                        repository.sendPublicMessage("📍 PINPOINT SOS UPDATE: More precise coordinates acquired.", null, null, location.latitude, location.longitude, isSOS = true)
-                    }
+        locationClient.requestPinpointLocation { location ->
+            if (location != null) {
+                // Check if the fresh location is significantly better/newer than cache
+                val isBetter = cachedLocation == null || location.accuracy < cachedLocation.accuracy || (location.time - cachedLocation.time > 60000)
+                if (isBetter) {
+                    // Send a follow-up pinpoint update!
+                    useCases.sendPublicMessage("📍 PINPOINT SOS UPDATE: More precise coordinates acquired.", null, null, location.latitude, location.longitude, isSOS = true)
                 }
             }
-        } catch (e: Exception) {
-            // Ignore if GPS fails, the rough cached location was already sent.
         }
     }
 
     fun cancelEmergencySOS() {
         _activeSosMessageId.value = null
-        repository.clearSosAlert()
-        repository.sendPublicMessage("✅ SOS Cancelled & Resolved", null, null, null, null, isSOS = false, isSOSCancel = true)
+        useCases.clearSosAlert()
+        useCases.sendPublicMessage("✅ SOS Cancelled & Resolved", null, null, null, null, isSOS = false, isSOSCancel = true)
     }
 
     fun deleteConversationWith(peerName: String) {
-        repository.deleteConversationWith(peerName)
+        useCases.deleteConversationWith(peerName)
     }
 
     fun sendPrivateMessage(targetName: String, text: String, imageBase64: String? = null, audioBase64: String? = null) {
-        repository.sendPrivateMessage(targetName, text, imageBase64, audioBase64)
+        useCases.sendPrivateMessage(targetName, text, imageBase64, audioBase64)
     }
 
     fun disconnectDevice(endpointId: String) {
-        repository.disconnectDevice(endpointId)
+        useCases.disconnectDevice(endpointId)
     }
 
     fun markMessageAsSeen(messageId: String, isPrivate: Boolean, targetId: String? = null) {
-        repository.broadcastSeenReceipt(messageId, isPrivate, targetId)
+        useCases.broadcastSeenReceipt(messageId, isPrivate, targetId)
     }
 
     @androidx.annotation.RequiresPermission(anyOf = ["android.permission.ACCESS_FINE_LOCATION", "android.permission.ACCESS_COARSE_LOCATION"])
@@ -186,18 +151,18 @@ class CommunicationViewModel(private val repository: MeshRepository) : ViewModel
 
     private fun sendLocationMessage(location: android.location.Location, isPrivate: Boolean, targetName: String?) {
         if (isPrivate && targetName != null) {
-            repository.sendPrivateMessage(targetName, "📍 I am sharing my location.", null, null, location.latitude, location.longitude)
+            useCases.sendPrivateMessage(targetName, "📍 I am sharing my location.", null, null, location.latitude, location.longitude)
         } else {
-            repository.sendPublicMessage("📍 I am sharing my location.", null, null, location.latitude, location.longitude)
+            useCases.sendPublicMessage("📍 I am sharing my location.", null, null, location.latitude, location.longitude)
         }
     }
 
     private fun sendLocationError(isPrivate: Boolean, targetName: String?) {
         val errorMsg = "⚠️ Failed to get fresh GPS lock. Make sure Location is on, and you have sky visibility."
         if (isPrivate && targetName != null) {
-            repository.sendPrivateMessage(targetName, errorMsg, null, null, null, null)
+            useCases.sendPrivateMessage(targetName, errorMsg, null, null, null, null)
         } else {
-            repository.sendPublicMessage(errorMsg, null, null, null, null)
+            useCases.sendPublicMessage(errorMsg, null, null, null, null)
         }
     }
 }

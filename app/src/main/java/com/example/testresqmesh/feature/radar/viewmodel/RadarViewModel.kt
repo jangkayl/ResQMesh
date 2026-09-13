@@ -10,56 +10,56 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
-class RadarViewModel(private val repository: MeshRepository) : ViewModel() {
+class RadarViewModel(private val useCases: com.example.testresqmesh.core.domain.usecase.MeshUseCases) : ViewModel() {
 
     private val _uiState = MutableStateFlow(RadarUiState())
     val uiState: StateFlow<RadarUiState> = _uiState.asStateFlow()
 
     init {
         viewModelScope.launch {
-            repository.scannedDevices.collect { scanned ->
+            useCases.observeScannedDevices().collect { scanned ->
                 _uiState.update { it.copy(scannedDevices = scanned) }
             }
         }
         viewModelScope.launch {
-            repository.connectedDevices.collect { connected ->
+            useCases.observeConnectedDevices().collect { connected ->
                 _uiState.update { it.copy(connectedDevices = connected) }
             }
         }
         viewModelScope.launch {
-            repository.blockedDeviceNames.collect { blocked ->
+            useCases.observeBlockedDeviceNames().collect { blocked ->
                 _uiState.update { it.copy(blockedDeviceNames = blocked) }
             }
         }
         viewModelScope.launch {
-            repository.knownNodes.collect { known ->
+            useCases.observeKnownNodes().collect { known ->
                 _uiState.update { it.copy(knownNodes = known) }
             }
         }
         viewModelScope.launch {
-            repository.topology.collect { top ->
+            useCases.observeTopology().collect { top ->
                 _uiState.update { it.copy(topology = top) }
             }
         }
     }
 
     fun rescan() {
-        repository.rescan()
+        useCases.rescan()
     }
 
     fun disconnectDevice(endpointId: String) {
-        repository.disconnectDevice(endpointId)
+        useCases.disconnectDevice(endpointId)
     }
 
     fun blockDevice(deviceName: String) {
-        repository.blockDevice(deviceName)
+        useCases.blockDevice(deviceName)
     }
 
     fun unblockDevice(deviceName: String) {
-        repository.unblockDevice(deviceName)
+        useCases.unblockDevice(deviceName)
     }
 
     fun forceConnect(endpointId: String, endpointName: String) {
-        repository.forceConnect(endpointId, endpointName)
+        useCases.forceConnect(endpointId, endpointName)
     }
 }

@@ -66,7 +66,7 @@ fun MainContainerScreen(
 
     DisposableEffect(Unit) {
         // Start passive location tracking when the node is active
-        commsViewModel.startLocationTracking(context)
+        commsViewModel.startLocationTracking()
         onDispose {
             // Cleanup when the node is shut down or the app closes
             commsViewModel.stopLocationTracking()
@@ -110,7 +110,7 @@ fun MainContainerScreen(
         SOSBroadcastScreen(
             onCancel = { isSOSActive = false },
             onSosTriggered = { type ->
-                commsViewModel.sendEmergencySOS(context, type)
+                commsViewModel.sendEmergencySOS(type)
                 isSOSActive = false
             }
         )

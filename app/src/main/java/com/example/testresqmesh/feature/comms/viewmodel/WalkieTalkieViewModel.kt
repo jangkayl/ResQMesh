@@ -12,7 +12,7 @@ import kotlinx.coroutines.launch
 import com.example.testresqmesh.core.utils.LiveAudioEngine
 
 class WalkieTalkieViewModel(
-    private val repository: MeshRepository,
+    private val useCases: com.example.testresqmesh.core.domain.usecase.MeshUseCases,
     private val mediaHelper: MediaHelper,
     private val liveAudioEngine: LiveAudioEngine
 ) : ViewModel() {
@@ -20,12 +20,12 @@ class WalkieTalkieViewModel(
     private val _isWalkieTalkieMode = MutableStateFlow(false)
     val isWalkieTalkieMode = _isWalkieTalkieMode.asStateFlow()
 
-    val currentChannelId: StateFlow<String> = repository.currentChannelId
+    val currentChannelId: StateFlow<String> = useCases.observeCurrentChannelId()
     
     val currentSpeaker: StateFlow<String?> = liveAudioEngine.currentSpeaker
     
     fun setChannel(channelId: String) {
-        repository.setChannel(channelId)
+        useCases.setChannel(channelId)
     }
 
     fun setVolumeGain(gain: Float) {
@@ -34,11 +34,11 @@ class WalkieTalkieViewModel(
 
     init {
         viewModelScope.launch {
-            repository.incomingVoiceMessage.collect { message ->
+            useCases.observeIncomingVoiceMessage().collect { message ->
                 if (_isWalkieTalkieMode.value) {
                     message.audioBase64?.let { base64 ->
                         mediaHelper.playVoiceMail(base64)
-                        repository.broadcastSeenReceipt(message.id, message.isPrivate, message.senderName)
+                        useCases.broadcastSeenReceipt(message.id, message.isPrivate, message.senderName)
                     }
                 }
             }
@@ -59,7 +59,7 @@ class WalkieTalkieViewModel(
     fun toggleWalkieTalkieMode() {
         _isWalkieTalkieMode.value = !_isWalkieTalkieMode.value
         if (_isWalkieTalkieMode.value) {
-            liveAudioEngine.startPlayback(repository.incomingLiveAudioChunk)
+            liveAudioEngine.startPlayback(useCases.observeIncomingLiveAudioChunk())
         } else {
             liveAudioEngine.stopPlayback()
         }
