@@ -5,12 +5,13 @@ import android.bluetooth.BluetoothGatt
 import android.bluetooth.BluetoothSocket
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ConcurrentLinkedQueue
+import java.util.concurrent.CopyOnWriteArraySet
 import java.util.concurrent.atomic.AtomicBoolean
 
 class BleStateStore {
-    val connectedEndpointIds = mutableSetOf<String>()
-    val connectedEndpointNames = mutableMapOf<String, String>()
-    val seenMessageIds = java.util.LinkedHashSet<String>()
+    val connectedEndpointIds = CopyOnWriteArraySet<String>()
+    val connectedEndpointNames = ConcurrentHashMap<String, String>()
+    val seenMessageIds = CopyOnWriteArraySet<String>()
     
     val isNodeActive = AtomicBoolean(false)
     val isConnecting = AtomicBoolean(false)
@@ -27,10 +28,10 @@ class BleStateStore {
     val blockedDevices = ConcurrentHashMap<String, Boolean>()
     val orphanDetectionTime = ConcurrentHashMap<String, Long>()
     
-    val endpointLastSeen = mutableMapOf<String, Long>()
-    val endpointFirstSeen = mutableMapOf<String, Long>()
-    val endpointLastScore = mutableMapOf<String, String>()
-    val connectionEstablishTime = mutableMapOf<String, Long>()
+    val endpointLastSeen = ConcurrentHashMap<String, Long>()
+    val endpointFirstSeen = ConcurrentHashMap<String, Long>()
+    val endpointLastScore = ConcurrentHashMap<String, String>()
+    val connectionEstablishTime = ConcurrentHashMap<String, Long>()
     val writeFailureCount = ConcurrentHashMap<String, Int>()
 
     var connectingMacAddress: String? = null

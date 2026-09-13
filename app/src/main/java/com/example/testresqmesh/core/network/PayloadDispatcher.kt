@@ -38,10 +38,8 @@ class PayloadDispatcher(private val callback: PayloadDispatcherCallback) {
             if (seenMessageIds.contains(msgId)) return
             seenMessageIds.add(msgId)
             if (seenMessageIds.size > 500) {
-                val iterator = seenMessageIds.iterator()
-                if (iterator.hasNext()) {
-                    iterator.next()
-                    iterator.remove()
+                seenMessageIds.firstOrNull()?.let { oldest ->
+                    seenMessageIds.remove(oldest)
                 }
             }
 

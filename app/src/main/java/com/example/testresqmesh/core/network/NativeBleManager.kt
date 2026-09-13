@@ -128,11 +128,11 @@ class NativeBleManager(val context: Context) {
                     val lastInteraction = store.connectionInteractionTimes[macAddress] ?: now
                     if (now - lastInteraction > 20000) { // 20s without a SYSTEM pulse means dead link
                         AppLogger.d("BLE_MESH", "Zombie Socket Detected! No data from $macAddress for 20s. Forcing disconnect.")
-                        if (isClient) forceGattDisconnect(macAddress, store.activeConnections[macAddress])
-                        if (isServer) gattServer?.cancelConnection(store.activeServerConnections[macAddress])
+                        store.activeConnections[macAddress]?.let { forceGattDisconnect(macAddress, it) }
+                        store.activeServerConnections[macAddress]?.let { gattServer?.cancelConnection(it) }
                         // Let the disconnect callbacks handle the cleanup
                     } else {
-                        entry.setValue(now) // Keep alive in discovery list
+                        store.endpointLastSeen[macAddress] = now // Keep alive in discovery list
                     }
                     continue
                 }
@@ -140,7 +140,7 @@ class NativeBleManager(val context: Context) {
                 if (now - entry.value > 8000) { 
                     store.connectedEndpointIds.remove(macAddress)
                     store.connectedEndpointNames.remove(macAddress)
-                    iterator.remove()
+                    store.endpointLastSeen.remove(macAddress)
                     AppLogger.d("BLE_MESH", "Node Timed Out: ${macAddress}")
                     onDeviceDisconnected?.invoke(macAddress)
                     onDeviceScanRemoved?.invoke(macAddress)
