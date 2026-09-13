@@ -38,8 +38,6 @@ class PayloadDispatcher(private val callback: PayloadDispatcherCallback) {
             if (seenMessageIds.contains(msgId)) return
             seenMessageIds.add(msgId)
             if (seenMessageIds.size > 500) {
-                // CopyOnWriteArraySet iterators do not support remove(). 
-                // We must remove the first element safely.
                 seenMessageIds.firstOrNull()?.let { oldest ->
                     seenMessageIds.remove(oldest)
                 }
