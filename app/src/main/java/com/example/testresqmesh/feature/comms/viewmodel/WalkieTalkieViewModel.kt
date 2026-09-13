@@ -49,8 +49,11 @@ class WalkieTalkieViewModel(
         liveAudioEngine.startRecording()
     }
 
-    fun stopLiveAudio() {
-        liveAudioEngine.stopRecording()
+    fun stopLiveAudio(): String? {
+        val wavBytes = liveAudioEngine.stopRecording()
+        return if (wavBytes != null) {
+            android.util.Base64.encodeToString(wavBytes, android.util.Base64.NO_WRAP)
+        } else null
     }
 
     fun toggleWalkieTalkieMode() {
