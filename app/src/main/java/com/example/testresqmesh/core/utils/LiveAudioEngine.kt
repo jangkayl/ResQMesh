@@ -34,6 +34,7 @@ class LiveAudioEngine(
     private var playbackJob: Job? = null
 
     private var archiveStream: java.io.ByteArrayOutputStream? = null
+    private val voiceCodec = VoiceCodec()
 
     fun startRecording() {
         if (ActivityCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
@@ -51,6 +52,7 @@ class LiveAudioEngine(
         audioRecord?.startRecording()
         isRecording = true
         archiveStream = java.io.ByteArrayOutputStream()
+        voiceCodec.startEncoder()
 
         recordingJob = CoroutineScope(Dispatchers.IO).launch {
             val audioBuffer = ByteArray(bufferSize)
@@ -62,9 +64,11 @@ class LiveAudioEngine(
                     // Archive it locally for the guaranteed Voice Note fallback
                     archiveStream?.write(pcmChunk)
 
-                    // COMPRESSION: Reduce size by 50% for live broadcast
-                    val compressedChunk = G711Ulaw.compress(pcmChunk)
-                    broadcastChunk(compressedChunk)
+                    // COMPRESSION: Use Hardware Opus/AAC
+                    val compressedChunk = voiceCodec.encodeChunk(pcmChunk)
+                    if (compressedChunk != null) {
+                        broadcastChunk(compressedChunk)
+                    }
                 }
             }
         }
@@ -76,6 +80,7 @@ class LiveAudioEngine(
         audioRecord?.stop()
         audioRecord?.release()
         audioRecord = null
+        voiceCodec.stop()
 
         val pcmData = archiveStream?.toByteArray()
         archiveStream?.close()
@@ -118,6 +123,7 @@ class LiveAudioEngine(
 
     fun startPlayback(incomingLiveAudioChunk: SharedFlow<Pair<String, ByteArray>>) {
         isPlaying = true
+        voiceCodec.startDecoder()
         
         val minBufferSize = AudioTrack.getMinBufferSize(sampleRate, AudioFormat.CHANNEL_OUT_MONO, audioFormat)
         
@@ -138,8 +144,23 @@ class LiveAudioEngine(
             launch {
                 incomingLiveAudioChunk.collect { (sender, compressedChunk) ->
                     if (isPlaying) {
-                        val pcmChunk = G711Ulaw.decompress(compressedChunk, volumeGain)
-                        jitterBuffer.offer(Pair(sender, pcmChunk))
+                        val pcmChunk = voiceCodec.decodeChunk(compressedChunk)
+                        if (pcmChunk != null) {
+                            // Apply software gain
+                            if (volumeGain != 1.0f) {
+                                for (i in pcmChunk.indices step 2) {
+                                    val low = pcmChunk[i].toInt() and 0xFF
+                                    val high = pcmChunk[i + 1].toInt() shl 8
+                                    var sample = (low or high).toShort().toInt()
+                                    sample = (sample * volumeGain).toInt()
+                                    if (sample > Short.MAX_VALUE) sample = Short.MAX_VALUE.toInt()
+                                    if (sample < Short.MIN_VALUE) sample = Short.MIN_VALUE.toInt()
+                                    pcmChunk[i] = (sample and 0xFF).toByte()
+                                    pcmChunk[i + 1] = ((sample shr 8) and 0xFF).toByte()
+                                }
+                            }
+                            jitterBuffer.offer(Pair(sender, pcmChunk))
+                        }
                         
                         // Wait until we have 20 chunks (~600ms) before starting to play to completely eliminate choppiness
                         if (isBuffering && jitterBuffer.size >= 20) {
@@ -178,5 +199,6 @@ class LiveAudioEngine(
         audioTrack?.stop()
         audioTrack?.release()
         audioTrack = null
+        voiceCodec.stop()
     }
 }
