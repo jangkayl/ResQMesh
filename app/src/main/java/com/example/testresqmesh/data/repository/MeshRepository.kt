@@ -379,21 +379,19 @@ class MeshRepository(
         val messageId = UUID.randomUUID().toString()
         val timestamp = System.currentTimeMillis()
         
-        val payload = com.example.testresqmesh.core.network.MeshPayload(
-            id = messageId,
-            type = "MESSAGE",
+        val payloadBytes = PayloadFactory.buildPublicPayload(
+            msgId = messageId,
+            timestamp = timestamp,
             senderName = myNodeName,
             text = text,
-            image = imageBase64,
-            audio = audioBase64,
-            isPrivate = false,
+            imageBase64 = imageBase64,
+            audioBase64 = audioBase64,
             locationLat = locationLat,
             locationLng = locationLng,
             isSOS = isSOS,
             isSOSCancel = isSOSCancel,
             channelId = _currentChannelId.value
         )
-        val payloadBytes = kotlinx.serialization.protobuf.ProtoBuf.encodeToByteArray(com.example.testresqmesh.core.network.MeshPayload.serializer(), payload)
 
         val message = ChatMessage(messageId, myNodeName, text, imageBase64, audioBase64, locationLat, locationLng, true, false, timestamp, isSOS = isSOS)
         repositoryScope.launch {

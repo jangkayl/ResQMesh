@@ -5,6 +5,10 @@ import com.example.testresqmesh.core.network.CryptoManager
 import kotlinx.serialization.encodeToByteArray
 import kotlinx.serialization.protobuf.ProtoBuf
 
+import android.util.Base64
+
+import com.example.testresqmesh.core.utils.BinaryCompressor
+
 object PayloadFactory {
 
     fun buildPublicPayload(
@@ -17,22 +21,24 @@ object PayloadFactory {
         locationLat: Double?,
         locationLng: Double?,
         isSOS: Boolean,
-        isSOSCancel: Boolean
+        isSOSCancel: Boolean,
+        channelId: String
     ): ByteArray {
         val payload = MeshPayload(
             id = msgId,
             type = "MESSAGE",
             senderName = senderName,
             text = text,
-            image = imageBase64,
-            audio = audioBase64,
+            imageBytes = imageBase64?.let { BinaryCompressor.compress(Base64.decode(it, Base64.DEFAULT)) },
+            audioBytes = audioBase64?.let { BinaryCompressor.compress(Base64.decode(it, Base64.DEFAULT)) },
             locationLat = locationLat,
             locationLng = locationLng,
             isPrivate = false,
             isEncrypted = false,
             isSOS = isSOS,
             isSOSCancel = isSOSCancel,
-            routePath = listOf(senderName)
+            routePath = listOf(senderName),
+            channelId = channelId
         )
         return ProtoBuf.encodeToByteArray(payload)
     }
@@ -81,8 +87,8 @@ object PayloadFactory {
                 senderName = senderName,
                 targetName = targetName,
                 text = text,
-                image = imageBase64,
-                audio = audioBase64,
+                imageBytes = imageBase64?.let { BinaryCompressor.compress(Base64.decode(it, Base64.DEFAULT)) },
+                audioBytes = audioBase64?.let { BinaryCompressor.compress(Base64.decode(it, Base64.DEFAULT)) },
                 locationLat = locationLat,
                 locationLng = locationLng,
                 isPrivate = true,

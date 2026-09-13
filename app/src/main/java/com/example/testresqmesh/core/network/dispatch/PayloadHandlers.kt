@@ -6,6 +6,8 @@ import com.example.testresqmesh.core.network.CryptoManager
 import com.example.testresqmesh.core.utils.AppLogger
 import kotlinx.serialization.encodeToByteArray
 import kotlinx.serialization.protobuf.ProtoBuf
+import android.util.Base64
+import com.example.testresqmesh.core.utils.BinaryCompressor
 import kotlinx.serialization.ExperimentalSerializationApi
 
 interface PayloadHandler {
@@ -142,8 +144,8 @@ class StandardMessageHandler : PayloadHandler {
         val isEncrypted = payload.isEncrypted
 
         var text = payload.text
-        var imageBase64 = payload.image
-        var audioBase64 = payload.audio
+        var imageBase64 = payload.imageBytes?.let { Base64.encodeToString(BinaryCompressor.decompress(it), Base64.DEFAULT) }
+        var audioBase64 = payload.audioBytes?.let { Base64.encodeToString(BinaryCompressor.decompress(it), Base64.DEFAULT) }
         
         if (isEncrypted) {
             val previewData = payload.encryptedData?.take(20) ?: "MISSING"
