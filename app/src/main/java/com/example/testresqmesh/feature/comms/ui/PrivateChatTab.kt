@@ -29,7 +29,9 @@ fun PrivateChatTab(
         
         val peerName = id
 
-        val isDirectNode = uiState.knownNodes.find { it.name == peerName }?.isDirect ?: false
+        val isDirectNode = uiState.knownNodes.find {
+            com.example.testresqmesh.core.model.NodeIdentity.matches(it.name, peerName)
+        }?.isDirect ?: false
 
         InboxItemData(
             id = id,

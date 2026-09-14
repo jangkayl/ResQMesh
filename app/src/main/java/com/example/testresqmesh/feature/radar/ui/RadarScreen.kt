@@ -32,95 +32,161 @@ import com.example.testresqmesh.core.ui.theme.InboxBackground
 import com.example.testresqmesh.core.ui.theme.InboxAccentBlue
 import com.example.testresqmesh.core.ui.theme.Spacing
 import com.example.testresqmesh.feature.radar.viewmodel.RadarViewModel
+import com.example.testresqmesh.core.model.NodeIdentity
+import com.example.testresqmesh.ui.state.RadarUiState
 import com.example.testresqmesh.core.utils.AppLogger
 
 @Composable
 fun RadarScreen(viewModel: RadarViewModel) {
     val uiState by viewModel.uiState.collectAsState()
     val context = androidx.compose.ui.platform.LocalContext.current
-    val prefs = context.getSharedPreferences("resqmesh_prefs", android.content.Context.MODE_PRIVATE)
-    val customName = prefs.getString("custom_name", android.os.Build.MODEL) ?: android.os.Build.MODEL
-    val tag = prefs.getString("node_tag", "NODE") ?: "NODE"
-    val myDeviceName = "$customName [$tag]"
-    
-    // Create a set of names that are physically connected via BLE
-    val connectedNames = uiState.connectedDevices.map { it.name }.toSet()
 
-    // 1. Map directly connected nodes
-    val connectedNodes = uiState.connectedDevices
-        .distinctBy { it.name }
-        .map { 
-            NodeItemData(it.endpointId, it.name, "Connected (Direct)", isConnected = true, isActiveRelay = true)
-        }
-    
-    // 2. Map scanned nodes (and use topology to determine if they are indirect hops)
-    val scannedNodes = uiState.scannedDevices
-        .filter { scanned -> connectedNames.none { it.contains(scanned.name.take(15)) || scanned.name.contains(it.take(15)) } }
-        .distinctBy { it.name }
-        .map {
-            // Check if this node exists in the Mesh Routing Topology
-            val isIndirectRoute = uiState.topology.containsKey(it.name) || uiState.topology.values.any { nodes -> nodes.contains(it.name) }
-            val displayStatus = if (isIndirectRoute) {
-                "Connected (Via Relay)"
-            } else if (it.isConnecting) {
-                "SYNCING..."
-            } else {
-                "Discovered / Scanning..."
-            }
-            
-            NodeItemData(
-                it.endpointId,
-                it.name, 
-                displayStatus,
-                isConnected = isIndirectRoute,
-                isActiveRelay = false,
-                isBlocked = uiState.blockedDeviceNames.contains(it.name)
-            )
-        }
+    // Must match MeshRepository.startNode exactly, including the "#nodeId" suffix, otherwise the
+    // graph fails to collapse the local node onto the centre and "me" is drawn twice.
+    val myDeviceName = remember(context) {
+        val prefs = context.getSharedPreferences("resqmesh_prefs", android.content.Context.MODE_PRIVATE)
+        val customName = prefs.getString("custom_name", android.os.Build.MODEL) ?: android.os.Build.MODEL
+        val tag = prefs.getString("node_tag", "NODE") ?: "NODE"
+        val nodeId = prefs.getString("node_id", "") ?: ""
+        if (nodeId.isEmpty()) "$customName [$tag]" else "$customName [$tag]#$nodeId"
+    }
 
-    // Include blocked devices that are completely out of range so the user can still unblock them
-    val scannedAndConnectedNames = connectedNames + scannedNodes.map { it.name }
-    
-    val offlineBlockedNodes = uiState.blockedDeviceNames
-        .filter { blockedName -> scannedAndConnectedNames.none { it.contains(blockedName.take(15)) || blockedName.contains(it.take(15)) } }
-        .map { name ->
-            NodeItemData(
-                endpointId = "",
-                name = name,
-                status = "OFFLINE",
-                isConnected = false,
-                isActiveRelay = false,
-                isBlocked = true
-            )
-        }
-
-    val hoppedNodes = uiState.knownNodes
-        .filter { knownNode -> 
-            scannedAndConnectedNames.none { it.contains(knownNode.name.take(15)) || knownNode.name.contains(it.take(15)) } && 
-            !uiState.blockedDeviceNames.contains(knownNode.name) 
-        }
-        .map { node ->
-            NodeItemData(
-                endpointId = "",
-                name = node.name,
-                status = "Hopped via Mesh",
-                isConnected = false,
-                isActiveRelay = true,
-                isBlocked = false
-            )
-        }
+    val nodes = remember(uiState) { classifyRadarNodes(uiState) }
+    val activeNodesCount = remember(nodes) { nodes.count { it.kind != NodeKind.BLOCKED_OFFLINE } }
+    val directNodeNames = remember(nodes) { nodes.filter { it.kind == NodeKind.DIRECT }.map { it.name } }
 
     RadarScreenContent(
-        activeNodesCount = connectedNodes.size + scannedNodes.size + hoppedNodes.size,
-        nodes = connectedNodes + scannedNodes + offlineBlockedNodes + hoppedNodes,
+        activeNodesCount = activeNodesCount,
+        nodes = nodes,
         topology = uiState.topology,
         myDeviceName = myDeviceName,
+        directNodeNames = directNodeNames,
         onRefresh = { viewModel.rescan() },
         onDisconnect = { viewModel.disconnectDevice(it) },
         onForceConnect = { id, name -> viewModel.forceConnect(id, name) },
         onBlock = { name -> viewModel.blockDevice(name) },
         onUnblock = { name -> viewModel.unblockDevice(name) }
     )
+}
+
+/**
+ * Derives the "Nearby Nodes" list from network state.
+ *
+ * The previous implementation decided a scanned device was reachable "Via Relay" by checking whether
+ * its name appeared anywhere in [RadarUiState.topology]. That was never a valid test: every node that
+ * emits a SYSTEM pulse becomes a topology key, including the peers we are *directly* connected to. So
+ * whenever a live direct link was briefly missing from `connectedDevices` (a nameless inbound socket,
+ * a dual-MAC rotation, or a stale discovery row) the device fell through to the scanned branch,
+ * matched the topology, and was labelled "Connected (Via Relay)" despite being physically connected.
+ *
+ * Classification is now driven by explicit authoritative signals:
+ *  - `connectedDevices`  -> a physical socket exists (DIRECT, or HANDSHAKING while still nameless).
+ *  - `knownNodes.isDirect == false` -> genuinely only reachable through the mesh.
+ *  - `scannedDevices`    -> in radio range but not routed yet.
+ *
+ * Kept as a pure function so it is cheap to reason about and unit-testable without Compose.
+ */
+internal fun classifyRadarNodes(state: RadarUiState): List<NodeItemData> {
+    fun blockedNameFor(name: String): String? =
+        state.blockedDeviceNames.firstOrNull { NodeIdentity.matches(it, name) }
+
+    fun label(fullName: String): String {
+        val display = NodeIdentity.displayNameOf(fullName).ifBlank { fullName }
+        val id = NodeIdentity.idOf(fullName)
+        return if (id == null) display else "$display #$id"
+    }
+
+    // 1. Physical direct links. Authoritative: a socket either exists or it does not.
+    val directNodes = state.connectedDevices
+        .distinctBy { NodeIdentity.key(it.name).ifEmpty { it.endpointId } }
+        .map { device ->
+            val handshaking = device.isProvisional || NodeIdentity.isPlaceholder(device.name)
+            if (handshaking) {
+                NodeItemData(
+                    endpointId = device.endpointId,
+                    name = device.name,
+                    label = "Node ${device.endpointId.takeLast(5)}",
+                    status = "Linking (Handshaking)",
+                    kind = NodeKind.HANDSHAKING,
+                    isConnected = true,
+                    isActiveRelay = false
+                )
+            } else {
+                NodeItemData(
+                    endpointId = device.endpointId,
+                    name = device.name,
+                    label = label(device.name),
+                    status = "Connected (Direct)",
+                    kind = NodeKind.DIRECT,
+                    isConnected = true,
+                    isActiveRelay = true,
+                    isBlocked = blockedNameFor(device.name) != null
+                )
+            }
+        }
+
+    fun isDirectPeer(name: String): Boolean =
+        directNodes.any { NodeIdentity.matches(it.name, name) }
+
+    // 2. Nodes the router says are reachable only through the mesh.
+    val indirectNodes = state.knownNodes
+        .filter { !it.isDirect && !NodeIdentity.isPlaceholder(it.name) && !isDirectPeer(it.name) }
+        .distinctBy { NodeIdentity.key(it.name) }
+        .map { node ->
+            // Still advertising nearby -> it is a relay peer in radio range.
+            // Not advertising    -> it is purely a mesh hop somewhere further out.
+            val inRadioRange = state.scannedDevices.any { NodeIdentity.matches(it.name, node.name) }
+            val blocked = blockedNameFor(node.name) != null
+            NodeItemData(
+                endpointId = "",
+                name = node.name,
+                label = label(node.name),
+                status = if (inRadioRange) "Connected (Via Relay)" else "Hopped via Mesh",
+                kind = if (inRadioRange) NodeKind.RELAY else NodeKind.HOPPED,
+                isConnected = false,
+                isActiveRelay = true,
+                isBlocked = blocked
+            )
+        }
+
+    fun isRouted(name: String): Boolean =
+        indirectNodes.any { NodeIdentity.matches(it.name, name) }
+
+    // 3. Everything else we can physically see but have not linked or routed.
+    val discoveredNodes = state.scannedDevices
+        .filter { !isDirectPeer(it.name) && !isRouted(it.name) && !NodeIdentity.isPlaceholder(it.name) }
+        .distinctBy { NodeIdentity.key(it.name) }
+        .map { scanned ->
+            NodeItemData(
+                endpointId = scanned.endpointId,
+                name = scanned.name,
+                label = label(scanned.name),
+                status = if (scanned.isConnecting) "SYNCING..." else "Discovered / Scanning...",
+                kind = if (scanned.isConnecting) NodeKind.SYNCING else NodeKind.DISCOVERED,
+                isConnected = false,
+                isActiveRelay = false,
+                isBlocked = blockedNameFor(scanned.name) != null
+            )
+        }
+
+    // 4. Blocked nodes that are entirely out of range, so the user can still unblock them.
+    val visible = directNodes + indirectNodes + discoveredNodes
+    val offlineBlockedNodes = state.blockedDeviceNames
+        .filter { blockedName -> visible.none { NodeIdentity.matches(it.name, blockedName) } }
+        .map { name ->
+            NodeItemData(
+                endpointId = "",
+                name = name,
+                label = label(name),
+                status = "OFFLINE",
+                kind = NodeKind.BLOCKED_OFFLINE,
+                isConnected = false,
+                isActiveRelay = false,
+                isBlocked = true
+            )
+        }
+
+    return visible + offlineBlockedNodes
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -134,7 +200,8 @@ fun RadarScreenContent(
     onDisconnect: (String) -> Unit,
     onForceConnect: (String, String) -> Unit,
     onBlock: (String) -> Unit,
-    onUnblock: (String) -> Unit
+    onUnblock: (String) -> Unit,
+    directNodeNames: List<String> = nodes.filter { it.kind == NodeKind.DIRECT }.map { it.name }
 ) {
     Scaffold(
         topBar = {
@@ -192,7 +259,9 @@ fun RadarScreenContent(
                     }
                 }
 
-                NetworkGraphVisualizer(topology = topology, myDeviceName = myDeviceName, connectedNodes = nodes.filter { it.isConnected }.map { it.name })
+                // Ring 1 must be true physical links only. Passing every `isConnected` node also
+                // pushed relay-reachable peers into the inner ring, misrepresenting the topology.
+                NetworkGraphVisualizer(topology = topology, myDeviceName = myDeviceName, connectedNodes = directNodeNames)
                 
                 Text(
                     "SCAN RANGE: 1.2KM",
@@ -257,14 +326,24 @@ fun RadarScreenContent(
                     .padding(horizontal = Spacing.Medium),
                 verticalArrangement = Arrangement.spacedBy(Spacing.Small)
             ) {
-                val connectedNodesList = nodes.filter { it.status.contains("Connected", ignoreCase = true) }
-                val hoppedNodesList = nodes.filter { it.status.contains("Hopped", ignoreCase = true) }
-                val onlineNodesList = nodes.filter { it.status.contains("Discovered", ignoreCase = true) || it.status.contains("SYNCING") }
-                val offlineNodesList = nodes.filter { it.status.contains("OFFLINE", ignoreCase = true) }
+                // Group by explicit kind. The previous `status.contains("Connected")` matching would
+                // misfile any node whose user-chosen display name happened to contain those words.
+                val connectedNodesList = nodes.filter { it.kind == NodeKind.DIRECT || it.kind == NodeKind.HANDSHAKING }
+                val relayNodesList = nodes.filter { it.kind == NodeKind.RELAY }
+                val hoppedNodesList = nodes.filter { it.kind == NodeKind.HOPPED }
+                val onlineNodesList = nodes.filter { it.kind == NodeKind.DISCOVERED || it.kind == NodeKind.SYNCING }
+                val offlineNodesList = nodes.filter { it.kind == NodeKind.BLOCKED_OFFLINE }
 
                 if (connectedNodesList.isNotEmpty()) {
                     Text("CONNECTED", style = MaterialTheme.typography.labelSmall, color = InboxAccentBlue, modifier = Modifier.padding(top = Spacing.Small))
                     connectedNodesList.forEach { node ->
+                        NearbyNodeItem(node, onDisconnect, onForceConnect, onBlock, onUnblock)
+                    }
+                }
+
+                if (relayNodesList.isNotEmpty()) {
+                    Text("CONNECTED VIA RELAY", style = MaterialTheme.typography.labelSmall, color = Color(0xFF38BDF8), modifier = Modifier.padding(top = Spacing.Small))
+                    relayNodesList.forEach { node ->
                         NearbyNodeItem(node, onDisconnect, onForceConnect, onBlock, onUnblock)
                     }
                 }
@@ -371,11 +450,25 @@ fun NearbyNodeItem(
             Spacer(modifier = Modifier.width(Spacing.Medium))
 
             Column(modifier = Modifier.weight(1f)) {
-                Text(node.name, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Black, color = if (node.isBlocked) Color.Gray else Color.White)
+                Text(
+                    node.label.ifEmpty { node.name },
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.Black,
+                    color = if (node.isBlocked) Color.Gray else Color.White
+                )
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    val statusColor = if (node.isBlocked) Color.Red else if (node.status.contains("MASTER") || node.isConnected) InboxAccentBlue else Color.White.copy(alpha = 0.4f)
+                    val isLive = node.kind == NodeKind.DIRECT || node.kind == NodeKind.RELAY || node.kind == NodeKind.HOPPED
+                    val statusColor = when {
+                        node.isBlocked -> Color.Red
+                        isLive -> InboxAccentBlue
+                        else -> Color.White.copy(alpha = 0.4f)
+                    }
                     Icon(
-                        if (node.isBlocked) Icons.Default.Block else if (node.status.contains("MASTER") || node.isConnected) Icons.Default.Bolt else Icons.Default.Info, 
+                        when {
+                            node.isBlocked -> Icons.Default.Block
+                            isLive -> Icons.Default.Bolt
+                            else -> Icons.Default.Info
+                        },
                         contentDescription = null, 
                         tint = statusColor, 
                         modifier = Modifier.size(12.dp)
@@ -385,44 +478,57 @@ fun NearbyNodeItem(
                 }
             }
 
-            if (node.isBlocked) {
-                TextButton(
-                    onClick = { onUnblock(node.name) },
-                    colors = ButtonDefaults.textButtonColors(contentColor = Color(0xFF10B981))
-                ) {
-                    Text("UNBLOCK", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Black)
-                }
-            } else if (node.isConnected) {
-                IconButton(onClick = { onBlock(node.name) }) {
-                    Icon(
-                        imageVector = Icons.Default.Block,
-                        contentDescription = "Block Device",
-                        tint = Color.Gray
-                    )
-                }
-                IconButton(onClick = { onDisconnect(node.endpointId) }) {
-                    Icon(
-                        imageVector = Icons.Outlined.LinkOff,
-                        contentDescription = "Unlink Device",
-                        tint = Color(0xFFEF4444)
-                    )
-                }
-            } else {
-                if (node.endpointId.isNotEmpty() && !node.status.contains("Hopped", ignoreCase = true)) {
-                    IconButton(onClick = { onBlock(node.name) }) {
-                        Icon(
-                            imageVector = Icons.Default.Block,
-                            contentDescription = "Block Device",
-                            tint = Color.Gray
-                        )
-                    }
+            when {
+                node.isBlocked -> {
                     TextButton(
-                        onClick = { onForceConnect(node.endpointId, node.name) },
-                        colors = ButtonDefaults.textButtonColors(contentColor = InboxAccentBlue)
+                        onClick = { onUnblock(node.name) },
+                        colors = ButtonDefaults.textButtonColors(contentColor = Color(0xFF10B981))
                     ) {
-                        Icon(Icons.Default.Bolt, contentDescription = null, modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("FORCE", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Black)
+                        Text("UNBLOCK", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Black)
+                    }
+                }
+
+                // Only a real physical link owns a valid endpointId to tear down. Relay and hopped
+                // nodes previously showed this button too, but their endpointId was the peer's
+                // advertising MAC, so the disconnect silently hit the wrong endpoint.
+                node.kind == NodeKind.DIRECT -> {
+                    IconButton(onClick = { onBlock(node.name) }) {
+                        Icon(Icons.Default.Block, contentDescription = "Block Device", tint = Color.Gray)
+                    }
+                    IconButton(onClick = { onDisconnect(node.endpointId) }) {
+                        Icon(Icons.Outlined.LinkOff, contentDescription = "Unlink Device", tint = Color(0xFFEF4444))
+                    }
+                }
+
+                // Handshaking: socket is up but nameless, so blocking/unlinking by name is unsafe.
+                node.kind == NodeKind.HANDSHAKING -> {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(18.dp),
+                        strokeWidth = 2.dp,
+                        color = InboxAccentBlue
+                    )
+                }
+
+                node.kind == NodeKind.RELAY || node.kind == NodeKind.DISCOVERED || node.kind == NodeKind.SYNCING -> {
+                    IconButton(onClick = { onBlock(node.name) }) {
+                        Icon(Icons.Default.Block, contentDescription = "Block Device", tint = Color.Gray)
+                    }
+                    if (node.endpointId.isNotEmpty()) {
+                        TextButton(
+                            onClick = { onForceConnect(node.endpointId, node.name) },
+                            colors = ButtonDefaults.textButtonColors(contentColor = InboxAccentBlue)
+                        ) {
+                            Icon(Icons.Default.Bolt, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("FORCE", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Black)
+                        }
+                    }
+                }
+
+                // HOPPED nodes are out of radio range: nothing to link or unlink directly.
+                else -> {
+                    IconButton(onClick = { onBlock(node.name) }) {
+                        Icon(Icons.Default.Block, contentDescription = "Block Device", tint = Color.Gray)
                     }
                 }
             }
@@ -430,31 +536,54 @@ fun NearbyNodeItem(
     }
 }
 
+/** Explicit classification of a Radar row, so grouping and actions never depend on status text. */
+enum class NodeKind {
+    /** A live physical socket with a confirmed name. */
+    DIRECT,
+    /** A live physical socket that has not completed the name handshake yet. */
+    HANDSHAKING,
+    /** Reachable only through the mesh, but still advertising within radio range. */
+    RELAY,
+    /** Reachable only through the mesh and out of radio range. */
+    HOPPED,
+    /** Advertising nearby, not linked and not routed. */
+    DISCOVERED,
+    /** Advertising nearby with an outbound connection attempt in flight. */
+    SYNCING,
+    /** Blocked and not currently visible anywhere in the mesh. */
+    BLOCKED_OFFLINE
+}
+
 data class NodeItemData(
     val endpointId: String,
+    /** Fully qualified node name. Always used for block/unblock/connect actions. */
     val name: String,
     val status: String,
+    val kind: NodeKind = NodeKind.DISCOVERED,
     val isConnected: Boolean = false,
     val isActiveRelay: Boolean = false,
-    val isBlocked: Boolean = false
+    val isBlocked: Boolean = false,
+    /** Human friendly text for display only. Falls back to [name] when empty. */
+    val label: String = ""
 )
 
 @Preview(showBackground = true)
 @Composable
 fun RadarScreenPreview() {
     val mockNodes = listOf(
-        NodeItemData("id1", "Node_X77A", "120m • End Device"),
-        NodeItemData("id2", "Node_BK29", "250m • Active Relay", isConnected = true, isActiveRelay = true),
-        NodeItemData("id3", "Node_L005", "410m • End Device"),
-        NodeItemData("id4", "Node_MN04", "680m • Active Relay", isConnected = false, isActiveRelay = true),
-        NodeItemData("id5", "Node_PJ88", "910m • End Device")
+        NodeItemData("id2", "Node_BK29 [MEDIC]#BK29", "Connected (Direct)", NodeKind.DIRECT, isConnected = true, isActiveRelay = true, label = "Node_BK29 [MEDIC] #BK29"),
+        NodeItemData("id6", "Node_QQ12 [NODE]#QQ12", "Linking (Handshaking)", NodeKind.HANDSHAKING, isConnected = true, label = "Node 4F:A2"),
+        NodeItemData("id4", "Node_MN04 [NODE]#MN04", "Connected (Via Relay)", NodeKind.RELAY, isActiveRelay = true, label = "Node_MN04 [NODE] #MN04"),
+        NodeItemData("", "Node_L005 [NODE]#L005", "Hopped via Mesh", NodeKind.HOPPED, isActiveRelay = true, label = "Node_L005 [NODE] #L005"),
+        NodeItemData("id1", "Node_X77A [NODE]#X77A", "Discovered / Scanning...", NodeKind.DISCOVERED, label = "Node_X77A [NODE] #X77A"),
+        NodeItemData("id5", "Node_PJ88 [NODE]#PJ88", "SYNCING...", NodeKind.SYNCING, label = "Node_PJ88 [NODE] #PJ88")
     )
     TestResQMeshTheme {
         RadarScreenContent(
-            activeNodesCount = 6,
+            activeNodesCount = mockNodes.size,
             nodes = mockNodes,
             topology = emptyMap(),
-            myDeviceName = "Me",
+            myDeviceName = "Me [NODE]#ME01",
             onRefresh = {},
             onDisconnect = {},
             onForceConnect = { _, _ -> },

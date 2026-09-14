@@ -5,6 +5,8 @@ import android.content.Context
 import android.os.Handler
 import android.os.Looper
 import com.example.testresqmesh.core.model.ConnectedDevice
+import com.example.testresqmesh.core.model.NodeIdentity
+import com.example.testresqmesh.core.model.ScanEvent
 import com.example.testresqmesh.core.network.NativeBleManager
 import com.example.testresqmesh.core.utils.AppLogger
 import java.util.concurrent.ConcurrentLinkedQueue
@@ -15,6 +17,22 @@ class GattClientManager(
     val context: Context,
     val manager: NativeBleManager
 ) {
+    /**
+     * Publishes a connection-state change for a peer that is already in the discovery list.
+     * `peerConnections` / `peerScore` are deliberately left null so the repository keeps the values
+     * learned from the peer's last real advertisement.
+     */
+    private fun NativeBleManager.notifyScanState(macAddress: String, peerName: String, isConnecting: Boolean) {
+        onDeviceScanned?.invoke(
+            ScanEvent(
+                endpointId = macAddress,
+                name = peerName,
+                nodeId = NodeIdentity.idOf(peerName) ?: store.endpointNodeIds[macAddress].orEmpty(),
+                isConnecting = isConnecting
+            )
+        )
+    }
+
     fun connectToPersistentGatt(macAddress: String, peerName: String) {
         with(manager) {
         if (!store.isConnecting.compareAndSet(false, true)) {
@@ -26,7 +44,7 @@ class GattClientManager(
         store.connectingMacAddress = macAddress
         handler.post {
             // Force UI update to show SYNCING...
-            onDeviceScanned?.invoke(macAddress, peerName, 0, "", true)
+            notifyScanState(macAddress, peerName, isConnecting = true)
         }
 
         val device = bluetoothAdapter.getRemoteDevice(macAddress)
@@ -39,7 +57,7 @@ class GattClientManager(
                 val oldMac = store.connectingMacAddress
                 store.connectingMacAddress = null
                 if (oldMac != null) {
-                    handler.post { onDeviceScanned?.invoke(oldMac, peerName, 0, "", false) }
+                    handler.post { notifyScanState(oldMac, peerName, isConnecting = false) }
                 }
             }
         }
@@ -51,6 +69,7 @@ class GattClientManager(
                         AppLogger.d("BLE_MESH", "GATT Socket locked with ${peerName}. Requesting MTU 512...")
                         store.activeConnections[macAddress] = gatt
                         store.connectedEndpointNames[macAddress] = peerName
+                        NodeIdentity.idOf(peerName)?.let { store.endpointNodeIds[macAddress] = it }
                         store.pendingQueues.putIfAbsent(macAddress, ConcurrentLinkedQueue<ByteArray>())
                         store.isWriting.putIfAbsent(macAddress, AtomicBoolean(false))
                         store.chunkBuffers.putIfAbsent(macAddress, ByteArray(0))
@@ -70,7 +89,7 @@ class GattClientManager(
                         AppLogger.d("BLE_MESH", "GATT Socket disconnected from ${peerName}.")
                         if (store.connectingMacAddress == macAddress) {
                             store.connectingMacAddress = null
-                            handler.post { onDeviceScanned?.invoke(macAddress, peerName, 0, "", false) }
+                            handler.post { notifyScanState(macAddress, peerName, isConnecting = false) }
                         }
                         store.isConnecting.set(false)
                         store.activeConnections.remove(macAddress)
@@ -131,7 +150,7 @@ class GattClientManager(
                             } catch (e: Exception) {}
                             if (store.connectingMacAddress == macAddress) {
                                 store.connectingMacAddress = null
-                                handler.post { onDeviceScanned?.invoke(macAddress, "", 0, "", false) }
+                                handler.post { notifyScanState(macAddress, peerName, isConnecting = false) }
                             }
                             store.isConnecting.set(false)
                             forceGattDisconnect(macAddress, gatt)
@@ -148,7 +167,7 @@ class GattClientManager(
                         AppLogger.d("BLE_MESH", "GATT services discovery failed for ${macAddress}. Status: ${status}. Forcing UI disconnect.")
                         if (store.connectingMacAddress == macAddress) {
                             store.connectingMacAddress = null
-                            handler.post { onDeviceScanned?.invoke(macAddress, "", 0, "", false) }
+                            handler.post { notifyScanState(macAddress, peerName, isConnecting = false) }
                         }
                         store.isConnecting.set(false)
                         forceGattDisconnect(macAddress, gatt)
@@ -167,14 +186,14 @@ class GattClientManager(
                         
                         if (store.connectingMacAddress == macAddress) {
                             store.connectingMacAddress = null
-                            handler.post { onDeviceScanned?.invoke(macAddress, "", 0, "", false) }
+                            handler.post { notifyScanState(macAddress, peerName, isConnecting = false) }
                         }
                         store.isConnecting.set(false)
                     } else {
                         AppLogger.d("BLE_MESH", "GATT descriptor write failed for ${macAddress}. Status: ${status}. Forcing UI disconnect.")
                         if (store.connectingMacAddress == macAddress) {
                             store.connectingMacAddress = null
-                            handler.post { onDeviceScanned?.invoke(macAddress, "", 0, "", false) }
+                            handler.post { notifyScanState(macAddress, peerName, isConnecting = false) }
                         }
                         store.isConnecting.set(false)
                         forceGattDisconnect(macAddress, gatt)
@@ -261,7 +280,7 @@ class GattClientManager(
             AppLogger.d("BLE_MESH", "Exception in connectGatt: ${e.message}")
             if (store.connectingMacAddress == macAddress) {
                 store.connectingMacAddress = null
-                handler.post { onDeviceScanned?.invoke(macAddress, peerName, 0, "", false) }
+                handler.post { notifyScanState(macAddress, peerName, isConnecting = false) }
             }
             store.isConnecting.set(false)
             timeoutHandler.removeCallbacks(timeoutRunnable)

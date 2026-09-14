@@ -4,6 +4,7 @@ import com.example.testresqmesh.core.model.ChatMessage
 import com.example.testresqmesh.core.model.ConnectedDevice
 import com.example.testresqmesh.core.model.ScannedDevice
 import com.example.testresqmesh.core.model.KnownNode
+import com.example.testresqmesh.core.model.NodeIdentity
 import com.example.testresqmesh.core.network.NativeBleManager
 import com.example.testresqmesh.core.utils.AppLogger
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -85,37 +86,48 @@ class MeshRepository(
         }
 
         networkManager.onDeviceConnected = { device ->
-            // Deduplicate by BOTH endpointId and name to prevent Ghost Sockets (Zombie MACs)
+            // Deduplicate by BOTH endpointId and identity to prevent Ghost Sockets (Zombie MACs)
             val existingById = _connectedDevices.value.find { it.endpointId == device.endpointId }
-            val existingByName = _connectedDevices.value.find { it.name == device.name && it.endpointId != device.endpointId }
-            
-            var updatedList = _connectedDevices.value
-            
-            // If this exact device name is already connected under an old Ghost MAC, kill the ghost!
-            if (existingByName != null && device.name != "Unknown Node") {
-                AppLogger.d("BLE_MESH", "Ghost Socket Detected! Replacing old MAC ${existingByName.endpointId} with new MAC ${device.endpointId} for ${device.name}")
-                networkManager.disconnectFromEndpoint(existingByName.endpointId)
-                updatedList = updatedList.filter { it.endpointId != existingByName.endpointId }
+            val existingByIdentity = _connectedDevices.value.find {
+                it.endpointId != device.endpointId && NodeIdentity.matches(it.name, device.name)
             }
 
-            if (existingById != null) {
-                if (device.isClassicConnected != existingById.isClassicConnected || existingById.name == "Unknown Node" || device.name != existingById.name) {
-                    updatedList = updatedList.map {
-                        if (it.endpointId == device.endpointId) device else it
-                    }
-                    meshRouter.removeNode(existingById.name)
-                    meshRouter.markNodeSeen(device.name)
-                    meshRouter.recalculateKnownNodes(myNodeName, updatedList)
-                }
-            } else {
-                updatedList = updatedList + device
-                _scannedDevices.value = _scannedDevices.value.filter { it.endpointId != device.endpointId && !it.name.contains(device.name.take(15)) && !device.name.contains(it.name.take(15)) }
-                
-                meshRouter.markNodeSeen(device.name)
-                meshRouter.recalculateKnownNodes(myNodeName, updatedList)
+            var updatedList = _connectedDevices.value
+
+            // If this same node is already connected under an old Ghost MAC, kill the ghost.
+            // Placeholder names are never used for this because they identify no particular peer.
+            if (existingByIdentity != null && !NodeIdentity.isPlaceholder(device.name)) {
+                AppLogger.d("BLE_MESH", "Ghost Socket Detected! Replacing old MAC ${existingByIdentity.endpointId} with new MAC ${device.endpointId} for ${device.name}")
+                networkManager.disconnectFromEndpoint(existingByIdentity.endpointId)
+                updatedList = updatedList.filter { it.endpointId != existingByIdentity.endpointId }
+                meshRouter.removeNode(existingByIdentity.name)
             }
-            
+
+            updatedList = if (existingById != null) {
+                if (existingById.name != device.name) {
+                    meshRouter.removeNode(existingById.name)
+                }
+                updatedList.map { if (it.endpointId == device.endpointId) device else it }
+            } else {
+                updatedList + device
+            }
+
+            // Always purge the discovery list for this peer, including on the rename path. Previously
+            // only brand new devices purged it, so a peer first seen as a nameless inbound socket left
+            // a stale scanned row behind on its advertising MAC. That row is what the Radar rendered
+            // as "Connected (Via Relay)" for an already directly connected device.
+            _scannedDevices.value = _scannedDevices.value.filter {
+                it.endpointId != device.endpointId && !NodeIdentity.matches(it.name, device.name)
+            }
+
+            // Provisional links have a real socket but only a placeholder name, so they must not be
+            // published into the routing tables or they would pollute the topology with ghost nodes.
+            if (!device.isProvisional && !NodeIdentity.isPlaceholder(device.name)) {
+                meshRouter.markNodeSeen(device.name)
+            }
+
             _connectedDevices.value = updatedList
+            meshRouter.recalculateKnownNodes(myNodeName, updatedList)
         }
 
         networkManager.onDeviceDisconnected = { endpointId ->
@@ -137,41 +149,64 @@ class MeshRepository(
         }
 
         networkManager.onDeviceBlocked = { senderName ->
-            _blockedDeviceNames.value = _blockedDeviceNames.value + senderName
+            _blockedDeviceNames.value = _blockedDeviceNames.value
+                .filterNot { NodeIdentity.matches(it, senderName) }
+                .toSet() + senderName
             networkManager.blockDevice(senderName)
         }
 
         networkManager.onDeviceUnblocked = { senderName ->
-            _blockedDeviceNames.value = _blockedDeviceNames.value - senderName
+            _blockedDeviceNames.value = _blockedDeviceNames.value
+                .filterNot { NodeIdentity.matches(it, senderName) }
+                .toSet()
             networkManager.unblockDevice(senderName)
         }
 
         networkManager.checkRouteExists = { targetName ->
-            meshRouter.knownNodes.value.any { it.name.contains(targetName.take(15)) || targetName.contains(it.name.take(15)) }
+            meshRouter.knownNodes.value.any { NodeIdentity.matches(it.name, targetName) }
         }
 
-        networkManager.onDeviceScanned = { id, name, score, role, isConnecting ->
-            if (name != myNodeName && name != myNodeName.take(20)) {
-                val isNotConnected = _connectedDevices.value.none { 
-                    it.endpointId == id || it.name.contains(name.take(15)) || name.contains(it.name.take(15))
+        networkManager.onDeviceScanned = { event ->
+            if (!NodeIdentity.matches(event.name, myNodeName)) {
+                // A peer we already hold a physical socket to must never appear in the discovery list.
+                val isPhysicallyConnected = _connectedDevices.value.any {
+                    it.endpointId == event.endpointId || NodeIdentity.matches(it.name, event.name)
                 }
-                
-                if (isNotConnected) {
+
+                if (isPhysicallyConnected) {
+                    _scannedDevices.value = _scannedDevices.value.filter { it.endpointId != event.endpointId }
+                } else {
                     val currentScanned = _scannedDevices.value.toMutableList()
-                    val existingIndex = currentScanned.indexOfFirst { it.name == name }
-                    
-                    if (existingIndex != -1) {
-                        currentScanned[existingIndex] = currentScanned[existingIndex].copy(
-                            endpointId = id,
-                            lastSeen = System.currentTimeMillis(),
-                            powerScore = score,
-                            myRole = role,
-                            isConnecting = isConnecting
-                        )
-                    } else {
-                        currentScanned.add(ScannedDevice(id, name, System.currentTimeMillis(), score, role, isConnecting))
+                    val existingIndex = currentScanned.indexOfFirst {
+                        it.endpointId == event.endpointId || NodeIdentity.matches(it.name, event.name)
                     }
-                    _scannedDevices.value = currentScanned
+
+                    if (existingIndex != -1) {
+                        val existing = currentScanned[existingIndex]
+                        currentScanned[existingIndex] = existing.copy(
+                            endpointId = event.endpointId,
+                            name = event.name.ifBlank { existing.name },
+                            lastSeen = System.currentTimeMillis(),
+                            powerScore = event.peerConnections ?: existing.powerScore,
+                            myRole = event.peerScore ?: existing.myRole,
+                            isConnecting = event.isConnecting,
+                            nodeId = event.nodeId.ifEmpty { existing.nodeId }
+                        )
+                        _scannedDevices.value = currentScanned
+                    } else if (event.name.isNotBlank()) {
+                        currentScanned.add(
+                            ScannedDevice(
+                                endpointId = event.endpointId,
+                                name = event.name,
+                                lastSeen = System.currentTimeMillis(),
+                                powerScore = event.peerConnections ?: 0,
+                                myRole = event.peerScore ?: "IDLE",
+                                isConnecting = event.isConnecting,
+                                nodeId = event.nodeId
+                            )
+                        )
+                        _scannedDevices.value = currentScanned
+                    }
                 }
             }
         }
@@ -202,7 +237,7 @@ class MeshRepository(
                 meshRouter.recalculateKnownNodes(myNodeName, _connectedDevices.value)
 
                 if (!isSystem && (isPrivate || channelId == _currentChannelId.value) && !networkManager.isDeviceBlocked(sender)) {
-                    val isDirect = _connectedDevices.value.any { it.name == sender }
+                    val isDirect = _connectedDevices.value.any { NodeIdentity.matches(it.name, sender) }
                     val message = ChatMessage(
                         id = msgId,
                         senderName = sender,
@@ -282,7 +317,7 @@ class MeshRepository(
             }
         }
         
-        val directEndpointId = _connectedDevices.value.find { it.name == targetName }?.endpointId
+        val directEndpointId = _connectedDevices.value.find { NodeIdentity.matches(it.name, targetName) }?.endpointId
         if (directEndpointId != null) {
             networkManager.broadcastSeenReceipt(messageId, isPrivate, directEndpointId)
         } else {
@@ -293,6 +328,7 @@ class MeshRepository(
     fun startNode(customName: String, nodeTag: String, teamKey: String, nodeId: String) {
         myNodeName = "$customName [$nodeTag]#$nodeId"
         networkManager.myDeviceName = myNodeName
+        networkManager.myNodeId = nodeId
         networkManager.startMeshNode(teamKey)
         _isOnline.value = true
     }
@@ -312,13 +348,17 @@ class MeshRepository(
     val blockedDeviceNames: StateFlow<Set<String>> = _blockedDeviceNames.asStateFlow()
 
     fun blockDevice(deviceName: String) {
-        _blockedDeviceNames.value = _blockedDeviceNames.value + deviceName
+        _blockedDeviceNames.value = _blockedDeviceNames.value
+            .filterNot { NodeIdentity.matches(it, deviceName) }
+            .toSet() + deviceName
         networkManager.blockDevice(deviceName)
         sendSystemCommand(deviceName, "BLOCK")
     }
 
     fun unblockDevice(deviceName: String) {
-        _blockedDeviceNames.value = _blockedDeviceNames.value - deviceName
+        _blockedDeviceNames.value = _blockedDeviceNames.value
+            .filterNot { NodeIdentity.matches(it, deviceName) }
+            .toSet()
         networkManager.unblockDevice(deviceName)
         sendSystemCommand(deviceName, "UNBLOCK")
     }
@@ -363,7 +403,7 @@ class MeshRepository(
         
         // Better yet: just send to connected devices whose name is in stpNeighbors
         _connectedDevices.value.forEach { device ->
-            if (stpNeighbors.contains(device.name)) {
+            if (NodeIdentity.matchesAny(device.name, stpNeighbors)) {
                 networkManager.sendDirectPayload(device.endpointId, payloadBytes)
             }
         }
@@ -431,21 +471,21 @@ class MeshRepository(
             channelId = _currentChannelId.value
         )
 
-        val isDirect = _connectedDevices.value.any { it.name == targetName }
+        val isDirect = _connectedDevices.value.any { NodeIdentity.matches(it.name, targetName) }
         val message = ChatMessage(msgId, myNodeName, text, imageBase64, audioBase64, locationLat, locationLng, true, true, timestamp, isHopped = !isDirect, outboundRoute = directedRouteList)
         
         repositoryScope.launch {
             appDatabase.messageDao().insertMessage(message.toMessageEntity(targetName = targetName))
         }
 
-        val directEndpointId = _connectedDevices.value.find { it.name == targetName }?.endpointId
+        val directEndpointId = _connectedDevices.value.find { NodeIdentity.matches(it.name, targetName) }?.endpointId
 
         if (isDirect && directEndpointId != null) {
             networkManager.sendDirectPayload(directEndpointId, payloadBytes)
         } else {
             if (directedRouteList.size > 1) {
                 val nextHopName = directedRouteList[1]
-                val nextHopEndpointId = _connectedDevices.value.find { it.name == nextHopName }?.endpointId
+                val nextHopEndpointId = _connectedDevices.value.find { NodeIdentity.matches(it.name, nextHopName) }?.endpointId
                 if (nextHopEndpointId != null) {
                     networkManager.sendDirectPayload(nextHopEndpointId, payloadBytes)
                 } else {

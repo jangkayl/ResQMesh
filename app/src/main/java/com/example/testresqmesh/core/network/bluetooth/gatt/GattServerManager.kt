@@ -3,6 +3,7 @@ package com.example.testresqmesh.core.network.bluetooth.gatt
 import android.bluetooth.*
 import android.content.Context
 import com.example.testresqmesh.core.model.ConnectedDevice
+import com.example.testresqmesh.core.model.NodeIdentity
 import com.example.testresqmesh.core.network.NativeBleManager
 import com.example.testresqmesh.core.utils.AppLogger
 import java.util.concurrent.ConcurrentLinkedQueue
@@ -21,7 +22,7 @@ class GattServerManager(
                 val macAddress = device.address
                 if (newState == BluetoothProfile.STATE_CONNECTED) {
                     val peerName = store.connectedEndpointNames[macAddress]
-                    if (peerName != null && store.blockedDevices[peerName] == true) {
+                    if (peerName != null && isDeviceBlocked(peerName)) {
                         AppLogger.d("BLE_MESH", "Server: Rejected blocked device ${peerName}.")
                         gattServer?.cancelConnection(device)
                         return
@@ -61,31 +62,45 @@ class GattServerManager(
                     store.chunkBuffers.putIfAbsent(macAddress, ByteArray(0))
                     store.connectionInteractionTimes.putIfAbsent(macAddress, System.currentTimeMillis())
                     
-                    val safePeerName = peerName ?: "Unknown Node"
+                    val safePeerName = peerName ?: NodeIdentity.UNKNOWN_NAME
                     store.connectedEndpointNames[macAddress] = safePeerName
                     
                     handler.postDelayed({
                         updateInvisibilityCloak()
                     }, 2000)
                     
-                    if (safePeerName == "Unknown Node") {
-                        AppLogger.d("BLE_MESH", "Server: Alien device connected. Waiting 5s for SYSTEM pulse handshake...")
+                    // A physical socket now exists, so publish it immediately. Previously the
+                    // connected event was withheld until a SYSTEM pulse revealed the peer name, which
+                    // left a live link missing from `connectedDevices`. The Radar then fell through to
+                    // its scanned-device branch and mislabelled the peer "Connected (Via Relay)".
+                    // Provisional links are surfaced to the UI but kept out of the routing tables.
+                    val isProvisional = NodeIdentity.isPlaceholder(safePeerName)
+                    handler.post {
+                        onDeviceConnected?.invoke(
+                            ConnectedDevice(
+                                endpointId = macAddress,
+                                name = safePeerName,
+                                isClassicConnected = true,
+                                isProvisional = isProvisional
+                            )
+                        )
+                    }
+
+                    if (isProvisional) {
+                        AppLogger.d("BLE_MESH", "Server: Alien device connected. Waiting ${NAME_HANDSHAKE_TIMEOUT_MS}ms for name handshake...")
                         handler.postDelayed({
-                            if (store.connectedEndpointNames[macAddress] == "Unknown Node") {
+                            if (NodeIdentity.isPlaceholder(store.connectedEndpointNames[macAddress])) {
                                 AppLogger.d("BLE_MESH", "Server: Handshake timeout! Alien device $macAddress kicked from Mesh.")
                                 gattServer?.cancelConnection(device)
                             }
-                        }, 5000)
-                    } else {
-                        handler.post {
-                            onDeviceConnected?.invoke(ConnectedDevice(macAddress, safePeerName, isClassicConnected = true))
-                        }
+                        }, NAME_HANDSHAKE_TIMEOUT_MS)
                     }
                 } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
                     AppLogger.d("BLE_MESH", "Server: Device ${macAddress} disconnected.")
                     store.activeServerConnections.remove(macAddress)
                     store.connectedEndpointIds.remove(macAddress)
                     store.connectedEndpointNames.remove(macAddress)
+                    store.endpointNodeIds.remove(macAddress)
                     handler.post {
                         onDeviceDisconnected?.invoke(macAddress)
                         sendSystemPulse()

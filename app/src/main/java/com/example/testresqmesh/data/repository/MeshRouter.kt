@@ -2,6 +2,7 @@ package com.example.testresqmesh.data.repository
 
 import com.example.testresqmesh.core.model.ConnectedDevice
 import com.example.testresqmesh.core.model.KnownNode
+import com.example.testresqmesh.core.model.NodeIdentity
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -22,14 +23,14 @@ class MeshRouter {
     val knownNodes: StateFlow<List<KnownNode>> = _knownNodes.asStateFlow()
 
     fun updateTopology(senderName: String, connectedNodes: List<String>, myNodeName: String) {
-        if (senderName == myNodeName || senderName == "Unknown Node") return
+        if (NodeIdentity.matches(senderName, myNodeName) || NodeIdentity.isPlaceholder(senderName)) return
 
         markNodeSeen(senderName)
 
         val currentTopology = _topology.value.toMutableMap()
         
-        // Filter out "Unknown Node" from the connectedNodes list to prevent ghost node pollution
-        val validNodes = connectedNodes.filter { it.isNotEmpty() && !it.contains("Unknown") }
+        // Filter out placeholder names to prevent ghost node pollution
+        val validNodes = connectedNodes.filter { !NodeIdentity.isPlaceholder(it) }
         
         validNodes.forEach { node ->
             if (node != myNodeName) {
@@ -64,18 +65,25 @@ class MeshRouter {
 
     fun recalculateKnownNodes(myNodeName: String, connectedDevices: List<ConnectedDevice>) {
         val newKnownNodes = mutableListOf<KnownNode>()
+
+        // Direct links are authoritative, but a provisional socket has not revealed its real name yet.
+        // Publishing it would inject an "Unknown Node" ghost into the routing table and the Radar.
         connectedDevices.forEach { device ->
+            if (device.isProvisional || NodeIdentity.isPlaceholder(device.name)) return@forEach
+            if (NodeIdentity.matches(device.name, myNodeName)) return@forEach
+            if (newKnownNodes.any { NodeIdentity.matches(it.name, device.name) }) return@forEach
             val lastSeen = lastSeenMap[device.name] ?: System.currentTimeMillis()
             newKnownNodes.add(KnownNode(device.name, isDirect = true, lastSeen = lastSeen))
         }
-        
+
         networkGraph.values.flatten().toSet().forEach { indirectNode ->
-            if (indirectNode != myNodeName && newKnownNodes.none { it.name == indirectNode }) {
-                val lastSeen = lastSeenMap[indirectNode] ?: System.currentTimeMillis()
-                newKnownNodes.add(KnownNode(indirectNode, isDirect = false, lastSeen = lastSeen))
-            }
+            if (NodeIdentity.isPlaceholder(indirectNode)) return@forEach
+            if (NodeIdentity.matches(indirectNode, myNodeName)) return@forEach
+            if (newKnownNodes.any { NodeIdentity.matches(it.name, indirectNode) }) return@forEach
+            val lastSeen = lastSeenMap[indirectNode] ?: System.currentTimeMillis()
+            newKnownNodes.add(KnownNode(indirectNode, isDirect = false, lastSeen = lastSeen))
         }
-        
+
         _knownNodes.value = newKnownNodes
     }
 

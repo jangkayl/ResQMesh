@@ -31,6 +31,8 @@ class BleStateStore {
     val endpointLastSeen = ConcurrentHashMap<String, Long>()
     val endpointFirstSeen = ConcurrentHashMap<String, Long>()
     val endpointLastScore = ConcurrentHashMap<String, String>()
+    /** MAC address -> stable node ID lifted from the peer's advertisement. */
+    val endpointNodeIds = ConcurrentHashMap<String, String>()
     val connectionEstablishTime = ConcurrentHashMap<String, Long>()
     val writeFailureCount = ConcurrentHashMap<String, Int>()
 

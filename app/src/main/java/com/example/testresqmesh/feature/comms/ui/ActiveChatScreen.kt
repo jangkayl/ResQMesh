@@ -119,7 +119,9 @@ fun ActiveChatScreen(
                             Text(displayName, fontWeight = FontWeight.Black, color = Color.White, fontSize = 20.sp)
                             Spacer(modifier = Modifier.width(12.dp))
                             
-                            val isDirect = uiState.knownNodes.find { it.name == displayName }?.isDirect ?: false
+                            val isDirect = uiState.knownNodes.find {
+                                com.example.testresqmesh.core.model.NodeIdentity.matches(it.name, displayName)
+                            }?.isDirect ?: false
                             
                             Surface(
                                 color = Color.White.copy(alpha = 0.05f),

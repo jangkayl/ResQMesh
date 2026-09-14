@@ -8,6 +8,7 @@ import android.os.Handler
 import android.os.Looper
 import android.os.ParcelUuid
 import com.example.testresqmesh.core.model.ConnectedDevice
+import com.example.testresqmesh.core.model.NodeIdentity
 import com.example.testresqmesh.core.utils.AppLogger
 import com.example.testresqmesh.core.utils.NotificationHelper
 import java.util.UUID
@@ -26,7 +27,7 @@ class NativeBleManager(val context: Context) {
     val store = com.example.testresqmesh.core.network.bluetooth.state.BleStateStore()
     var onDeviceConnected: ((ConnectedDevice) -> Unit)? = null
     var onDeviceDisconnected: ((String) -> Unit)? = null
-    var onDeviceScanned: ((String, String, Int, String, Boolean) -> Unit)? = null
+    var onDeviceScanned: ((com.example.testresqmesh.core.model.ScanEvent) -> Unit)? = null
     var onDeviceScanRemoved: ((String) -> Unit)? = null
     var onMessageReceived: ((String, String, String, String, Boolean, Boolean, String?, String?, Double?, Double?, String, List<String>, String) -> Unit)? = null
     var onMessageSeen: ((String, String) -> Unit)? = null
@@ -43,6 +44,12 @@ class NativeBleManager(val context: Context) {
 
     var myDeviceName: String = "ResQMesh_Node"
     val myHex = java.util.UUID.randomUUID().toString().substring(0, 4).uppercase()
+
+    /**
+     * Stable, persisted node ID (SharedPreferences `node_id`) supplied by [MeshRepository.startNode].
+     * Advertised as its own field so peer identity survives display-name truncation.
+     */
+    var myNodeId: String = ""
 
     val bluetoothManager = context.getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
     val bluetoothAdapter = bluetoothManager.adapter
@@ -67,11 +74,22 @@ class NativeBleManager(val context: Context) {
     val MAX_TOTAL_CONNECTIONS = 3 // MUST BE 3! If set to 1, it causes an infinite eviction loop.
     val MAX_CONNECTIONS = 4
 
+    /** Hard limit imposed by the BLE `0xFFFF` manufacturer data field. */
+    val MAX_ADVERT_PAYLOAD_BYTES = 26
+
+    /**
+     * How long an inbound server link may stay nameless before it is kicked. Raised from 5s because
+     * a peer whose first inbound payload was a relayed message (non-empty routePath, so auto-rename
+     * is intentionally skipped) could be dropped despite having a perfectly healthy socket.
+     */
+    val NAME_HANDSHAKE_TIMEOUT_MS = 10_000L
+
     val payloadDispatcherCallback = object : PayloadDispatcherCallback {
         override fun getMyDeviceName() = myDeviceName
         override fun getSeenMessageIds() = store.seenMessageIds
         override fun getEndpointMedium(endpointId: String) = "Persistent BLE Mesh"
-        override fun getConnectedEndpointIdByName(name: String) = store.connectedEndpointNames.entries.find { it.value == name }?.key
+        override fun getConnectedEndpointIdByName(name: String) =
+            store.connectedEndpointNames.entries.find { NodeIdentity.matches(it.value, name) }?.key
         override fun getStpNeighbors(): Set<String> {
             return this@NativeBleManager.stpNeighborsProvider?.invoke() ?: emptySet()
         }
@@ -99,7 +117,7 @@ class NativeBleManager(val context: Context) {
             }
         }
         override fun onSosCancelled() { this@NativeBleManager.onSosCancelled?.invoke() }
-        override fun isDeviceBlocked(deviceName: String) = store.blockedDevices[deviceName] == true
+        override fun isDeviceBlocked(deviceName: String) = this@NativeBleManager.isDeviceBlocked(deviceName)
         override fun onDeviceBlocked(deviceName: String) { this@NativeBleManager.onDeviceBlocked?.invoke(deviceName) }
         override fun onDeviceUnblocked(deviceName: String) { this@NativeBleManager.onDeviceUnblocked?.invoke(deviceName) }
         override fun showNotification(sender: String, text: String) { notificationHelper.showPrivateMessageNotification(sender, text) }
@@ -141,6 +159,7 @@ class NativeBleManager(val context: Context) {
                     store.connectedEndpointIds.remove(macAddress)
                     store.connectedEndpointNames.remove(macAddress)
                     store.endpointLastSeen.remove(macAddress)
+                    store.endpointNodeIds.remove(macAddress)
                     AppLogger.d("BLE_MESH", "Node Timed Out: ${macAddress}")
                     onDeviceDisconnected?.invoke(macAddress)
                     onDeviceScanRemoved?.invoke(macAddress)
@@ -188,7 +207,9 @@ class NativeBleManager(val context: Context) {
     fun sendSystemPulse() {
         if (!store.isNodeActive.get()) return
         try {
-            val connectedNodesList = store.connectedEndpointNames.values.filter { !it.contains("Unknown") && it.isNotEmpty() }.toList().sorted()
+            val connectedNodesList = store.connectedEndpointNames.values
+                .filter { !NodeIdentity.isPlaceholder(it) }
+                .toList().sorted()
             val currentHash = connectedNodesList.hashCode()
             val now = System.currentTimeMillis()
             
@@ -257,6 +278,7 @@ class NativeBleManager(val context: Context) {
         store.connectedEndpointNames.clear()
         store.endpointLastSeen.clear()
         store.endpointFirstSeen.clear()
+        store.endpointNodeIds.clear()
         instance = null
         onStatusChanged?.invoke("Offline")
     }
@@ -285,14 +307,25 @@ class NativeBleManager(val context: Context) {
             .setTimeout(0)
             .setTxPowerLevel(AdvertiseSettings.ADVERTISE_TX_POWER_HIGH)
             .build()
-            
+
         val totalConnections = store.activeConnections.size + store.activeServerConnections.size
         val electionScore = getElectionScore()
-        val combinedName = "$electionScore|$totalConnections|$myDeviceName"
-        var nameBytes = combinedName.toByteArray(Charsets.UTF_8)
-        if (nameBytes.size > 26) {
-            nameBytes = nameBytes.sliceArray(0 until 26)
+
+        // IDENTITY FIX: advertise the stable node ID as its own field. Previously the whole
+        // "score|connections|fullName" string was blindly cut at 26 bytes, which amputated the
+        // "[TAG]#NODE_ID" suffix on longer device names and left the mesh with no reliable way to
+        // tell two similarly named peers apart.
+        val nodeId = NodeIdentity.idOf(myDeviceName) ?: myNodeId.ifEmpty { myHex }
+        val prefix = "$electionScore|$totalConnections|$nodeId|"
+        val prefixBytes = prefix.toByteArray(Charsets.UTF_8)
+        val nameBudget = (MAX_ADVERT_PAYLOAD_BYTES - prefixBytes.size).coerceAtLeast(0)
+        val displayName = truncateToBytes(NodeIdentity.displayNameOf(myDeviceName), nameBudget)
+
+        var nameBytes = (prefix + displayName).toByteArray(Charsets.UTF_8)
+        if (nameBytes.size > MAX_ADVERT_PAYLOAD_BYTES) {
+            nameBytes = nameBytes.sliceArray(0 until MAX_ADVERT_PAYLOAD_BYTES)
         }
+
         val data = AdvertiseData.Builder()
             .setIncludeDeviceName(false)
             .addServiceUuid(ParcelUuid(SERVICE_UUID))
@@ -304,6 +337,22 @@ class NativeBleManager(val context: Context) {
             .build()
             
         bleAdvertiser?.startAdvertising(settings, data, scanResponse, advertiseCallback)
+    }
+
+    /**
+     * Truncates [value] so its UTF-8 encoding fits within [maxBytes], dropping whole characters so a
+     * multi-byte codepoint is never cut in half (which would corrupt the advertisement).
+     */
+    private fun truncateToBytes(value: String, maxBytes: Int): String {
+        if (maxBytes <= 0) return ""
+        if (value.toByteArray(Charsets.UTF_8).size <= maxBytes) return value
+        var end = value.length
+        while (end > 0) {
+            val candidate = value.substring(0, end)
+            if (candidate.toByteArray(Charsets.UTF_8).size <= maxBytes) return candidate
+            end--
+        }
+        return ""
     }
 
     val advertiseCallback = object : AdvertiseCallback() {}
@@ -332,26 +381,51 @@ class NativeBleManager(val context: Context) {
             if (manufacturerData == null) return
             
             val serviceDataStr = String(manufacturerData, Charsets.UTF_8).replace("\u0000", "").trim()
-            val parts = serviceDataStr.split("|", limit = 3)
-            
-            // STRICT FILTER: If the advertisement does not perfectly match the ResQMesh signature, ignore it completely!
-            if (parts.size != 3) {
-                AppLogger.d("BLE_MESH", "Scanner: Ignored alien device ${device.address}. Invalid signature: $serviceDataStr")
-                return
+            val parts = serviceDataStr.split("|")
+
+            // STRICT FILTER: If the advertisement does not match the ResQMesh signature, ignore it.
+            // Format is "score|connections|nodeId|displayName". Three-part advertisements are the
+            // legacy "score|connections|fullName" layout and are still accepted so a partially
+            // upgraded mesh keeps working.
+            val peerScore: String
+            val peerConnections: Int
+            val advertisedName: String
+            val advertisedNodeId: String
+            when {
+                parts.size >= 4 -> {
+                    peerScore = parts[0]
+                    peerConnections = parts[1].toIntOrNull() ?: -1
+                    advertisedNodeId = parts[2].trim().uppercase()
+                    advertisedName = parts.drop(3).joinToString("|")
+                }
+                parts.size == 3 -> {
+                    peerScore = parts[0]
+                    peerConnections = parts[1].toIntOrNull() ?: -1
+                    advertisedName = parts[2]
+                    advertisedNodeId = NodeIdentity.idOf(parts[2]).orEmpty()
+                }
+                else -> {
+                    AppLogger.d("BLE_MESH", "Scanner: Ignored alien device ${device.address}. Invalid signature: $serviceDataStr")
+                    return
+                }
             }
-            
-            val peerScore = parts[0]
-            val peerConnections = parts[1].toIntOrNull() ?: -1
-            val peerName = parts[2]
+
+            val peerName = if (advertisedNodeId.isNotEmpty()) {
+                NodeIdentity.compose(advertisedName, advertisedNodeId)
+            } else {
+                advertisedName.trim()
+            }
+            if (peerName.isEmpty()) return
             val macAddress = device.address
 
-            if (store.blockedDevices[peerName] == true) {
+            if (isDeviceBlocked(peerName)) {
                 return
             }
 
             // GHOST NODE EVICTION & DUAL-MAC SPLIT-BRAIN FIX:
             // Android uses different MACs for scanning (Central) vs advertising (Peripheral).
-            val oldMac = store.connectedEndpointNames.entries.find { it.value.contains(peerName.take(15)) || peerName.contains(it.value.take(15)) }?.key
+            val oldMac = store.connectedEndpointNames.entries
+                .find { NodeIdentity.matches(it.value, peerName) }?.key
             if (oldMac != null && oldMac != macAddress) {
                 val isOldMacPhysicallyConnected = store.activeConnections.containsKey(oldMac) || store.activeServerConnections.containsKey(oldMac)
                 
@@ -366,16 +440,20 @@ class NativeBleManager(val context: Context) {
                     store.connectedEndpointIds.remove(oldMac)
                     store.connectedEndpointNames.remove(oldMac)
                     store.endpointLastSeen.remove(oldMac)
+                    store.endpointNodeIds.remove(oldMac)
                     handler.post {
                         onDeviceDisconnected?.invoke(oldMac)
                     }
                 }
             }
 
-            if (peerName != myDeviceName && peerName != myDeviceName.take(26) && !peerName.contains(myDeviceName.take(15))) {
+            if (!NodeIdentity.matches(peerName, myDeviceName)) {
                 val now = System.currentTimeMillis()
                 store.endpointLastSeen[macAddress] = now
                 store.endpointLastScore[macAddress] = peerScore
+                if (advertisedNodeId.isNotEmpty()) {
+                    store.endpointNodeIds[macAddress] = advertisedNodeId
+                }
                 if (!store.endpointFirstSeen.containsKey(macAddress)) {
                     store.endpointFirstSeen[macAddress] = now
                 }
@@ -385,13 +463,22 @@ class NativeBleManager(val context: Context) {
                     store.connectedEndpointNames[macAddress] = peerName
                     
                     handler.post {
-                        onDeviceScanned?.invoke(macAddress, peerName, peerConnections, peerScore, false)
+                        onDeviceScanned?.invoke(
+                            com.example.testresqmesh.core.model.ScanEvent(
+                                endpointId = macAddress,
+                                name = peerName,
+                                nodeId = advertisedNodeId,
+                                peerConnections = peerConnections,
+                                peerScore = peerScore,
+                                isConnecting = false
+                            )
+                        )
                         sendSystemPulse()
                     }
                 }
 
-                val isClient = store.activeConnections.keys.any { store.connectedEndpointNames[it]?.contains(peerName.take(15)) == true || peerName.contains(store.connectedEndpointNames[it]?.take(15) ?: "") }
-                val isServer = store.activeServerConnections.keys.any { store.connectedEndpointNames[it]?.contains(peerName.take(15)) == true || peerName.contains(store.connectedEndpointNames[it]?.take(15) ?: "") }
+                val isClient = store.activeConnections.keys.any { NodeIdentity.matches(store.connectedEndpointNames[it], peerName) }
+                val isServer = store.activeServerConnections.keys.any { NodeIdentity.matches(store.connectedEndpointNames[it], peerName) }
                 val isAlreadyConnected = isClient || isServer || store.activeConnections.containsKey(macAddress) || store.activeServerConnections.containsKey(macAddress)
                 val hasIndirectRoute = checkRouteExists?.invoke(peerName) == true
 
@@ -600,15 +687,25 @@ class NativeBleManager(val context: Context) {
         try {
             val payload = kotlinx.serialization.protobuf.ProtoBuf.decodeFromByteArray(com.example.testresqmesh.core.network.MeshPayload.serializer(), payloadBytes)
             
-            // Only auto-rename the physical socket if this is a direct message (not relayed)
+            // Only auto-rename the physical socket if this is a direct message (not relayed).
+            // Relayed payloads carry a non-empty routePath; renaming from those would map a remote
+            // node onto a local socket and corrupt the routing table.
             if (payload.routePath.isEmpty() && payload.senderName.isNotEmpty()) {
                 val oldName = store.connectedEndpointNames[endpointId]
-                if (oldName == null || oldName.contains("Unknown")) {
+                if (NodeIdentity.isPlaceholder(oldName) || !NodeIdentity.matches(oldName, payload.senderName)) {
                     AppLogger.d("BLE_MESH", "Auto-rename: $endpointId is now ${payload.senderName}")
                     store.connectedEndpointNames[endpointId] = payload.senderName
+                    NodeIdentity.idOf(payload.senderName)?.let { store.endpointNodeIds[endpointId] = it }
                     handler.post {
                         val isDirectlyConnected = store.activeConnections.containsKey(endpointId) || store.activeServerConnections.containsKey(endpointId)
-                        onDeviceConnected?.invoke(com.example.testresqmesh.core.model.ConnectedDevice(endpointId, payload.senderName, isDirectlyConnected))
+                        onDeviceConnected?.invoke(
+                            com.example.testresqmesh.core.model.ConnectedDevice(
+                                endpointId = endpointId,
+                                name = payload.senderName,
+                                isClassicConnected = isDirectlyConnected,
+                                isProvisional = false
+                            )
+                        )
                         sendSystemPulse()
                     }
                 }
@@ -733,6 +830,7 @@ class NativeBleManager(val context: Context) {
         store.chunkBuffers.remove(macAddress)
         store.connectedEndpointIds.remove(macAddress)
         store.connectedEndpointNames.remove(macAddress)
+        store.endpointNodeIds.remove(macAddress)
         
         handler.post {
             onDeviceDisconnected?.invoke(macAddress)
@@ -760,9 +858,10 @@ class NativeBleManager(val context: Context) {
     }
     
     fun blockDevice(deviceName: String, sendNotification: Boolean = true) {
-        store.blockedDevices[deviceName] = true
+        store.blockedDevices[NodeIdentity.key(deviceName)] = true
         // Find and disconnect if currently connected
-        val macAddress = store.connectedEndpointNames.entries.find { it.value == deviceName }?.key
+        val macAddress = store.connectedEndpointNames.entries
+            .find { NodeIdentity.matches(it.value, deviceName) }?.key
         if (macAddress != null) {
             disconnectFromEndpoint(macAddress)
             store.connectedEndpointIds.remove(macAddress)
@@ -773,10 +872,24 @@ class NativeBleManager(val context: Context) {
             }
         }
     }
-    fun isDeviceBlocked(deviceName: String): Boolean = store.blockedDevices[deviceName] == true
+
+    /**
+     * Blocked devices are keyed by [NodeIdentity.key] rather than the raw display name. The UI blocks
+     * using the fully qualified name while the scanner only ever sees a truncated advertisement, so
+     * the previous raw-name map lookup never matched and blocked peers kept reappearing in scans.
+     */
+    fun isDeviceBlocked(deviceName: String): Boolean {
+        if (store.blockedDevices[NodeIdentity.key(deviceName)] == true) return true
+        return store.blockedDevices.keys.any { key ->
+            store.blockedDevices[key] == true && NodeIdentity.matches(key, deviceName)
+        }
+    }
     
     fun unblockDevice(deviceName: String) {
-        store.blockedDevices.remove(deviceName)
+        store.blockedDevices.remove(NodeIdentity.key(deviceName))
+        store.blockedDevices.keys
+            .filter { NodeIdentity.matches(it, deviceName) }
+            .forEach { store.blockedDevices.remove(it) }
     }
     
     fun rescan() {
