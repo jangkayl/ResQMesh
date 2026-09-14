@@ -29,7 +29,7 @@ class MeshRouter {
         val currentTopology = _topology.value.toMutableMap()
         
         // Filter out "Unknown Node" from the connectedNodes list to prevent ghost node pollution
-        val validNodes = connectedNodes.filter { it != "Unknown Node" }
+        val validNodes = connectedNodes.filter { it.isNotEmpty() && !it.contains("Unknown") }
         
         validNodes.forEach { node ->
             if (node != myNodeName) {

@@ -157,14 +157,8 @@ fun WalkieTalkieScreen(
                                 if (isRecording) {
                                     isRecording = false
                                     if (isLiveMode) {
-                                        val audioBase64 = walkieTalkieViewModel.stopLiveAudio()
-                                        if (audioBase64 != null) {
-                                            commsViewModel.sendPublicMessage(
-                                                text = "Live Stream Archive",
-                                                imageBase64 = null,
-                                                audioBase64 = audioBase64
-                                            )
-                                        }
+                                        walkieTalkieViewModel.stopLiveAudio()
+                                        // Removed Live Stream Archive backup to prevent chat clutter
                                     } else {
                                         val audioBase64 = mediaHelper.stopRecording()
                                         if (audioBase64 != null) {

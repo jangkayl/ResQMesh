@@ -55,7 +55,7 @@ fun RadarScreen(viewModel: RadarViewModel) {
     
     // 2. Map scanned nodes (and use topology to determine if they are indirect hops)
     val scannedNodes = uiState.scannedDevices
-        .filter { it.name !in connectedNames }
+        .filter { scanned -> connectedNames.none { it.contains(scanned.name.take(15)) || scanned.name.contains(it.take(15)) } }
         .distinctBy { it.name }
         .map {
             // Check if this node exists in the Mesh Routing Topology
@@ -82,7 +82,7 @@ fun RadarScreen(viewModel: RadarViewModel) {
     val scannedAndConnectedNames = connectedNames + scannedNodes.map { it.name }
     
     val offlineBlockedNodes = uiState.blockedDeviceNames
-        .filter { it !in scannedAndConnectedNames }
+        .filter { blockedName -> scannedAndConnectedNames.none { it.contains(blockedName.take(15)) || blockedName.contains(it.take(15)) } }
         .map { name ->
             NodeItemData(
                 endpointId = "",
@@ -95,7 +95,10 @@ fun RadarScreen(viewModel: RadarViewModel) {
         }
 
     val hoppedNodes = uiState.knownNodes
-        .filter { it.name !in scannedAndConnectedNames && !uiState.blockedDeviceNames.contains(it.name) }
+        .filter { knownNode -> 
+            scannedAndConnectedNames.none { it.contains(knownNode.name.take(15)) || knownNode.name.contains(it.take(15)) } && 
+            !uiState.blockedDeviceNames.contains(knownNode.name) 
+        }
         .map { node ->
             NodeItemData(
                 endpointId = "",
@@ -405,14 +408,14 @@ fun NearbyNodeItem(
                     )
                 }
             } else {
-                IconButton(onClick = { onBlock(node.name) }) {
-                    Icon(
-                        imageVector = Icons.Default.Block,
-                        contentDescription = "Block Device",
-                        tint = Color.Gray
-                    )
-                }
-                if (node.endpointId.isNotEmpty()) {
+                if (node.endpointId.isNotEmpty() && !node.status.contains("Hopped", ignoreCase = true)) {
+                    IconButton(onClick = { onBlock(node.name) }) {
+                        Icon(
+                            imageVector = Icons.Default.Block,
+                            contentDescription = "Block Device",
+                            tint = Color.Gray
+                        )
+                    }
                     TextButton(
                         onClick = { onForceConnect(node.endpointId, node.name) },
                         colors = ButtonDefaults.textButtonColors(contentColor = InboxAccentBlue)

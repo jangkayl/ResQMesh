@@ -109,7 +109,7 @@ class MeshRepository(
                 }
             } else {
                 updatedList = updatedList + device
-                _scannedDevices.value = _scannedDevices.value.filter { it.endpointId != device.endpointId }
+                _scannedDevices.value = _scannedDevices.value.filter { it.endpointId != device.endpointId && !it.name.contains(device.name.take(15)) && !device.name.contains(it.name.take(15)) }
                 
                 meshRouter.markNodeSeen(device.name)
                 meshRouter.recalculateKnownNodes(myNodeName, updatedList)
@@ -147,12 +147,14 @@ class MeshRepository(
         }
 
         networkManager.checkRouteExists = { targetName ->
-            meshRouter.knownNodes.value.any { it.name == targetName }
+            meshRouter.knownNodes.value.any { it.name.contains(targetName.take(15)) || targetName.contains(it.name.take(15)) }
         }
 
         networkManager.onDeviceScanned = { id, name, score, role, isConnecting ->
             if (name != myNodeName && name != myNodeName.take(20)) {
-                val isNotConnected = _connectedDevices.value.none { it.endpointId == id || it.name == name }
+                val isNotConnected = _connectedDevices.value.none { 
+                    it.endpointId == id || it.name.contains(name.take(15)) || name.contains(it.name.take(15))
+                }
                 
                 if (isNotConnected) {
                     val currentScanned = _scannedDevices.value.toMutableList()
@@ -187,7 +189,7 @@ class MeshRepository(
         }
 
         networkManager.onLiveAudioChunk = { sender, channelId, chunk ->
-            if (channelId == _currentChannelId.value) {
+            if (channelId == _currentChannelId.value && !networkManager.isDeviceBlocked(sender)) {
                 repositoryScope.launch {
                     incomingLiveAudioChunk.emit(Pair(sender, chunk))
                 }
@@ -199,7 +201,7 @@ class MeshRepository(
                 meshRouter.markNodeSeen(sender)
                 meshRouter.recalculateKnownNodes(myNodeName, _connectedDevices.value)
 
-                if (!isSystem && (isPrivate || channelId == _currentChannelId.value)) {
+                if (!isSystem && (isPrivate || channelId == _currentChannelId.value) && !networkManager.isDeviceBlocked(sender)) {
                     val isDirect = _connectedDevices.value.any { it.name == sender }
                     val message = ChatMessage(
                         id = msgId,

@@ -1,137 +1,71 @@
 package com.example.testresqmesh.core.utils
 
-import android.media.MediaCodec
-import android.media.MediaCodecInfo
-import android.media.MediaFormat
-import android.os.Build
-
+/**
+ * Ultra-low latency G.711 u-law codec.
+ * Completely bypasses Android MediaCodec, eliminating all CSD header bugs,
+ * Xiaomi/Samsung crashes, and state synchronization issues.
+ * Compresses 16-bit PCM to 8-bit u-law (50% compression), easily fitting in BLE bandwidth.
+ */
 class VoiceCodec {
-    private var encoder: MediaCodec? = null
-    private var decoder: MediaCodec? = null
-    
     private var isEncoderStarted = false
     private var isDecoderStarted = false
 
-    fun startEncoder() {
-        try {
-            // Use OPUS on Android 10+, fallback to AAC-LC on older devices
-            val mime = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) MediaFormat.MIMETYPE_AUDIO_OPUS else MediaFormat.MIMETYPE_AUDIO_AAC
-            
-            val format = MediaFormat.createAudioFormat(mime, 16000, 1)
-            format.setInteger(MediaFormat.KEY_BIT_RATE, 16000) // 16 kbps!
-            
-            if (mime == MediaFormat.MIMETYPE_AUDIO_AAC) {
-                format.setInteger(MediaFormat.KEY_AAC_PROFILE, MediaCodecInfo.CodecProfileLevel.AACObjectLC)
-            }
-
-            encoder = MediaCodec.createEncoderByType(mime)
-            encoder?.configure(format, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE)
-            encoder?.start()
-            isEncoderStarted = true
-        } catch (e: Exception) {
-            AppLogger.d("VoiceCodec", "Encoder failed to start: ${e.message}")
-        }
-    }
+    fun startEncoder() { isEncoderStarted = true }
+    fun stopEncoder() { isEncoderStarted = false }
+    
+    fun startDecoder() { isDecoderStarted = true }
+    fun stopDecoder() { isDecoderStarted = false }
 
     fun encodeChunk(pcmData: ByteArray): ByteArray? {
-        if (!isEncoderStarted) return null
-        val enc = encoder ?: return null
-        
-        try {
-            val inputIndex = enc.dequeueInputBuffer(10000)
-            if (inputIndex >= 0) {
-                val inputBuffer = enc.getInputBuffer(inputIndex)
-                inputBuffer?.clear()
-                inputBuffer?.put(pcmData)
-                enc.queueInputBuffer(inputIndex, 0, pcmData.size, System.nanoTime() / 1000, 0)
-            }
-
-            val bufferInfo = MediaCodec.BufferInfo()
-            var outputIndex = enc.dequeueOutputBuffer(bufferInfo, 10000)
-            val stream = java.io.ByteArrayOutputStream()
-            
-            while (outputIndex >= 0) {
-                val outputBuffer = enc.getOutputBuffer(outputIndex)
-                if (outputBuffer != null && bufferInfo.size > 0) {
-                    val outData = ByteArray(bufferInfo.size)
-                    outputBuffer.get(outData)
-                    stream.write(outData)
-                }
-                enc.releaseOutputBuffer(outputIndex, false)
-                outputIndex = enc.dequeueOutputBuffer(bufferInfo, 0)
-            }
-            
-            val finalData = stream.toByteArray()
-            if (finalData.isNotEmpty()) return finalData
-            return null
-        } catch (e: Exception) {
-            AppLogger.d("VoiceCodec", "Encode error: ${e.message}")
+        if (!isEncoderStarted || pcmData.isEmpty()) return null
+        val out = ByteArray(pcmData.size / 2)
+        var outIdx = 0
+        for (i in 0 until pcmData.size - 1 step 2) {
+            val low = pcmData[i].toInt() and 0xFF
+            val high = pcmData[i + 1].toInt() shl 8
+            val pcm = (low or high).toShort()
+            out[outIdx++] = linearToUlaw(pcm)
         }
-        return null
-    }
-
-    fun startDecoder() {
-        try {
-            val mime = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) MediaFormat.MIMETYPE_AUDIO_OPUS else MediaFormat.MIMETYPE_AUDIO_AAC
-            val format = MediaFormat.createAudioFormat(mime, 16000, 1)
-            decoder = MediaCodec.createDecoderByType(mime)
-            decoder?.configure(format, null, null, 0)
-            decoder?.start()
-            isDecoderStarted = true
-        } catch (e: Exception) {
-            AppLogger.d("VoiceCodec", "Decoder failed to start: ${e.message}")
-        }
+        return out
     }
 
     fun decodeChunk(encodedData: ByteArray): ByteArray? {
-        if (!isDecoderStarted) return null
-        val dec = decoder ?: return null
-        
-        try {
-            val inputIndex = dec.dequeueInputBuffer(10000)
-            if (inputIndex >= 0) {
-                val inputBuffer = dec.getInputBuffer(inputIndex)
-                inputBuffer?.clear()
-                inputBuffer?.put(encodedData)
-                dec.queueInputBuffer(inputIndex, 0, encodedData.size, System.nanoTime() / 1000, 0)
-            }
-
-            val bufferInfo = MediaCodec.BufferInfo()
-            var outputIndex = dec.dequeueOutputBuffer(bufferInfo, 10000)
-            val stream = java.io.ByteArrayOutputStream()
-            
-            while (outputIndex >= 0) {
-                val outputBuffer = dec.getOutputBuffer(outputIndex)
-                if (outputBuffer != null && bufferInfo.size > 0) {
-                    val outData = ByteArray(bufferInfo.size)
-                    outputBuffer.get(outData)
-                    stream.write(outData)
-                }
-                dec.releaseOutputBuffer(outputIndex, false)
-                outputIndex = dec.dequeueOutputBuffer(bufferInfo, 0)
-            }
-            
-            val finalData = stream.toByteArray()
-            if (finalData.isNotEmpty()) return finalData
-            return null
-        } catch (e: Exception) {
-            AppLogger.d("VoiceCodec", "Decode error: ${e.message}")
+        if (!isDecoderStarted || encodedData.isEmpty()) return null
+        val out = ByteArray(encodedData.size * 2)
+        var outIdx = 0
+        for (i in encodedData.indices) {
+            val pcm = ulawToLinear(encodedData[i])
+            out[outIdx++] = (pcm.toInt() and 0xFF).toByte()
+            out[outIdx++] = ((pcm.toInt() shr 8) and 0xFF).toByte()
         }
-        return null
+        return out
     }
 
-    fun stop() {
-        try {
-            if (isEncoderStarted) {
-                encoder?.stop()
-                encoder?.release()
-                isEncoderStarted = false
+    private fun linearToUlaw(pcm: Short): Byte {
+        val sign = if (pcm < 0) 0x80 else 0
+        var mag = if (pcm < 0) -pcm else pcm.toInt()
+        mag = mag + 132
+        if (mag > 32767) mag = 32767
+        var exp = 7
+        for (i in 7 downTo 0) {
+            if ((mag and (0x100 shl i)) != 0) {
+                exp = i + 1
+                break
             }
-            if (isDecoderStarted) {
-                decoder?.stop()
-                decoder?.release()
-                isDecoderStarted = false
-            }
-        } catch (e: Exception) {}
+        }
+        val mantissa = (mag shr (exp + 3)) and 0x0F
+        val ulaw = (sign or (exp shl 4) or mantissa).inv()
+        return ulaw.toByte()
+    }
+
+    private fun ulawToLinear(ulaw: Byte): Short {
+        val ulawInv = ulaw.toInt().inv()
+        val sign = if ((ulawInv and 0x80) != 0) -1 else 1
+        val exp = (ulawInv shr 4) and 0x07
+        val mantissa = ulawInv and 0x0F
+        var mag = (mantissa shl 3) + 132
+        mag = mag shl exp
+        mag -= 132
+        return (sign * mag).toShort()
     }
 }

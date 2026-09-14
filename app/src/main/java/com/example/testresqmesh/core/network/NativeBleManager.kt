@@ -188,7 +188,7 @@ class NativeBleManager(val context: Context) {
     fun sendSystemPulse() {
         if (!store.isNodeActive.get()) return
         try {
-            val connectedNodesList = store.connectedEndpointNames.values.toList().sorted()
+            val connectedNodesList = store.connectedEndpointNames.values.filter { !it.contains("Unknown") && it.isNotEmpty() }.toList().sorted()
             val currentHash = connectedNodesList.hashCode()
             val now = System.currentTimeMillis()
             
@@ -351,7 +351,7 @@ class NativeBleManager(val context: Context) {
 
             // GHOST NODE EVICTION & DUAL-MAC SPLIT-BRAIN FIX:
             // Android uses different MACs for scanning (Central) vs advertising (Peripheral).
-            val oldMac = store.connectedEndpointNames.entries.find { it.value == peerName }?.key
+            val oldMac = store.connectedEndpointNames.entries.find { it.value.contains(peerName.take(15)) || peerName.contains(it.value.take(15)) }?.key
             if (oldMac != null && oldMac != macAddress) {
                 val isOldMacPhysicallyConnected = store.activeConnections.containsKey(oldMac) || store.activeServerConnections.containsKey(oldMac)
                 
@@ -372,7 +372,7 @@ class NativeBleManager(val context: Context) {
                 }
             }
 
-            if (peerName != myDeviceName && peerName != myDeviceName.take(26)) {
+            if (peerName != myDeviceName && peerName != myDeviceName.take(26) && !peerName.contains(myDeviceName.take(15))) {
                 val now = System.currentTimeMillis()
                 store.endpointLastSeen[macAddress] = now
                 store.endpointLastScore[macAddress] = peerScore
@@ -390,8 +390,8 @@ class NativeBleManager(val context: Context) {
                     }
                 }
 
-                val isClient = store.activeConnections.keys.any { store.connectedEndpointNames[it] == peerName }
-                val isServer = store.activeServerConnections.keys.any { store.connectedEndpointNames[it] == peerName }
+                val isClient = store.activeConnections.keys.any { store.connectedEndpointNames[it]?.contains(peerName.take(15)) == true || peerName.contains(store.connectedEndpointNames[it]?.take(15) ?: "") }
+                val isServer = store.activeServerConnections.keys.any { store.connectedEndpointNames[it]?.contains(peerName.take(15)) == true || peerName.contains(store.connectedEndpointNames[it]?.take(15) ?: "") }
                 val isAlreadyConnected = isClient || isServer || store.activeConnections.containsKey(macAddress) || store.activeServerConnections.containsKey(macAddress)
                 val hasIndirectRoute = checkRouteExists?.invoke(peerName) == true
 
@@ -600,8 +600,8 @@ class NativeBleManager(val context: Context) {
         try {
             val payload = kotlinx.serialization.protobuf.ProtoBuf.decodeFromByteArray(com.example.testresqmesh.core.network.MeshPayload.serializer(), payloadBytes)
             
-            // Only auto-rename the physical socket if this is a direct SYSTEM pulse (not relayed)
-            if (payload.type == "SYSTEM" && payload.routePath.isEmpty() && payload.senderName.isNotEmpty()) {
+            // Only auto-rename the physical socket if this is a direct message (not relayed)
+            if (payload.routePath.isEmpty() && payload.senderName.isNotEmpty()) {
                 val oldName = store.connectedEndpointNames[endpointId]
                 if (oldName == null || oldName.contains("Unknown")) {
                     AppLogger.d("BLE_MESH", "Auto-rename: $endpointId is now ${payload.senderName}")
@@ -741,10 +741,22 @@ class NativeBleManager(val context: Context) {
     }
 
     fun disconnectFromEndpoint(endpointId: String) {
-        store.activeConnections[endpointId]?.disconnect()
-        store.activeServerConnections[endpointId]?.let { device ->
-            gattServer?.cancelConnection(device)
+        val gatt = store.activeConnections.remove(endpointId)
+        try {
+            gatt?.disconnect()
+            gatt?.close()
+        } catch (e: Exception) {}
+
+        store.activeServerConnections.remove(endpointId)?.let { device ->
+            try {
+                gattServer?.cancelConnection(device)
+            } catch (e: Exception) {}
         }
+
+        val l2cap = store.activeL2capSockets.remove(endpointId)
+        try {
+            l2cap?.close()
+        } catch (e: Exception) {}
     }
     
     fun blockDevice(deviceName: String, sendNotification: Boolean = true) {
@@ -761,6 +773,8 @@ class NativeBleManager(val context: Context) {
             }
         }
     }
+    fun isDeviceBlocked(deviceName: String): Boolean = store.blockedDevices[deviceName] == true
+    
     fun unblockDevice(deviceName: String) {
         store.blockedDevices.remove(deviceName)
     }

@@ -80,7 +80,7 @@ class LiveAudioEngine(
         audioRecord?.stop()
         audioRecord?.release()
         audioRecord = null
-        voiceCodec.stop()
+        voiceCodec.stopEncoder()
 
         val pcmData = archiveStream?.toByteArray()
         archiveStream?.close()
@@ -162,8 +162,8 @@ class LiveAudioEngine(
                             jitterBuffer.offer(Pair(sender, pcmChunk))
                         }
                         
-                        // Wait until we have 20 chunks (~600ms) before starting to play to completely eliminate choppiness
-                        if (isBuffering && jitterBuffer.size >= 20) {
+                        // Wait until we have 4 chunks (~120ms) before starting to play to minimize delay
+                        if (isBuffering && jitterBuffer.size >= 4) {
                             isBuffering = false
                             audioTrack?.play()
                         }
@@ -199,6 +199,6 @@ class LiveAudioEngine(
         audioTrack?.stop()
         audioTrack?.release()
         audioTrack = null
-        voiceCodec.stop()
+        voiceCodec.stopDecoder()
     }
 }
