@@ -52,7 +52,7 @@ fun RadarScreen(viewModel: RadarViewModel) {
     }
 
     val nodes = remember(uiState) { classifyRadarNodes(uiState) }
-    val activeNodesCount = remember(nodes) { nodes.count { it.kind != NodeKind.BLOCKED_OFFLINE } }
+    val activeNodesCount = remember(nodes) { nodes.count { it.kind == NodeKind.DIRECT } }
     val directNodeNames = remember(nodes) { nodes.filter { it.kind == NodeKind.DIRECT }.map { it.name } }
 
     RadarScreenContent(
@@ -98,9 +98,10 @@ internal fun classifyRadarNodes(state: RadarUiState): List<NodeItemData> {
 
     // 1. Physical direct links. Authoritative: a socket either exists or it does not.
     val directNodes = state.connectedDevices
+        .sortedByDescending { it.isPayloadReady }
         .distinctBy { NodeIdentity.key(it.name).ifEmpty { it.endpointId } }
         .map { device ->
-            val handshaking = device.isProvisional || NodeIdentity.isPlaceholder(device.name)
+            val handshaking = !device.isPayloadReady || device.isProvisional || NodeIdentity.isPlaceholder(device.name)
             if (handshaking) {
                 NodeItemData(
                     endpointId = device.endpointId,
@@ -111,12 +112,22 @@ internal fun classifyRadarNodes(state: RadarUiState): List<NodeItemData> {
                     isConnected = true,
                     isActiveRelay = false
                 )
+            } else if (!device.isPeerResponsive) {
+                NodeItemData(
+                    endpointId = device.endpointId,
+                    name = device.name,
+                    label = label(device.name),
+                    status = "No response (checking connection)",
+                    kind = NodeKind.UNRESPONSIVE,
+                    isConnected = true,
+                    isBlocked = blockedNameFor(device.name) != null
+                )
             } else {
                 NodeItemData(
                     endpointId = device.endpointId,
                     name = device.name,
                     label = label(device.name),
-                    status = "Connected (Direct)",
+                    status = "ONLINE (Direct)",
                     kind = NodeKind.DIRECT,
                     isConnected = true,
                     isActiveRelay = true,
@@ -128,9 +139,24 @@ internal fun classifyRadarNodes(state: RadarUiState): List<NodeItemData> {
     fun isDirectPeer(name: String): Boolean =
         directNodes.any { NodeIdentity.matches(it.name, name) }
 
+    // Node IDs of every peer we hold a socket to, including still-provisional links whose
+    // placeholder name matches nothing. Without this a connected-but-unnamed peer kept its
+    // discovery row and the Radar showed "Discovered / Scanning..." for a live connection.
+    val linkedNodeIds = state.connectedDevices
+        .mapNotNull { device -> device.nodeId.ifEmpty { NodeIdentity.idOf(device.name).orEmpty() }.ifEmpty { null } }
+        .toSet()
+
+    fun isLinkedById(nodeId: String, name: String): Boolean {
+        val id = nodeId.ifEmpty { NodeIdentity.idOf(name).orEmpty() }
+        return id.isNotEmpty() && linkedNodeIds.contains(id)
+    }
+
     // 2. Nodes the router says are reachable only through the mesh.
     val indirectNodes = state.knownNodes
-        .filter { !it.isDirect && !NodeIdentity.isPlaceholder(it.name) && !isDirectPeer(it.name) }
+        .filter {
+            !it.isDirect && !NodeIdentity.isPlaceholder(it.name) &&
+                !isDirectPeer(it.name) && !isLinkedById("", it.name)
+        }
         .distinctBy { NodeIdentity.key(it.name) }
         .map { node ->
             // Still advertising nearby -> it is a relay peer in radio range.
@@ -154,7 +180,10 @@ internal fun classifyRadarNodes(state: RadarUiState): List<NodeItemData> {
 
     // 3. Everything else we can physically see but have not linked or routed.
     val discoveredNodes = state.scannedDevices
-        .filter { !isDirectPeer(it.name) && !isRouted(it.name) && !NodeIdentity.isPlaceholder(it.name) }
+        .filter {
+            !isDirectPeer(it.name) && !isRouted(it.name) &&
+                !NodeIdentity.isPlaceholder(it.name) && !isLinkedById(it.nodeId, it.name)
+        }
         .distinctBy { NodeIdentity.key(it.name) }
         .map { scanned ->
             NodeItemData(
@@ -169,8 +198,26 @@ internal fun classifyRadarNodes(state: RadarUiState): List<NodeItemData> {
             )
         }
 
-    // 4. Blocked nodes that are entirely out of range, so the user can still unblock them.
-    val visible = directNodes + indirectNodes + discoveredNodes
+    // 4. Keep a recently disconnected peer visible briefly so its status says OFFLINE.
+    val offlineNodes = state.recentOfflineDevices
+        .filter { device ->
+            !isDirectPeer(device.name) && !isRouted(device.name) &&
+                state.scannedDevices.none { NodeIdentity.matches(it.name, device.name) }
+        }
+        .distinctBy { NodeIdentity.key(it.name) }
+        .map { device ->
+            NodeItemData(
+                endpointId = "",
+                name = device.name,
+                label = label(device.name),
+                status = "OFFLINE",
+                kind = NodeKind.OFFLINE,
+                isBlocked = blockedNameFor(device.name) != null
+            )
+        }
+
+    // 5. Blocked nodes that are entirely out of range, so the user can still unblock them.
+    val visible = directNodes + indirectNodes + discoveredNodes + offlineNodes
     val offlineBlockedNodes = state.blockedDeviceNames
         .filter { blockedName -> visible.none { NodeIdentity.matches(it.name, blockedName) } }
         .map { name ->
@@ -491,7 +538,7 @@ fun NearbyNodeItem(
                 // Only a real physical link owns a valid endpointId to tear down. Relay and hopped
                 // nodes previously showed this button too, but their endpointId was the peer's
                 // advertising MAC, so the disconnect silently hit the wrong endpoint.
-                node.kind == NodeKind.DIRECT -> {
+                node.kind == NodeKind.DIRECT || node.kind == NodeKind.UNRESPONSIVE -> {
                     IconButton(onClick = { onBlock(node.name) }) {
                         Icon(Icons.Default.Block, contentDescription = "Block Device", tint = Color.Gray)
                     }
@@ -540,6 +587,8 @@ fun NearbyNodeItem(
 enum class NodeKind {
     /** A live physical socket with a confirmed name. */
     DIRECT,
+    /** CCCD is ready, but two expected peer heartbeats have not arrived. */
+    UNRESPONSIVE,
     /** A live physical socket that has not completed the name handshake yet. */
     HANDSHAKING,
     /** Reachable only through the mesh, but still advertising within radio range. */
@@ -550,6 +599,8 @@ enum class NodeKind {
     DISCOVERED,
     /** Advertising nearby with an outbound connection attempt in flight. */
     SYNCING,
+    /** A direct link ended recently and the peer is no longer advertising nearby. */
+    OFFLINE,
     /** Blocked and not currently visible anywhere in the mesh. */
     BLOCKED_OFFLINE
 }

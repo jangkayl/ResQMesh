@@ -37,6 +37,9 @@ class MeshRepository(
 
     private val _connectedDevices = MutableStateFlow<List<ConnectedDevice>>(emptyList())
     val connectedDevices = _connectedDevices.asStateFlow()
+    private fun readyConnectedDevices(): List<ConnectedDevice> = _connectedDevices.value.filter {
+        it.isPayloadReady && !NodeIdentity.isPlaceholder(it.name)
+    }
 
     private val _scannedDevices = MutableStateFlow<List<ScannedDevice>>(emptyList())
     val scannedDevices: StateFlow<List<ScannedDevice>> = _scannedDevices.asStateFlow()
@@ -73,43 +76,102 @@ class MeshRepository(
     val isOnline = _isOnline.asStateFlow()
 
     private var myNodeName: String = ""
-    private val publicKeys = mutableMapOf<String, String>()
+    private val publicKeys = PeerPublicKeyCache()
 
     init {
         setupCallbacks()
-        meshRouter.startTopologyCleanup(repositoryScope, { myNodeName }, { _connectedDevices.value })
+        meshRouter.startTopologyCleanup(repositoryScope, { myNodeName }, { readyConnectedDevices() })
     }
 
-    private fun setupCallbacks() {
-        networkManager.onStatusChanged = { status ->
+    /**
+     * Identity comparison for two links. Falls back to the stable node ID so a provisional socket
+     * (whose name is still a placeholder, and which therefore matches nothing by name) is still
+     * recognised as the same peer.
+     */
+    private fun sameNode(a: ConnectedDevice, b: ConnectedDevice): Boolean {
+        if (a.nodeId.isNotEmpty() && b.nodeId.isNotEmpty()) return a.nodeId == b.nodeId
+        return NodeIdentity.matches(a.name, b.name)
+    }
+
+    private fun setupCallbacks() {        networkManager.onStatusChanged = { status ->
             _connectionStatus.value = status
         }
 
         networkManager.onDeviceConnected = { device ->
-            // Deduplicate by BOTH endpointId and identity to prevent Ghost Sockets (Zombie MACs)
             val existingById = _connectedDevices.value.find { it.endpointId == device.endpointId }
             val existingByIdentity = _connectedDevices.value.find {
-                it.endpointId != device.endpointId && NodeIdentity.matches(it.name, device.name)
+                it.endpointId != device.endpointId && sameNode(it, device)
+            }
+            val existingIsReady = existingByIdentity?.let { networkManager.hasReadyEndpoint(it.endpointId) } ?: false
+            if (existingById == null && !NodeIdentity.isPlaceholder(device.name) &&
+                (existingByIdentity == null || !networkManager.hasLiveSocket(existingByIdentity.endpointId))) {
+                publicKeys.observeDirectLink(device.name, device.endpointId)
             }
 
             var updatedList = _connectedDevices.value
+            var duplicateRejected = false
 
-            // If this same node is already connected under an old Ghost MAC, kill the ghost.
-            // Placeholder names are never used for this because they identify no particular peer.
+            // DUPLICATE ENDPOINT RESOLUTION.
+            // This used to unconditionally disconnect the older endpoint the moment an identity
+            // match appeared, which meant the app tore down its own healthy socket every time
+            // dual-MAC produced a second entry for one peer: connect -> "ghost socket" ->
+            // self-disconnect -> rescan -> reconnect. Now a stale row is merged away without
+            // touching the radio, and when two sockets really are live the survivor is chosen
+            // deterministically by age so the churn cannot keep winning.
             if (existingByIdentity != null && !NodeIdentity.isPlaceholder(device.name)) {
-                AppLogger.d("BLE_MESH", "Ghost Socket Detected! Replacing old MAC ${existingByIdentity.endpointId} with new MAC ${device.endpointId} for ${device.name}")
-                networkManager.disconnectFromEndpoint(existingByIdentity.endpointId)
-                updatedList = updatedList.filter { it.endpointId != existingByIdentity.endpointId }
-                meshRouter.removeNode(existingByIdentity.name)
+                val existingIsLive = networkManager.hasLiveSocket(existingByIdentity.endpointId)
+                val incomingIsLive = networkManager.hasLiveSocket(device.endpointId)
+                val incomingIsReady = networkManager.hasReadyEndpoint(device.endpointId)
+
+                when {
+                    !existingIsLive -> {
+                        AppLogger.d("BLE_MESH", "Merging stale endpoint ${existingByIdentity.endpointId} into ${device.endpointId} for ${device.name}")
+                        updatedList = updatedList.filter { it.endpointId != existingByIdentity.endpointId }
+                        meshRouter.removeNode(existingByIdentity.name)
+                    }
+                    !incomingIsLive -> {
+                        AppLogger.d("BLE_MESH", "Ignoring dead duplicate endpoint ${device.endpointId} for ${device.name}")
+                        duplicateRejected = true
+                    }
+                    existingIsReady && !incomingIsReady -> {
+                        AppLogger.d("BLE_MESH", "Keeping READY endpoint ${existingByIdentity.endpointId} for ${device.name}; alternate endpoint is still configuring")
+                        duplicateRejected = true
+                    }
+                    incomingIsReady && !existingIsReady -> {
+                        AppLogger.d("BLE_MESH", "Selecting READY endpoint ${device.endpointId} for ${device.name}; retaining alternate radio role")
+                        updatedList = updatedList.filter { it.endpointId != existingByIdentity.endpointId }
+                    }
+                    networkManager.linkEstablishedAt(existingByIdentity.endpointId) <= networkManager.linkEstablishedAt(device.endpointId) -> {
+                        AppLogger.d("BLE_MESH", "Duplicate link to ${device.name}. Keeping older endpoint ${existingByIdentity.endpointId} in routing view.")
+                        duplicateRejected = true
+                    }
+                    else -> {
+                        AppLogger.d("BLE_MESH", "Duplicate link to ${device.name}. Keeping newer endpoint ${device.endpointId} in routing view.")
+                        updatedList = updatedList.filter { it.endpointId != existingByIdentity.endpointId }
+                    }
+                }
             }
 
-            updatedList = if (existingById != null) {
-                if (existingById.name != device.name) {
-                    meshRouter.removeNode(existingById.name)
+            updatedList = when {
+                // The surviving entry still adopts the freshly resolved name and identity.
+                duplicateRejected && existingByIdentity != null -> updatedList.map {
+                    if (it.endpointId == existingByIdentity.endpointId) {
+                        it.copy(
+                            name = device.name,
+                            isProvisional = false,
+                            nodeId = device.nodeId.ifEmpty { it.nodeId },
+                            isPayloadReady = existingIsReady
+                        )
+                    } else it
                 }
-                updatedList.map { if (it.endpointId == device.endpointId) device else it }
-            } else {
-                updatedList + device
+                duplicateRejected -> updatedList
+                existingById != null -> {
+                    if (existingById.name != device.name) {
+                        meshRouter.removeNode(existingById.name)
+                    }
+                    updatedList.map { if (it.endpointId == device.endpointId) device else it }
+                }
+                else -> updatedList + device
             }
 
             // Always purge the discovery list for this peer, including on the rename path. Previously
@@ -117,35 +179,54 @@ class MeshRepository(
             // a stale scanned row behind on its advertising MAC. That row is what the Radar rendered
             // as "Connected (Via Relay)" for an already directly connected device.
             _scannedDevices.value = _scannedDevices.value.filter {
-                it.endpointId != device.endpointId && !NodeIdentity.matches(it.name, device.name)
+                it.endpointId != device.endpointId &&
+                    !NodeIdentity.matches(it.name, device.name) &&
+                    !(device.nodeId.isNotEmpty() && it.nodeId == device.nodeId)
             }
 
             // Provisional links have a real socket but only a placeholder name, so they must not be
             // published into the routing tables or they would pollute the topology with ghost nodes.
-            if (!device.isProvisional && !NodeIdentity.isPlaceholder(device.name)) {
+            if (device.isPayloadReady && !device.isProvisional && !NodeIdentity.isPlaceholder(device.name)) {
                 meshRouter.markNodeSeen(device.name)
             }
 
             _connectedDevices.value = updatedList
-            meshRouter.recalculateKnownNodes(myNodeName, updatedList)
+            meshRouter.recalculateKnownNodes(myNodeName, updatedList.filter { it.isPayloadReady })
         }
 
         networkManager.onDeviceDisconnected = { endpointId ->
             val disconnectedDevice = _connectedDevices.value.find { it.endpointId == endpointId }
-            _connectedDevices.value = _connectedDevices.value.filter { it.endpointId != endpointId }
-            if (disconnectedDevice != null) {
+            val peerStillReady = disconnectedDevice != null && !NodeIdentity.isPlaceholder(disconnectedDevice.name) &&
+                networkManager.hasReadyLinkToIdentity(disconnectedDevice.name)
+            if (disconnectedDevice != null && !NodeIdentity.isPlaceholder(disconnectedDevice.name) && !peerStillReady) {
+                publicKeys.forgetDirectLink(disconnectedDevice.name, endpointId)
+            }
+            _connectedDevices.value = _connectedDevices.value.filter {
+                it.endpointId != endpointId || peerStillReady && networkManager.hasLiveSocket(endpointId)
+            }
+            if (disconnectedDevice != null && !peerStillReady) {
                 meshRouter.removeNode(disconnectedDevice.name)
             }
-            meshRouter.recalculateKnownNodes(myNodeName, _connectedDevices.value)
+            meshRouter.recalculateKnownNodes(myNodeName, readyConnectedDevices())
+        }
+
+        networkManager.onDeviceLivenessChanged = { endpointId, responsive ->
+            val current = _connectedDevices.value
+            if (current.any { it.endpointId == endpointId && it.isPeerResponsive != responsive }) {
+                _connectedDevices.value = current.map { device ->
+                    if (device.endpointId == endpointId) device.copy(isPeerResponsive = responsive) else device
+                }
+            }
         }
         
-        networkManager.onPublicKeyReceived = { senderName, key ->
-            publicKeys[senderName] = key
+        networkManager.onPublicKeyReceived = { endpointId, senderName, key ->
+            publicKeys.put(senderName, key, endpointId)
+            AppLogger.d("BLE_MESH", "Received recipient public key for $senderName via $endpointId")
         }
         
         networkManager.onRoutingTableReceived = { senderName, connectedNodes ->
             meshRouter.updateTopology(senderName, connectedNodes, myNodeName)
-            meshRouter.recalculateKnownNodes(myNodeName, _connectedDevices.value)
+            meshRouter.recalculateKnownNodes(myNodeName, readyConnectedDevices())
         }
 
         networkManager.onDeviceBlocked = { senderName ->
@@ -169,8 +250,12 @@ class MeshRepository(
         networkManager.onDeviceScanned = { event ->
             if (!NodeIdentity.matches(event.name, myNodeName)) {
                 // A peer we already hold a physical socket to must never appear in the discovery list.
+                // Node ID is checked too, so a still-provisional link (placeholder name, matches
+                // nothing by name) also suppresses its own advertising MAC.
                 val isPhysicallyConnected = _connectedDevices.value.any {
-                    it.endpointId == event.endpointId || NodeIdentity.matches(it.name, event.name)
+                    it.endpointId == event.endpointId ||
+                        NodeIdentity.matches(it.name, event.name) ||
+                        (event.nodeId.isNotEmpty() && it.nodeId == event.nodeId)
                 }
 
                 if (isPhysicallyConnected) {
@@ -220,7 +305,7 @@ class MeshRepository(
         }
 
         networkManager.stpNeighborsProvider = {
-            meshRouter.getSpanningTreeNeighbors(myNodeName, _connectedDevices.value)
+            meshRouter.getSpanningTreeNeighbors(myNodeName, readyConnectedDevices())
         }
 
         networkManager.onLiveAudioChunk = { sender, channelId, chunk ->
@@ -234,7 +319,7 @@ class MeshRepository(
         networkManager.onMessageReceived = { endpointId, msgId, sender, text, isPrivate, isSystem, img, audio, lat, lng, medium, routePath, channelId ->
             if (sender != myNodeName) {
                 meshRouter.markNodeSeen(sender)
-                meshRouter.recalculateKnownNodes(myNodeName, _connectedDevices.value)
+                meshRouter.recalculateKnownNodes(myNodeName, readyConnectedDevices())
 
                 if (!isSystem && (isPrivate || channelId == _currentChannelId.value) && !networkManager.isDeviceBlocked(sender)) {
                     val isDirect = _connectedDevices.value.any { NodeIdentity.matches(it.name, sender) }
@@ -326,6 +411,7 @@ class MeshRepository(
     }
 
     fun startNode(customName: String, nodeTag: String, teamKey: String, nodeId: String) {
+        publicKeys.clear()
         myNodeName = "$customName [$nodeTag]#$nodeId"
         networkManager.myDeviceName = myNodeName
         networkManager.myNodeId = nodeId
@@ -334,6 +420,7 @@ class MeshRepository(
     }
 
     fun stopNode() {
+        publicKeys.clear()
         networkManager.stopMeshNode()
         _isOnline.value = false
         _connectedDevices.value = emptyList()
@@ -364,7 +451,7 @@ class MeshRepository(
     }
 
     private fun sendSystemCommand(targetName: String, commandType: String) {
-        val payloadBytes = PayloadFactory.buildPrivatePayload(
+        val payloadBytes = runCatching { PayloadFactory.buildPrivatePayload(
             msgId = UUID.randomUUID().toString(),
             timestamp = System.currentTimeMillis(),
             senderName = myNodeName,
@@ -374,10 +461,13 @@ class MeshRepository(
             audioBase64 = null,
             locationLat = null,
             locationLng = null,
-            directedRoute = meshRouter.findShortestPath(myNodeName, targetName, _connectedDevices.value),
-            targetPubKey = publicKeys[targetName],
+            directedRoute = meshRouter.findShortestPath(myNodeName, targetName, readyConnectedDevices()),
+            targetPubKey = publicKeys.get(targetName),
             channelId = _currentChannelId.value
-        ).let {
+        ) }.getOrElse {
+            AppLogger.d("MeshNetwork_E2EE", "Could not send private control command to $targetName: recipient key unavailable or encryption failed")
+            return
+        }.let {
             // We need to override the type in the byte array or construct a custom payload.
             // Since PayloadFactory builds ChatMessage payloads, we'll decode, change type, encode.
             val decoded = kotlinx.serialization.protobuf.ProtoBuf.decodeFromByteArray(com.example.testresqmesh.core.network.MeshPayload.serializer(), it)
@@ -399,7 +489,7 @@ class MeshRepository(
         val payloadBytes = kotlinx.serialization.protobuf.ProtoBuf.encodeToByteArray(com.example.testresqmesh.core.network.MeshPayload.serializer(), payload)
         
         // STP Directed Routing: Only initiate stream to Spanning Tree neighbors
-        val stpNeighbors = meshRouter.getSpanningTreeNeighbors(myNodeName, _connectedDevices.value)
+        val stpNeighbors = meshRouter.getSpanningTreeNeighbors(myNodeName, readyConnectedDevices())
         
         // Better yet: just send to connected devices whose name is in stpNeighbors
         _connectedDevices.value.forEach { device ->
@@ -449,14 +539,22 @@ class MeshRepository(
         }
     }
 
-    fun sendPrivateMessage(targetName: String, text: String, imageBase64: String?, audioBase64: String?, locationLat: Double? = null, locationLng: Double? = null) {
+    fun sendPrivateMessage(targetName: String, text: String, imageBase64: String?, audioBase64: String?, locationLat: Double? = null, locationLng: Double? = null): Boolean {
         val msgId = UUID.randomUUID().toString()
         val timestamp = System.currentTimeMillis()
         
-        val directedRouteList = meshRouter.findShortestPath(myNodeName, targetName, _connectedDevices.value)
-        val targetPubKey = publicKeys[targetName]
+        val readyDevices = readyConnectedDevices()
+        if (readyDevices.isEmpty()) {
+            AppLogger.d("MeshNetwork_E2EE", "Private send blocked: no payload-ready peer link")
+            return false
+        }
+        val directedRouteList = meshRouter.findShortestPath(myNodeName, targetName, readyDevices)
+        val targetPubKey = publicKeys.get(targetName)
+        if (targetPubKey == null) {
+            AppLogger.d("MeshNetwork_E2EE", "Private send blocked: no recipient public key for $targetName")
+        }
 
-        val payloadBytes = PayloadFactory.buildPrivatePayload(
+        val payloadBytes = runCatching { PayloadFactory.buildPrivatePayload(
             msgId = msgId,
             timestamp = timestamp,
             senderName = myNodeName,
@@ -469,23 +567,26 @@ class MeshRepository(
             directedRoute = directedRouteList,
             targetPubKey = targetPubKey,
             channelId = _currentChannelId.value
-        )
+        ) }.getOrElse {
+            AppLogger.d("MeshNetwork_E2EE", "Private message to $targetName was not sent: recipient key unavailable or encryption failed")
+            return false
+        }
 
-        val isDirect = _connectedDevices.value.any { NodeIdentity.matches(it.name, targetName) }
+        val isDirect = readyDevices.any { NodeIdentity.matches(it.name, targetName) }
         val message = ChatMessage(msgId, myNodeName, text, imageBase64, audioBase64, locationLat, locationLng, true, true, timestamp, isHopped = !isDirect, outboundRoute = directedRouteList)
         
         repositoryScope.launch {
             appDatabase.messageDao().insertMessage(message.toMessageEntity(targetName = targetName))
         }
 
-        val directEndpointId = _connectedDevices.value.find { NodeIdentity.matches(it.name, targetName) }?.endpointId
+        val directEndpointId = readyDevices.find { NodeIdentity.matches(it.name, targetName) }?.endpointId
 
         if (isDirect && directEndpointId != null) {
             networkManager.sendDirectPayload(directEndpointId, payloadBytes)
         } else {
             if (directedRouteList.size > 1) {
                 val nextHopName = directedRouteList[1]
-                val nextHopEndpointId = _connectedDevices.value.find { NodeIdentity.matches(it.name, nextHopName) }?.endpointId
+                val nextHopEndpointId = readyDevices.find { NodeIdentity.matches(it.name, nextHopName) }?.endpointId
                 if (nextHopEndpointId != null) {
                     networkManager.sendDirectPayload(nextHopEndpointId, payloadBytes)
                 } else {
@@ -495,5 +596,6 @@ class MeshRepository(
                 networkManager.broadcastPayload(payloadBytes)
             }
         }
+        return true
     }
 }

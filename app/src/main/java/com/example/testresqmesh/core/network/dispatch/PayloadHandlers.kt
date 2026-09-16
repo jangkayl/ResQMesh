@@ -25,7 +25,7 @@ class SystemPulseHandler : PayloadHandler {
         callback.onDeviceNameSync(endpointId, sender)
         
         if (payload.publicKey.isNotEmpty()) {
-            callback.onPublicKeyReceived(sender, payload.publicKey)
+            callback.onPublicKeyReceived(endpointId, sender, payload.publicKey)
         }
         if (payload.connectedNodes.isNotEmpty()) {
             callback.onRoutingTableReceived(sender, payload.connectedNodes)
@@ -43,14 +43,23 @@ class SystemPulseHandler : PayloadHandler {
 
 @OptIn(ExperimentalSerializationApi::class)
 class PingHandler : PayloadHandler {
-    override fun canHandle(payloadType: String) = payloadType == "PING"
+    override fun canHandle(payloadType: String) = payloadType == "PING" || payloadType == "PONG"
 
     override fun handle(endpointId: String, payload: MeshPayload, payloadBytes: ByteArray, callback: PayloadDispatcherCallback) {
-        val sender = payload.senderName
-        callback.onDeviceNameSync(endpointId, sender)
-        
-        // PINGs exist purely to keep GATT sockets alive and refresh the Zombie Watchdog timer.
-        // We do NOT broadcast them to the rest of the Mesh, saving massive battery power.
+        if (payload.type == "PONG") {
+            callback.onHeartbeatAck(endpointId, payload.targetMessageId)
+            return
+        }
+        callback.onDeviceNameSync(endpointId, payload.senderName)
+        if (payload.id.startsWith("HB:")) {
+            val reply = MeshPayload(
+                id = "HA:${java.util.UUID.randomUUID()}",
+                type = "PONG",
+                senderName = callback.getMyDeviceName(),
+                targetMessageId = payload.id
+            )
+            callback.sendGattPayload(endpointId, ProtoBuf.encodeToByteArray(reply))
+        }
     }
 }
 
@@ -156,12 +165,18 @@ class StandardMessageHandler : PayloadHandler {
         val isEncrypted = payload.isEncrypted
 
         var text = payload.text
-        var imageBase64 = payload.imageBytes?.let { Base64.encodeToString(BinaryCompressor.decompress(it), Base64.DEFAULT) }
-        var audioBase64 = payload.audioBytes?.let { Base64.encodeToString(BinaryCompressor.decompress(it), Base64.DEFAULT) }
+        var imageBase64 = if (isPrivate) null else payload.imageBytes?.let { Base64.encodeToString(BinaryCompressor.decompress(it), Base64.DEFAULT) }
+        var audioBase64 = if (isPrivate) null else payload.audioBytes?.let { Base64.encodeToString(BinaryCompressor.decompress(it), Base64.DEFAULT) }
+        var locationLat = if (isPrivate) null else payload.locationLat
+        var locationLng = if (isPrivate) null else payload.locationLng
+
+        if (isPrivate && !isEncrypted) {
+            AppLogger.d("MeshNetwork_E2EE", "Rejected unencrypted private payload from $sender")
+            return
+        }
         
         if (isEncrypted) {
-            val previewData = payload.encryptedData?.take(20) ?: "MISSING"
-            AppLogger.d("MeshNetwork_E2EE", "INBOUND ENCRYPTED PAYLOAD DETECTED from $sender. Raw Ciphertext preview: [$previewData...]")
+            AppLogger.d("MeshNetwork_E2EE", "INBOUND ENCRYPTED PAYLOAD DETECTED from $sender")
         } else {
             AppLogger.d("MeshNetwork_E2EE", "INBOUND PUBLIC PAYLOAD DETECTED from $sender. No encryption applied.")
         }
@@ -171,22 +186,26 @@ class StandardMessageHandler : PayloadHandler {
             val encryptedKey = payload.encryptedKey
             
             AppLogger.d("MeshNetwork_E2EE", "Message is addressed to ME. Attempting RSA+AES Hybrid Decryption...")
-            if (encryptedData != null && encryptedKey != null) {
-                val decryptedJsonString = CryptoManager.decryptHybrid(encryptedData, encryptedKey)
-                if (decryptedJsonString != null) {
-                    try {
-                        val innerPayload = org.json.JSONObject(decryptedJsonString)
-                        text = innerPayload.optString("text", text)
-                        if (innerPayload.has("image")) imageBase64 = innerPayload.getString("image")
-                        if (innerPayload.has("audio")) audioBase64 = innerPayload.getString("audio")
-                        AppLogger.d("MeshNetwork_E2EE", "E2EE SUCCESS: Decrypted private payload! Plaintext: [$text]")
-                    } catch (e: Exception) {
-                        text = "[ENCRYPTED CONTENT: Inner JSON Parse Failed]"
-                    }
-                } else {
-                    text = "[ENCRYPTED CONTENT: Decryption Failed]"
-                    AppLogger.d("MeshNetwork_E2EE", "E2EE FAILED: Could not decrypt payload. Keys do not match.")
-                }
+            if (encryptedData.isNullOrBlank() || encryptedKey.isNullOrBlank()) {
+                AppLogger.d("MeshNetwork_E2EE", "E2EE FAILED: Missing encrypted envelope")
+                return
+            }
+            val decryptedJsonString = CryptoManager.decryptHybrid(encryptedData, encryptedKey)
+            if (decryptedJsonString == null) {
+                AppLogger.d("MeshNetwork_E2EE", "E2EE FAILED: Could not decrypt payload")
+                return
+            }
+            try {
+                val innerPayload = org.json.JSONObject(decryptedJsonString)
+                text = innerPayload.getString("text")
+                if (innerPayload.has("image")) imageBase64 = innerPayload.getString("image")
+                if (innerPayload.has("audio")) audioBase64 = innerPayload.getString("audio")
+                if (innerPayload.has("locationLat")) locationLat = innerPayload.getDouble("locationLat")
+                if (innerPayload.has("locationLng")) locationLng = innerPayload.getDouble("locationLng")
+                AppLogger.d("MeshNetwork_E2EE", "E2EE SUCCESS: Decrypted private payload")
+            } catch (e: Exception) {
+                AppLogger.d("MeshNetwork_E2EE", "E2EE FAILED: Invalid encrypted content")
+                return
             }
         } else if (isEncrypted) {
             text = "[ENCRYPTED CONTENT: Routing...]"
@@ -204,7 +223,7 @@ class StandardMessageHandler : PayloadHandler {
         if (isPrivate) {
             if (targetName == callback.getMyDeviceName()) {
                 callback.showNotification(sender, text)
-                callback.onMessageReceived(endpointId, msgId, sender, text, isPrivate, false, imageBase64, audioBase64, payload.locationLat, payload.locationLng, medium, routePath, payload.channelId)
+                callback.onMessageReceived(endpointId, msgId, sender, text, isPrivate, false, imageBase64, audioBase64, locationLat, locationLng, medium, routePath, payload.channelId)
             } else {
                 AppLogger.d("PayloadDispatcher", "ROUTE (Relay): Forwarding Private message meant for [$targetName] securely across the mesh.")
                 routePath.add(callback.getMyDeviceName())

@@ -6,6 +6,8 @@ import com.example.testresqmesh.core.model.ConnectedDevice
 import com.example.testresqmesh.data.repository.MeshRepository
 import com.example.testresqmesh.ui.state.ChatUiState
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
@@ -18,6 +20,8 @@ class CommunicationViewModel(
 
     private val _uiState = MutableStateFlow(ChatUiState())
     val uiState: StateFlow<ChatUiState> = _uiState.asStateFlow()
+    private val _privateSendErrors = MutableSharedFlow<String>(extraBufferCapacity = 1)
+    val privateSendErrors: SharedFlow<String> = _privateSendErrors
     
     private val _activeSosMessageId = MutableStateFlow<String?>(null)
     val activeSosMessageId: StateFlow<String?> = _activeSosMessageId.asStateFlow()
@@ -107,8 +111,14 @@ class CommunicationViewModel(
         useCases.deleteConversationWith(peerName)
     }
 
-    fun sendPrivateMessage(targetName: String, text: String, imageBase64: String? = null, audioBase64: String? = null) {
-        useCases.sendPrivateMessage(targetName, text, imageBase64, audioBase64)
+    fun sendPrivateMessage(targetName: String, text: String, imageBase64: String? = null, audioBase64: String? = null): Boolean {
+        val sent = useCases.sendPrivateMessage(targetName, text, imageBase64, audioBase64)
+        if (!sent) reportPrivateSendFailure()
+        return sent
+    }
+
+    private fun reportPrivateSendFailure() {
+        _privateSendErrors.tryEmit("Private message not sent. Waiting for a ready connection and current recipient key.")
     }
 
     fun disconnectDevice(endpointId: String) {
@@ -151,7 +161,9 @@ class CommunicationViewModel(
 
     private fun sendLocationMessage(location: android.location.Location, isPrivate: Boolean, targetName: String?) {
         if (isPrivate && targetName != null) {
-            useCases.sendPrivateMessage(targetName, "📍 I am sharing my location.", null, null, location.latitude, location.longitude)
+            if (!useCases.sendPrivateMessage(targetName, "📍 I am sharing my location.", null, null, location.latitude, location.longitude)) {
+                reportPrivateSendFailure()
+            }
         } else {
             useCases.sendPublicMessage("📍 I am sharing my location.", null, null, location.latitude, location.longitude)
         }
@@ -160,7 +172,9 @@ class CommunicationViewModel(
     private fun sendLocationError(isPrivate: Boolean, targetName: String?) {
         val errorMsg = "⚠️ Failed to get fresh GPS lock. Make sure Location is on, and you have sky visibility."
         if (isPrivate && targetName != null) {
-            useCases.sendPrivateMessage(targetName, errorMsg, null, null, null, null)
+            if (!useCases.sendPrivateMessage(targetName, errorMsg, null, null, null, null)) {
+                reportPrivateSendFailure()
+            }
         } else {
             useCases.sendPublicMessage(errorMsg, null, null, null, null)
         }

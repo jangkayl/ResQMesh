@@ -95,9 +95,8 @@ class SendPublicMessageUseCase(private val repository: MeshRepository) {
 }
 
 class SendPrivateMessageUseCase(private val repository: MeshRepository) {
-    operator fun invoke(targetName: String, text: String, imageBase64: String?, audioBase64: String?, locationLat: Double? = null, locationLng: Double? = null) {
+    operator fun invoke(targetName: String, text: String, imageBase64: String?, audioBase64: String?, locationLat: Double? = null, locationLng: Double? = null): Boolean =
         repository.sendPrivateMessage(targetName, text, imageBase64, audioBase64, locationLat, locationLng)
-    }
 }
 
 class DeleteConversationWithUseCase(private val repository: MeshRepository) {

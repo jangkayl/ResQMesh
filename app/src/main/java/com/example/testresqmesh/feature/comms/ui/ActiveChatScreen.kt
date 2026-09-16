@@ -79,6 +79,10 @@ fun ActiveChatScreen(
     var pendingAudio by remember { mutableStateOf<String?>(null) }
     var isRecording by remember { mutableStateOf(false) }
     var showDeleteDialog by remember { mutableStateOf(false) }
+    val snackbarHostState = remember { SnackbarHostState() }
+    LaunchedEffect(viewModel) {
+        viewModel.privateSendErrors.collect { snackbarHostState.showSnackbar(it) }
+    }
 
     // Fix: Prioritize connected device name, then look for the first message not sent by "Me"
     val displayName = name
@@ -106,6 +110,7 @@ fun ActiveChatScreen(
     }
 
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             Column(modifier = Modifier.background(InboxBackground)) {
                 TopAppBar(
@@ -195,16 +200,18 @@ fun ActiveChatScreen(
                         val hasAudio = pendingAudio != null
                         val finalMessage = if (hasAudio && inputText.isBlank()) "🎤 Voice Note" else inputText.trim()
                         
-                        viewModel.sendPrivateMessage(
+                        val sent = viewModel.sendPrivateMessage(
                             targetName = displayName,
                             text = finalMessage,
                             imageBase64 = pendingImage,
                             audioBase64 = pendingAudio
                         )
                         
-                        inputText = ""
-                        pendingImage = null
-                        pendingAudio = null
+                        if (sent) {
+                            inputText = ""
+                            pendingImage = null
+                            pendingAudio = null
+                        }
                     },
                     onSendLocation = {
                         viewModel.broadcastLocation(context, isPrivate = true, targetName = displayName)

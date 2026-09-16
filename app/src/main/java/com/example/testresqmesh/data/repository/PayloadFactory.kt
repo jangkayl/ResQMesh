@@ -57,48 +57,32 @@ object PayloadFactory {
         targetPubKey: String?,
         channelId: String
     ): ByteArray {
-        if (targetPubKey != null) {
-            val innerPayloadJson = org.json.JSONObject().apply {
-                put("text", text)
-                if (imageBase64 != null) put("image", imageBase64)
-                if (audioBase64 != null) put("audio", audioBase64)
-            }.toString()
-            
-            val encrypted = CryptoManager.encryptHybrid(innerPayloadJson, targetPubKey)
-            
-            val payload = MeshPayload(
-                id = msgId,
-                type = "MESSAGE",
-                senderName = senderName,
-                targetName = targetName,
-                isPrivate = true,
-                isEncrypted = true,
-                encryptedData = encrypted?.first,
-                encryptedKey = encrypted?.second,
-                routePath = listOf(senderName),
-                directedRoute = directedRoute,
-                channelId = channelId
-            )
-            return ProtoBuf.encodeToByteArray(payload)
-        } else {
-            val payload = MeshPayload(
-                id = msgId,
-                type = "MESSAGE",
-                senderName = senderName,
-                targetName = targetName,
-                text = text,
-                imageBytes = imageBase64?.let { BinaryCompressor.compress(Base64.decode(it, Base64.DEFAULT)) },
-                audioBytes = audioBase64?.let { BinaryCompressor.compress(Base64.decode(it, Base64.DEFAULT)) },
-                locationLat = locationLat,
-                locationLng = locationLng,
-                isPrivate = true,
-                isEncrypted = false,
-                routePath = listOf(senderName),
-                directedRoute = directedRoute,
-                channelId = channelId
-            )
-            return ProtoBuf.encodeToByteArray(payload)
-        }
+        require(!targetPubKey.isNullOrBlank()) { "Recipient public key is unavailable" }
+        val innerPayloadJson = org.json.JSONObject().apply {
+            put("text", text)
+            if (imageBase64 != null) put("image", imageBase64)
+            if (audioBase64 != null) put("audio", audioBase64)
+            if (locationLat != null) put("locationLat", locationLat)
+            if (locationLng != null) put("locationLng", locationLng)
+        }.toString()
+
+        val encrypted = CryptoManager.encryptHybrid(innerPayloadJson, targetPubKey)
+            ?: throw IllegalStateException("Private payload encryption failed")
+
+        val payload = MeshPayload(
+            id = msgId,
+            type = "MESSAGE",
+            senderName = senderName,
+            targetName = targetName,
+            isPrivate = true,
+            isEncrypted = true,
+            encryptedData = encrypted.first,
+            encryptedKey = encrypted.second,
+            routePath = listOf(senderName),
+            directedRoute = directedRoute,
+            channelId = channelId
+        )
+        return ProtoBuf.encodeToByteArray(payload)
     }
 
     fun buildSystemPulse(

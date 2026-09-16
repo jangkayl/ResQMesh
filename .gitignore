@@ -13,8 +13,6 @@
 .externalNativeBuild
 .cxx
 local.properties
-GEMINI.md
-docs/
 .antigravitycli/
 /app/references/
 /app/ui/
