@@ -8,11 +8,13 @@ interface PayloadDispatcherCallback {
     fun getStpNeighbors(): Set<String>
     
     fun sendDirectPayload(endpointId: String, payload: ByteArray)
+    fun sendGattPayload(endpointId: String, payload: ByteArray)
+    fun onHeartbeatAck(endpointId: String, challengeId: String)
     fun broadcastPayload(payload: ByteArray, excludeEndpointId: String?)
     
     fun onMessageSeen(msgId: String, readerName: String)
     fun onMessageDelivered(msgId: String, readerName: String, returnRoute: List<String>)
-    fun onPublicKeyReceived(senderName: String, key: String)
+    fun onPublicKeyReceived(endpointId: String, senderName: String, key: String)
     fun onRoutingTableReceived(senderName: String, connectedNodes: List<String>)
     fun onMessageReceived(endpointId: String, msgId: String, senderName: String, text: String, isPrivate: Boolean, isSystem: Boolean, imageBase64: String?, audioBase64: String?, locationLat: Double?, locationLng: Double?, medium: String, routePath: List<String>, channelId: String)
     fun onLiveAudioChunk(sender: String, channelId: String, chunk: ByteArray)

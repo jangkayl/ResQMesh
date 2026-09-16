@@ -29,7 +29,16 @@ data class ConnectedDevice(
      * handshake yet. The link is real and must be reflected in the UI, but the name is a
      * placeholder so it must not be published into the routing tables.
      */
-    val isProvisional: Boolean = false
+    val isProvisional: Boolean = false,
+    /**
+     * Stable node ID for this link when known. Lets the UI suppress a peer's discovery row even
+     * while the link is still provisional and its name is a placeholder.
+     */
+    val nodeId: String = "",
+    /** Radio connection is visible before CCCD completes; only READY can carry app payloads. */
+    val isPayloadReady: Boolean = false,
+    /** UI presence hint: recent inbound app traffic was observed on this direct endpoint. */
+    val isPeerResponsive: Boolean = true
 )
 
 data class KnownNode(

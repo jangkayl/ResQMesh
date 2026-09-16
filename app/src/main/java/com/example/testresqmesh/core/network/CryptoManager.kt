@@ -1,9 +1,14 @@
 package com.example.testresqmesh.core.network
 
 import android.util.Base64
+import android.security.keystore.KeyGenParameterSpec
+import android.security.keystore.KeyProperties
+import com.example.testresqmesh.core.utils.AppLogger
 import java.security.KeyPair
 import java.security.KeyPairGenerator
 import java.security.KeyFactory
+import java.security.KeyStore
+import java.security.PrivateKey
 import java.security.PublicKey
 import java.security.spec.X509EncodedKeySpec
 import javax.crypto.Cipher
@@ -13,18 +18,32 @@ import javax.crypto.spec.GCMParameterSpec
 import javax.crypto.spec.SecretKeySpec
 
 object CryptoManager {
-    private val keyPair: KeyPair
+    private val keyPair: KeyPair by lazy { loadOrCreateKeyPair() }
+    private const val KEY_ALIAS = "resqmesh_private_message_rsa_v1"
     private const val RSA_ALGO = "RSA/ECB/PKCS1Padding"
     private const val AES_ALGO = "AES/GCM/NoPadding"
     private const val GCM_IV_LENGTH = 12
     private const val GCM_TAG_LENGTH = 128
 
-    init {
-        // Generate Ephemeral RSA 2048-bit Key Pair on startup
-        // Ephemeral keys guarantee Forward Secrecy and Plausible Deniability.
-        val generator = KeyPairGenerator.getInstance("RSA")
-        generator.initialize(2048)
-        keyPair = generator.generateKeyPair()
+    private fun loadOrCreateKeyPair(): KeyPair {
+        val keyStore = KeyStore.getInstance("AndroidKeyStore")
+        keyStore.load(null)
+        val existingPrivate = keyStore.getKey(KEY_ALIAS, null) as? PrivateKey
+        val existingPublic = keyStore.getCertificate(KEY_ALIAS)?.publicKey
+        if (existingPrivate != null && existingPublic != null) {
+            AppLogger.d("MeshNetwork_E2EE", "Loaded persistent private-message key")
+            return KeyPair(existingPublic, existingPrivate)
+        }
+        val generator = KeyPairGenerator.getInstance(KeyProperties.KEY_ALGORITHM_RSA, "AndroidKeyStore")
+        generator.initialize(
+            KeyGenParameterSpec.Builder(KEY_ALIAS, KeyProperties.PURPOSE_DECRYPT)
+                .setKeySize(2048)
+                .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_RSA_PKCS1)
+                .build()
+        )
+        val generated = generator.generateKeyPair()
+        AppLogger.d("MeshNetwork_E2EE", "Generated persistent private-message key")
+        return generated
     }
 
     fun getMyPublicKeyBase64(): String {

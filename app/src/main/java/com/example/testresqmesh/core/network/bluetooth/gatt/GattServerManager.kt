@@ -5,8 +5,10 @@ import android.content.Context
 import com.example.testresqmesh.core.model.ConnectedDevice
 import com.example.testresqmesh.core.model.NodeIdentity
 import com.example.testresqmesh.core.network.NativeBleManager
+import com.example.testresqmesh.core.network.bluetooth.state.BleLinkRole
+import com.example.testresqmesh.core.network.bluetooth.state.BleLinkState
 import com.example.testresqmesh.core.utils.AppLogger
-import java.util.concurrent.ConcurrentLinkedQueue
+import java.util.concurrent.ConcurrentLinkedDeque
 import java.util.concurrent.atomic.AtomicBoolean
 import java.nio.ByteBuffer
 
@@ -14,6 +16,8 @@ class GattServerManager(
     val context: Context,
     val manager: NativeBleManager
 ) {
+    private val serverSetupTimeoutMs = 12_000L
+
     fun startGattServer() {
         with(manager) {
         val serverCallback = object : BluetoothGattServerCallback() {
@@ -29,41 +33,86 @@ class GattServerManager(
                     }
                     
                     // COLLISION & ZOMBIE SOCKET RESOLUTION
-                    val clientGatt = store.activeConnections[macAddress]
-                    if (clientGatt != null) {
-                        val age = System.currentTimeMillis() - (store.connectionEstablishTime[macAddress] ?: 0L)
-                        if (age < 5000) {
-                            val myScore = getElectionScore()
-                            val theirScore = store.endpointLastScore[macAddress] ?: ""
-                            if (myScore > theirScore) {
-                                AppLogger.d("BLE_MESH", "Dual-Link Collision: We have superior score ($myScore > $theirScore). Rejecting incoming Server link.")
+                    // Resolved by identity rather than MAC. The inbound device arrives on its
+                    // Central MAC, so `activeConnections[macAddress]` was almost always null here
+                    // and the collision went undetected, leaving two sockets to one peer. The old
+                    // score comparison was also dead code: `endpointLastScore` is empty for a MAC
+                    // we never scanned, so `myScore > ""` was always true.
+                    val existingEndpoint = peerName?.let { findLinkEndpointByIdentity(it) }
+                    if (existingEndpoint != null && existingEndpoint != macAddress) {
+                        val existingAge = System.currentTimeMillis() - linkEstablishedAt(existingEndpoint)
+                        if (existingAge < DUPLICATE_LINK_GRACE_MS) {
+                            // Simultaneous connect. Break the tie deterministically so exactly one
+                            // side yields: the node with the lower ID keeps its outbound link.
+                            val myId = NodeIdentity.idOf(myDeviceName) ?: myNodeId
+                            val theirId = NodeIdentity.idOf(peerName) ?: ""
+                            if (myId < theirId) {
+                                AppLogger.d("BLE_MESH", "Dual-Link Collision with $peerName: we keep our link ($myId < $theirId). Rejecting inbound.")
                                 gattServer?.cancelConnection(device)
                                 return
-                            } else {
-                                AppLogger.d("BLE_MESH", "Dual-Link Collision: We have inferior score. Killing our Client link and accepting Server link.")
-                                forceGattDisconnect(macAddress, clientGatt)
                             }
+                            AppLogger.d("BLE_MESH", "Dual-Link Collision with $peerName: yielding our link ($myId >= $theirId). Accepting inbound.")
+                            disconnectFromEndpoint(existingEndpoint)
                         } else {
-                            AppLogger.d("BLE_MESH", "Zombie Socket Detected! Peer $macAddress is forcing a reconnection. Killing old Client link.")
-                            forceGattDisconnect(macAddress, clientGatt)
+                            // The existing link is established and healthy. A redundant inbound
+                            // connection must not be allowed to tear it down: that self-inflicted
+                            // teardown was the connect/disconnect loop.
+                            AppLogger.d("BLE_MESH", "Rejecting redundant inbound link from $peerName. Healthy link already on $existingEndpoint.")
+                            gattServer?.cancelConnection(device)
+                            return
                         }
                     }
 
-                    val totalConnections = store.activeConnections.size + store.activeServerConnections.size
+                    val totalConnections = distinctLinkCount()
                     if (totalConnections >= MAX_TOTAL_CONNECTIONS) {
                         AppLogger.d("BLE_MESH", "Server: Rejected connection from ${device.address}. Mesh node is full.")
                         gattServer?.cancelConnection(device)
                         return
                     }
                     AppLogger.d("BLE_MESH", "Server: Device ${macAddress} connected.")
+                    val queue = store.pendingQueues.computeIfAbsent(macAddress) { ConcurrentLinkedDeque() }
+                    val writing = if (!store.activeConnections.containsKey(macAddress) &&
+                        !store.activeServerConnections.containsKey(macAddress)) {
+                        AtomicBoolean(false).also { store.isWriting[macAddress] = it }
+                    } else store.isWriting.computeIfAbsent(macAddress) { AtomicBoolean(false) }
+                    val link = store.links.begin(macAddress, BleLinkRole.SERVER, peerName?.let(NodeIdentity::idOf), queue, writing)
+                    link.serverDevice = device
+                    store.links.transition(link, BleLinkState.CONFIGURING)
+                    AppLogger.d("BLE_MESH", "Link ${link.generation} SERVER $macAddress ${link.peerNodeId ?: "unknown"}: CONFIGURING radioStatus=$status")
+                    val setupDeadline = object : Runnable {
+                        override fun run() {
+                            if (!store.links.isCurrent(link) || link.state != BleLinkState.CONFIGURING) return
+                            if (store.links.hasReadyPeerExcept(link)) {
+                                AppLogger.d("BLE_MESH", "Link ${link.generation} SERVER $macAddress: keeping unfinished role while peer has a READY link")
+                                handler.postDelayed(this, serverSetupTimeoutMs)
+                                return
+                            }
+                            if (store.links.expireConfiguring(link)) {
+                                AppLogger.d("BLE_MESH", "Link ${link.generation} SERVER $macAddress: CCCD setup timed out; closing unfinished link")
+                                try { gattServer?.cancelConnection(device) } catch (e: Exception) {
+                                    AppLogger.d("BLE_MESH", "Server setup timeout disconnect failed on $macAddress: ${e.message}")
+                                }
+                            }
+                        }
+                    }
+                    handler.postDelayed(setupDeadline, serverSetupTimeoutMs)
                     store.activeServerConnections[macAddress] = device
-                    store.pendingQueues.putIfAbsent(macAddress, ConcurrentLinkedQueue<ByteArray>())
+                    store.pendingQueues.putIfAbsent(macAddress, ConcurrentLinkedDeque())
                     store.isWriting.putIfAbsent(macAddress, AtomicBoolean(false))
                     store.chunkBuffers.putIfAbsent(macAddress, ByteArray(0))
                     store.connectionInteractionTimes.putIfAbsent(macAddress, System.currentTimeMillis())
+                    // Recorded for server links too, so duplicate-link resolution can compare ages.
+                    store.connectionEstablishTime[macAddress] = System.currentTimeMillis()
                     
                     val safePeerName = peerName ?: NodeIdentity.UNKNOWN_NAME
                     store.connectedEndpointNames[macAddress] = safePeerName
+                    // Seed the identity when this MAC was scanned before, so a provisional socket can
+                    // still suppress the peer's discovery row instead of showing it twice.
+                    val seededNodeId = NodeIdentity.idOf(safePeerName) ?: store.endpointNodeIds[macAddress].orEmpty()
+                    if (seededNodeId.isNotEmpty()) {
+                        store.endpointNodeIds[macAddress] = seededNodeId
+                        link.peerNodeId = seededNodeId
+                    }
                     
                     handler.postDelayed({
                         updateInvisibilityCloak()
@@ -81,7 +130,9 @@ class GattServerManager(
                                 endpointId = macAddress,
                                 name = safePeerName,
                                 isClassicConnected = true,
-                                isProvisional = isProvisional
+                                isProvisional = isProvisional,
+                                nodeId = seededNodeId,
+                                isPayloadReady = false
                             )
                         )
                     }
@@ -89,18 +140,33 @@ class GattServerManager(
                     if (isProvisional) {
                         AppLogger.d("BLE_MESH", "Server: Alien device connected. Waiting ${NAME_HANDSHAKE_TIMEOUT_MS}ms for name handshake...")
                         handler.postDelayed({
-                            if (NodeIdentity.isPlaceholder(store.connectedEndpointNames[macAddress])) {
+                            if (store.links.isCurrent(link) &&
+                                NodeIdentity.isPlaceholder(store.connectedEndpointNames[macAddress])) {
                                 AppLogger.d("BLE_MESH", "Server: Handshake timeout! Alien device $macAddress kicked from Mesh.")
                                 gattServer?.cancelConnection(device)
                             }
                         }, NAME_HANDSHAKE_TIMEOUT_MS)
                     }
                 } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
+                    val link = store.links.current(macAddress, BleLinkRole.SERVER)
+                    if (link == null || link.serverDevice?.address != device.address) {
+                        AppLogger.d("BLE_MESH", "Ignoring unowned SERVER disconnect on $macAddress status=$status")
+                        return
+                    }
+                    store.links.transition(link, BleLinkState.DISCONNECTING)
+                    AppLogger.d("BLE_MESH", "Link ${link.generation} SERVER $macAddress: DISCONNECTING radioStatus=$status")
                     AppLogger.d("BLE_MESH", "Server: Device ${macAddress} disconnected.")
-                    store.activeServerConnections.remove(macAddress)
-                    store.connectedEndpointIds.remove(macAddress)
-                    store.connectedEndpointNames.remove(macAddress)
-                    store.endpointNodeIds.remove(macAddress)
+                    store.activeServerConnections.remove(macAddress, device)
+                    store.links.forget(link)
+                    cleanupEndpointIfUnowned(macAddress)
+                    // The client role may share this address and still be READY. Its identity and
+                    // establishment state belong to the surviving role, not this server callback.
+                    if (!store.activeConnections.containsKey(macAddress)) {
+                        store.connectedEndpointIds.remove(macAddress)
+                        store.connectedEndpointNames.remove(macAddress)
+                        store.endpointNodeIds.remove(macAddress)
+                        store.connectionEstablishTime.remove(macAddress)
+                    }
                     handler.post {
                         onDeviceDisconnected?.invoke(macAddress)
                         sendSystemPulse()
@@ -112,11 +178,36 @@ class GattServerManager(
                 if (responseNeeded) {
                     gattServer?.sendResponse(device, requestId, BluetoothGatt.GATT_SUCCESS, offset, value)
                 }
+                val link = store.links.current(device.address, BleLinkRole.SERVER)
+                if (link?.serverDevice?.address == device.address && descriptor.uuid == CCC_DESCRIPTOR_UUID &&
+                    value?.contentEquals(BluetoothGattDescriptor.ENABLE_INDICATION_VALUE) == true &&
+                    store.links.transition(link, BleLinkState.READY)) {
+                    AppLogger.d("BLE_MESH", "Link ${link.generation} SERVER ${device.address}: READY CCCD indications enabled")
+                    handler.post {
+                        if (store.links.isCurrent(link) && link.state == BleLinkState.READY) {
+                            val name = store.connectedEndpointNames[device.address] ?: NodeIdentity.UNKNOWN_NAME
+                            onDeviceConnected?.invoke(ConnectedDevice(
+                                endpointId = device.address,
+                                name = name,
+                                isClassicConnected = true,
+                                isProvisional = NodeIdentity.isPlaceholder(name),
+                                nodeId = link.peerNodeId.orEmpty(),
+                                isPayloadReady = true
+                            ))
+                        }
+                    }
+                    processNextPayload(device.address)
+                }
             }
 
             override fun onMtuChanged(device: BluetoothDevice, mtu: Int) {
                 AppLogger.d("BLE_MESH", "Server: MTU Expanded to $mtu for ${device.address}.")
                 store.connectionMtu[device.address] = mtu - 3
+                store.links.current(device.address, BleLinkRole.SERVER)?.takeIf { it.serverDevice?.address == device.address }?.mtu = mtu - 3
+            }
+
+            override fun onNotificationSent(device: BluetoothDevice, status: Int) {
+                completeGattChunk(device.address, BleLinkRole.SERVER, status, device = device)
             }
 
             override fun onCharacteristicReadRequest(
@@ -150,6 +241,7 @@ class GattServerManager(
                         store.chunkBuffers[macAddress] = ByteArray(0)
                     }
                     store.connectionInteractionTimes[macAddress] = now
+                    store.links.current(macAddress, BleLinkRole.SERVER)?.takeIf { it.serverDevice?.address == device.address }?.lastInteractionAt = now
                     
                     val currentBuffer = store.chunkBuffers[macAddress] ?: ByteArray(0)
                     val newBuffer = ByteArray(currentBuffer.size + it.size)
@@ -193,7 +285,7 @@ class GattServerManager(
 
         val txChar = BluetoothGattCharacteristic(
             TX_CHARACTERISTIC_UUID,
-            BluetoothGattCharacteristic.PROPERTY_NOTIFY,
+            BluetoothGattCharacteristic.PROPERTY_INDICATE,
             BluetoothGattCharacteristic.PERMISSION_READ
         )
         val cccDescriptor = BluetoothGattDescriptor(CCC_DESCRIPTOR_UUID, BluetoothGattDescriptor.PERMISSION_WRITE)
