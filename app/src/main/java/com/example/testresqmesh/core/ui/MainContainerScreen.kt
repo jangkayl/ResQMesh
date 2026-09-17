@@ -19,6 +19,7 @@ import com.example.testresqmesh.feature.sos.ui.FullScreenSosAlarm
 import com.example.testresqmesh.feature.sos.ui.ActiveSOSMonitoringScreen
 import com.example.testresqmesh.feature.sos.ui.SosMapScreen
 import com.example.testresqmesh.feature.profile.ui.ProfileScreen
+import com.example.testresqmesh.feature.profile.ui.AdvancedScreen
 import com.example.testresqmesh.feature.comms.viewmodel.CommunicationViewModel
 import com.example.testresqmesh.feature.radar.viewmodel.RadarViewModel
 import com.example.testresqmesh.feature.setup.viewmodel.SetupViewModel
@@ -42,6 +43,7 @@ fun MainContainerScreen(
     var isSOSActive by remember { mutableStateOf(false) }
     var mapSosAlert by remember { mutableStateOf<com.example.testresqmesh.core.model.ChatMessage?>(null) }
     var showProfile by remember { mutableStateOf(false) }
+    var showAdvanced by remember { mutableStateOf(false) }
     
     
     val incomingSosAlert by commsViewModel.incomingSosAlert.collectAsState()
@@ -135,8 +137,18 @@ fun MainContainerScreen(
         return
     }
 
+    if (showAdvanced) {
+        AdvancedScreen(walkieTalkieViewModel = walkieTalkieViewModel, onBack = { showAdvanced = false })
+        BackHandler { showAdvanced = false }
+        return
+    }
+
     if (showProfile) {
-        ProfileScreen(setupViewModel)
+        ProfileScreen(
+            viewModel = setupViewModel,
+            onAdvanced = { showAdvanced = true },
+            onBack = { showProfile = false }
+        )
         BackHandler { showProfile = false }
         return
     }
