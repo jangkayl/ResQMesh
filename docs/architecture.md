@@ -1,6 +1,6 @@
 # Architecture
 
-Last source review: 2026-09-16, branch `temp`, HEAD `d7cd5e3`, with uncommitted changes. This page describes the current checkout; verify changed paths before relying on it.
+Last source review: 2026-09-17, branch `fix/ble-reliability`, with the phase 4-6 maintainability work uncommitted. This page describes the current checkout; verify changed paths before relying on it.
 
 ## System shape
 
@@ -34,10 +34,10 @@ The intended lifecycle distinguishes radio connection from payload readiness:
 ```text
 DISCONNECTED -> CONNECTING -> DISCOVERING -> CONFIGURING -> READY
       ^                                                       |
-      +--------------- DISCONNECTING / FAILED <---------------+
+      +------------------- DISCONNECTING <---------------------+
 ```
 
-Client readiness follows required GATT configuration such as service discovery and CCCD completion. Server readiness follows subscription. Server-to-client GATT fallback uses acknowledged indications so queue advancement is tied to `onNotificationSent` rather than an unacknowledged notification accepted only by the local stack. Callbacks and timeouts should act only on their owned link reference/generation. The working tree includes callback-driven client writes and server indications, heartbeat challenges, inbound-progress liveness, endpoint cleanup, and L2CAP failure fallback. Same-address late server callback ownership and complete queue bounds still require review and device evidence.
+Client readiness follows required GATT configuration such as service discovery and CCCD completion. Server readiness follows subscription. Server-to-client GATT fallback uses acknowledged indications so queue advancement is tied to `onNotificationSent` rather than an unacknowledged notification accepted only by the local stack. `GattTransferCoordinator` owns deterministic flight claiming, generation checks, chunk completion, removal, and L2CAP queue promotion. `HeartbeatCoordinator` owns one generation-bound challenge per endpoint; Android scheduling and radio I/O remain in `NativeBleManager`. Same-address late server callback ownership and complete queue bounds still require review and device evidence.
 
 Client setup treats the default 20-byte ATT payload as the reliable baseline: service discovery and CCCD subscription establish `READY` without waiting for MTU negotiation. A GATT-server connection callback for an endpoint already owned by a live outbound client is treated as another local view of that ACL, not as a second configuring mesh role with its own destructive timeout.
 
@@ -73,7 +73,7 @@ This is not yet a basis for claiming authenticated end-to-end encryption or forw
 
 ## Persistence and UI
 
-`MeshRepository` joins network callbacks, `MeshRouter`, Room DAOs, and UI-facing state. Its Room collection and background writes run in a process-owned `AppCoroutineScope` supplied by Koin, rather than creating an unmanaged scope internally; the scope uses `Dispatchers.IO`, owns a `SupervisorJob`, and exists for the app process lifetime. Compose features cover setup, chat, Radar, SOS, profile, responder tracking, and audio. UI rules live in `docs/ui.md`; physical behavior must be checked against `docs/validation.md`.
+`MeshRepository` joins network callbacks, `MeshRouter`, persistence, and UI-facing state through two boundaries: `MeshNetworkGateway` hides Android Bluetooth types, and `MessageStore` hides Room/DAO operations. Their production adapters are supplied by Koin. Room collection and background writes run in the process-owned `AppCoroutineScope`. Compose features cover setup, chat, Radar, SOS, profile, responder tracking, and audio; Active Chat header presentation and Radar row models are separated from their route-level screens. UI rules live in `docs/ui.md`; physical behavior must be checked against `docs/validation.md`.
 
 ## Source map
 
@@ -84,7 +84,7 @@ This is not yet a basis for claiming authenticated end-to-end encryption or forw
 | Link ownership and liveness | `core/network/bluetooth/state/` |
 | Payload schema and dispatch | `core/network/MeshPayload.kt`, `PayloadDispatcher.kt`, `dispatch/` |
 | Cryptography | `core/network/CryptoManager.kt`, `data/repository/PeerPublicKeyCache.kt` |
-| Repository and routing | `data/repository/MeshRepository.kt`, `MeshRouter.kt`, `PayloadFactory.kt` |
+| Repository and routing | `core/network/MeshNetworkGateway.kt`, `data/repository/MeshRepository.kt`, `MessageStore.kt`, `MeshRouter.kt`, `PayloadFactory.kt` |
 | Room | `data/local/` |
 | Compose features | `feature/` and `core/ui/` |
 | UI state | `ui/state/UiStates.kt` |

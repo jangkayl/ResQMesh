@@ -583,41 +583,6 @@ fun NearbyNodeItem(
     }
 }
 
-/** Explicit classification of a Radar row, so grouping and actions never depend on status text. */
-enum class NodeKind {
-    /** A live physical socket with a confirmed name. */
-    DIRECT,
-    /** CCCD is ready, but two expected peer heartbeats have not arrived. */
-    UNRESPONSIVE,
-    /** A live physical socket that has not completed the name handshake yet. */
-    HANDSHAKING,
-    /** Reachable only through the mesh, but still advertising within radio range. */
-    RELAY,
-    /** Reachable only through the mesh and out of radio range. */
-    HOPPED,
-    /** Advertising nearby, not linked and not routed. */
-    DISCOVERED,
-    /** Advertising nearby with an outbound connection attempt in flight. */
-    SYNCING,
-    /** A direct link ended recently and the peer is no longer advertising nearby. */
-    OFFLINE,
-    /** Blocked and not currently visible anywhere in the mesh. */
-    BLOCKED_OFFLINE
-}
-
-data class NodeItemData(
-    val endpointId: String,
-    /** Fully qualified node name. Always used for block/unblock/connect actions. */
-    val name: String,
-    val status: String,
-    val kind: NodeKind = NodeKind.DISCOVERED,
-    val isConnected: Boolean = false,
-    val isActiveRelay: Boolean = false,
-    val isBlocked: Boolean = false,
-    /** Human friendly text for display only. Falls back to [name] when empty. */
-    val label: String = ""
-)
-
 @Preview(showBackground = true)
 @Composable
 fun RadarScreenPreview() {

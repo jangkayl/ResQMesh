@@ -3,12 +3,16 @@ package com.example.testresqmesh.core.di
 import com.example.testresqmesh.core.domain.usecase.MeshUseCases
 import com.example.testresqmesh.core.domain.usecase.*
 import com.example.testresqmesh.core.network.NativeBleManager
+import com.example.testresqmesh.core.network.MeshNetworkGateway
+import com.example.testresqmesh.core.network.NativeBleGateway
 import com.example.testresqmesh.core.utils.LiveAudioEngine
 import com.example.testresqmesh.core.utils.MediaHelper
 import com.example.testresqmesh.data.local.AppDatabase
 import com.example.testresqmesh.data.location.DefaultLocationClient
 import com.example.testresqmesh.core.location.LocationClient
 import com.example.testresqmesh.data.repository.MeshRepository
+import com.example.testresqmesh.data.repository.MessageStore
+import com.example.testresqmesh.data.repository.RoomMessageStore
 import com.example.testresqmesh.feature.comms.viewmodel.CommunicationViewModel
 import com.example.testresqmesh.feature.comms.viewmodel.WalkieTalkieViewModel
 import com.example.testresqmesh.feature.radar.viewmodel.RadarViewModel
@@ -20,7 +24,9 @@ import org.koin.dsl.module
 
 val appModule = module {
     single { NativeBleManager(androidContext()) }
+    single<MeshNetworkGateway> { NativeBleGateway(get()) }
     single { AppDatabase.getDatabase(androidContext()) }
+    single<MessageStore> { RoomMessageStore(get<AppDatabase>().messageDao()) }
     single(createdAtStart = true) { AppCoroutineScope(Dispatchers.IO) }
     single { MeshRepository(get(), get(), get<AppCoroutineScope>().scope) }
     single { MediaHelper(androidContext()) }

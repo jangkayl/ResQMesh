@@ -13,14 +13,14 @@ import com.example.testresqmesh.core.network.bluetooth.state.BleLinkRole
 import com.example.testresqmesh.core.network.bluetooth.state.BleLinkState
 import com.example.testresqmesh.core.network.bluetooth.state.BleLivenessPolicy
 import com.example.testresqmesh.core.network.bluetooth.state.GattTransfer
+import com.example.testresqmesh.core.network.bluetooth.state.GattTransferCoordinator
 import com.example.testresqmesh.core.network.bluetooth.state.GattTransferFlight
-import com.example.testresqmesh.core.network.bluetooth.state.HeartbeatChallenge
+import com.example.testresqmesh.core.network.bluetooth.state.HeartbeatCoordinator
 import com.example.testresqmesh.core.network.bluetooth.state.HandshakeRadioGate
 import com.example.testresqmesh.core.network.bluetooth.state.payloadBytes
 import com.example.testresqmesh.core.utils.AppLogger
 import com.example.testresqmesh.core.utils.NotificationHelper
 import java.util.UUID
-import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ConcurrentLinkedDeque
 import java.util.concurrent.atomic.AtomicBoolean
 import java.nio.ByteBuffer
@@ -164,7 +164,8 @@ class NativeBleManager(val context: Context) {
     
     val payloadDispatcher = PayloadDispatcher(payloadDispatcherCallback)
     val handler = Handler(Looper.getMainLooper())
-    private val heartbeatChallenges = ConcurrentHashMap<String, HeartbeatChallenge>()
+    private val transferCoordinator = GattTransferCoordinator(store)
+    private val heartbeatCoordinator = HeartbeatCoordinator()
     private val HEARTBEAT_ACK_TIMEOUT_MS = 8_000L
     private val GATT_CHUNK_TIMEOUT_MS = 4_000L
     val timeoutRunnable = object : Runnable {
@@ -190,18 +191,18 @@ class NativeBleManager(val context: Context) {
                 onDeviceLivenessChanged?.invoke(macAddress, !BleLivenessPolicy.isUnresponsive(lastInbound, now))
                 if (!store.activeL2capSockets.containsKey(macAddress) &&
                     now - lastInbound >= BleLivenessPolicy.UNRESPONSIVE_AFTER_MS &&
-                    !heartbeatChallenges.containsKey(macAddress)) {
+                    !heartbeatCoordinator.contains(macAddress)) {
                     startHeartbeatChallenge(macAddress)
                 }
                 if (BleLivenessPolicy.isStale(lastInbound, now)) {
-                    val probe = heartbeatChallenges[macAddress]
+                    val probe = heartbeatCoordinator.pending(macAddress)
                     if (probe != null && now - probe.createdAt < 30_000L &&
                         (probe.sentAt == 0L || !probe.expired(now, HEARTBEAT_ACK_TIMEOUT_MS))) {
                         AppLogger.d("BLE_MESH", "Waiting for generation-bound GATT heartbeat result on $macAddress")
                         return@forEach
                     }
                     AppLogger.d("BLE_MESH", "No inbound progress from $macAddress for ${now - lastInbound}ms. Retiring stale GATT roles.")
-                    heartbeatChallenges.remove(macAddress)
+                    heartbeatCoordinator.remove(macAddress)
                     store.activeConnections[macAddress]?.let { forceGattDisconnect(macAddress, it) }
                     store.activeServerConnections[macAddress]?.let { gattServer?.cancelConnection(it) }
                 } else {
@@ -345,7 +346,7 @@ class NativeBleManager(val context: Context) {
         store.activeL2capSockets.clear()
         store.pendingQueues.clear()
         store.gattFlights.clear()
-        heartbeatChallenges.clear()
+        heartbeatCoordinator.clear()
         store.isWriting.clear()
         handler.removeCallbacks(timeoutRunnable)
         store.connectedEndpointIds.clear()
@@ -714,7 +715,7 @@ class NativeBleManager(val context: Context) {
         }
         store.pendingQueues.remove(endpointId)
         store.gattFlights.remove(endpointId)?.writing?.set(false)
-        heartbeatChallenges.remove(endpointId)
+        heartbeatCoordinator.remove(endpointId)
         store.isWriting.remove(endpointId)
         store.chunkBuffers.remove(endpointId)
         store.connectionMtu.remove(endpointId)
@@ -796,37 +797,22 @@ class NativeBleManager(val context: Context) {
         }
         val link = readyGattLink(macAddress)
         if (link == null) return
-        val queue = store.pendingQueues[macAddress] ?: return
-        val writing = store.isWriting[macAddress] ?: return
-        store.gattFlights[macAddress]?.takeIf { !store.links.isCurrent(it.link) }?.let { stale ->
-            if (store.gattFlights.remove(macAddress, stale)) stale.writing.set(false)
-        }
-        if (!writing.compareAndSet(false, true)) return
-        val transfer = queue.pollFirst()
-        if (transfer == null) {
-            writing.set(false)
-            return
-        }
-        val flight = GattTransferFlight(
-            transfer, link, queue, writing,
+        val flight = transferCoordinator.claimNext(
+            macAddress, link,
             if (link.role == BleLinkRole.CLIENT) store.activeConnections[macAddress] else null,
             if (link.role == BleLinkRole.SERVER) store.activeServerConnections[macAddress] else null
-        )
-        store.gattFlights[macAddress] = flight
+        ) ?: return
         sendGattChunk(flight)
     }
 
     private fun sendGattChunk(flight: GattTransferFlight) {
         val endpoint = flight.link.endpoint
-        if (!store.links.isCurrent(flight.link) || flight.link.state != BleLinkState.READY ||
-            store.pendingQueues[endpoint] !== flight.queue ||
-            store.gattFlights[endpoint] !== flight) return
+        if (!transferCoordinator.owns(flight)) return
         val remaining = flight.transfer.frame.size - flight.offset
         if (remaining <= 0) return
         val mtu = (store.connectionMtu[endpoint] ?: 20).coerceAtLeast(1)
         val chunk = flight.transfer.frame.copyOfRange(flight.offset, flight.offset + minOf(mtu, remaining))
-        flight.chunkLength = chunk.size
-        val operationId = ++flight.operationId
+        val operationId = transferCoordinator.beginChunk(flight, chunk.size)
         val initiated = if (flight.link.role == BleLinkRole.CLIENT) {
             val gatt = flight.gatt
             val characteristic = gatt?.getService(SERVICE_UUID)?.getCharacteristic(RX_CHARACTERISTIC_UUID)
@@ -852,7 +838,7 @@ class NativeBleManager(val context: Context) {
             }
         }
         if (!initiated) {
-            if (++flight.retryCount >= 5) {
+            if (transferCoordinator.recordInitiationRejected(flight, maxAttempts = 5)) {
                 failGattFlight(flight, "GATT initiation rejected 5 times")
             } else {
                 handler.postDelayed({
@@ -877,31 +863,26 @@ class NativeBleManager(val context: Context) {
     ) {
         handler.post {
             val flight = store.gattFlights[endpoint] ?: return@post
-            if (flight.link.role != role || !store.links.isCurrent(flight.link) ||
-                (role == BleLinkRole.CLIENT && flight.gatt !== gatt) ||
-                (role == BleLinkRole.SERVER && flight.serverDevice !== device)) return@post
+            if (!transferCoordinator.callbackMatches(flight, role, gatt, device)) return@post
             if (status != BluetoothGatt.GATT_SUCCESS) {
                 failGattFlight(flight, "GATT completion failed status=$status")
                 return@post
             }
-            flight.offset += flight.chunkLength
-            flight.chunkLength = 0
-            flight.retryCount = 0
-            if (flight.offset < flight.transfer.frame.size) {
-                sendGattChunk(flight)
-            } else if (store.gattFlights.remove(endpoint, flight)) {
-                flight.writing.set(false)
-                flight.transfer.heartbeatId?.let { markHeartbeatSent(endpoint, flight.link, it) }
-                processNextPayload(endpoint)
+            when (transferCoordinator.completeChunk(flight)) {
+                GattTransferCoordinator.Completion.MORE -> sendGattChunk(flight)
+                GattTransferCoordinator.Completion.DONE -> {
+                    flight.transfer.heartbeatId?.let { markHeartbeatSent(endpoint, flight.link, it) }
+                    processNextPayload(endpoint)
+                }
+                GattTransferCoordinator.Completion.STALE -> Unit
             }
         }
     }
 
     private fun failGattFlight(flight: GattTransferFlight, reason: String) {
         val endpoint = flight.link.endpoint
-        if (!store.gattFlights.remove(endpoint, flight)) return
-        flight.writing.set(false)
-        heartbeatChallenges.remove(endpoint)
+        if (!transferCoordinator.remove(flight)) return
+        heartbeatCoordinator.remove(endpoint)
         if (hasUsableL2cap(endpoint)) {
             AppLogger.d("BLE_MESH", "Link ${flight.link.generation} $endpoint: $reason; preserving healthy L2CAP and promoting payload")
             sendDirectPayload(endpoint, flight.transfer.payloadBytes())
@@ -968,7 +949,7 @@ class NativeBleManager(val context: Context) {
         try {
             val payload = kotlinx.serialization.protobuf.ProtoBuf.decodeFromByteArray(com.example.testresqmesh.core.network.MeshPayload.serializer(), payloadBytes)
             onDeviceLivenessChanged?.invoke(endpointId, true)
-            if (payload.type != "PONG") heartbeatChallenges.remove(endpointId)
+            if (payload.type != "PONG") heartbeatCoordinator.remove(endpointId)
             
             // Only auto-rename the physical socket if this is a direct message (not relayed).
             // Relayed payloads carry a non-empty routePath; renaming from those would map a remote
@@ -1049,41 +1030,38 @@ class NativeBleManager(val context: Context) {
         }
 
     private fun startHeartbeatChallenge(endpoint: String) {
-        if (!store.isNodeActive.get() || heartbeatChallenges.containsKey(endpoint)) return
+        if (!store.isNodeActive.get() || heartbeatCoordinator.contains(endpoint)) return
         val link = readyGattLink(endpoint) ?: return
         val id = "HB:${UUID.randomUUID()}"
-        val challenge = HeartbeatChallenge(endpoint, link.role, link.generation, id, System.currentTimeMillis())
-        heartbeatChallenges[endpoint] = challenge
+        val challenge = heartbeatCoordinator.begin(endpoint, link.role, link.generation, id) ?: return
         val payload = MeshPayload(id = id, type = "PING", senderName = myDeviceName)
         if (!enqueueGattPayload(endpoint, ProtoBuf.encodeToByteArray(payload), priority = true, heartbeatId = id)) {
-            heartbeatChallenges.remove(endpoint, challenge)
+            heartbeatCoordinator.remove(endpoint, challenge)
         } else {
             AppLogger.d("BLE_MESH", "Link ${link.generation} $endpoint: queued GATT heartbeat challenge")
         }
     }
 
     private fun markHeartbeatSent(endpoint: String, link: com.example.testresqmesh.core.network.bluetooth.state.BleLink, id: String) {
-        val pending = heartbeatChallenges[endpoint] ?: return
-        if (pending.id != id || pending.generation != link.generation || !store.links.isCurrent(link)) return
-        val sent = pending.copy(sentAt = System.currentTimeMillis())
-        if (!heartbeatChallenges.replace(endpoint, pending, sent)) return
+        if (!store.links.isCurrent(link)) return
+        val sent = heartbeatCoordinator.markSent(endpoint, link.generation, id) ?: return
         handler.postDelayed({
-            if (heartbeatChallenges[endpoint] != sent) return@postDelayed
+            if (heartbeatCoordinator.pending(endpoint) != sent) return@postDelayed
             val current = store.links.current(endpoint, sent.role)
             if (current == null || current.generation != sent.generation) {
-                heartbeatChallenges.remove(endpoint, sent)
+                heartbeatCoordinator.remove(endpoint, sent)
                 return@postDelayed
             }
             if (store.connectionInteractionTimes[endpoint]?.let { it > sent.sentAt } == true) {
-                heartbeatChallenges.remove(endpoint, sent)
+                heartbeatCoordinator.remove(endpoint, sent)
                 return@postDelayed
             }
             if (store.activeL2capSockets.containsKey(endpoint)) {
-                heartbeatChallenges.remove(endpoint, sent)
+                heartbeatCoordinator.remove(endpoint, sent)
                 return@postDelayed
             }
             if (sent.expired(System.currentTimeMillis(), HEARTBEAT_ACK_TIMEOUT_MS)) {
-                heartbeatChallenges.remove(endpoint, sent)
+                heartbeatCoordinator.remove(endpoint, sent)
                 AppLogger.d("BLE_MESH", "Link ${sent.generation} $endpoint: GATT heartbeat ACK timed out; retiring silent roles")
                 store.activeConnections[endpoint]?.let { forceGattDisconnect(endpoint, it) }
                 store.activeServerConnections[endpoint]?.let { gattServer?.cancelConnection(it) }
@@ -1093,10 +1071,9 @@ class NativeBleManager(val context: Context) {
 
     private fun onHeartbeatAck(endpoint: String, id: String) {
         handler.post {
-            val pending = heartbeatChallenges[endpoint] ?: return@post
+            val pending = heartbeatCoordinator.pending(endpoint) ?: return@post
             val current = store.links.current(endpoint, pending.role) ?: return@post
-            if (pending.accepts(endpoint, id, current.generation) && store.links.isCurrent(current)) {
-                heartbeatChallenges.remove(endpoint, pending)
+            if (store.links.isCurrent(current) && heartbeatCoordinator.acknowledge(endpoint, id, current.generation)) {
                 AppLogger.d("BLE_MESH", "Link ${current.generation} $endpoint: GATT heartbeat acknowledged")
             }
         }
@@ -1235,16 +1212,9 @@ class NativeBleManager(val context: Context) {
         }
         if (!hasUsableL2cap(endpoint)) return
 
-        val promoted = mutableListOf<GattTransfer>()
-        store.gattFlights.remove(endpoint)?.let { flight ->
-            flight.writing.set(false)
-            flight.transfer.heartbeatId?.let { heartbeatChallenges.remove(endpoint) }
-            promoted += flight.transfer
-        }
-        store.pendingQueues[endpoint]?.let { queue ->
-            while (true) promoted += queue.pollFirst() ?: break
-        }
-        store.isWriting[endpoint]?.set(false)
+        val activeHeartbeatId = store.gattFlights[endpoint]?.transfer?.heartbeatId
+        val promoted = transferCoordinator.drainForPromotion(endpoint)
+        if (activeHeartbeatId != null) heartbeatCoordinator.remove(endpoint)
         if (promoted.isEmpty()) return
 
         AppLogger.d("BLE_MESH", "Promoting ${promoted.size} queued GATT transfer(s) to L2CAP for $endpoint")
@@ -1282,7 +1252,7 @@ class NativeBleManager(val context: Context) {
         store.connectionEstablishTime.remove(endpointId)
         store.pendingQueues.remove(endpointId)
         store.gattFlights.remove(endpointId)?.writing?.set(false)
-        heartbeatChallenges.remove(endpointId)
+        heartbeatCoordinator.remove(endpointId)
         store.isWriting.remove(endpointId)
         store.chunkBuffers.remove(endpointId)
         store.connectionMtu.remove(endpointId)

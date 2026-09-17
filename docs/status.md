@@ -24,6 +24,7 @@ Restore cross-OEM GATT readiness without weakening known-good links or allowing 
 - L2CAP socket identity checks, failure retirement, and GATT retry/fallback behavior.
 - Persistent Android Keystore RSA identity, fail-closed private sending, endpoint-aware key cache rules, encrypted private locations, and removal of private plaintext logging in the reviewed handlers.
 - Focused unit tests for link lifecycle, liveness, heartbeat ownership, and private-message policy.
+- Deterministic coordinators now own GATT-flight and heartbeat state; repository gateway/store boundaries hide Bluetooth and Room; Active Chat header and Radar models are separated without changing public UI behavior.
 - The in-app diagnostic terminal now uses structured Connection/Sync/Transport/Routing/Security/System events, a live direct-link summary, newest-first paused-follow scrolling, and Latest/Last Sync controls. Local compile/test evidence is still required; device validation must confirm the displayed lifecycle matches the phones.
 - Lean pull-request CI for the debug build, unit tests, error-free Android Lint, canonical-document checks, and diff hygiene; PR creation and merging remain explicit user actions.
 
@@ -48,7 +49,7 @@ Local build, unit tests, and Android Lint passed; physical BLE validation remain
 1. Retest the clean opposite role: CPH client and Samsung server, without role reversal or advertiser restart.
 2. If that succeeds, add a stable-identity per-peer role preference after repeated discovery failure; if it fails, isolate the phones with a standard GATT test app before another transport change.
 3. Validate a three-phone A-B-C routed hop, then add a fourth/fifth node while enforcing three direct neighbors per phone.
-4. Complete server callback ownership and queue/framing bounds.
+4. Complete server callback ownership and queue/framing bounds, then continue the remaining repository event-handler and screen-component slices.
 
 ## Scope guard
 

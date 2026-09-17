@@ -6,6 +6,7 @@ The UI uses Jetpack Compose and Material 3. Inspect the actual screen, ViewModel
 
 - Reuse shared components under `core/ui/components` and theme tokens before adding local styling.
 - Keep business, routing, and transport decisions out of composables. ViewModels/use cases expose UI state and user actions.
+- Keep route-level composables responsible for state collection and side effects; move reusable stateless presentation into feature `ui/components` files.
 - Prefer immutable screen state and explicit loading, success, empty, warning, and error states.
 - Do not perform blocking storage/network work during composition.
 - Preserve previews or focused UI tests where they provide meaningful coverage.
