@@ -16,8 +16,8 @@ val AuroraCyan600 = Color(0xFF0891B2)
 val AuroraCyan500 = Color(0xFF06B6D4)
 val AuroraCyan200 = Color(0xFFA5F3FC)
 
-val AuroraCanvasLight = Color(0xFFFFFFFF)
-val AuroraCanvasLightEnd = Color(0xFFFFFFFF)
+val AuroraCanvasLight = Color(0xFFFBFAFF)
+val AuroraCanvasLightEnd = Color(0xFFF7F5FC)
 val AuroraCanvasDark = Color(0xFF090D1A)
 val AuroraCanvasDarkEnd = Color(0xFF151A30)
 

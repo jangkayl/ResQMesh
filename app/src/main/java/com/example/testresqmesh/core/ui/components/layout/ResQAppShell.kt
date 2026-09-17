@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.ChatBubbleOutline
 import androidx.compose.material.icons.outlined.Home
@@ -88,21 +89,23 @@ private fun ResQBottomBar(
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = Spacing.Medium, vertical = 10.dp),
+            .height(132.dp)
+            .padding(horizontal = Spacing.Large, vertical = Spacing.Medium),
         contentAlignment = Alignment.Center
     ) {
         ResQGlassSurface(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(82.dp),
-            shape = MaterialTheme.shapes.extraLarge,
-            shadowElevation = 22.dp,
+                .height(72.dp)
+                .align(Alignment.BottomCenter),
+            shape = RoundedCornerShape(40.dp),
+            shadowElevation = 18.dp,
             contentAlignment = Alignment.Center
         ) {
             NavigationBar(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(ResQSize.BottomBarHeight),
+                    .height(72.dp),
                 containerColor = Color.Transparent,
                 tonalElevation = 0.dp
             ) {
@@ -116,15 +119,6 @@ private fun ResQBottomBar(
                     selected = selectedDestination == ResQDestination.Messages,
                     onClick = { onDestinationSelected(ResQDestination.Messages) }
                 )
-                Box(
-                    modifier = Modifier.weight(1f),
-                    contentAlignment = Alignment.Center
-                ) {
-                    SosHoldButton(
-                        onHoldComplete = onSosActivated,
-                        enabled = sosEnabled
-                    )
-                }
                 ResQNavigationItem(
                     destination = ResQDestination.Network,
                     selected = selectedDestination == ResQDestination.Network,
@@ -132,6 +126,13 @@ private fun ResQBottomBar(
                 )
             }
         }
+        SosHoldButton(
+            onHoldComplete = onSosActivated,
+            enabled = sosEnabled,
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(end = Spacing.Small)
+        )
     }
 }
 

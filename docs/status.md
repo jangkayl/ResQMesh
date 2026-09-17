@@ -7,7 +7,7 @@ Baseline: branch `temp`, HEAD `d7cd5e3`, with substantial uncommitted Android, t
 
 Preserve the physically validated two-phone BLE/L2CAP improvement, then address the separate asymmetric block-policy defect and finish the remaining ownership, queue-bound, and framing work before broader multi-phone expansion.
 
-In parallel, the civilian-first UI refactor is proceeding through explicit review gates. User review replaced the Aurora Glass direction with a clean white, mobile-first system before Home work began. The new foundation uses a white canvas, bold dark hierarchy, purple actions, cyan identity accents, green status, elevated white cards, and a floating capsule dock. The clean-white Permissions screen is complete and awaiting review; Identity Setup will not begin without approval.
+In parallel, the civilian-first UI refactor is proceeding through explicit review gates. User review replaced the prior direction with a light-only reference-inspired system: pale-white/lavender canvas, bold dark hierarchy, purple actions, cyan identity accents, green status, raised white cards, and a three-item capsule dock with SOS floating above it. Shared foundation work is complete; Splash and Permissions will be rebuilt from scratch before Identity Setup begins.
 
 ## Implemented in the working tree
 
