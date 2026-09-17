@@ -45,6 +45,7 @@ fun MainContainerScreen(
     var mapSosAlert by remember { mutableStateOf<com.example.testresqmesh.core.model.ChatMessage?>(null) }
     var showProfile by remember { mutableStateOf(false) }
     var showAdvanced by remember { mutableStateOf(false) }
+    var isCommunityConversationOpen by remember { mutableStateOf(false) }
     
     
     val incomingSosAlert by commsViewModel.incomingSosAlert.collectAsState()
@@ -157,7 +158,8 @@ fun MainContainerScreen(
     ResQAppShell(
         selectedDestination = currentDestination,
         onDestinationSelected = { currentDestination = it },
-        onSosActivated = { isSOSActive = true }
+        onSosActivated = { isSOSActive = true },
+        showNavigation = !isCommunityConversationOpen
     ) { innerPadding ->
         AnimatedContent(
             targetState = currentDestination,
@@ -183,7 +185,8 @@ fun MainContainerScreen(
                     viewModel = commsViewModel, 
                     walkieTalkieViewModel = walkieTalkieViewModel,
                     mediaHelper = mediaHelper, 
-                    onChatSelected = { activeChatNode = it }
+                    onChatSelected = { activeChatNode = it },
+                    onCommunityConversationChanged = { isCommunityConversationOpen = it }
                 )
                 ResQDestination.WalkieTalkie -> WalkieTalkieScreen(
                     commsViewModel = commsViewModel,

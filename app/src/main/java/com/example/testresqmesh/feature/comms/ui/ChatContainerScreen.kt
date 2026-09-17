@@ -33,6 +33,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -64,7 +65,8 @@ fun ChatContainerScreen(
     viewModel: CommunicationViewModel,
     walkieTalkieViewModel: com.example.testresqmesh.feature.comms.viewmodel.WalkieTalkieViewModel,
     mediaHelper: MediaHelper,
-    onChatSelected: (String) -> Unit
+    onChatSelected: (String) -> Unit,
+    onCommunityConversationChanged: (Boolean) -> Unit
 ) {
     @Suppress("UNUSED_VARIABLE")
     val retainedWalkieTalkieViewModel = walkieTalkieViewModel
@@ -76,6 +78,11 @@ fun ChatContainerScreen(
     }
     var showNewMessageModal by remember { mutableStateOf(false) }
     var showCommunityConversation by remember { mutableStateOf(false) }
+
+    DisposableEffect(showCommunityConversation) {
+        onCommunityConversationChanged(showCommunityConversation)
+        onDispose { onCommunityConversationChanged(false) }
+    }
 
     if (showNewMessageModal) {
         ModalBottomSheet(

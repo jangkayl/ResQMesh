@@ -62,6 +62,7 @@ fun ResQAppShell(
     onSosActivated: () -> Unit,
     modifier: Modifier = Modifier,
     sosEnabled: Boolean = true,
+    showNavigation: Boolean = true,
     content: @Composable (PaddingValues) -> Unit
 ) {
     ResQAuroraBackground(modifier = modifier.fillMaxSize()) {
@@ -69,12 +70,14 @@ fun ResQAppShell(
             modifier = Modifier.fillMaxSize(),
             containerColor = Color.Transparent,
             bottomBar = {
-                ResQBottomBar(
-                    selectedDestination = selectedDestination,
-                    onDestinationSelected = onDestinationSelected,
-                    onSosActivated = onSosActivated,
-                    sosEnabled = sosEnabled
-                )
+                if (showNavigation) {
+                    ResQBottomBar(
+                        selectedDestination = selectedDestination,
+                        onDestinationSelected = onDestinationSelected,
+                        onSosActivated = onSosActivated,
+                        sosEnabled = sosEnabled
+                    )
+                }
             },
             content = content
         )
