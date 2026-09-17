@@ -6,6 +6,7 @@ Builds and unit tests validate local code paths; they do not prove BLE behavior.
 
 ```powershell
 .\gradlew.bat :app:assembleDebug :app:testDebugUnitTest --console=plain
+.\gradlew.bat :app:lintDebug --console=plain
 powershell -ExecutionPolicy Bypass -File .\scripts\check_docs.ps1
 git diff --check
 ```
@@ -14,7 +15,7 @@ Use checks proportional to the change. Do not repeat broad tests after an unrela
 
 ## Pull-request CI gate
 
-`.github/workflows/lean-qa.yml` repeats the build, unit tests, documentation check, and diff hygiene on every pull request. Superseded runs for the same pull request are cancelled. Any failed command blocks readiness; AI review may explain the failure but cannot waive it. The workflow does not deploy, merge, run an emulator, or claim physical BLE validation.
+`.github/workflows/lean-qa.yml` repeats the build, unit tests, error-level Android Lint, documentation check, and diff hygiene on every pull request. Superseded runs for the same pull request are cancelled. Any failed command blocks readiness; AI review may explain the failure but cannot waive it. The workflow does not deploy, merge, run an emulator, or claim physical BLE validation.
 
 After local checks pass, Codex reports the result and waits for explicit user approval before creating a pull request. Merging is always a separate explicit user action.
 

@@ -1,5 +1,7 @@
 package com.example.testresqmesh.feature.comms.ui
 
+import android.Manifest
+import android.content.pm.PackageManager
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -27,6 +29,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.core.content.ContextCompat
 import com.example.testresqmesh.core.model.ConnectedDevice
 import com.example.testresqmesh.core.ui.theme.TestResQMeshTheme
 import com.example.testresqmesh.core.ui.theme.InboxBackground
@@ -214,7 +217,11 @@ fun ActiveChatScreen(
                         }
                     },
                     onSendLocation = {
-                        viewModel.broadcastLocation(context, isPrivate = true, targetName = displayName)
+                        if (ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
+                            ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
+                        ) {
+                            viewModel.broadcastLocation(context, isPrivate = true, targetName = displayName)
+                        }
                     },
                     mediaHelper = mediaHelper
                 )

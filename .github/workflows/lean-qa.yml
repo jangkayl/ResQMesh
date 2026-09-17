@@ -13,7 +13,7 @@ concurrency:
 
 jobs:
   validate:
-    name: Build, unit tests, and repository checks
+    name: Build, unit tests, lint, and repository checks
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
@@ -32,8 +32,8 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v6
 
-      - name: Build debug APK and run unit tests
-        run: ./gradlew :app:assembleDebug :app:testDebugUnitTest --console=plain --no-daemon
+      - name: Build debug APK, run unit tests, and run Android Lint
+        run: ./gradlew :app:assembleDebug :app:testDebugUnitTest :app:lintDebug --console=plain --no-daemon
 
       - name: Check canonical documentation
         shell: pwsh

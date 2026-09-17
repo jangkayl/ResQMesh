@@ -25,9 +25,9 @@ Restore cross-OEM GATT readiness without weakening known-good links or allowing 
 - Persistent Android Keystore RSA identity, fail-closed private sending, endpoint-aware key cache rules, encrypted private locations, and removal of private plaintext logging in the reviewed handlers.
 - Focused unit tests for link lifecycle, liveness, heartbeat ownership, and private-message policy.
 - The in-app diagnostic terminal now uses structured Connection/Sync/Transport/Routing/Security/System events, a live direct-link summary, newest-first paused-follow scrolling, and Latest/Last Sync controls. Local compile/test evidence is still required; device validation must confirm the displayed lifecycle matches the phones.
-- Lean pull-request CI for the debug build, unit tests, canonical-document checks, and diff hygiene; PR creation and merging remain explicit user actions.
+- Lean pull-request CI for the debug build, unit tests, error-free Android Lint, canonical-document checks, and diff hygiene; PR creation and merging remain explicit user actions.
 
-Local build and unit tests passed; physical BLE validation remains required.
+Local build, unit tests, and Android Lint passed; physical BLE validation remains required.
 
 ## Open blockers
 
@@ -42,15 +42,13 @@ Local build and unit tests passed; physical BLE validation remains required.
 | ROUTE-01 | P1 | Topology expiry/refresh, empty withdrawal, and loop lifetime need focused repair | Stable three-phone route, withdrawal, and duplicate/loop tests |
 | SEC-01 | P1 | Public keys lack authenticated identity binding/current-key proof; storage backup policy is unresolved | Defined threat model, fail-closed tests, and documented claim boundary |
 | SOS-01 | P1 | SOS cancellation/follow-up ownership needs sender/alert binding review | Concurrent-alert and cancel-before-location tests |
-| QUALITY-01 | P1 | Lint baseline: 27 errors, 58 warnings, 2 hints; errors are mainly unchecked GATT/location permissions | Repair permission errors before enabling lint in CI |
 
 ## Next actions
 
 1. Retest the clean opposite role: CPH client and Samsung server, without role reversal or advertiser restart.
 2. If that succeeds, add a stable-identity per-peer role preference after repeated discovery failure; if it fails, isolate the phones with a standard GATT test app before another transport change.
 3. Validate a three-phone A-B-C routed hop, then add a fourth/fifth node while enforcing three direct neighbors per phone.
-4. Triage Android Lint permission errors before enabling lint as a blocking CI gate.
-5. Complete server callback ownership and queue/framing bounds.
+4. Complete server callback ownership and queue/framing bounds.
 
 ## Scope guard
 

@@ -1,5 +1,7 @@
 package com.example.testresqmesh.feature.comms.ui
 
+import android.Manifest
+import android.content.pm.PackageManager
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -14,6 +16,7 @@ import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.shape.CircleShape
 import com.example.testresqmesh.core.ui.theme.ErrorRed
@@ -158,7 +161,11 @@ fun PublicChatTab(
                 focusManager.clearFocus()
             },
             onSendLocation = {
-                viewModel.broadcastLocation(context = context, isPrivate = false)
+                if (ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
+                    ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
+                ) {
+                    viewModel.broadcastLocation(context = context, isPrivate = false)
+                }
             },
             mediaHelper = mediaHelper
         )

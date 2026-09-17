@@ -1,7 +1,11 @@
 package com.example.testresqmesh.core.network.bluetooth.gatt
 
 import android.bluetooth.*
+import android.Manifest
 import android.content.Context
+import android.content.pm.PackageManager
+import android.os.Build
+import androidx.core.content.ContextCompat
 import com.example.testresqmesh.core.model.ConnectedDevice
 import com.example.testresqmesh.core.model.NodeIdentity
 import com.example.testresqmesh.core.network.NativeBleManager
@@ -21,10 +25,22 @@ class GattServerManager(
     private val serverSetupTimeoutMs = 20_000L
 
     fun startGattServer() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
+            ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED
+        ) {
+            AppLogger.d("BLE_MESH", "GATT server not started: BLUETOOTH_CONNECT is not granted")
+            return
+        }
         with(manager) {
         val serverCallback = object : BluetoothGattServerCallback() {
             
             override fun onConnectionStateChange(device: BluetoothDevice, status: Int, newState: Int) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
+                    ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED
+                ) {
+                    AppLogger.d("BLE_MESH", "Ignoring SERVER connection callback: BLUETOOTH_CONNECT was revoked")
+                    return
+                }
                 val macAddress = device.address
                 if (newState == BluetoothProfile.STATE_CONNECTED) {
                     // Android may report the local GATT server side of an ACL that this process
@@ -42,7 +58,11 @@ class GattServerManager(
                     val peerName = store.connectedEndpointNames[macAddress]
                     if (peerName != null && isDeviceBlocked(peerName)) {
                         AppLogger.d("BLE_MESH", "Server: Rejected blocked device ${peerName}.")
-                        gattServer?.cancelConnection(device)
+                        try {
+                            gattServer?.cancelConnection(device)
+                        } catch (e: SecurityException) {
+                            AppLogger.d("BLE_MESH", "Could not reject blocked device: BLUETOOTH_CONNECT was revoked")
+                        }
                         return
                     }
                     
@@ -62,7 +82,11 @@ class GattServerManager(
                             val theirId = NodeIdentity.idOf(peerName) ?: ""
                             if (myId < theirId) {
                                 AppLogger.d("BLE_MESH", "Dual-Link Collision with $peerName: we keep our link ($myId < $theirId). Rejecting inbound.")
-                                gattServer?.cancelConnection(device)
+                                try {
+                                    gattServer?.cancelConnection(device)
+                                } catch (e: SecurityException) {
+                                    AppLogger.d("BLE_MESH", "Could not reject duplicate inbound link: BLUETOOTH_CONNECT was revoked")
+                                }
                                 return
                             }
                             AppLogger.d("BLE_MESH", "Dual-Link Collision with $peerName: yielding our link ($myId >= $theirId). Accepting inbound.")
@@ -72,7 +96,11 @@ class GattServerManager(
                             // connection must not be allowed to tear it down: that self-inflicted
                             // teardown was the connect/disconnect loop.
                             AppLogger.d("BLE_MESH", "Rejecting redundant inbound link from $peerName. Healthy link already on $existingEndpoint.")
-                            gattServer?.cancelConnection(device)
+                            try {
+                                gattServer?.cancelConnection(device)
+                            } catch (e: SecurityException) {
+                                AppLogger.d("BLE_MESH", "Could not reject redundant inbound link: BLUETOOTH_CONNECT was revoked")
+                            }
                             return
                         }
                     }
@@ -80,7 +108,11 @@ class GattServerManager(
                     val totalConnections = distinctLinkCount()
                     if (totalConnections >= MAX_TOTAL_CONNECTIONS) {
                         AppLogger.d("BLE_MESH", "Server: Rejected connection from ${device.address}. Mesh node is full.")
-                        gattServer?.cancelConnection(device)
+                        try {
+                            gattServer?.cancelConnection(device)
+                        } catch (e: SecurityException) {
+                            AppLogger.d("BLE_MESH", "Could not reject full-mesh connection: BLUETOOTH_CONNECT was revoked")
+                        }
                         return
                     }
                     AppLogger.d("BLE_MESH", "Server: Device ${macAddress} connected.")
@@ -99,6 +131,15 @@ class GattServerManager(
                     val setupDeadline = object : Runnable {
                         override fun run() {
                             if (!store.links.isCurrent(link) || link.state != BleLinkState.CONFIGURING) return
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
+                                ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED
+                            ) {
+                                AppLogger.d("BLE_MESH", "SERVER setup deadline ended: BLUETOOTH_CONNECT was revoked")
+                                finishRadioHandshake(radioOwner, "Bluetooth permission revoked")
+                                store.links.transition(link, BleLinkState.DISCONNECTING)
+                                store.links.forget(link)
+                                return
+                            }
                             if (store.links.hasReadyPeerExcept(link)) {
                                 AppLogger.d("BLE_MESH", "Link ${link.generation} SERVER $macAddress: keeping unfinished role while peer has a READY link")
                                 handler.postDelayed(this, serverSetupTimeoutMs)
@@ -107,7 +148,7 @@ class GattServerManager(
                             if (store.links.expireConfiguring(link)) {
                                 AppLogger.d("BLE_MESH", "Link ${link.generation} SERVER $macAddress: CCCD setup timed out; closing unfinished link")
                                 finishRadioHandshake(radioOwner, "server setup timeout")
-                                try { gattServer?.cancelConnection(device) } catch (e: Exception) {
+                                try { gattServer?.cancelConnection(device) } catch (e: SecurityException) {
                                     AppLogger.d("BLE_MESH", "Server setup timeout disconnect failed on $macAddress: ${e.message}")
                                 }
                             }
@@ -184,8 +225,19 @@ class GattServerManager(
             }
 
             override fun onDescriptorWriteRequest(device: BluetoothDevice, requestId: Int, descriptor: BluetoothGattDescriptor, preparedWrite: Boolean, responseNeeded: Boolean, offset: Int, value: ByteArray?) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
+                    ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED
+                ) {
+                    AppLogger.d("BLE_MESH", "Ignoring SERVER descriptor callback: BLUETOOTH_CONNECT was revoked")
+                    return
+                }
                 if (responseNeeded) {
-                    gattServer?.sendResponse(device, requestId, BluetoothGatt.GATT_SUCCESS, offset, value)
+                    try {
+                        gattServer?.sendResponse(device, requestId, BluetoothGatt.GATT_SUCCESS, offset, value)
+                    } catch (e: SecurityException) {
+                        AppLogger.d("BLE_MESH", "SERVER descriptor response skipped: BLUETOOTH_CONNECT was revoked")
+                        return
+                    }
                 }
                 val link = store.links.current(device.address, BleLinkRole.SERVER)
                 if (link?.serverDevice?.address == device.address && descriptor.uuid == CCC_DESCRIPTOR_UUID &&
@@ -216,10 +268,20 @@ class GattServerManager(
                     processNextPayload(device.address)
                     if (NodeIdentity.isPlaceholder(store.connectedEndpointNames[device.address])) {
                         handler.postDelayed({
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
+                                ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED
+                            ) {
+                                AppLogger.d("BLE_MESH", "SERVER identity deadline ended: BLUETOOTH_CONNECT was revoked")
+                                return@postDelayed
+                            }
                             if (store.links.isCurrent(link) && link.state == BleLinkState.READY &&
                                 NodeIdentity.isPlaceholder(store.connectedEndpointNames[device.address])) {
                                 AppLogger.d("BLE_MESH", "Server: READY link received no identity; disconnecting ${device.address}.")
-                                gattServer?.cancelConnection(device)
+                                try {
+                                    gattServer?.cancelConnection(device)
+                                } catch (e: SecurityException) {
+                                    AppLogger.d("BLE_MESH", "SERVER identity timeout disconnect skipped: BLUETOOTH_CONNECT was revoked")
+                                }
                             }
                         }, NAME_HANDSHAKE_TIMEOUT_MS)
                     }
@@ -242,11 +304,25 @@ class GattServerManager(
                 offset: Int,
                 characteristic: BluetoothGattCharacteristic
             ) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
+                    ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED
+                ) {
+                    AppLogger.d("BLE_MESH", "Ignoring SERVER read request: BLUETOOTH_CONNECT was revoked")
+                    return
+                }
                 if (characteristic.uuid == L2CAP_PSM_CHARACTERISTIC_UUID) {
                     val psmBytes = java.nio.ByteBuffer.allocate(4).putInt(myL2capPsm).array()
-                    gattServer?.sendResponse(device, requestId, BluetoothGatt.GATT_SUCCESS, offset, psmBytes)
+                    try {
+                        gattServer?.sendResponse(device, requestId, BluetoothGatt.GATT_SUCCESS, offset, psmBytes)
+                    } catch (e: SecurityException) {
+                        AppLogger.d("BLE_MESH", "SERVER PSM response skipped: BLUETOOTH_CONNECT was revoked")
+                    }
                 } else {
-                    gattServer?.sendResponse(device, requestId, BluetoothGatt.GATT_READ_NOT_PERMITTED, offset, null)
+                    try {
+                        gattServer?.sendResponse(device, requestId, BluetoothGatt.GATT_READ_NOT_PERMITTED, offset, null)
+                    } catch (e: SecurityException) {
+                        AppLogger.d("BLE_MESH", "SERVER read rejection skipped: BLUETOOTH_CONNECT was revoked")
+                    }
                 }
             }
 
@@ -254,9 +330,20 @@ class GattServerManager(
                 device: BluetoothDevice, requestId: Int, characteristic: BluetoothGattCharacteristic,
                 preparedWrite: Boolean, responseNeeded: Boolean, offset: Int, value: ByteArray?
             ) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
+                    ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED
+                ) {
+                    AppLogger.d("BLE_MESH", "Ignoring SERVER write request: BLUETOOTH_CONNECT was revoked")
+                    return
+                }
                 super.onCharacteristicWriteRequest(device, requestId, characteristic, preparedWrite, responseNeeded, offset, value)
                 if (responseNeeded) {
-                    gattServer?.sendResponse(device, requestId, BluetoothGatt.GATT_SUCCESS, offset, value)
+                    try {
+                        gattServer?.sendResponse(device, requestId, BluetoothGatt.GATT_SUCCESS, offset, value)
+                    } catch (e: SecurityException) {
+                        AppLogger.d("BLE_MESH", "SERVER write response skipped: BLUETOOTH_CONNECT was revoked")
+                        return
+                    }
                 }
                 value?.let {
                     val macAddress = device.address
@@ -332,6 +419,12 @@ class GattServerManager(
     }
 
     fun startL2capServer() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
+            ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED
+        ) {
+            AppLogger.d("BLE_MESH", "L2CAP server not started: BLUETOOTH_CONNECT is not granted")
+            return
+        }
         with(manager) {
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
             try {

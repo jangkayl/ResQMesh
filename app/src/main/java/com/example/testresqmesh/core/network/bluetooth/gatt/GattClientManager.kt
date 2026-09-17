@@ -1,9 +1,13 @@
 package com.example.testresqmesh.core.network.bluetooth.gatt
 
 import android.bluetooth.*
+import android.Manifest
 import android.content.Context
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Handler
 import android.os.Looper
+import androidx.core.content.ContextCompat
 import com.example.testresqmesh.core.model.ConnectedDevice
 import com.example.testresqmesh.core.model.NodeIdentity
 import com.example.testresqmesh.core.model.ScanEvent
@@ -36,6 +40,12 @@ class GattClientManager(
     }
 
     fun connectToPersistentGatt(macAddress: String, peerName: String) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
+            ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED
+        ) {
+            AppLogger.d("BLE_MESH", "GATT connect skipped for $peerName: BLUETOOTH_CONNECT is not granted")
+            return
+        }
         with(manager) {
         // DUPLICATE LINK GUARD: resolve by identity, not by MAC. A peer already connected inbound
         // on its Central MAC used to look absent here, so we would open a second redundant link.
@@ -133,8 +143,23 @@ class GattClientManager(
                 }
 
                 override fun onConnectionStateChange(gatt: BluetoothGatt, status: Int, newState: Int) {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
+                        ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED
+                    ) {
+                        AppLogger.d("BLE_MESH", "Ignoring CLIENT connection callback for $peerName: BLUETOOTH_CONNECT was revoked")
+                        finishConnectPhase("Bluetooth permission revoked")
+                        store.links.transition(link, BleLinkState.DISCONNECTING)
+                        store.links.forget(link)
+                        return
+                    }
                     if (!owns(gatt, "connection state $newState/$status")) {
-                        if (newState == BluetoothProfile.STATE_DISCONNECTED) gatt.close()
+                        if (newState == BluetoothProfile.STATE_DISCONNECTED) {
+                            try {
+                                gatt.close()
+                            } catch (e: SecurityException) {
+                                AppLogger.d("BLE_MESH", "Could not close stale CLIENT link: BLUETOOTH_CONNECT was revoked")
+                            }
+                        }
                         return
                     }
                     if (newState == BluetoothProfile.STATE_CONNECTED) {
@@ -181,7 +206,15 @@ class GattClientManager(
                                 )
                             )
                         }
-                        gatt.requestConnectionPriority(BluetoothGatt.CONNECTION_PRIORITY_HIGH)
+                        try {
+                            gatt.requestConnectionPriority(BluetoothGatt.CONNECTION_PRIORITY_HIGH)
+                        } catch (e: SecurityException) {
+                            AppLogger.d("BLE_MESH", "CLIENT connection priority skipped: BLUETOOTH_CONNECT was revoked")
+                            finishConnectPhase("Bluetooth permission revoked")
+                            store.links.transition(link, BleLinkState.DISCONNECTING)
+                            store.links.forget(link)
+                            return
+                        }
                         // Default ATT payload size is reliable on every supported Android version.
                         // Negotiate no larger MTU until the link is READY and the setup queue is idle.
                         store.connectionMtu[macAddress] = 20
@@ -214,7 +247,11 @@ class GattClientManager(
                             onDeviceDisconnected?.invoke(macAddress)
                             sendSystemPulse()
                         }
-                        gatt.close()
+                        try {
+                            gatt.close()
+                        } catch (e: SecurityException) {
+                            AppLogger.d("BLE_MESH", "Could not close CLIENT link: BLUETOOTH_CONNECT was revoked")
+                        }
                         store.links.forget(link)
                     }
                 }
@@ -235,6 +272,15 @@ class GattClientManager(
                 }
     
                 override fun onServicesDiscovered(gatt: BluetoothGatt, status: Int) {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
+                        ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED
+                    ) {
+                        AppLogger.d("BLE_MESH", "Ignoring CLIENT service callback for $peerName: BLUETOOTH_CONNECT was revoked")
+                        finishConnectPhase("Bluetooth permission revoked")
+                        store.links.transition(link, BleLinkState.DISCONNECTING)
+                        store.links.forget(link)
+                        return
+                    }
                     if (!owns(gatt, "services $status")) return
                     link.currentOperation = null
                     if (status == BluetoothGatt.GATT_SUCCESS) {
@@ -247,16 +293,32 @@ class GattClientManager(
                         val txChar = service?.getCharacteristic(TX_CHARACTERISTIC_UUID)
                         var descriptorWritePending = false
                         if (txChar != null) {
-                            gatt.setCharacteristicNotification(txChar, true)
+                            try {
+                                gatt.setCharacteristicNotification(txChar, true)
+                            } catch (e: SecurityException) {
+                                AppLogger.d("BLE_MESH", "CLIENT notification setup skipped: BLUETOOTH_CONNECT was revoked")
+                                finishConnectPhase("Bluetooth permission revoked")
+                                store.links.transition(link, BleLinkState.DISCONNECTING)
+                                store.links.forget(link)
+                                return
+                            }
                             val descriptor = txChar.getDescriptor(CCC_DESCRIPTOR_UUID)
                             if (descriptor != null) {
                                 descriptorWritePending = true
                                 link.currentOperation = "WRITE_CCCD"
-                                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
-                                    gatt.writeDescriptor(descriptor, BluetoothGattDescriptor.ENABLE_INDICATION_VALUE)
-                                } else {
-                                    descriptor.value = BluetoothGattDescriptor.ENABLE_INDICATION_VALUE
-                                    gatt.writeDescriptor(descriptor)
+                                try {
+                                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+                                        gatt.writeDescriptor(descriptor, BluetoothGattDescriptor.ENABLE_INDICATION_VALUE)
+                                    } else {
+                                        descriptor.value = BluetoothGattDescriptor.ENABLE_INDICATION_VALUE
+                                        gatt.writeDescriptor(descriptor)
+                                    }
+                                } catch (e: SecurityException) {
+                                    AppLogger.d("BLE_MESH", "CLIENT descriptor setup skipped: BLUETOOTH_CONNECT was revoked")
+                                    finishConnectPhase("Bluetooth permission revoked")
+                                    store.links.transition(link, BleLinkState.DISCONNECTING)
+                                    store.links.forget(link)
+                                    return
                                 }
                             }
                         }
@@ -278,6 +340,15 @@ class GattClientManager(
                 }
     
                 override fun onDescriptorWrite(gatt: BluetoothGatt, descriptor: BluetoothGattDescriptor, status: Int) {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
+                        ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED
+                    ) {
+                        AppLogger.d("BLE_MESH", "Ignoring CLIENT descriptor callback for $peerName: BLUETOOTH_CONNECT was revoked")
+                        finishConnectPhase("Bluetooth permission revoked")
+                        store.links.transition(link, BleLinkState.DISCONNECTING)
+                        store.links.forget(link)
+                        return
+                    }
                     if (!owns(gatt, "descriptor $status")) return
                     link.currentOperation = null
                     if (status == BluetoothGatt.GATT_SUCCESS) {
@@ -300,7 +371,15 @@ class GattClientManager(
                         // Proceed to read the L2CAP PSM port
                         val psmChar = gatt.getService(SERVICE_UUID)?.getCharacteristic(L2CAP_PSM_CHARACTERISTIC_UUID)
                         if (psmChar != null) {
-                            gatt.readCharacteristic(psmChar)
+                            try {
+                                gatt.readCharacteristic(psmChar)
+                            } catch (e: SecurityException) {
+                                AppLogger.d("BLE_MESH", "CLIENT L2CAP PSM read skipped: BLUETOOTH_CONNECT was revoked")
+                                finishConnectPhase("Bluetooth permission revoked")
+                                store.links.transition(link, BleLinkState.DISCONNECTING)
+                                store.links.forget(link)
+                                return
+                            }
                         }
                         
                         finishConnectPhase("descriptor written")
