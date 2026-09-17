@@ -4,9 +4,7 @@ import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -27,8 +25,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
@@ -38,7 +34,6 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.example.testresqmesh.R
 import com.example.testresqmesh.core.ui.components.layout.ResQAuroraBackground
-import com.example.testresqmesh.core.ui.components.layout.ResQGlassSurface
 import com.example.testresqmesh.core.ui.theme.Spacing
 import com.example.testresqmesh.core.ui.theme.TestResQMeshTheme
 import kotlinx.coroutines.delay
@@ -73,27 +68,21 @@ private fun SplashContent(loadingProgress: Float) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = Spacing.Large, vertical = Spacing.ExtraLarge),
+                .padding(horizontal = Spacing.Large, vertical = Spacing.Huge),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.SpaceBetween
         ) {
-            Spacer(Modifier.height(Spacing.Medium))
+            Spacer(Modifier.height(Spacing.Large))
 
             Column(
                 modifier = Modifier.widthIn(max = 360.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                ResQGlassSurface(
-                    modifier = Modifier.size(144.dp),
-                    shape = MaterialTheme.shapes.extraLarge,
-                    contentAlignment = Alignment.Center
-                ) {
-                    Image(
-                        painter = painterResource(R.drawable.resqmesh_sublogo),
-                        contentDescription = stringResource(R.string.splash_logo_description),
-                        modifier = Modifier.size(96.dp)
-                    )
-                }
+                Image(
+                    painter = painterResource(R.drawable.resqmesh_logo),
+                    contentDescription = stringResource(R.string.splash_logo_description),
+                    modifier = Modifier.size(120.dp)
+                )
 
                 Spacer(Modifier.height(Spacing.ExtraLarge))
                 Text(
@@ -106,65 +95,47 @@ private fun SplashContent(loadingProgress: Float) {
                 Text(
                     text = stringResource(R.string.splash_tagline),
                     style = MaterialTheme.typography.titleLarge,
-                    color = MaterialTheme.colorScheme.primary
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-                Spacer(Modifier.height(Spacing.Large))
-                ResQGlassSurface(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = MaterialTheme.shapes.large,
-                    contentPadding = androidx.compose.foundation.layout.PaddingValues(Spacing.Medium)
-                ) {
-                    Text(
-                        text = stringResource(R.string.splash_description),
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
+                Spacer(Modifier.height(Spacing.Medium))
+                Text(
+                    text = stringResource(R.string.splash_description),
+                    modifier = Modifier.widthIn(max = 320.dp),
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
 
-            ResQGlassSurface(
+            Column(
                 modifier = Modifier
                     .widthIn(max = 360.dp)
                     .fillMaxWidth(),
-                shape = MaterialTheme.shapes.extraLarge,
-                contentPadding = androidx.compose.foundation.layout.PaddingValues(Spacing.Medium)
+                verticalArrangement = Arrangement.spacedBy(Spacing.Small)
             ) {
-                Column(verticalArrangement = Arrangement.spacedBy(Spacing.Small)) {
-                    Text(
-                        text = stringResource(R.string.splash_loading_label),
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
+                Text(
+                    text = stringResource(R.string.splash_loading_label),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(6.dp)
+                        .background(
+                            color = MaterialTheme.colorScheme.surfaceVariant,
+                            shape = MaterialTheme.shapes.extraLarge
+                        )
+                        .semantics { contentDescription = loadingDescription }
+                ) {
                     Box(
                         modifier = Modifier
-                            .fillMaxWidth()
-                            .height(8.dp)
-                            .shadow(2.dp, MaterialTheme.shapes.extraLarge)
+                            .fillMaxWidth(loadingProgress)
+                            .height(6.dp)
                             .background(
-                                color = MaterialTheme.colorScheme.surfaceVariant,
+                                color = MaterialTheme.colorScheme.primary,
                                 shape = MaterialTheme.shapes.extraLarge
                             )
-                            .border(
-                                BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-                                MaterialTheme.shapes.extraLarge
-                            )
-                            .semantics { contentDescription = loadingDescription }
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth(loadingProgress)
-                                .height(8.dp)
-                                .background(
-                                    brush = Brush.horizontalGradient(
-                                        listOf(
-                                            MaterialTheme.colorScheme.secondary,
-                                            MaterialTheme.colorScheme.primary
-                                        )
-                                    ),
-                                    shape = MaterialTheme.shapes.extraLarge
-                                )
-                        )
-                    }
+                    )
                 }
             }
         }
