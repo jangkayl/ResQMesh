@@ -1,33 +1,56 @@
 package com.example.testresqmesh.feature.setup.ui
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.filled.Bluetooth
+import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.outlined.Notifications
+import androidx.compose.material.icons.outlined.Security
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import com.example.testresqmesh.R
 import com.example.testresqmesh.core.ui.components.buttons.ResQButton
+import com.example.testresqmesh.core.ui.components.feedback.ResQStateCard
+import com.example.testresqmesh.core.ui.components.feedback.ResQStatusChip
+import com.example.testresqmesh.core.ui.components.feedback.ResQStatusTone
 import com.example.testresqmesh.core.ui.theme.Spacing
 import com.example.testresqmesh.core.ui.theme.TestResQMeshTheme
 
-import androidx.compose.ui.platform.LocalContext
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleEventObserver
-import androidx.compose.ui.platform.LocalLifecycleOwner
+private enum class SetupAccessState {
+    RequestAccess,
+    EnableHardware,
+    Ready
+}
 
 @Composable
 fun PermissionsScreen(
@@ -36,221 +59,214 @@ fun PermissionsScreen(
     requestPermissions: () -> Unit,
     checkHardware: () -> Boolean
 ) {
-    val pinkBackground = Color(0xFFFEE2E2)
-    val scrollState = rememberScrollState()
     val lifecycleOwner = LocalLifecycleOwner.current
-
-    // Local state to track hardware status
     var isHardwareOn by remember { mutableStateOf(checkHardware()) }
 
-    // Re-check hardware when the app is resumed (e.g. after user returns from settings)
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME) {
-                isHardwareOn = checkHardware()
-            }
+            if (event == Lifecycle.Event.ON_RESUME) isHardwareOn = checkHardware()
         }
         lifecycleOwner.lifecycle.addObserver(observer)
-        onDispose {
-            lifecycleOwner.lifecycle.removeObserver(observer)
-        }
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
-    // Auto-advance if everything is already granted and on
-    LaunchedEffect(hasPermissions, isHardwareOn) {
-        if (hasPermissions && isHardwareOn) {
-            onAllSet()
+    val state = when {
+        !hasPermissions -> SetupAccessState.RequestAccess
+        !isHardwareOn -> SetupAccessState.EnableHardware
+        else -> SetupAccessState.Ready
+    }
+
+    LaunchedEffect(state) {
+        if (state == SetupAccessState.Ready) onAllSet()
+    }
+
+    PermissionsContent(
+        state = state,
+        onPrimaryAction = {
+            when (state) {
+                SetupAccessState.RequestAccess -> requestPermissions()
+                SetupAccessState.EnableHardware -> isHardwareOn = checkHardware()
+                SetupAccessState.Ready -> onAllSet()
+            }
         }
+    )
+}
+
+@Composable
+private fun PermissionsContent(
+    state: SetupAccessState,
+    onPrimaryAction: () -> Unit
+) {
+    val scrollState = rememberScrollState()
+    val title = when (state) {
+        SetupAccessState.RequestAccess -> stringResource(R.string.permissions_access_title)
+        SetupAccessState.EnableHardware -> stringResource(R.string.permissions_hardware_title)
+        SetupAccessState.Ready -> stringResource(R.string.permissions_ready_title)
+    }
+    val description = when (state) {
+        SetupAccessState.RequestAccess -> stringResource(R.string.permissions_access_description)
+        SetupAccessState.EnableHardware -> stringResource(R.string.permissions_hardware_description)
+        SetupAccessState.Ready -> stringResource(R.string.permissions_ready_description)
+    }
+    val buttonLabel = when (state) {
+        SetupAccessState.RequestAccess -> stringResource(R.string.permissions_allow_action)
+        SetupAccessState.EnableHardware -> stringResource(R.string.permissions_recheck_action)
+        SetupAccessState.Ready -> stringResource(R.string.permissions_continue_action)
     }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(pinkBackground)
             .verticalScroll(scrollState)
-            .padding(Spacing.Large),
+            .padding(horizontal = Spacing.Large, vertical = Spacing.ExtraLarge),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Spacer(modifier = Modifier.height(48.dp))
-        
-        Box(
-            modifier = Modifier
-                .width(40.dp)
-                .height(4.dp)
-                .clip(CircleShape)
-                .background(Color.Black.copy(alpha = 0.1f))
-        )
-
-        Spacer(modifier = Modifier.height(32.dp))
-
-        Text(
-            text = if (!hasPermissions) "Grant Access" else "Hardware Check",
-            style = MaterialTheme.typography.displaySmall,
-            fontWeight = FontWeight.Black,
-            textAlign = TextAlign.Center,
-            color = Color.Black
-        )
-
-        Spacer(modifier = Modifier.height(Spacing.Small))
-
-        Text(
-            text = if (!hasPermissions) 
-                "ResQMesh needs hardware permissions to build your local mesh network." 
-                else "Permissions granted! Now please ensure your Bluetooth and GPS are turned ON.",
-            style = MaterialTheme.typography.bodyLarge,
-            textAlign = TextAlign.Center,
-            color = Color.Black.copy(alpha = 0.6f)
-        )
-
-        Spacer(modifier = Modifier.height(48.dp))
-
-        PermissionCard(
-            title = "Bluetooth Radio",
-            description = "Discovers and connects to nearby nodes.",
-            icon = Icons.Default.Bluetooth,
-            iconColor = Color(0xFF3B82F6)
-        )
-
-        Spacer(modifier = Modifier.height(Spacing.Medium))
-
-        PermissionCard(
-            title = "Location & GPS",
-            description = "Plots relative positions on the Radar.",
-            icon = Icons.Default.LocationOn,
-            iconColor = Color(0xFF10B981)
-        )
-
-        Spacer(modifier = Modifier.height(48.dp))
-
         Surface(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(16.dp),
-            color = Color.White.copy(alpha = 0.4f),
-            border = androidx.compose.foundation.BorderStroke(1.dp, Color.Black.copy(alpha = 0.05f))
+            modifier = Modifier.size(72.dp),
+            shape = MaterialTheme.shapes.large,
+            color = MaterialTheme.colorScheme.primaryContainer
         ) {
-            Row(
-                modifier = Modifier.padding(Spacing.Medium),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Icon(Icons.Default.Lock, contentDescription = null, modifier = Modifier.size(16.dp))
-                Spacer(modifier = Modifier.width(Spacing.Small))
-                Text(
-                    "Data stays local and never touches the cloud.",
-                    style = MaterialTheme.typography.labelSmall,
-                    fontSize = 10.sp
+            androidx.compose.foundation.layout.Box(contentAlignment = Alignment.Center) {
+                Icon(
+                    imageVector = Icons.Outlined.Security,
+                    contentDescription = null,
+                    modifier = Modifier.size(32.dp),
+                    tint = MaterialTheme.colorScheme.onPrimaryContainer
                 )
             }
         }
+        Spacer(Modifier.height(Spacing.Large))
+        ResQStatusChip(
+            label = stringResource(
+                if (state == SetupAccessState.RequestAccess) R.string.permissions_step_one
+                else R.string.permissions_step_two
+            ),
+            tone = if (state == SetupAccessState.EnableHardware) ResQStatusTone.Warning else ResQStatusTone.Information
+        )
+        Spacer(Modifier.height(Spacing.Medium))
+        Text(
+            text = title,
+            style = MaterialTheme.typography.displayLarge,
+            fontWeight = FontWeight.Bold,
+            textAlign = TextAlign.Center
+        )
+        Spacer(Modifier.height(Spacing.Small))
+        Text(
+            text = description,
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center
+        )
 
-        Spacer(modifier = Modifier.height(Spacing.Medium))
+        Spacer(Modifier.height(Spacing.ExtraLarge))
+        PermissionRequirementCard(
+            icon = Icons.Default.Bluetooth,
+            title = stringResource(R.string.permissions_bluetooth_title),
+            description = stringResource(R.string.permissions_bluetooth_description)
+        )
+        Spacer(Modifier.height(Spacing.Small))
+        PermissionRequirementCard(
+            icon = Icons.Default.LocationOn,
+            title = stringResource(R.string.permissions_location_title),
+            description = stringResource(R.string.permissions_location_description)
+        )
 
-        ResQButton(
-            onClick = {
-                if (!hasPermissions) {
-                    requestPermissions()
-                } else {
-                    isHardwareOn = checkHardware()
-                    if (isHardwareOn) {
-                        onAllSet()
-                    } else {
-                        // Optional: can open system settings here
-                    }
-                }
-            },
+        if (state == SetupAccessState.EnableHardware) {
+            Spacer(Modifier.height(Spacing.Medium))
+            ResQStateCard(
+                title = stringResource(R.string.permissions_hardware_warning_title),
+                message = stringResource(R.string.permissions_hardware_warning_description),
+                tone = ResQStatusTone.Warning
+            )
+        }
+
+        Spacer(Modifier.height(Spacing.Medium))
+        Surface(
             modifier = Modifier.fillMaxWidth(),
-            contentPadding = PaddingValues(Spacing.Medium)
+            shape = MaterialTheme.shapes.medium,
+            color = MaterialTheme.colorScheme.surfaceVariant
         ) {
             Text(
-                text = if (!hasPermissions) "Grant Hardware Access" 
-                       else if (!isHardwareOn) "Check Hardware Again" 
-                       else "All Set! Continue",
-                fontWeight = FontWeight.Bold
+                text = stringResource(R.string.permissions_extra_access_note),
+                modifier = Modifier.padding(Spacing.Medium),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
-        
-        if (hasPermissions && !isHardwareOn) {
-            Text(
-                text = "Please enable Bluetooth and GPS in your system settings to proceed.",
-                style = MaterialTheme.typography.bodySmall,
-                color = Color.Red.copy(alpha = 0.7f),
-                textAlign = TextAlign.Center,
-                modifier = Modifier.padding(top = 8.dp)
-            )
+        Spacer(Modifier.height(Spacing.Large))
+        ResQButton(
+            onClick = onPrimaryAction,
+            modifier = Modifier.fillMaxWidth(),
+            contentPadding = PaddingValues(vertical = Spacing.Medium)
+        ) {
+            Text(buttonLabel, fontWeight = FontWeight.SemiBold)
         }
+        Spacer(Modifier.height(Spacing.Small))
+        Text(
+            text = stringResource(R.string.permissions_offline_note),
+            modifier = Modifier.fillMaxWidth(),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center
+        )
     }
 }
 
 @Composable
-fun PermissionCard(
-    title: String,
-    description: String,
+private fun PermissionRequirementCard(
     icon: ImageVector,
-    iconColor: Color
+    title: String,
+    description: String
 ) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = Spacing.Small),
-        verticalAlignment = Alignment.CenterVertically
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.medium,
+        color = MaterialTheme.colorScheme.surface,
+        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
     ) {
-        Surface(
-            modifier = Modifier.size(56.dp),
-            shape = CircleShape,
-            color = iconColor.copy(alpha = 0.15f)
+        androidx.compose.foundation.layout.Row(
+            modifier = Modifier.padding(Spacing.Medium),
+            horizontalArrangement = Arrangement.spacedBy(Spacing.Medium),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Box(contentAlignment = Alignment.Center) {
-                Icon(icon, contentDescription = null, tint = iconColor, modifier = Modifier.size(24.dp))
-            }
-        }
-
-        Spacer(modifier = Modifier.width(Spacing.Medium))
-
-        Column(modifier = Modifier.weight(1f)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Black,
-                    color = Color.Black
-                )
-                Spacer(modifier = Modifier.width(Spacing.Small))
-                Surface(
-                    color = Color.Black.copy(alpha = 0.05f),
-                    shape = RoundedCornerShape(4.dp)
-                ) {
-                    Text(
-                        "Required",
-                        style = MaterialTheme.typography.labelSmall,
-                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                        fontSize = 8.sp,
-                        color = Color.Black.copy(alpha = 0.4f)
+            Surface(
+                modifier = Modifier.size(48.dp),
+                shape = MaterialTheme.shapes.small,
+                color = MaterialTheme.colorScheme.primaryContainer
+            ) {
+                androidx.compose.foundation.layout.Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onPrimaryContainer
                     )
                 }
             }
-            Text(
-                text = description,
-                style = MaterialTheme.typography.bodySmall,
-                color = Color.Black.copy(alpha = 0.6f)
-            )
+            Column(modifier = Modifier.weight(1f)) {
+                Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    text = description,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
         }
-        
-        Icon(
-            Icons.Default.ChevronRight,
-            contentDescription = null,
-            tint = Color.Black.copy(alpha = 0.2f)
-        )
     }
 }
 
-@Preview(showBackground = true)
+@Preview(name = "Permissions — request access", showBackground = true, widthDp = 390, heightDp = 844)
 @Composable
-fun PermissionsScreenPreview() {
-    TestResQMeshTheme {
-        PermissionsScreen(
-            onAllSet = {},
-            hasPermissions = false,
-            requestPermissions = {},
-            checkHardware = { false }
-        )
+private fun PermissionsRequestPreview() {
+    TestResQMeshTheme(darkTheme = false) {
+        PermissionsContent(SetupAccessState.RequestAccess, onPrimaryAction = {})
+    }
+}
+
+@Preview(name = "Permissions — turn on hardware", showBackground = true, widthDp = 390, heightDp = 844)
+@Composable
+private fun PermissionsHardwarePreview() {
+    TestResQMeshTheme(darkTheme = true) {
+        PermissionsContent(SetupAccessState.EnableHardware, onPrimaryAction = {})
     }
 }
