@@ -1,106 +1,155 @@
 package com.example.testresqmesh.feature.setup.ui
 
-import androidx.compose.animation.core.*
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import com.example.testresqmesh.core.ui.theme.InboxBackground
-import com.example.testresqmesh.core.ui.theme.InboxAccentBlue
+import com.example.testresqmesh.R
+import com.example.testresqmesh.core.ui.theme.Spacing
+import com.example.testresqmesh.core.ui.theme.TestResQMeshTheme
 import kotlinx.coroutines.delay
+
+private const val SPLASH_DURATION_MILLIS = 3_000L
 
 @Composable
 fun SplashScreen(onTimeout: () -> Unit) {
     LaunchedEffect(Unit) {
-        delay(3000)
+        delay(SPLASH_DURATION_MILLIS)
         onTimeout()
     }
 
+    var loadingStarted by remember { mutableStateOf(false) }
+    val loadingProgress by animateFloatAsState(
+        targetValue = if (loadingStarted) 1f else 0f,
+        animationSpec = tween(
+            durationMillis = SPLASH_DURATION_MILLIS.toInt() - 350,
+            easing = LinearEasing
+        ),
+        label = "Splash loading progress"
+    )
+
+    LaunchedEffect(Unit) { loadingStarted = true }
+    SplashContent(loadingProgress = loadingProgress)
+}
+
+@Composable
+private fun SplashContent(loadingProgress: Float) {
+    val loadingDescription = stringResource(R.string.splash_loading_description)
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(InboxBackground),
+            .background(MaterialTheme.colorScheme.background)
+            .padding(Spacing.Large),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        Image(
-            painter = painterResource(id = com.example.testresqmesh.R.drawable.resqmesh_sublogo),
-            contentDescription = "App Logo",
-            modifier = Modifier
-                .size(100.dp)
-                .clip(RoundedCornerShape(24.dp))
-        )
-
-        Spacer(modifier = Modifier.height(48.dp))
-
-        Text(
-            text = "OFFLINE EMERGENCY MESH",
-            style = MaterialTheme.typography.labelLarge,
-            fontWeight = FontWeight.Black,
-            letterSpacing = 2.sp,
-            color = Color.White
-        )
-
-        Spacer(modifier = Modifier.height(180.dp))
-
-        // Progress Bar
-        Box(
-            modifier = Modifier
-                .width(280.dp)
-                .height(4.dp)
-                .clip(RoundedCornerShape(2.dp))
-                .background(Color.White.copy(alpha = 0.1f))
+        Surface(
+            modifier = Modifier.size(112.dp),
+            shape = MaterialTheme.shapes.extraLarge,
+            color = MaterialTheme.colorScheme.surface,
+            tonalElevation = 2.dp
         ) {
-            var progress by remember { mutableStateOf(0f) }
-            val animatedProgress by animateFloatAsState(
-                targetValue = progress,
-                animationSpec = tween(durationMillis = 2500, easing = LinearEasing)
-            )
-            
-            LaunchedEffect(Unit) {
-                progress = 1f
+            Box(contentAlignment = Alignment.Center) {
+                Image(
+                    painter = painterResource(R.drawable.resqmesh_sublogo),
+                    contentDescription = stringResource(R.string.splash_logo_description),
+                    modifier = Modifier
+                        .size(84.dp)
+                        .clip(RoundedCornerShape(20.dp))
+                )
             }
-
-            Box(
-                modifier = Modifier
-                    .fillMaxHeight()
-                    .fillMaxWidth(animatedProgress)
-                    .background(InboxAccentBlue)
-            )
         }
 
-        Spacer(modifier = Modifier.height(16.dp))
-
+        Spacer(Modifier.height(Spacing.ExtraLarge))
         Text(
-            text = "INITIALIZING P2P PROTOCOL",
-            style = MaterialTheme.typography.labelSmall,
+            text = stringResource(R.string.app_name),
+            style = MaterialTheme.typography.displayLarge,
             fontWeight = FontWeight.Bold,
-            color = Color.White.copy(alpha = 0.4f)
+            color = MaterialTheme.colorScheme.onBackground
         )
+        Spacer(Modifier.height(Spacing.Small))
         Text(
-            text = "Scanning local nodes...",
-            style = MaterialTheme.typography.labelSmall,
-            color = Color.White.copy(alpha = 0.3f)
+            text = stringResource(R.string.splash_tagline),
+            style = MaterialTheme.typography.titleLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Spacer(Modifier.height(Spacing.Medium))
+        Text(
+            text = stringResource(R.string.splash_description),
+            modifier = Modifier.widthIn(max = 320.dp),
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
         )
 
-        Spacer(modifier = Modifier.height(48.dp))
-
-        Text(
-            text = "v1.0.4-BETA • SECURE OFFLINE NODES",
-            style = MaterialTheme.typography.labelSmall,
-            fontWeight = FontWeight.Bold,
-            color = Color.White.copy(alpha = 0.3f),
-            fontSize = 10.sp
-        )
+        Spacer(Modifier.height(Spacing.Huge))
+        Column(
+            modifier = Modifier.widthIn(max = 320.dp),
+            verticalArrangement = Arrangement.spacedBy(Spacing.Small)
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(6.dp)
+                    .clip(MaterialTheme.shapes.extraLarge)
+                    .background(MaterialTheme.colorScheme.surfaceVariant)
+                    .semantics { contentDescription = loadingDescription }
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth(loadingProgress)
+                        .fillMaxHeight()
+                        .background(MaterialTheme.colorScheme.primary)
+                )
+            }
+            Text(
+                text = stringResource(R.string.splash_loading_label),
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
     }
+}
+
+@Preview(name = "Splash — light", showBackground = true, widthDp = 390, heightDp = 844)
+@Composable
+private fun SplashScreenLightPreview() {
+    TestResQMeshTheme(darkTheme = false) { SplashContent(loadingProgress = 0.72f) }
+}
+
+@Preview(name = "Splash — dark", showBackground = true, widthDp = 390, heightDp = 844)
+@Composable
+private fun SplashScreenDarkPreview() {
+    TestResQMeshTheme(darkTheme = true) { SplashContent(loadingProgress = 0.72f) }
 }

@@ -7,7 +7,7 @@ Baseline: branch `temp`, HEAD `d7cd5e3`, with substantial uncommitted Android, t
 
 Preserve the physically validated two-phone BLE/L2CAP improvement, then address the separate asymmetric block-policy defect and finish the remaining ownership, queue-bound, and framing work before broader multi-phone expansion.
 
-In parallel, the approved civilian-first UI refactor is proceeding through explicit review gates. Gate 1 implements the shared semantic light/dark theme, reusable status and empty-state components, a three-destination application shell, and an accessible two-second SOS hold control. It is awaiting user review before Gate 2 (Splash) begins.
+In parallel, the approved civilian-first UI refactor is proceeding through explicit review gates. Gate 1 delivered the shared semantic light/dark theme, reusable status and empty-state components, a three-destination application shell, and an accessible two-second SOS hold control. Gate 2 delivers the redesigned Splash screen and is awaiting user review before Gate 3 (Permissions) begins.
 
 ## Implemented in the working tree
 
