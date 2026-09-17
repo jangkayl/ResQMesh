@@ -5,8 +5,18 @@ import com.example.testresqmesh.core.model.ConnectedDevice
 import com.example.testresqmesh.core.model.ScannedDevice
 import com.example.testresqmesh.core.model.KnownNode
 import com.example.testresqmesh.core.model.NodeIdentity
+import com.example.testresqmesh.core.model.BlockRelationship
+import com.example.testresqmesh.core.model.BlockRelationshipOrigin
+import com.example.testresqmesh.core.model.BlockRelationshipStatus
+import com.example.testresqmesh.core.network.BlockControlEnvelope
+import com.example.testresqmesh.core.network.BlockControlKind
+import com.example.testresqmesh.core.network.CryptoManager
 import com.example.testresqmesh.core.network.MeshNetworkGateway
 import com.example.testresqmesh.core.utils.AppLogger
+import android.util.Base64
+import kotlinx.serialization.decodeFromByteArray
+import kotlinx.serialization.encodeToByteArray
+import kotlinx.serialization.protobuf.ProtoBuf
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -14,11 +24,14 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import java.util.UUID
 
 class MeshRepository(
     private val networkManager: MeshNetworkGateway,
     private val messageStore: MessageStore,
+    private val blockStore: BlockRelationshipStore,
     private val repositoryScope: CoroutineScope
 ) {
 
@@ -66,6 +79,8 @@ class MeshRepository(
 
     private var myNodeName: String = ""
     private val publicKeys = PeerPublicKeyCache()
+    val blockRelationships = blockStore.relationships
+    private val blockRetryJobs = mutableMapOf<String, Job>()
 
     init {
         setupCallbacks()
@@ -225,17 +240,19 @@ class MeshRepository(
         }
 
         networkManager.onDeviceBlocked = { senderName ->
-            _blockedDeviceNames.value = _blockedDeviceNames.value
-                .filterNot { NodeIdentity.matches(it, senderName) }
-                .toSet() + senderName
-            networkManager.blockDevice(senderName)
+            AppLogger.d("BLE_MESH", "Ignoring legacy block callback from $senderName")
         }
 
         networkManager.onDeviceUnblocked = { senderName ->
-            _blockedDeviceNames.value = _blockedDeviceNames.value
-                .filterNot { NodeIdentity.matches(it, senderName) }
-                .toSet()
-            networkManager.unblockDevice(senderName)
+            AppLogger.d("BLE_MESH", "Ignoring legacy unblock callback from $senderName")
+        }
+
+        networkManager.onBlockRequest = { endpointId, payload, envelope ->
+            handleBlockRequest(endpointId, payload, envelope)
+        }
+
+        networkManager.onBlockAck = { endpointId, payload, envelope ->
+            handleBlockAck(endpointId, payload, envelope)
         }
 
         networkManager.checkRouteExists = { targetName ->
@@ -304,7 +321,7 @@ class MeshRepository(
         }
 
         networkManager.onLiveAudioChunk = { sender, channelId, chunk ->
-            if (channelId == _currentChannelId.value && !networkManager.isDeviceBlocked(sender)) {
+            if (channelId == _currentChannelId.value) {
                 repositoryScope.launch {
                     incomingLiveAudioChunk.emit(Pair(sender, chunk))
                 }
@@ -316,7 +333,7 @@ class MeshRepository(
                 meshRouter.markNodeSeen(sender)
                 meshRouter.recalculateKnownNodes(myNodeName, readyConnectedDevices())
 
-                if (!isSystem && (isPrivate || channelId == _currentChannelId.value) && !networkManager.isDeviceBlocked(sender)) {
+                if (!isSystem && (isPrivate || channelId == _currentChannelId.value)) {
                     val isDirect = _connectedDevices.value.any { NodeIdentity.matches(it.name, sender) }
                     val message = ChatMessage(
                         id = msgId,
@@ -398,7 +415,9 @@ class MeshRepository(
         myNodeName = "$customName [$nodeTag]#$nodeId"
         networkManager.myDeviceName = myNodeName
         networkManager.myNodeId = nodeId
+        synchronizeBlockRelationships()
         networkManager.startMeshNode(teamKey)
+        resumePendingBlockRequests()
         _isOnline.value = true
     }
 
@@ -417,47 +436,186 @@ class MeshRepository(
     private val _blockedDeviceNames = MutableStateFlow<Set<String>>(emptySet())
     val blockedDeviceNames: StateFlow<Set<String>> = _blockedDeviceNames.asStateFlow()
 
+    private fun publishBlockedDevices() {
+        _blockedDeviceNames.value = blockStore.activeRelationships().map { it.peerName }.toSet()
+    }
+
+    private fun synchronizeBlockRelationships() {
+        blockStore.activeRelationships().forEach { relationship ->
+            networkManager.denyDirectIdentity(relationship.peerName)
+        }
+        publishBlockedDevices()
+    }
+
+    private fun resumePendingBlockRequests() {
+        blockStore.activeRelationships()
+            .filter { it.origin == BlockRelationshipOrigin.LOCAL && it.status == BlockRelationshipStatus.PENDING_ACK }
+            .forEach(::startBlockRetry)
+    }
+
     fun blockDevice(deviceName: String) {
-        _blockedDeviceNames.value = _blockedDeviceNames.value
-            .filterNot { NodeIdentity.matches(it, deviceName) }
-            .toSet() + deviceName
-        networkManager.blockDevice(deviceName)
-        sendSystemCommand(deviceName, "BLOCK")
+        val relationship = blockStore.beginLocal(deviceName, UUID.randomUUID().toString())
+        networkManager.denyDirectIdentity(relationship.peerName)
+        publishBlockedDevices()
+        if (relationship.origin == BlockRelationshipOrigin.LOCAL && relationship.status == BlockRelationshipStatus.PENDING_ACK) {
+            startBlockRetry(relationship)
+        }
     }
 
     fun unblockDevice(deviceName: String) {
-        _blockedDeviceNames.value = _blockedDeviceNames.value
-            .filterNot { NodeIdentity.matches(it, deviceName) }
-            .toSet()
-        networkManager.unblockDevice(deviceName)
-        sendSystemCommand(deviceName, "UNBLOCK")
+        val released = blockStore.releaseLocal(deviceName)
+        val peerName = released?.peerName ?: deviceName
+        blockRetryJobs.remove(NodeIdentity.key(peerName))?.cancel()
+        networkManager.releaseDirectIdentity(peerName)
+        publishBlockedDevices()
     }
 
-    private fun sendSystemCommand(targetName: String, commandType: String) {
-        val payloadBytes = runCatching { PayloadFactory.buildPrivatePayload(
-            msgId = UUID.randomUUID().toString(),
-            timestamp = System.currentTimeMillis(),
-            senderName = myNodeName,
-            targetName = targetName,
-            text = "",
-            imageBase64 = null,
-            audioBase64 = null,
-            locationLat = null,
-            locationLng = null,
-            directedRoute = meshRouter.findShortestPath(myNodeName, targetName, readyConnectedDevices()),
-            targetPubKey = publicKeys.get(targetName),
-            channelId = _currentChannelId.value
-        ) }.getOrElse {
-            AppLogger.d("MeshNetwork_E2EE", "Could not send private control command to $targetName: recipient key unavailable or encryption failed")
-            return
-        }.let {
-            // We need to override the type in the byte array or construct a custom payload.
-            // Since PayloadFactory builds ChatMessage payloads, we'll decode, change type, encode.
-            val decoded = kotlinx.serialization.protobuf.ProtoBuf.decodeFromByteArray(com.example.testresqmesh.core.network.MeshPayload.serializer(), it)
-            val updated = decoded.copy(type = commandType)
-            kotlinx.serialization.protobuf.ProtoBuf.encodeToByteArray(com.example.testresqmesh.core.network.MeshPayload.serializer(), updated)
+    private fun startBlockRetry(relationship: BlockRelationship) {
+        val key = NodeIdentity.key(relationship.peerName)
+        if (blockRetryJobs[key]?.isActive == true) return
+        sendBlockRequest(relationship)
+        blockRetryJobs[key] = repositoryScope.launch {
+            delay(BLOCK_DIRECT_GRACE_MS)
+            val current = blockStore.relationshipFor(relationship.peerName)
+            if (current?.operationId == relationship.operationId && current.status == BlockRelationshipStatus.PENDING_ACK) {
+                networkManager.disconnectDirectIdentity(relationship.peerName, "block request grace elapsed")
+            }
+            while (true) {
+                delay(BLOCK_RETRY_MS)
+                val pending = blockStore.relationshipFor(relationship.peerName)
+                if (pending?.operationId != relationship.operationId || pending.status != BlockRelationshipStatus.PENDING_ACK) break
+                sendBlockRequest(pending)
+            }
         }
-        networkManager.broadcastPayload(payloadBytes)
+    }
+
+    private fun sendBlockRequest(relationship: BlockRelationship) {
+        val route = meshRouter.findShortestPath(myNodeName, relationship.peerName, readyConnectedDevices())
+        val bytes = sealedRetryPayload(relationship, route) ?: run {
+            val targetKey = publicKeys.get(relationship.peerName)
+            if (targetKey.isNullOrBlank()) {
+                AppLogger.d("MeshNetwork_E2EE", "Block request pending: no recipient key for ${relationship.peerName}")
+                return
+            }
+            val envelope = BlockControlEnvelope(
+                kind = BlockControlKind.REQUEST,
+                operationId = relationship.operationId,
+                initiatorName = myNodeName,
+                targetName = relationship.peerName,
+                replyPublicKey = CryptoManager.getMyPublicKeyBase64()
+            )
+            val created = runCatching {
+                PayloadFactory.buildBlockControlPayload(
+                    transmissionId = UUID.randomUUID().toString(),
+                    payloadType = BLOCK_REQUEST_TYPE,
+                    operationId = relationship.operationId,
+                    senderName = myNodeName,
+                    targetName = relationship.peerName,
+                    directedRoute = route,
+                    targetPublicKey = targetKey,
+                    envelopeJson = envelope.encode()
+                )
+            }.getOrElse {
+                AppLogger.d("MeshNetwork_E2EE", "Block request encryption failed for ${relationship.peerName}")
+                return
+            }
+            blockStore.setSealedRequest(
+                relationship.peerName,
+                relationship.operationId,
+                Base64.encodeToString(created, Base64.NO_WRAP)
+            )
+            created
+        }
+        sendControl(relationship.peerName, route, bytes)
+    }
+
+    private fun sealedRetryPayload(relationship: BlockRelationship, route: List<String>): ByteArray? {
+        if (relationship.sealedRequest.isBlank()) return null
+        return runCatching {
+            val original = ProtoBuf.decodeFromByteArray<com.example.testresqmesh.core.network.MeshPayload>(
+                Base64.decode(relationship.sealedRequest, Base64.NO_WRAP)
+            )
+            ProtoBuf.encodeToByteArray(original.copy(
+                id = UUID.randomUUID().toString(),
+                directedRoute = route
+            ))
+        }.getOrNull()
+    }
+
+    private fun handleBlockRequest(endpointId: String, payload: com.example.testresqmesh.core.network.MeshPayload, envelope: BlockControlEnvelope) {
+        if (!NodeIdentity.matches(envelope.targetName, myNodeName) || !NodeIdentity.matches(envelope.initiatorName, payload.senderName)) return
+        val relationship = blockStore.acceptRemote(
+            peerName = envelope.initiatorName,
+            operationId = envelope.operationId,
+            replyPublicKey = envelope.replyPublicKey
+        )
+        publishBlockedDevices()
+        if (relationship.deniesDirectLink) networkManager.denyDirectIdentity(relationship.peerName)
+        sendBlockAck(payload, envelope)
+        repositoryScope.launch {
+            delay(BLOCK_ACK_GRACE_MS)
+            val current = blockStore.relationshipFor(envelope.initiatorName)
+            if (current?.deniesDirectLink == true) {
+                networkManager.disconnectDirectIdentity(envelope.initiatorName, "block request acknowledged")
+            }
+        }
+    }
+
+    private fun sendBlockAck(request: com.example.testresqmesh.core.network.MeshPayload, envelope: BlockControlEnvelope) {
+        val replyPublicKey = envelope.replyPublicKey.ifBlank {
+            blockStore.relationshipFor(envelope.initiatorName)?.replyPublicKey.orEmpty()
+        }
+        if (replyPublicKey.isBlank()) {
+            AppLogger.d("MeshNetwork_E2EE", "Cannot acknowledge block request: reply key missing")
+            return
+        }
+        val reverseRoute = request.directedRoute.takeIf { it.isNotEmpty() }?.reversed()
+            ?: (listOf(myNodeName) + request.routePath.asReversed()).distinct()
+        val ack = BlockControlEnvelope(
+            kind = BlockControlKind.ACK,
+            operationId = envelope.operationId,
+            initiatorName = myNodeName,
+            targetName = envelope.initiatorName
+        )
+        val bytes = runCatching {
+            PayloadFactory.buildBlockControlPayload(
+                transmissionId = UUID.randomUUID().toString(),
+                payloadType = BLOCK_ACK_TYPE,
+                operationId = envelope.operationId,
+                senderName = myNodeName,
+                targetName = envelope.initiatorName,
+                directedRoute = reverseRoute,
+                targetPublicKey = replyPublicKey,
+                envelopeJson = ack.encode()
+            )
+        }.getOrElse {
+            AppLogger.d("MeshNetwork_E2EE", "Block acknowledgement encryption failed")
+            return
+        }
+        sendControl(envelope.initiatorName, reverseRoute, bytes)
+    }
+
+    private fun handleBlockAck(endpointId: String, payload: com.example.testresqmesh.core.network.MeshPayload, envelope: BlockControlEnvelope) {
+        if (!NodeIdentity.matches(envelope.targetName, myNodeName) || !NodeIdentity.matches(envelope.initiatorName, payload.senderName)) return
+        if (!blockStore.confirmLocalAck(payload.senderName, envelope.operationId)) return
+        publishBlockedDevices()
+        blockRetryJobs.remove(NodeIdentity.key(payload.senderName))?.cancel()
+        networkManager.disconnectDirectIdentity(payload.senderName, "block acknowledgement received")
+    }
+
+    private fun sendControl(targetName: String, route: List<String>, payloadBytes: ByteArray) {
+        when (val target = PrivateDeliveryPlanner.select(targetName, route, readyConnectedDevices())) {
+            is PrivateDeliveryPlanner.Target.Endpoint -> networkManager.sendPriorityPayload(target.endpointId, payloadBytes)
+            PrivateDeliveryPlanner.Target.Broadcast -> networkManager.broadcastPayload(payloadBytes)
+        }
+    }
+
+    private companion object {
+        const val BLOCK_REQUEST_TYPE = "BLOCK_REQUEST"
+        const val BLOCK_ACK_TYPE = "BLOCK_ACK"
+        const val BLOCK_DIRECT_GRACE_MS = 2_000L
+        const val BLOCK_ACK_GRACE_MS = 1_000L
+        const val BLOCK_RETRY_MS = 3_000L
     }
 
     fun broadcastLiveAudioChunk(chunk: ByteArray) {

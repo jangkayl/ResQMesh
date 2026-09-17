@@ -13,6 +13,7 @@ import com.example.testresqmesh.core.location.LocationClient
 import com.example.testresqmesh.data.repository.MeshRepository
 import com.example.testresqmesh.data.repository.MessageStore
 import com.example.testresqmesh.data.repository.RoomMessageStore
+import com.example.testresqmesh.data.repository.BlockRelationshipStore
 import com.example.testresqmesh.feature.comms.viewmodel.CommunicationViewModel
 import com.example.testresqmesh.feature.comms.viewmodel.WalkieTalkieViewModel
 import com.example.testresqmesh.feature.radar.viewmodel.RadarViewModel
@@ -27,8 +28,9 @@ val appModule = module {
     single<MeshNetworkGateway> { NativeBleGateway(get()) }
     single { AppDatabase.getDatabase(androidContext()) }
     single<MessageStore> { RoomMessageStore(get<AppDatabase>().messageDao()) }
+    single { BlockRelationshipStore(androidContext()) }
     single(createdAtStart = true) { AppCoroutineScope(Dispatchers.IO) }
-    single { MeshRepository(get(), get(), get<AppCoroutineScope>().scope) }
+    single { MeshRepository(get(), get(), get(), get<AppCoroutineScope>().scope) }
     single { MediaHelper(androidContext()) }
     single<LocationClient> { DefaultLocationClient(androidContext()) }
     

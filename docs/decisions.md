@@ -45,6 +45,14 @@ Small work stays in one task. Medium work updates current status. Only large mul
 
 Pull requests repeat the debug build, unit tests, canonical-document checks, and diff hygiene in GitHub Actions. A failed deterministic check blocks readiness and cannot be waived by AI interpretation. Codex reports locally validated work and waits for explicit permission before creating a pull request; merging is never automatic. CI is local-code evidence only, so device-facing BLE behavior still requires the user-run physical test card.
 
+## D11: Blocking is mutual direct-link denial, with independent local release
+
+A block request must reach the named peer through a direct or relayed path, make both phones show and enforce the direct-link denial, and then remove their direct socket. Public/private text, SOS, receipts, and live audio remain routable through other peers. The remote phone does not automatically unblock when the initiator does: each phone must explicitly tap Unblock locally before a direct link may return. The protocol requires stable-identity persistence, acknowledgement/retry, and post-identity admission enforcement; it is implemented in the working tree but remains unvalidated. This is a routing-debug policy, not a privacy or authenticated-security claim.
+
+## D12: Direct links may bootstrap recovery, but do not replace healthy routes by default
+
+Discovery retains a healthy routed path instead of forming a redundant direct ACL for every nearby peer. Once no payload-ready direct neighbor remains, an unblocked nearby routed peer may proceed through the normal election, cooldown, and capacity checks to restore direct reachability. An explicit user request uses those same checks and cannot override direct-link block denial or capacity. Device validation must confirm recovery without churn.
+
 ## Considering new work
 
 Before selecting a difficult fix or feature, compare the smallest viable change, a structural alternative, and a non-code/operational alternative when relevant. Evaluate capstone value, production value, reliability impact, Android/device support, security, complexity, migration risk, and physical-test cost. Do not treat an explored option as an accepted requirement.

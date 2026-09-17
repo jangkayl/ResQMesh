@@ -26,6 +26,8 @@ interface MeshNetworkGateway {
     var onStatusChanged: ((String) -> Unit)?
     var onDeviceBlocked: ((String) -> Unit)?
     var onDeviceUnblocked: ((String) -> Unit)?
+    var onBlockRequest: ((String, MeshPayload, BlockControlEnvelope) -> Unit)?
+    var onBlockAck: ((String, MeshPayload, BlockControlEnvelope) -> Unit)?
     var checkRouteExists: ((String) -> Boolean)?
     var stpNeighborsProvider: (() -> Set<String>)?
 
@@ -38,9 +40,13 @@ interface MeshNetworkGateway {
     fun disconnectFromEndpoint(endpointId: String)
     fun blockDevice(deviceName: String)
     fun unblockDevice(deviceName: String)
+    fun denyDirectIdentity(deviceName: String)
+    fun releaseDirectIdentity(deviceName: String)
+    fun disconnectDirectIdentity(deviceName: String, reason: String)
     fun isDeviceBlocked(deviceName: String): Boolean
     fun broadcastPayload(payloadBytes: ByteArray, excludeEndpointId: String? = null)
     fun sendDirectPayload(targetEndpointId: String, payloadBytes: ByteArray)
+    fun sendPriorityPayload(targetEndpointId: String, payloadBytes: ByteArray)
     fun broadcastSeenReceipt(messageId: String, isPrivate: Boolean, targetId: String? = null)
     fun broadcastDeliveredReceipt(
         messageId: String,
@@ -75,6 +81,8 @@ class NativeBleGateway(private val manager: NativeBleManager) : MeshNetworkGatew
     override var onStatusChanged by manager::onStatusChanged
     override var onDeviceBlocked by manager::onDeviceBlocked
     override var onDeviceUnblocked by manager::onDeviceUnblocked
+    override var onBlockRequest by manager::onBlockRequest
+    override var onBlockAck by manager::onBlockAck
     override var checkRouteExists by manager::checkRouteExists
     override var stpNeighborsProvider by manager::stpNeighborsProvider
 
@@ -87,11 +95,16 @@ class NativeBleGateway(private val manager: NativeBleManager) : MeshNetworkGatew
     override fun disconnectFromEndpoint(endpointId: String) = manager.disconnectFromEndpoint(endpointId)
     override fun blockDevice(deviceName: String) = manager.blockDevice(deviceName)
     override fun unblockDevice(deviceName: String) = manager.unblockDevice(deviceName)
+    override fun denyDirectIdentity(deviceName: String) = manager.denyDirectIdentity(deviceName)
+    override fun releaseDirectIdentity(deviceName: String) = manager.releaseDirectIdentity(deviceName)
+    override fun disconnectDirectIdentity(deviceName: String, reason: String) = manager.disconnectDirectIdentity(deviceName, reason)
     override fun isDeviceBlocked(deviceName: String) = manager.isDeviceBlocked(deviceName)
     override fun broadcastPayload(payloadBytes: ByteArray, excludeEndpointId: String?) =
         manager.broadcastPayload(payloadBytes, excludeEndpointId)
     override fun sendDirectPayload(targetEndpointId: String, payloadBytes: ByteArray) =
         manager.sendDirectPayload(targetEndpointId, payloadBytes)
+    override fun sendPriorityPayload(targetEndpointId: String, payloadBytes: ByteArray) =
+        manager.sendPriorityPayload(targetEndpointId, payloadBytes)
     override fun broadcastSeenReceipt(messageId: String, isPrivate: Boolean, targetId: String?) =
         manager.broadcastSeenReceipt(messageId, isPrivate, targetId)
     override fun broadcastDeliveredReceipt(

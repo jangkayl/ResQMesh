@@ -521,7 +521,11 @@ fun NearbyNodeItem(
                         modifier = Modifier.size(12.dp)
                     )
                     Spacer(modifier = Modifier.width(4.dp))
-                    Text(if (node.isBlocked) "BLOCKED" else node.status, style = MaterialTheme.typography.labelSmall, color = statusColor)
+                    Text(
+                        if (node.isBlocked) "BLOCKED (DIRECT LINK DENIED)" else node.status,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = statusColor
+                    )
                 }
             }
 
@@ -567,7 +571,7 @@ fun NearbyNodeItem(
                         ) {
                             Icon(Icons.Default.Bolt, contentDescription = null, modifier = Modifier.size(16.dp))
                             Spacer(modifier = Modifier.width(4.dp))
-                            Text("FORCE", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Black)
+                            Text("CONNECT DIRECTLY", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Black)
                         }
                     }
                 }

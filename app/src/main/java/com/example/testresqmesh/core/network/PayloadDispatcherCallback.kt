@@ -8,6 +8,7 @@ interface PayloadDispatcherCallback {
     fun getStpNeighbors(): Set<String>
     
     fun sendDirectPayload(endpointId: String, payload: ByteArray)
+    fun sendPriorityPayload(endpointId: String, payload: ByteArray)
     fun sendGattPayload(endpointId: String, payload: ByteArray)
     fun onHeartbeatAck(endpointId: String, challengeId: String)
     fun broadcastPayload(payload: ByteArray, excludeEndpointId: String?)
@@ -23,9 +24,9 @@ interface PayloadDispatcherCallback {
     fun onDeviceGoodbye(endpointId: String)
     fun onSosCancelled()
     
-    fun isDeviceBlocked(deviceName: String): Boolean
-    fun onDeviceBlocked(deviceName: String)
-    fun onDeviceUnblocked(deviceName: String)
+    fun onBlockRequest(endpointId: String, payload: MeshPayload, envelope: BlockControlEnvelope)
+    fun onBlockAck(endpointId: String, payload: MeshPayload, envelope: BlockControlEnvelope)
+    fun onLegacyBlockControl(payloadType: String, senderName: String)
     
     fun showNotification(sender: String, text: String)
     fun showSosEmergencyNotification(sender: String, text: String)

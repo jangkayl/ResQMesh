@@ -85,6 +85,34 @@ object PayloadFactory {
         return ProtoBuf.encodeToByteArray(payload)
     }
 
+    fun buildBlockControlPayload(
+        transmissionId: String,
+        payloadType: String,
+        operationId: String,
+        senderName: String,
+        targetName: String,
+        directedRoute: List<String>,
+        targetPublicKey: String,
+        envelopeJson: String
+    ): ByteArray {
+        val encrypted = CryptoManager.encryptHybrid(envelopeJson, targetPublicKey)
+            ?: throw IllegalStateException("Block control encryption failed")
+        val payload = MeshPayload(
+            id = transmissionId,
+            type = payloadType,
+            senderName = senderName,
+            targetName = targetName,
+            isPrivate = true,
+            isEncrypted = true,
+            encryptedData = encrypted.first,
+            encryptedKey = encrypted.second,
+            routePath = listOf(senderName),
+            directedRoute = directedRoute,
+            targetMessageId = operationId
+        )
+        return ProtoBuf.encodeToByteArray(payload)
+    }
+
     fun buildSystemPulse(
         msgId: String,
         senderName: String,

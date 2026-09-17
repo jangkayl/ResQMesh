@@ -1,11 +1,11 @@
 # Current status
 
-Last reviewed: 2026-09-17
-Baseline: commit-backed `fix/ble-reliability` branch; physical validation remains pending.
+Last reviewed: 2026-09-18
+Baseline: uncommitted `fix/ble-reliability` working tree; the 2026-09-18 focused five-phone capture confirms block acknowledgement, direct teardown, and public/private relay, while direct-upgrade behavior is awaiting a fresh APK run.
 
 ## Current objective
 
-Restore cross-OEM GATT readiness without weakening known-good links or allowing setup collisions.
+Make blocking reliably mutual across relays: deny direct links after identity, show the state on both phones, and require both phones to unblock locally.
 
 ## Implemented in the working tree
 
@@ -16,20 +16,18 @@ Restore cross-OEM GATT readiness without weakening known-good links or allowing 
 - Callback-driven GATT client writes and server notification completion for the heartbeat/fallback path.
 - Server-to-client GATT fallback now uses acknowledged indications after the 2026-09-16 capture showed accepted notifications repeatedly missing completion callbacks after L2CAP loss.
 - L2CAP promotion disarms overlapping GATT work, preventing late callbacks from tearing down a healthy link; connect-lock contention retains its cooldown.
-- Client setup now starts service discovery with the default MTU instead of overlapping discovery with MTU negotiation; the server callback also suppresses a duplicate timeout-owning role when it is only the server view of the same outbound ACL. The 2026-09-16 SM-A236E validation disproved setup ordering as the complete fix: CPH2219 acted as client, while the Samsung server accepted the ACL but did not answer primary-service discovery requests.
-- A generation-owned handshake gate pauses scanning during GATT setup and resumes it after the final owner exits. Local tests pass.
-- The follow-up Samsung captures proved scan pausing and explicit LE were both insufficient: ATT discovery timed out with `AUTO` and `TRANSPORT_LE`. Samsung repeatedly logged an overlapping legacy-advertiser restart immediately before the inbound GATT callback. The current leading application-side defect is advertising churn during connection establishment, not role selection or transport choice.
-- The minimal Samsung repair keeps advertising stable and removes role reversal, but the 2026-09-17 retest still failed with Samsung as client. Samsung's stack began discovery before the app's connected callback; CPH received no ATT request. `transport=2` is normal LE and unowned-endpoint retirement is cleanup, not the cause.
+- User reports the stabilized Samsung pairing now reaches `READY`, and a five-device mesh run shows all nodes available. Exact build, device/API matrix, repetitions, and capture are not yet recorded, so this is encouraging device evidence rather than a capacity or production-reliability claim.
 - Direct-link admission now consistently uses three distinct neighbors; meshes larger than four devices depend on routed hops rather than a full direct-link graph.
+- A nearby routed peer is normally kept on its existing mesh path, avoiding redundant direct ACL churn. If no payload-ready direct neighbor remains, admission may bootstrap one direct link; explicit Radar **Connect Directly** uses the same block, duplicate, and capacity guards.
 - L2CAP socket identity checks, failure retirement, and GATT retry/fallback behavior.
 - Persistent Android Keystore RSA identity, fail-closed private sending, endpoint-aware key cache rules, encrypted private locations, and removal of private plaintext logging in the reviewed handlers.
 - Focused unit tests for link lifecycle, liveness, heartbeat ownership, and private-message policy.
 - Coordinators own GATT-flight/heartbeat state; shared framing rejects malformed or oversized payloads; pending GATT work is capped at 128 transfers per endpoint. Repository gateway/store boundaries hide Bluetooth/Room, while Active Chat and Radar models are separated without public UI changes.
-- BLE radio, GATT transfer, L2CAP socket, lifecycle/watchdog, and peer-admission work live in focused collaborators; `NativeBleManager` remains the public policy facade. Non-Samsung smoke test reported; Samsung validation pending.
+- BLE radio, GATT transfer, L2CAP socket, lifecycle/watchdog, and peer-admission work live in focused collaborators; `NativeBleManager` remains the public policy facade. Samsung and five-device smoke success are user-reported; recorded device evidence is still pending.
 - The diagnostic terminal uses structured events, a live direct-link summary, paused-follow scrolling, and Latest/Last Sync controls. Device validation must confirm that its lifecycle matches the phones.
 - Lean pull-request CI for the debug build, unit tests, error-free Android Lint, canonical-document checks, and diff hygiene; PR creation and merging remain explicit user actions.
 
-Local build, unit tests, and Android Lint passed; physical BLE validation remains required.
+Local checks passed; physical BLE validation remains required.
 
 ## Open blockers
 
@@ -37,19 +35,19 @@ Local build, unit tests, and Android Lint passed; physical BLE validation remain
 | --- | --- | --- | --- |
 | BLE-OWN | P0 | Shared server callback can still be ambiguous for late same-address events | Ownership rule plus focused test and same-process reconnect validation |
 | BLE-QUEUE | P0 | Queue capacity and active-flight ownership are bounded, but overflow UX, complete retry rules, and starvation behavior still need device evidence | Sustained phone traffic without duplicate advancement, silent loss, or starvation |
-| SAMSUNG-01 | P0 | SM-A236E radio links connect, but ATT discovery receives no response under both AUTO and explicit LE; overlapping legacy-advertiser refresh occurs immediately before connection | Keep advertising stable for the whole mesh session, simplify to one setup deadline/initiator, then require five repeated `READY` connections |
-| BLOCK-01 | P1 | Block currently disconnects before attempting its remote command, and the receiver interprets that command as a reciprocal block | Define local block semantics, enforce inbound rejection, and test block/unblock/restart behavior |
-| LIMIT-01 | P1 | The three-direct-neighbor rule is unified in source but unmeasured across larger device sets | Stable three-phone relay and four-plus-node admission/route tests |
-| ROUTE-01 | P1 | Topology expiry/refresh, empty withdrawal, and loop lifetime need focused repair | Stable three-phone route, withdrawal, and duplicate/loop tests |
+| BLOCK-01 | P0 | The 2026-09-18 five-phone capture shows acknowledgement-driven direct teardown and public/private relay; one-sided-unblock state presentation, restart persistence, and a 70-second stable-route run remain unrecorded | Focused A-B-C run covering restart, unilateral/bilateral unblock, direct non-reconnect, and 70-second relay stability |
+| ADMIT-01 | P1 | Automatic direct admission previously deferred every peer already reachable through a hop; the working-tree recovery exception needs device evidence without redundant-link churn | A routed peer bootstraps only after the last ready direct link disappears; blocked/capacity-full peers remain denied |
+| LIMIT-01 | P2 | User reports five-device availability, but direct-limit/admission and routed-capacity conditions lack a recorded matrix | Record devices/build/conditions; repeat controlled five-device admission and route tests |
+| ROUTE-01 | P0 | Topology cleanup is 10s while full SYSTEM neighbor refresh can be 60s; relayed route freshness may disappear before a block forces a hop | Source repair plus A-B-C stable route/withdrawal/duplicate test |
 | SEC-01 | P1 | Public keys lack authenticated identity binding/current-key proof; storage backup policy is unresolved | Defined threat model, fail-closed tests, and documented claim boundary |
 | SOS-01 | P1 | SOS cancellation/follow-up ownership needs sender/alert binding review | Concurrent-alert and cancel-before-location tests |
 
 ## Next actions
 
-1. Retest the clean opposite role: CPH client and Samsung server, without role reversal or advertiser restart.
-2. If that succeeds, add a stable-identity per-peer role preference after repeated discovery failure; if it fails, isolate the phones with a standard GATT test app before another transport change.
-3. Validate a three-phone A-B-C routed hop, then add a fourth/fifth node while enforcing three direct neighbors per phone.
-4. Validate queue overflow/retry and L2CAP fallback on phones before Phase 5 repository event-handler work.
+1. Build and install the direct-upgrade working tree; run the `ADMIT-01` A-B-C recovery card.
+2. Record unilateral/bilateral unblock, restart persistence, and 70-second relay stability for `BLOCK-01`.
+3. Record APK/build identity, device matrix, and repetitions for the Samsung and five-device runs.
+4. Repair topology freshness only if a fresh focused trace proves an expired route.
 
 ## Scope guard
 

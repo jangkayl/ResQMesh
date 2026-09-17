@@ -48,6 +48,8 @@ class NativeBleManager(val context: Context) {
     var onStatusChanged: ((String) -> Unit)? = null
     var onDeviceBlocked: ((String) -> Unit)? = null
     var onDeviceUnblocked: ((String) -> Unit)? = null
+    var onBlockRequest: ((String, MeshPayload, BlockControlEnvelope) -> Unit)? = null
+    var onBlockAck: ((String, MeshPayload, BlockControlEnvelope) -> Unit)? = null
     var checkRouteExists: ((String) -> Boolean)? = null
 
     var myDeviceName: String = "ResQMesh_Node"
@@ -126,6 +128,7 @@ class NativeBleManager(val context: Context) {
             return this@NativeBleManager.stpNeighborsProvider?.invoke() ?: emptySet()
         }
         override fun sendDirectPayload(endpointId: String, payload: ByteArray) = this@NativeBleManager.sendDirectPayload(endpointId, payload)
+        override fun sendPriorityPayload(endpointId: String, payload: ByteArray) = this@NativeBleManager.sendPriorityPayload(endpointId, payload)
         override fun sendGattPayload(endpointId: String, payload: ByteArray) {
             this@NativeBleManager.enqueueGattPayload(endpointId, payload, priority = true)
         }
@@ -150,9 +153,15 @@ class NativeBleManager(val context: Context) {
             this@NativeBleManager.disconnectFromEndpoint(endpointId)
         }
         override fun onSosCancelled() { this@NativeBleManager.onSosCancelled?.invoke() }
-        override fun isDeviceBlocked(deviceName: String) = this@NativeBleManager.isDeviceBlocked(deviceName)
-        override fun onDeviceBlocked(deviceName: String) { this@NativeBleManager.onDeviceBlocked?.invoke(deviceName) }
-        override fun onDeviceUnblocked(deviceName: String) { this@NativeBleManager.onDeviceUnblocked?.invoke(deviceName) }
+        override fun onBlockRequest(endpointId: String, payload: MeshPayload, envelope: BlockControlEnvelope) {
+            onBlockRequest?.invoke(endpointId, payload, envelope)
+        }
+        override fun onBlockAck(endpointId: String, payload: MeshPayload, envelope: BlockControlEnvelope) {
+            onBlockAck?.invoke(endpointId, payload, envelope)
+        }
+        override fun onLegacyBlockControl(payloadType: String, senderName: String) {
+            AppLogger.d("BLE_MESH", "Ignoring legacy $payloadType control from $senderName")
+        }
         override fun showNotification(sender: String, text: String) { notificationHelper.showPrivateMessageNotification(sender, text) }
         override fun showSosEmergencyNotification(sender: String, text: String) {
             if (!com.example.testresqmesh.MainActivity.isAppInForeground) {
@@ -202,7 +211,7 @@ class NativeBleManager(val context: Context) {
     )
     private val peerAdmissionController = BlePeerAdmissionController(
         store, handler, { myDeviceName }, ::isDeviceBlocked, ::hasLinkToIdentity,
-        { peerName -> checkRouteExists?.invoke(peerName) == true }, ::distinctLinkCount,
+        { peerName -> checkRouteExists?.invoke(peerName) == true }, ::hasPayloadReadyDirectLink, ::distinctLinkCount,
         { MAX_TOTAL_CONNECTIONS }, ::getElectionScore, ::latestEndpointForIdentity,
         ::connectToPersistentGatt, { event -> onDeviceScanned?.invoke(event) },
         { endpoint -> onDeviceDisconnected?.invoke(endpoint) }, ::sendSystemPulse
@@ -449,6 +458,12 @@ class NativeBleManager(val context: Context) {
         }
     }
 
+    /** A direct neighbor is usable only after its GATT role has reached payload READY. */
+    private fun hasPayloadReadyDirectLink(): Boolean =
+        (store.activeConnections.keys + store.activeServerConnections.keys).any { endpoint ->
+            store.links.isReady(endpoint)
+        }
+
     /** When this link was established, or [Long.MAX_VALUE] when unknown. */
     fun linkEstablishedAt(endpointId: String): Long =
         store.connectionEstablishTime[endpointId] ?: Long.MAX_VALUE
@@ -526,6 +541,16 @@ class NativeBleManager(val context: Context) {
             val payload = kotlinx.serialization.protobuf.ProtoBuf.decodeFromByteArray(com.example.testresqmesh.core.network.MeshPayload.serializer(), payloadBytes)
             onDeviceLivenessChanged?.invoke(endpointId, true)
             if (payload.type != "PONG") heartbeatCoordinator.remove(endpointId)
+
+            // Inbound central addresses are often unknown at ACL creation. A direct SYSTEM pulse is
+            // the first reliable endpoint-to-stable-identity binding; reject it before the peer is
+            // published or normal traffic is dispatched. Relayed packets never take this path.
+            val isDirectIdentityPulse = payload.type == "SYSTEM" && payload.routePath.isEmpty() && payload.senderName.isNotEmpty()
+            if (isDirectIdentityPulse && isDeviceBlocked(payload.senderName)) {
+                AppLogger.d("BLE_MESH", "Identity gate rejected direct blocked peer ${payload.senderName} on $endpointId")
+                handler.post { disconnectDirectIdentity(payload.senderName, "identity gate") }
+                return
+            }
             
             // Only auto-rename the physical socket if this is a direct message (not relayed).
             // Relayed payloads carry a non-empty routePath; renaming from those would map a remote
@@ -652,6 +677,13 @@ class NativeBleManager(val context: Context) {
                 AppLogger.d("BLE_MESH", "Link ${current.generation} $endpoint: GATT heartbeat acknowledged")
             }
         }
+    }
+
+    /** Sends a control payload ahead of normal GATT queue traffic; it never opens a new link. */
+    fun sendPriorityPayload(targetEndpointId: String, payloadBytes: ByteArray) {
+        if (!BluetoothAdapter.checkBluetoothAddress(targetEndpointId) || !hasReadyEndpoint(targetEndpointId)) return
+        if (l2capTransport.send(targetEndpointId, payloadBytes)) return
+        enqueueGattPayload(targetEndpointId, payloadBytes, priority = true)
     }
 
     fun sendDirectPayload(targetMacAddress: String, payloadBytes: ByteArray) {
@@ -823,14 +855,37 @@ class NativeBleManager(val context: Context) {
         }
     }
     
-    fun blockDevice(deviceName: String, sendNotification: Boolean = true) {
+    /** Installs direct-link denial by stable identity without tearing down a live control path. */
+    fun denyDirectIdentity(deviceName: String) {
         store.blockedDevices[NodeIdentity.key(deviceName)] = true
-        // Find and disconnect if currently connected
-        val macAddress = store.connectedEndpointNames.entries
-            .find { NodeIdentity.matches(it.value, deviceName) }?.key
-        if (macAddress != null) {
-            disconnectFromEndpoint(macAddress)
+    }
+
+    fun releaseDirectIdentity(deviceName: String) {
+        store.blockedDevices.remove(NodeIdentity.key(deviceName))
+        store.blockedDevices.keys
+            .filter { NodeIdentity.matches(it, deviceName) }
+            .forEach { store.blockedDevices.remove(it) }
+    }
+
+    /** Closes every active client/server/L2CAP endpoint resolved to [deviceName]. */
+    fun disconnectDirectIdentity(deviceName: String, reason: String = "direct identity denied") {
+        val nodeId = NodeIdentity.idOf(deviceName)
+        val endpoints = (store.activeConnections.keys + store.activeServerConnections.keys)
+            .filter { endpoint ->
+                NodeIdentity.matches(store.connectedEndpointNames[endpoint], deviceName) ||
+                    (nodeId != null && nodeIdForEndpoint(endpoint) == nodeId)
+            }
+            .toSet()
+        endpoints.forEach { endpoint ->
+            AppLogger.d("BLE_MESH", "Disconnecting $endpoint for $deviceName ($reason)")
+            disconnectFromEndpoint(endpoint)
         }
+    }
+
+    /** Legacy entry point: deny then immediately retire all known direct endpoints. */
+    fun blockDevice(deviceName: String, sendNotification: Boolean = true) {
+        denyDirectIdentity(deviceName)
+        disconnectDirectIdentity(deviceName, "legacy block")
     }
 
     /**
@@ -846,10 +901,7 @@ class NativeBleManager(val context: Context) {
     }
     
     fun unblockDevice(deviceName: String) {
-        store.blockedDevices.remove(NodeIdentity.key(deviceName))
-        store.blockedDevices.keys
-            .filter { NodeIdentity.matches(it, deviceName) }
-            .forEach { store.blockedDevices.remove(it) }
+        releaseDirectIdentity(deviceName)
     }
     
     fun rescan() {
@@ -857,9 +909,20 @@ class NativeBleManager(val context: Context) {
     }
     
     fun forceConnectToDevice(endpointId: String, endpointName: String) {
-        if (!store.activeConnections.containsKey(endpointId)) {
-            connectToPersistentGatt(endpointId, endpointName)
+        if (isDeviceBlocked(endpointName)) {
+            AppLogger.d("BLE_MESH", "Connect Directly denied for blocked peer $endpointName")
+            return
         }
+        if (findLinkEndpointByIdentity(endpointName) != null) {
+            AppLogger.d("BLE_MESH", "Connect Directly skipped for $endpointName; a direct link already exists")
+            return
+        }
+        if (distinctLinkCount() >= MAX_TOTAL_CONNECTIONS) {
+            AppLogger.d("BLE_MESH", "Connect Directly deferred for $endpointName; direct-link capacity is full")
+            return
+        }
+        AppLogger.d("BLE_MESH", "Connect Directly requested for $endpointName on $endpointId")
+        connectToPersistentGatt(endpointId, endpointName)
     }
 
     fun broadcastSeenReceipt(targetMessageId: String, isPrivate: Boolean, targetId: String? = null) {
@@ -898,5 +961,3 @@ class NativeBleManager(val context: Context) {
         }
     }
 }
-
-

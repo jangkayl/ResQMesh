@@ -1,6 +1,6 @@
 # Architecture
 
-Last source review: 2026-09-17, branch `fix/ble-reliability`, with the phase 4-6 maintainability work uncommitted. This page describes the current checkout; verify changed paths before relying on it.
+Last source review: 2026-09-17, branch `fix/ble-reliability`, with Phase 4 committed. This page describes the current checkout; verify changed paths before relying on it.
 
 ## System shape
 
@@ -51,9 +51,13 @@ When L2CAP becomes available, it takes ownership of any active or queued GATT tr
 
 Each phone admits at most three distinct direct GATT neighbors. A mesh may contain more than four devices because additional nodes are expected to be reached through routing; the three-link rule is not a total mesh-size claim. The rule still needs multi-phone measurement before any stable-capacity claim.
 
+Discovery does not automatically turn every nearby routed peer into another direct ACL: when at least one payload-ready direct neighbor exists, the existing route is retained. If the last payload-ready direct neighbor disappears, a nearby, unblocked routed peer may pass ordinary election and capacity admission to bootstrap recovery. Radar's explicit **Connect Directly** request follows the same blocked-identity, duplicate-link, and three-neighbor capacity checks; it is not a block bypass.
+
 ## Identity, routing, and presence
 
 Stable `NodeIdentity` IDs identify peers across changing BLE endpoint addresses. A MAC/endpoint identifies a physical transport attempt and must not replace node identity. UI and routing should select payload-ready links, not merely scanned or radio-connected endpoints.
+
+A block relationship is persisted by stable identity, not MAC. A `BLOCK_REQUEST` is encrypted to the target and may traverse direct or relay links; the receiver persists complementary direct-link denial and replies with `BLOCK_ACK` before the initiator tears down direct endpoints. Each device releases only its own record—there is no remote `UNBLOCK` command—so both must unblock locally before direct admission resumes. Relayed text, private messages, SOS, receipts, and live audio are intentionally not filtered. Inbound central MACs may be unknown at ACL setup; a direct SYSTEM identity pulse is therefore gated before the peer is published or ordinary direct traffic is dispatched. This working-tree protocol still requires its physical validation card.
 
 Keep these states distinct:
 

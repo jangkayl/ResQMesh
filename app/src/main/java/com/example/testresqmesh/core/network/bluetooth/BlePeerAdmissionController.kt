@@ -14,6 +14,7 @@ class BlePeerAdmissionController(
     private val isBlocked: (String) -> Boolean,
     private val hasLinkToIdentity: (String) -> Boolean,
     private val hasIndirectRoute: (String) -> Boolean,
+    private val hasPayloadReadyDirectLink: () -> Boolean,
     private val directLinkCount: () -> Int,
     private val maxDirectLinks: () -> Int,
     private val electionScore: () -> String,
@@ -53,7 +54,19 @@ class BlePeerAdmissionController(
 
         val alreadyConnected = hasLinkToIdentity(peerName) ||
             store.activeConnections.containsKey(endpoint) || store.activeServerConnections.containsKey(endpoint)
-        if (alreadyConnected || hasIndirectRoute(peerName)) return
+        if (alreadyConnected) return
+
+        // A routed peer normally stays routed to avoid eagerly turning every visible mesh hop into
+        // a redundant direct ACL. The exception is bootstrap/recovery: when no payload-ready direct
+        // neighbor remains, a nearby unblocked routed peer may restore a direct path. Explicit UI
+        // "Connect Directly" uses the same downstream block and duplicate guards.
+        if (hasIndirectRoute(peerName) && hasPayloadReadyDirectLink()) {
+            AppLogger.d("BLE_MESH", "Deferring direct upgrade to $peerName; healthy payload-ready direct link exists")
+            return
+        }
+        if (hasIndirectRoute(peerName)) {
+            AppLogger.d("BLE_MESH", "Direct bootstrap candidate $peerName; no payload-ready direct link remains")
+        }
         admitOrElect(endpoint, peerName, advertisement, now)
     }
 

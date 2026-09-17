@@ -47,6 +47,10 @@ class GattClientManager(
             return
         }
         with(manager) {
+        if (isDeviceBlocked(peerName)) {
+            AppLogger.d("BLE_MESH", "Skipping GATT connect to blocked peer $peerName")
+            return
+        }
         // DUPLICATE LINK GUARD: resolve by identity, not by MAC. A peer already connected inbound
         // on its Central MAC used to look absent here, so we would open a second redundant link.
         val existingEndpoint = findLinkEndpointByIdentity(peerName)
