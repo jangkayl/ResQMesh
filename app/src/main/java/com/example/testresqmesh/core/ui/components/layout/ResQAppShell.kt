@@ -149,11 +149,12 @@ private fun androidx.compose.foundation.layout.RowScope.ResQNavigationItem(
         icon = {
             Icon(
                 imageVector = destination.icon,
-                contentDescription = null,
+                contentDescription = stringResource(destination.labelRes),
                 modifier = Modifier.size(24.dp)
             )
         },
-        label = { Text(stringResource(destination.labelRes)) },
+        alwaysShowLabel = false,
+        label = null,
         colors = NavigationBarItemDefaults.colors(
             selectedIconColor = MaterialTheme.colorScheme.primary,
             selectedTextColor = MaterialTheme.colorScheme.primary,
