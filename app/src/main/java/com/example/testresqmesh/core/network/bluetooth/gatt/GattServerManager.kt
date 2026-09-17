@@ -11,10 +11,10 @@ import com.example.testresqmesh.core.model.NodeIdentity
 import com.example.testresqmesh.core.network.NativeBleManager
 import com.example.testresqmesh.core.network.bluetooth.state.BleLinkRole
 import com.example.testresqmesh.core.network.bluetooth.state.BleLinkState
+import com.example.testresqmesh.core.network.bluetooth.state.MeshFrameCodec
 import com.example.testresqmesh.core.utils.AppLogger
 import java.util.concurrent.ConcurrentLinkedDeque
 import java.util.concurrent.atomic.AtomicBoolean
-import java.nio.ByteBuffer
 
 class GattServerManager(
     val context: Context,
@@ -356,31 +356,16 @@ class GattServerManager(
                     store.connectionInteractionTimes[macAddress] = now
                     store.links.current(macAddress, BleLinkRole.SERVER)?.takeIf { it.serverDevice?.address == device.address }?.lastInteractionAt = now
                     
-                    val currentBuffer = store.chunkBuffers[macAddress] ?: ByteArray(0)
-                    val newBuffer = ByteArray(currentBuffer.size + it.size)
-                    System.arraycopy(currentBuffer, 0, newBuffer, 0, currentBuffer.size)
-                    System.arraycopy(it, 0, newBuffer, currentBuffer.size, it.size)
-                    
-                    var workingBuffer = newBuffer
-                    
-                    while (workingBuffer.size >= 4) {
-                        val lengthBuffer = ByteBuffer.wrap(workingBuffer.sliceArray(0..3))
-                        val expectedLength = lengthBuffer.int
-                        
-                        if (workingBuffer.size >= 4 + expectedLength) {
-                            val payloadBytes = workingBuffer.sliceArray(4 until 4 + expectedLength)
-                            processBinaryPayload(macAddress, payloadBytes)
-                            
-                            val remaining = workingBuffer.size - (4 + expectedLength)
-                            val nextBuffer = ByteArray(remaining)
-                            System.arraycopy(workingBuffer, 4 + expectedLength, nextBuffer, 0, remaining)
-                            workingBuffer = nextBuffer
-                        } else {
-                            break
+                    when (val result = MeshFrameCodec.append(store.chunkBuffers[macAddress] ?: ByteArray(0), it)) {
+                        is MeshFrameCodec.AppendResult.Accepted -> {
+                            result.payloads.forEach { payload -> processBinaryPayload(macAddress, payload) }
+                            store.chunkBuffers[macAddress] = result.remainder
+                        }
+                        is MeshFrameCodec.AppendResult.Rejected -> {
+                            AppLogger.d("BLE_MESH", "Rejected malformed SERVER frame from $macAddress: ${result.reason}")
+                            store.chunkBuffers[macAddress] = ByteArray(0)
                         }
                     }
-                    
-                    store.chunkBuffers[macAddress] = workingBuffer
                 }
             }
         }

@@ -562,22 +562,11 @@ class MeshRepository(
             messageStore.save(message, targetName = targetName)
         }
 
-        val directEndpointId = readyDevices.find { NodeIdentity.matches(it.name, targetName) }?.endpointId
-
-        if (isDirect && directEndpointId != null) {
-            networkManager.sendDirectPayload(directEndpointId, payloadBytes)
-        } else {
-            if (directedRouteList.size > 1) {
-                val nextHopName = directedRouteList[1]
-                val nextHopEndpointId = readyDevices.find { NodeIdentity.matches(it.name, nextHopName) }?.endpointId
-                if (nextHopEndpointId != null) {
-                    networkManager.sendDirectPayload(nextHopEndpointId, payloadBytes)
-                } else {
-                    networkManager.broadcastPayload(payloadBytes)
-                }
-            } else {
+        when (val delivery = PrivateDeliveryPlanner.select(targetName, directedRouteList, readyDevices)) {
+            is PrivateDeliveryPlanner.Target.Endpoint ->
+                networkManager.sendDirectPayload(delivery.endpointId, payloadBytes)
+            PrivateDeliveryPlanner.Target.Broadcast ->
                 networkManager.broadcastPayload(payloadBytes)
-            }
         }
         return true
     }

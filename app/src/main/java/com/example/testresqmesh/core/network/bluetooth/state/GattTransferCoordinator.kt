@@ -10,6 +10,16 @@ import android.bluetooth.BluetoothGatt
 class GattTransferCoordinator(private val store: BleStateStore) {
     enum class Completion { STALE, MORE, DONE }
 
+    fun enqueue(endpoint: String, transfer: GattTransfer, priority: Boolean): Boolean {
+        val queue = store.pendingQueues.computeIfAbsent(endpoint) { java.util.concurrent.ConcurrentLinkedDeque() }
+        synchronized(queue) {
+            if (queue.size >= MeshFrameCodec.MAX_PENDING_TRANSFERS) return false
+            if (priority) queue.addFirst(transfer) else queue.addLast(transfer)
+        }
+        store.isWriting.putIfAbsent(endpoint, java.util.concurrent.atomic.AtomicBoolean(false))
+        return true
+    }
+
     fun claimNext(
         endpoint: String,
         link: BleLink,

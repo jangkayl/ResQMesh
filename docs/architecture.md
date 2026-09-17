@@ -37,7 +37,7 @@ DISCONNECTED -> CONNECTING -> DISCOVERING -> CONFIGURING -> READY
       +------------------- DISCONNECTING <---------------------+
 ```
 
-Client readiness follows required GATT configuration such as service discovery and CCCD completion. Server readiness follows subscription. Server-to-client GATT fallback uses acknowledged indications so queue advancement is tied to `onNotificationSent` rather than an unacknowledged notification accepted only by the local stack. `GattTransferCoordinator` owns deterministic flight claiming, generation checks, chunk completion, removal, and L2CAP queue promotion. `HeartbeatCoordinator` owns one generation-bound challenge per endpoint; Android scheduling and radio I/O remain in `NativeBleManager`. Same-address late server callback ownership and complete queue bounds still require review and device evidence.
+Client readiness follows required GATT configuration such as service discovery and CCCD completion. Server readiness follows subscription. Server-to-client GATT fallback uses acknowledged indications so queue advancement is tied to `onNotificationSent` rather than an unacknowledged notification accepted only by the local stack. `GattTransferCoordinator` owns deterministic flight claiming, generation checks, bounded queue admission, chunk completion, removal, and L2CAP queue promotion. `MeshFrameCodec` applies the same length-prefix and payload bounds to GATT and L2CAP. `HeartbeatCoordinator` owns one generation-bound challenge per endpoint; Android scheduling and radio I/O remain in `NativeBleManager`. Same-address late server callback ownership and queue overflow/retry behavior still require review and device evidence.
 
 Client setup treats the default 20-byte ATT payload as the reliable baseline: service discovery and CCCD subscription establish `READY` without waiting for MTU negotiation. A GATT-server connection callback for an endpoint already owned by a live outbound client is treated as another local view of that ACL, not as a second configuring mesh role with its own destructive timeout.
 
@@ -73,7 +73,7 @@ This is not yet a basis for claiming authenticated end-to-end encryption or forw
 
 ## Persistence and UI
 
-`MeshRepository` joins network callbacks, `MeshRouter`, persistence, and UI-facing state through two boundaries: `MeshNetworkGateway` hides Android Bluetooth types, and `MessageStore` hides Room/DAO operations. Their production adapters are supplied by Koin. Room collection and background writes run in the process-owned `AppCoroutineScope`. Compose features cover setup, chat, Radar, SOS, profile, responder tracking, and audio; Active Chat header presentation and Radar row models are separated from their route-level screens. UI rules live in `docs/ui.md`; physical behavior must be checked against `docs/validation.md`.
+`MeshRepository` joins network callbacks, `MeshRouter`, persistence, and UI-facing state through two boundaries: `MeshNetworkGateway` hides Android Bluetooth types, and `MessageStore` hides Room/DAO operations. `PrivateDeliveryPlanner` makes the pure direct/next-hop/broadcast selection before the gateway performs transport I/O. Production adapters are supplied by Koin. Room collection and background writes run in the process-owned `AppCoroutineScope`. Compose features cover setup, chat, Radar, SOS, profile, responder tracking, and audio; Active Chat header presentation and Radar row models are separated from their route-level screens. UI rules live in `docs/ui.md`; physical behavior must be checked against `docs/validation.md`.
 
 ## Source map
 

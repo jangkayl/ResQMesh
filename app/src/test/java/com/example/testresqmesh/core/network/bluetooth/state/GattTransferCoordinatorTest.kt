@@ -10,6 +10,23 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class GattTransferCoordinatorTest {
+    @Test fun enqueuePreservesPriorityAndRejectsWorkBeyondTheQueueBound() {
+        val store = BleStateStore()
+        val coordinator = GattTransferCoordinator(store)
+        val ordinary = GattTransfer(byteArrayOf(1))
+        val priority = GattTransfer(byteArrayOf(2))
+
+        assertTrue(coordinator.enqueue("peer", ordinary, priority = false))
+        assertTrue(coordinator.enqueue("peer", priority, priority = true))
+        repeat(MeshFrameCodec.MAX_PENDING_TRANSFERS - 2) {
+            assertTrue(coordinator.enqueue("peer", GattTransfer(byteArrayOf(3)), priority = false))
+        }
+
+        assertSame(priority, store.pendingQueues["peer"]?.first)
+        assertFalse(coordinator.enqueue("peer", GattTransfer(byteArrayOf(4)), priority = false))
+        assertEquals(MeshFrameCodec.MAX_PENDING_TRANSFERS, store.pendingQueues["peer"]?.size)
+    }
+
     @Test fun claimAndCompleteKeepsOneFlightUntilTheWholeFrameFinishes() {
         val fixture = readyServerFixture()
         val transfer = GattTransfer(byteArrayOf(1, 2, 3, 4))

@@ -17,13 +17,13 @@ import com.example.testresqmesh.core.network.bluetooth.state.GattTransferCoordin
 import com.example.testresqmesh.core.network.bluetooth.state.GattTransferFlight
 import com.example.testresqmesh.core.network.bluetooth.state.HeartbeatCoordinator
 import com.example.testresqmesh.core.network.bluetooth.state.HandshakeRadioGate
+import com.example.testresqmesh.core.network.bluetooth.state.MeshFrameCodec
 import com.example.testresqmesh.core.network.bluetooth.state.payloadBytes
 import com.example.testresqmesh.core.utils.AppLogger
 import com.example.testresqmesh.core.utils.NotificationHelper
 import java.util.UUID
 import java.util.concurrent.ConcurrentLinkedDeque
 import java.util.concurrent.atomic.AtomicBoolean
-import java.nio.ByteBuffer
 import kotlinx.serialization.encodeToByteArray
 import kotlinx.serialization.decodeFromByteArray
 import kotlinx.serialization.protobuf.ProtoBuf
@@ -921,7 +921,7 @@ class NativeBleManager(val context: Context) {
                 while (store.isNodeActive.get() && socket.isConnected &&
                     store.activeL2capSockets[macAddress] === socket && hasLiveSocket(macAddress)) {
                     val length = din.readInt()
-                    if (length > 0 && length < 10 * 1024 * 1024) { // Max 10MB sanity check
+                    if (MeshFrameCodec.isValidPayloadLength(length)) {
                         val payloadBytes = ByteArray(length)
                         din.readFully(payloadBytes)
                         store.connectionInteractionTimes[macAddress] = System.currentTimeMillis()
@@ -929,6 +929,9 @@ class NativeBleManager(val context: Context) {
                         if (store.activeL2capSockets[macAddress] === socket && hasLiveSocket(macAddress)) {
                             processBinaryPayload(macAddress, payloadBytes)
                         }
+                    } else {
+                        AppLogger.d("BLE_MESH", "Rejected invalid L2CAP payload length $length from $macAddress")
+                        break
                     }
                 }
             } catch (e: Exception) {
@@ -1012,12 +1015,11 @@ class NativeBleManager(val context: Context) {
         heartbeatId: String? = null
     ): Boolean {
         if (!hasReadyEndpoint(endpoint)) return false
-        val frame = ByteBuffer.allocate(4 + payloadBytes.size)
-            .putInt(payloadBytes.size).put(payloadBytes).array()
-        val queue = store.pendingQueues.computeIfAbsent(endpoint) { ConcurrentLinkedDeque() }
-        val transfer = GattTransfer(frame, heartbeatId)
-        if (priority) queue.addFirst(transfer) else queue.addLast(transfer)
-        store.isWriting.putIfAbsent(endpoint, AtomicBoolean(false))
+        val frame = MeshFrameCodec.encode(payloadBytes) ?: return false
+        if (!transferCoordinator.enqueue(endpoint, GattTransfer(frame, heartbeatId), priority)) {
+            AppLogger.d("BLE_MESH", "GATT queue full for $endpoint; rejected payload")
+            return false
+        }
         processNextPayload(endpoint)
         return true
     }
@@ -1081,13 +1083,13 @@ class NativeBleManager(val context: Context) {
 
     fun sendDirectPayload(targetMacAddress: String, payloadBytes: ByteArray) {
         if (!BluetoothAdapter.checkBluetoothAddress(targetMacAddress)) return
+        val fullData = MeshFrameCodec.encode(payloadBytes)
+        if (fullData == null) {
+            AppLogger.d("BLE_MESH", "Rejected oversized or empty outbound payload for $targetMacAddress")
+            return
+        }
         
         cacheOutgoingMessageId(payloadBytes)
-        
-        val fullData = ByteArray(4 + payloadBytes.size)
-        val lengthBuffer = ByteBuffer.allocate(4).putInt(payloadBytes.size).array()
-        System.arraycopy(lengthBuffer, 0, fullData, 0, 4)
-        System.arraycopy(payloadBytes, 0, fullData, 4, payloadBytes.size)
 
         // PHASE 2 L2CAP ROUTING: Bypass GATT entirely if high-speed socket is available
         val l2capSocket = store.activeL2capSockets[targetMacAddress]
@@ -1116,10 +1118,10 @@ class NativeBleManager(val context: Context) {
         val isServerConnected = store.activeServerConnections.containsKey(targetMacAddress)
         val isClientConnected = store.activeConnections.containsKey(targetMacAddress)
 
-        val queue = store.pendingQueues.computeIfAbsent(targetMacAddress) { ConcurrentLinkedDeque() }
-        queue.addLast(GattTransfer(fullData))
-        
-        store.isWriting.putIfAbsent(targetMacAddress, AtomicBoolean(false))
+        if (!transferCoordinator.enqueue(targetMacAddress, GattTransfer(fullData), priority = false)) {
+            AppLogger.d("BLE_MESH", "GATT queue full for $targetMacAddress; rejected payload")
+            return
+        }
 
         if (isServerConnected || isClientConnected) {
             processNextPayload(targetMacAddress)
