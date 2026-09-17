@@ -61,4 +61,21 @@
     <string name="home_network_empty">No people nearby</string>
     <string name="home_sos_title">Need help?</string>
     <string name="home_sos_description">Hold SOS below.</string>
+    <string name="messages_title">Messages</string>
+    <string name="messages_subtitle">Stay in touch.</string>
+    <string name="messages_new_action">New message</string>
+    <string name="messages_community_title">Community</string>
+    <string name="messages_community_description">Channel %1$s</string>
+    <string name="messages_channel_short">Ch %1$s</string>
+    <string name="messages_channel_option">Channel %1$d</string>
+    <string name="messages_open_community">Open community</string>
+    <string name="messages_private_section">Private</string>
+    <string name="messages_empty_title">No messages yet</string>
+    <string name="messages_empty_description">Start a chat with someone nearby.</string>
+    <string name="messages_open_conversation">Open chat with %1$s</string>
+    <string name="messages_status_direct">Direct</string>
+    <string name="messages_status_checking">Checking</string>
+    <string name="messages_status_relayed">Relayed</string>
+    <string name="messages_status_offline">Offline</string>
+    <string name="messages_attachment_preview">Attachment</string>
 </resources>
