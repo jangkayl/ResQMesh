@@ -24,39 +24,57 @@ class CommunicationViewModel(
     // Real repository data replaces each sample group as soon as it is available.
     private val sampleTimestamp = System.currentTimeMillis()
     private val samplePublicMessages = listOf(
+        "Sample: Community check-in started.",
+        "Sample: I am safe near the meeting point.",
+        "Sample: Please keep messages short.",
+        "Sample: Water is available at the hall.",
+        "Sample: Thank you for the update.",
+        "Sample: Looking for two people from the east side.",
+        "Sample: We are together and safe.",
+        "Sample: A responder is checking the route.",
+        "Sample: Share a location only if it is safe to do so.",
+        "Sample: Power is out in our block.",
+        "Sample: We can help with first-aid supplies.",
+        "Sample: Please check in again when you can.",
+        "Sample: This is demonstration content."
+    ).mapIndexed { index, text ->
         ChatMessage(
-            id = "sample-public-1",
-            senderName = "Community sample",
-            text = "Sample: Check in if you are safe.",
+            id = "sample-public-$index",
+            senderName = if (index % 3 == 0) "Community sample" else "Local sample",
+            text = text,
             imageBase64 = null,
             audioBase64 = null,
-            isMine = false,
-            timestamp = sampleTimestamp - 120_000L
+            isMine = index % 4 == 0,
+            timestamp = sampleTimestamp - (13 - index) * 75_000L
         )
-    )
+    }
     private val samplePrivateMessages = mapOf(
         "Alex (sample)" to listOf(
+            "Sample: Are you safe?",
+            "Sample: Yes, I am okay.",
+            "Sample: Is anyone with you?",
+            "Sample: Two of us are here.",
+            "Sample: Do you need supplies?",
+            "Sample: Water would help.",
+            "Sample: I will share that with the group.",
+            "Sample: Thank you.",
+            "Sample: Please stay where it is safe.",
+            "Sample: We will check in again soon.",
+            "Sample: The route looks clear from here.",
+            "Sample: That is good to know.",
+            "Sample: This conversation is sample data."
+        ).mapIndexed { index, text ->
             ChatMessage(
-                id = "sample-private-1",
-                senderName = "Alex (sample)",
-                text = "Sample: I am nearby and available.",
+                id = "sample-private-$index",
+                senderName = if (index % 2 == 0) "Alex (sample)" else "Me",
+                text = text,
                 imageBase64 = null,
                 audioBase64 = null,
-                isMine = false,
+                isMine = index % 2 != 0,
                 isPrivate = true,
-                timestamp = sampleTimestamp - 300_000L
-            ),
-            ChatMessage(
-                id = "sample-private-2",
-                senderName = "Me",
-                text = "Sample: Thanks for checking in.",
-                imageBase64 = null,
-                audioBase64 = null,
-                isMine = true,
-                isPrivate = true,
-                timestamp = sampleTimestamp - 180_000L
+                timestamp = sampleTimestamp - (13 - index) * 80_000L
             )
-        )
+        }
     )
 
     private fun visiblePublicMessages(messages: List<ChatMessage>): List<ChatMessage> =
