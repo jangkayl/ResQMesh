@@ -11,6 +11,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.runtime.collectAsState
 import com.example.testresqmesh.feature.comms.ui.ActiveChatScreen
 import com.example.testresqmesh.feature.comms.ui.ChatContainerScreen
+import com.example.testresqmesh.feature.comms.ui.WalkieTalkieScreen
 import com.example.testresqmesh.feature.radar.ui.NetworkScreen
 import com.example.testresqmesh.feature.radar.ui.ResponderTrackerScreen
 import com.example.testresqmesh.feature.home.ui.HomeScreen
@@ -183,6 +184,11 @@ fun MainContainerScreen(
                     walkieTalkieViewModel = walkieTalkieViewModel,
                     mediaHelper = mediaHelper, 
                     onChatSelected = { activeChatNode = it }
+                )
+                ResQDestination.WalkieTalkie -> WalkieTalkieScreen(
+                    commsViewModel = commsViewModel,
+                    walkieTalkieViewModel = walkieTalkieViewModel,
+                    mediaHelper = mediaHelper
                 )
                 ResQDestination.Network -> NetworkScreen(radarViewModel)
             }

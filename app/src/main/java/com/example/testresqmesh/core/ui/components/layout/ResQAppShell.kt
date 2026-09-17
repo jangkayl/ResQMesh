@@ -18,6 +18,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.ChatBubbleOutline
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Hub
+import androidx.compose.material.icons.outlined.Mic
 import androidx.compose.material.icons.outlined.SignalWifiStatusbarConnectedNoInternet4
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -50,6 +51,7 @@ enum class ResQDestination(
 ) {
     Home(R.string.nav_home, Icons.Outlined.Home),
     Messages(R.string.nav_messages, Icons.Outlined.ChatBubbleOutline),
+    WalkieTalkie(R.string.nav_walkie_talkie, Icons.Outlined.Mic),
     Network(R.string.nav_network, Icons.Outlined.Hub)
 }
 
@@ -119,6 +121,11 @@ private fun ResQBottomBar(
                     destination = ResQDestination.Messages,
                     selected = selectedDestination == ResQDestination.Messages,
                     onClick = { onDestinationSelected(ResQDestination.Messages) }
+                )
+                ResQNavigationItem(
+                    destination = ResQDestination.WalkieTalkie,
+                    selected = selectedDestination == ResQDestination.WalkieTalkie,
+                    onClick = { onDestinationSelected(ResQDestination.WalkieTalkie) }
                 )
                 ResQNavigationItem(
                     destination = ResQDestination.Network,
