@@ -99,9 +99,8 @@ fun ChatContainerScreen(
         PublicChatTab(
             viewModel = viewModel,
             mediaHelper = mediaHelper,
-            onChatSelected = onChatSelected
+            onBack = { showCommunityConversation = false }
         )
-        androidx.activity.compose.BackHandler { showCommunityConversation = false }
         return
     }
 
