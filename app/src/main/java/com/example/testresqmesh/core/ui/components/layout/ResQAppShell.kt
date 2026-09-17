@@ -221,10 +221,10 @@ private fun ResQAppShellLightPreview() {
     }
 }
 
-@Preview(name = "App shell — dark", showBackground = true, widthDp = 390, heightDp = 844)
+@Preview(name = "App shell — large text", showBackground = true, widthDp = 390, heightDp = 844, fontScale = 1.3f)
 @Composable
-private fun ResQAppShellDarkPreview() {
-    TestResQMeshTheme(darkTheme = true) {
+private fun ResQAppShellLargeTextPreview() {
+    TestResQMeshTheme {
         ResQAppShell(
             selectedDestination = ResQDestination.Home,
             onDestinationSelected = {},

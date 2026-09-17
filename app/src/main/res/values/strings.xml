@@ -43,4 +43,22 @@
     <string name="identity_tag_hint">Up to 6 letters or numbers.</string>
     <string name="identity_start_action">Continue</string>
     <string name="identity_change_note">Choose a name people know.</string>
+    <string name="home_subtitle">Stay ready.</string>
+    <string name="home_profile_action">Open profile</string>
+    <string name="home_ready_title">Nearby sharing is on</string>
+    <string name="home_ready_description">Ready to find people.</string>
+    <string name="home_setup_title">Finish phone setup</string>
+    <string name="home_setup_description">Turn on Bluetooth and Location.</string>
+    <string name="home_message_title">Send a message</string>
+    <string name="home_message_description">Reach nearby people.</string>
+    <string name="home_message_action">Messages</string>
+    <string name="home_network_title">Your network</string>
+    <string name="home_network_action">View network</string>
+    <string name="home_network_direct">%1$d direct</string>
+    <string name="home_network_relayed">%1$d relayed</string>
+    <string name="home_network_nearby">%1$d nearby</string>
+    <string name="home_network_checking">Checking %1$d connection</string>
+    <string name="home_network_empty">No people nearby</string>
+    <string name="home_sos_title">Need help?</string>
+    <string name="home_sos_description">Hold SOS below.</string>
 </resources>
