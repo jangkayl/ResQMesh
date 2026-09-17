@@ -12,7 +12,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.runtime.collectAsState
 import com.example.testresqmesh.feature.comms.ui.ActiveChatScreen
 import com.example.testresqmesh.feature.comms.ui.ChatContainerScreen
-import com.example.testresqmesh.feature.radar.ui.RadarScreen
+import com.example.testresqmesh.feature.radar.ui.NetworkScreen
 import com.example.testresqmesh.feature.radar.ui.ResponderTrackerScreen
 import com.example.testresqmesh.feature.home.ui.HomeScreen
 import com.example.testresqmesh.feature.sos.ui.SOSBroadcastScreen
@@ -185,7 +185,7 @@ fun MainContainerScreen(
                     mediaHelper = mediaHelper, 
                     onChatSelected = { activeChatNode = it }
                 )
-                ResQDestination.Network -> RadarScreen(radarViewModel)
+                ResQDestination.Network -> NetworkScreen(radarViewModel)
             }
         }
     }
