@@ -94,4 +94,27 @@
     <string name="recipient_status_connecting">Connecting</string>
     <string name="recipient_status_offline">Offline</string>
     <string name="recipient_status_blocked">Blocked</string>
+    <string name="private_chat_back_action">Back</string>
+    <string name="private_chat_delete_action">Delete conversation</string>
+    <string name="private_chat_empty_title">No messages yet</string>
+    <string name="private_chat_empty_description">Say hello to start.</string>
+    <string name="private_chat_image_description">Shared image</string>
+    <string name="private_chat_voice_note">Voice note</string>
+    <string name="private_chat_photo">Photo</string>
+    <string name="private_chat_location_shared">Location shared</string>
+    <string name="private_chat_view_map_action">View map</string>
+    <string name="private_chat_remove_attachment">Remove attachment</string>
+    <string name="private_chat_add_image_action">Add image</string>
+    <string name="private_chat_share_location_action">Share location</string>
+    <string name="private_chat_record_action">Record voice note</string>
+    <string name="private_chat_stop_recording_action">Stop recording</string>
+    <string name="private_chat_message_placeholder">Message</string>
+    <string name="private_chat_send_action">Send</string>
+    <string name="private_chat_delete_title">Delete chat?</string>
+    <string name="private_chat_delete_description">Remove messages with %1$s?</string>
+    <string name="private_chat_delete_confirm">Delete</string>
+    <string name="private_chat_cancel_action">Cancel</string>
+    <string name="private_chat_status_sent">Sent</string>
+    <string name="private_chat_status_delivered">Delivered</string>
+    <string name="private_chat_status_read">Read</string>
 </resources>

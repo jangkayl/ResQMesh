@@ -7,7 +7,7 @@ Baseline: branch `temp`, HEAD `d7cd5e3`, with substantial uncommitted Android, t
 
 Preserve the physically validated two-phone BLE/L2CAP improvement, then address the separate asymmetric block-policy defect and finish the remaining ownership, queue-bound, and framing work before broader multi-phone expansion.
 
-In parallel, the civilian-first UI refactor is proceeding through explicit review gates. User review replaced the prior direction with a light-only reference-inspired system: pale-white/lavender canvas, bold dark hierarchy, purple actions, cyan identity accents, green status, raised white cards, and a three-item capsule dock with SOS floating above it. The rebuilt new-message flow is complete and awaiting review; the private conversation will not begin without approval.
+In parallel, the civilian-first UI refactor is proceeding through explicit review gates. User review replaced the prior direction with a light-only reference-inspired system: pale-white/lavender canvas, bold dark hierarchy, purple actions, cyan identity accents, green status, raised white cards, and a three-item capsule dock with SOS floating above it. The rebuilt private conversation is complete and awaiting review; the community broadcast conversation will not begin without approval.
 
 ## Implemented in the working tree
 
