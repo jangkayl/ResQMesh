@@ -15,6 +15,7 @@ import com.example.testresqmesh.core.network.bluetooth.state.BleLivenessPolicy
 import com.example.testresqmesh.core.network.bluetooth.state.GattTransfer
 import com.example.testresqmesh.core.network.bluetooth.state.GattTransferFlight
 import com.example.testresqmesh.core.network.bluetooth.state.HeartbeatChallenge
+import com.example.testresqmesh.core.network.bluetooth.state.HandshakeRadioGate
 import com.example.testresqmesh.core.network.bluetooth.state.payloadBytes
 import com.example.testresqmesh.core.utils.AppLogger
 import com.example.testresqmesh.core.utils.NotificationHelper
@@ -63,6 +64,8 @@ class NativeBleManager(val context: Context) {
     val bluetoothAdapter = bluetoothManager.adapter
     val bleAdvertiser get() = bluetoothAdapter?.bluetoothLeAdvertiser
     val bleScanner get() = bluetoothAdapter?.bluetoothLeScanner
+    private val scanActive = AtomicBoolean(false)
+    private val handshakeRadioGate = HandshakeRadioGate()
 
     val SERVICE_UUID = UUID.fromString("B9A34F5C-7462-4C61-8935-7C2D4A15A3E4") // ResQMesh Custom Service
     val RX_CHARACTERISTIC_UUID = UUID.fromString("6A81C2E5-309F-4D88-B270-4A9A65D8B6C7")
@@ -79,8 +82,8 @@ class NativeBleManager(val context: Context) {
     val notificationHelper = NotificationHelper(context)
     var currentTeamKey: String = ""
     var isCloaked = false
+    /** Direct radio links per phone. Larger meshes expand through routed neighbors. */
     val MAX_TOTAL_CONNECTIONS = 3 // MUST BE 3! If set to 1, it causes an infinite eviction loop.
-    val MAX_CONNECTIONS = 4
 
     /** Hard limit imposed by the BLE `0xFFFF` manufacturer data field. */
     val MAX_ADVERT_PAYLOAD_BYTES = 26
@@ -96,13 +99,14 @@ class NativeBleManager(val context: Context) {
     val CONNECT_TIMEOUT_MS = 15_000L
 
     /**
-     * Absolute ceiling on the post-connect handshake (MTU, discovery, descriptor write). Always
+     * Absolute ceiling on the post-connect handshake (discovery and descriptor write). Always
      * fires, so a dropped OEM callback can never strand the connect lock.
      */
-    val HANDSHAKE_WATCHDOG_MS = 12_000L
+    val HANDSHAKE_WATCHDOG_MS = 15_000L
 
-    /** If `onMtuChanged` has not arrived by then, start service discovery with the default MTU. */
-    val MTU_FALLBACK_MS = 1_500L
+    /** Bounded retry for a synchronous `discoverServices()` rejection from a busy OEM stack. */
+    val DISCOVERY_REQUEST_RETRY_MS = 300L
+    val MAX_DISCOVERY_REQUEST_ATTEMPTS = 3
 
     /** Hard ceiling on holding the connect lock, enforced by [timeoutRunnable]. */
     val CONNECT_LOCK_MAX_HOLD_MS = 25_000L
@@ -294,7 +298,12 @@ class NativeBleManager(val context: Context) {
                 publicKey = com.example.testresqmesh.core.network.CryptoManager.getMyPublicKeyBase64()
             )
             val payloadBytes = kotlinx.serialization.protobuf.ProtoBuf.encodeToByteArray(com.example.testresqmesh.core.network.MeshPayload.serializer(), payload)
-            AppLogger.d("BLE_MESH", "Sending full SYSTEM pulse to ${store.activeConnections.size + store.activeServerConnections.size} GATT endpoints")
+            AppLogger.event(
+                category = com.example.testresqmesh.core.utils.TerminalLogCategory.SYNC,
+                event = "SYSTEM_SENT",
+                message = "Sending full SYSTEM pulse to ${store.activeConnections.size + store.activeServerConnections.size} GATT endpoints",
+                tag = "BLE_MESH"
+            )
             broadcastPayload(payloadBytes)
         } catch (e: Exception) {
             AppLogger.d("BLE_MESH", "Failed to send system pulse: ${e.message}")
@@ -303,8 +312,10 @@ class NativeBleManager(val context: Context) {
 
     fun stopMeshNode() {
         store.isNodeActive.set(false)
+        AppLogger.clearLinks()
         bleAdvertiser?.stopAdvertising(advertiseCallback)
-        bleScanner?.stopScan(scanCallback)
+        if (scanActive.compareAndSet(true, false)) bleScanner?.stopScan(scanCallback)
+        handshakeRadioGate.clear()
         
         try {
             val goodbyePayload = MeshPayload(
@@ -422,24 +433,57 @@ class NativeBleManager(val context: Context) {
 
     val advertiseCallback = object : AdvertiseCallback() {}
 
-    fun updateInvisibilityCloak() {
-        if (!store.isNodeActive.get() || currentTeamKey.isEmpty()) return
-        try {
-            bleAdvertiser?.stopAdvertising(advertiseCallback)
-            startAdvertising(currentTeamKey)
-        } catch (e: Exception) {}
-    }
-
     fun startScanning() {
+        val scanner = bleScanner ?: return
+        if (!scanActive.compareAndSet(false, true)) return
         val filters = listOf(ScanFilter.Builder().setServiceUuid(ParcelUuid(SERVICE_UUID)).build())
         val settings = ScanSettings.Builder()
-            .setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY)
+            .setScanMode(ScanSettings.SCAN_MODE_BALANCED)
             .build()
-            
-        bleScanner?.startScan(filters, settings, scanCallback)
+
+        try {
+            scanner.startScan(filters, settings, scanCallback)
+        } catch (e: Exception) {
+            scanActive.set(false)
+            AppLogger.d("BLE_MESH", "Scanner start failed: ${e.message}")
+        }
+    }
+
+    fun beginRadioHandshake(owner: String) {
+        if (!handshakeRadioGate.begin(owner)) return
+        if (scanActive.compareAndSet(true, false)) {
+            try { bleScanner?.stopScan(scanCallback) } catch (_: Exception) {}
+        }
+        AppLogger.d("BLE_MESH", "Radio handshake gate acquired by $owner; scanning paused")
+    }
+
+    fun isRadioHandshakeActive(): Boolean = handshakeRadioGate.isActive()
+
+    fun finishRadioHandshake(owner: String, reason: String) {
+        if (!handshakeRadioGate.finish(owner)) return
+        AppLogger.d("BLE_MESH", "Radio handshake gate released by $owner ($reason); scanning resumed")
+        if (store.isNodeActive.get()) startScanning()
+    }
+
+    fun latestEndpointForIdentity(peerName: String, fallback: String): String {
+        val targetId = NodeIdentity.idOf(peerName)
+        return store.connectedEndpointNames.entries
+            .asSequence()
+            .filter { entry ->
+                val name = entry.value
+                NodeIdentity.matches(name, peerName) ||
+                    (targetId != null && store.endpointNodeIds[entry.key] == targetId)
+            }
+            .maxByOrNull { store.endpointLastSeen[it.key] ?: Long.MIN_VALUE }
+            ?.key ?: fallback
     }
 
     val scanCallback = object : ScanCallback() {
+        override fun onScanFailed(errorCode: Int) {
+            scanActive.set(false)
+            AppLogger.d("BLE_MESH", "Scanner failed with errorCode=$errorCode")
+        }
+
         override fun onScanResult(callbackType: Int, result: ScanResult) {
             val device = result.device
             val manufacturerData = result.scanRecord?.getManufacturerSpecificData(0xFFFF)
@@ -590,7 +634,11 @@ class NativeBleManager(val context: Context) {
                             if (peerScore.isNotEmpty() && myScore > peerScore) {
                                 AppLogger.d("BLE_MESH", "Battery Master Election: $myScore > $peerScore. Initiating connection with jitter.")
                                 handler.postDelayed({
-                                    connectToPersistentGatt(macAddress, peerName)
+                                    val latestEndpoint = latestEndpointForIdentity(peerName, macAddress)
+                                    if (latestEndpoint != macAddress) {
+                                        AppLogger.d("BLE_MESH", "Resolved rotated endpoint for $peerName: $macAddress -> $latestEndpoint")
+                                    }
+                                    connectToPersistentGatt(latestEndpoint, peerName)
                                 }, (100L..1000L).random())
                             } else if (peerScore.isEmpty()) {
                                 if (myDeviceName > peerName) {
@@ -599,18 +647,6 @@ class NativeBleManager(val context: Context) {
                                 }
                             } else {
                                 AppLogger.d("BLE_MESH", "Battery Master Election: $myScore <= $peerScore. Yielding.")
-                                // QA FIX: If the Master fails to initiate due to hardware bugs, the Slave seizes control after 10 seconds!
-                                handler.postDelayed({
-                                    // Identity check, not MAC check. The designated master may already
-                                    // have connected inbound using its Central MAC, which neither socket
-                                    // map contains under the advertising MAC. The old MAC-keyed guard
-                                    // therefore passed and opened a duplicate link to the same peer,
-                                    // which the repository later tore down as a "ghost socket".
-                                    if (!hasLinkToIdentity(peerName)) {
-                                        AppLogger.d("BLE_MESH", "Master-Slave Reversal! Designated Master failed. Initiating as Client.")
-                                        connectToPersistentGatt(macAddress, peerName)
-                                    }
-                                }, 10000)
                             }
                         }
                     }
@@ -890,6 +926,7 @@ class NativeBleManager(val context: Context) {
         store.activeL2capSockets.put(macAddress, socket)?.let { old ->
             if (old !== socket) try { old.close() } catch (e: Exception) {}
         }
+        AppLogger.updateLinkTransport(macAddress, "GATT+L2CAP")
         // GATT becomes READY before the L2CAP socket on many phones. Any payload started in that
         // small window must no longer be allowed to time out and tear down the now-healthy L2CAP
         // transport. Promote both the active transfer and queued transfers on the main thread.
@@ -1110,7 +1147,7 @@ class NativeBleManager(val context: Context) {
         if (isServerConnected || isClientConnected) {
             processNextPayload(targetMacAddress)
         } else {
-            if (store.activeConnections.size >= MAX_CONNECTIONS) {
+            if (distinctLinkCount() >= MAX_TOTAL_CONNECTIONS) {
                 // VIP BOUNCER (LRU EVICTION)
                 val lruMac = store.connectionInteractionTimes
                     .filterKeys { store.activeConnections.containsKey(it) }

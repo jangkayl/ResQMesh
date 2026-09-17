@@ -16,7 +16,9 @@ class GattServerManager(
     val context: Context,
     val manager: NativeBleManager
 ) {
-    private val serverSetupTimeoutMs = 12_000L
+    // The elected client owns the normal 15 s setup deadline. This longer server deadline is only a
+    // safety backstop for a vanished client whose disconnect callback never arrives.
+    private val serverSetupTimeoutMs = 20_000L
 
     fun startGattServer() {
         with(manager) {
@@ -25,6 +27,18 @@ class GattServerManager(
             override fun onConnectionStateChange(device: BluetoothDevice, status: Int, newState: Int) {
                 val macAddress = device.address
                 if (newState == BluetoothProfile.STATE_CONNECTED) {
+                    // Android may report the local GATT server side of an ACL that this process
+                    // opened as a client. It is not a second inbound mesh link. Creating a SERVER
+                    // record here schedules a CCCD timeout which can later cancel the healthy
+                    // outbound ACL, especially on Samsung devices.
+                    val ownedClient = store.links.current(macAddress, BleLinkRole.CLIENT)
+                    if (ownedClient != null && store.links.hasLiveRole(macAddress, BleLinkRole.CLIENT)) {
+                        AppLogger.d(
+                            "BLE_MESH",
+                            "Server view shares outbound CLIENT link ${ownedClient.generation} on $macAddress; no duplicate SERVER setup"
+                        )
+                        return
+                    }
                     val peerName = store.connectedEndpointNames[macAddress]
                     if (peerName != null && isDeviceBlocked(peerName)) {
                         AppLogger.d("BLE_MESH", "Server: Rejected blocked device ${peerName}.")
@@ -76,9 +90,12 @@ class GattServerManager(
                         AtomicBoolean(false).also { store.isWriting[macAddress] = it }
                     } else store.isWriting.computeIfAbsent(macAddress) { AtomicBoolean(false) }
                     val link = store.links.begin(macAddress, BleLinkRole.SERVER, peerName?.let(NodeIdentity::idOf), queue, writing)
+                    val radioOwner = "server:${link.endpoint}:${link.generation}"
+                    beginRadioHandshake(radioOwner)
                     link.serverDevice = device
                     store.links.transition(link, BleLinkState.CONFIGURING)
                     AppLogger.d("BLE_MESH", "Link ${link.generation} SERVER $macAddress ${link.peerNodeId ?: "unknown"}: CONFIGURING radioStatus=$status")
+                    AppLogger.updateLink(macAddress, peerName, "SERVER", link.generation, "CONFIGURING")
                     val setupDeadline = object : Runnable {
                         override fun run() {
                             if (!store.links.isCurrent(link) || link.state != BleLinkState.CONFIGURING) return
@@ -89,6 +106,7 @@ class GattServerManager(
                             }
                             if (store.links.expireConfiguring(link)) {
                                 AppLogger.d("BLE_MESH", "Link ${link.generation} SERVER $macAddress: CCCD setup timed out; closing unfinished link")
+                                finishRadioHandshake(radioOwner, "server setup timeout")
                                 try { gattServer?.cancelConnection(device) } catch (e: Exception) {
                                     AppLogger.d("BLE_MESH", "Server setup timeout disconnect failed on $macAddress: ${e.message}")
                                 }
@@ -114,10 +132,6 @@ class GattServerManager(
                         link.peerNodeId = seededNodeId
                     }
                     
-                    handler.postDelayed({
-                        updateInvisibilityCloak()
-                    }, 2000)
-                    
                     // A physical socket now exists, so publish it immediately. Previously the
                     // connected event was withheld until a SYSTEM pulse revealed the peer name, which
                     // left a live link missing from `connectedDevices`. The Radar then fell through to
@@ -138,14 +152,7 @@ class GattServerManager(
                     }
 
                     if (isProvisional) {
-                        AppLogger.d("BLE_MESH", "Server: Alien device connected. Waiting ${NAME_HANDSHAKE_TIMEOUT_MS}ms for name handshake...")
-                        handler.postDelayed({
-                            if (store.links.isCurrent(link) &&
-                                NodeIdentity.isPlaceholder(store.connectedEndpointNames[macAddress])) {
-                                AppLogger.d("BLE_MESH", "Server: Handshake timeout! Alien device $macAddress kicked from Mesh.")
-                                gattServer?.cancelConnection(device)
-                            }
-                        }, NAME_HANDSHAKE_TIMEOUT_MS)
+                        AppLogger.d("BLE_MESH", "Server: Provisional device connected; identity deadline starts only after CCCD is READY.")
                     }
                 } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
                     val link = store.links.current(macAddress, BleLinkRole.SERVER)
@@ -154,8 +161,10 @@ class GattServerManager(
                         return
                     }
                     store.links.transition(link, BleLinkState.DISCONNECTING)
+                    finishRadioHandshake("server:${link.endpoint}:${link.generation}", "server disconnected")
                     AppLogger.d("BLE_MESH", "Link ${link.generation} SERVER $macAddress: DISCONNECTING radioStatus=$status")
                     AppLogger.d("BLE_MESH", "Server: Device ${macAddress} disconnected.")
+                    AppLogger.removeLink(macAddress, "SERVER", link.generation)
                     store.activeServerConnections.remove(macAddress, device)
                     store.links.forget(link)
                     cleanupEndpointIfUnowned(macAddress)
@@ -182,7 +191,15 @@ class GattServerManager(
                 if (link?.serverDevice?.address == device.address && descriptor.uuid == CCC_DESCRIPTOR_UUID &&
                     value?.contentEquals(BluetoothGattDescriptor.ENABLE_INDICATION_VALUE) == true &&
                     store.links.transition(link, BleLinkState.READY)) {
+                    finishRadioHandshake("server:${link.endpoint}:${link.generation}", "server ready")
                     AppLogger.d("BLE_MESH", "Link ${link.generation} SERVER ${device.address}: READY CCCD indications enabled")
+                    AppLogger.updateLink(
+                        device.address,
+                        store.connectedEndpointNames[device.address],
+                        "SERVER",
+                        link.generation,
+                        "READY"
+                    )
                     handler.post {
                         if (store.links.isCurrent(link) && link.state == BleLinkState.READY) {
                             val name = store.connectedEndpointNames[device.address] ?: NodeIdentity.UNKNOWN_NAME
@@ -197,6 +214,15 @@ class GattServerManager(
                         }
                     }
                     processNextPayload(device.address)
+                    if (NodeIdentity.isPlaceholder(store.connectedEndpointNames[device.address])) {
+                        handler.postDelayed({
+                            if (store.links.isCurrent(link) && link.state == BleLinkState.READY &&
+                                NodeIdentity.isPlaceholder(store.connectedEndpointNames[device.address])) {
+                                AppLogger.d("BLE_MESH", "Server: READY link received no identity; disconnecting ${device.address}.")
+                                gattServer?.cancelConnection(device)
+                            }
+                        }, NAME_HANDSHAKE_TIMEOUT_MS)
+                    }
                 }
             }
 

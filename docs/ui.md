@@ -32,6 +32,14 @@ Avoid showing “connected” from a BLE callback alone. Counters and selected p
 - SOS alerts and cancellation feedback must identify the relevant alert/sender once the model supports it.
 - Never render debug plaintext, keys, ciphertext previews, or sensitive location content in the terminal/debug UI.
 
+## Diagnostic terminal
+
+- The in-app terminal is a bounded, session-only diagnostic view; it is not a replacement for a focused Logcat capture.
+- Its categories are Connection, Sync, Transport, Routing, Security, System, and cross-category Alerts. Categories must be emitted explicitly for new diagnostics; the compatibility classifier exists only for older log sites.
+- Direct-link summary rows use client/server lifecycle evidence, never an advertisement or a routed peer. Show peer name, shortened endpoint, role/generation, readiness state, and transport only.
+- Display newest events first. When the user scrolls into older events, pause live follow, show a new-event count, and provide controls to jump to Latest or the latest Sync event.
+- Keep heartbeat and relay chatter behind the Details control so connection state, setup failures, and topology changes remain readable by default. Last Sync is a one-time jump, not an instruction to resume live follow.
+
 ## Accessibility and interaction
 
 - Provide readable contrast, touch targets, content descriptions, and text equivalents for color/status indicators.

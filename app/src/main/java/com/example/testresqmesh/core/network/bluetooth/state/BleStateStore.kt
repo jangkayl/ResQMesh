@@ -38,6 +38,12 @@ class BleStateStore {
     val connectionEstablishTime = ConcurrentHashMap<String, Long>()
     val writeFailureCount = ConcurrentHashMap<String, Int>()
 
+    /**
+     * Stable node IDs whose AUTO GATT transport connected but received no ATT discovery response.
+     * Only those peers retry with explicit LE, preserving AUTO for known-good OEM combinations.
+     */
+    val explicitLeTransportPeers = ConcurrentHashMap.newKeySet<String>()
+
     var connectingMacAddress: String? = null
 
     /**

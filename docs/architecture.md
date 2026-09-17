@@ -39,9 +39,17 @@ DISCONNECTED -> CONNECTING -> DISCOVERING -> CONFIGURING -> READY
 
 Client readiness follows required GATT configuration such as service discovery and CCCD completion. Server readiness follows subscription. Server-to-client GATT fallback uses acknowledged indications so queue advancement is tied to `onNotificationSent` rather than an unacknowledged notification accepted only by the local stack. Callbacks and timeouts should act only on their owned link reference/generation. The working tree includes callback-driven client writes and server indications, heartbeat challenges, inbound-progress liveness, endpoint cleanup, and L2CAP failure fallback. Same-address late server callback ownership and complete queue bounds still require review and device evidence.
 
+Client setup treats the default 20-byte ATT payload as the reliable baseline: service discovery and CCCD subscription establish `READY` without waiting for MTU negotiation. A GATT-server connection callback for an endpoint already owned by a live outbound client is treated as another local view of that ACL, not as a second configuring mesh role with its own destructive timeout.
+
+A generation-owned radio handshake gate pauses discovery scanning while any client or server link is configuring. Advertising starts once with the mesh session and is not restarted when the direct-link count changes; local admission remains authoritative even though the advertised count can be stale until the next session. Existing ready links continue carrying traffic, and only the last setup owner may resume balanced scanning. The higher election score is the sole initiator; the yielding peer no longer schedules a delayed role reversal. An inbound setup also blocks a previously scheduled outbound attempt, keeping setup single-flight even when the two roles use different private addresses.
+
+The elected client owns a 15-second setup deadline covering connect, discovery, and CCCD subscription. The server's 20-second configuring deadline is only an orphan backstop if the client and its disconnect callback vanish. A provisional peer's 10-second identity deadline starts only after CCCD reaches `READY`, so identity waiting cannot abort ATT discovery.
+
+Outbound GATT uses Android's `AUTO` transport for known-good peers because the project previously observed immediate disconnects with globally forced LE on some OEM pairs. If `AUTO` reaches `CONNECTED` but receives no ATT service-discovery response, the stable peer identity is marked for explicit `TRANSPORT_LE` on the next attempt in that app session. This is a per-peer compatibility fallback, not a Samsung model allowlist.
+
 When L2CAP becomes available, it takes ownership of any active or queued GATT transfer. The payload is resent in full over L2CAP and the obsolete GATT flight is disarmed, so a late or missing GATT completion callback cannot tear down a healthy L2CAP path. If a GATT callback fails after that handoff race, the manager preserves L2CAP and promotes the payload instead of retiring the link.
 
-The source still contains conflicting direct-link limits: `MAX_TOTAL_CONNECTIONS = 3` and `MAX_CONNECTIONS = 4`. Do not make a stable-capacity claim until one rule is implemented and measured.
+Each phone admits at most three distinct direct GATT neighbors. A mesh may contain more than four devices because additional nodes are expected to be reached through routing; the three-link rule is not a total mesh-size claim. The rule still needs multi-phone measurement before any stable-capacity claim.
 
 ## Identity, routing, and presence
 
@@ -65,7 +73,7 @@ This is not yet a basis for claiming authenticated end-to-end encryption or forw
 
 ## Persistence and UI
 
-`MeshRepository` joins network callbacks, `MeshRouter`, Room DAOs, and UI-facing state. Compose features cover setup, chat, Radar, SOS, profile, responder tracking, and audio. UI rules live in `docs/ui.md`; physical behavior must be checked against `docs/validation.md`.
+`MeshRepository` joins network callbacks, `MeshRouter`, Room DAOs, and UI-facing state. Its Room collection and background writes run in a process-owned `AppCoroutineScope` supplied by Koin, rather than creating an unmanaged scope internally; the scope uses `Dispatchers.IO`, owns a `SupervisorJob`, and exists for the app process lifetime. Compose features cover setup, chat, Radar, SOS, profile, responder tracking, and audio. UI rules live in `docs/ui.md`; physical behavior must be checked against `docs/validation.md`.
 
 ## Source map
 

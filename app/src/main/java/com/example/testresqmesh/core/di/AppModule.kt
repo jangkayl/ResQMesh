@@ -13,6 +13,7 @@ import com.example.testresqmesh.feature.comms.viewmodel.CommunicationViewModel
 import com.example.testresqmesh.feature.comms.viewmodel.WalkieTalkieViewModel
 import com.example.testresqmesh.feature.radar.viewmodel.RadarViewModel
 import com.example.testresqmesh.feature.setup.viewmodel.SetupViewModel
+import kotlinx.coroutines.Dispatchers
 import org.koin.android.ext.koin.androidContext
 import org.koin.androidx.viewmodel.dsl.viewModel
 import org.koin.dsl.module
@@ -20,7 +21,8 @@ import org.koin.dsl.module
 val appModule = module {
     single { NativeBleManager(androidContext()) }
     single { AppDatabase.getDatabase(androidContext()) }
-    single { MeshRepository(get(), get()) }
+    single(createdAtStart = true) { AppCoroutineScope(Dispatchers.IO) }
+    single { MeshRepository(get(), get(), get<AppCoroutineScope>().scope) }
     single { MediaHelper(androidContext()) }
     single<LocationClient> { DefaultLocationClient(androidContext()) }
     
