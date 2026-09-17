@@ -45,6 +45,13 @@ class GattClientManager(
             return
         }
 
+        // A delayed election/reversal may fire after an inbound setup has already started on a
+        // different private address. Do not create a second ACL while that handshake is alive.
+        if (isRadioHandshakeActive()) {
+            AppLogger.d("BLE_MESH", "Deferring outbound GATT to $peerName; another handshake owns the radio")
+            return
+        }
+
         if (!tryAcquireConnectLock(macAddress)) {
             AppLogger.d("BLE_MESH", "Connect already in progress; deferring $peerName until its cooldown expires.")
             return
@@ -62,21 +69,41 @@ class GattClientManager(
             AtomicBoolean(false).also { store.isWriting[macAddress] = it }
         } else store.isWriting.computeIfAbsent(macAddress) { AtomicBoolean(false) }
         val link = store.links.begin(macAddress, BleLinkRole.CLIENT, NodeIdentity.idOf(peerName), queue, writing)
+        val stablePeerId = link.peerNodeId ?: NodeIdentity.idOf(peerName)
+        val useExplicitLeTransport = stablePeerId != null &&
+            store.explicitLeTransportPeers.contains(stablePeerId)
+        val radioOwner = "client:${link.endpoint}:${link.generation}"
+        beginRadioHandshake(radioOwner)
         AppLogger.d("BLE_MESH", "Link ${link.generation} CLIENT $macAddress ${link.peerNodeId ?: "unknown"}: CONNECTING")
+        AppLogger.updateLink(macAddress, peerName, "CLIENT", link.generation, "CONNECTING")
 
         val timeoutHandler = Handler(Looper.getMainLooper())
-        // Guarantees service discovery is kicked off exactly once, whether it is triggered by
-        // onMtuChanged or by the fallback below.
+        // Service discovery is the only readiness-critical operation started after CONNECTED.
+        // MTU negotiation used to run first, but some Samsung stacks begin their own cache/service
+        // work at connection time. The MTU request then overlapped that work and the later discovery
+        // fallback was rejected as "already has a pending command".
         val servicesRequested = AtomicBoolean(false)
+        var discoveryRequestAttempts = 0
 
         fun requestServicesOnce(gatt: BluetoothGatt) {
             if (store.links.isCurrent(link) && servicesRequested.compareAndSet(false, true)) {
-                gatt.discoverServices()
+                discoveryRequestAttempts += 1
+                link.currentOperation = "DISCOVER_SERVICES"
+                val accepted = gatt.discoverServices()
+                AppLogger.d("BLE_MESH", "Service discovery request for $peerName accepted=$accepted attempt=$discoveryRequestAttempts")
+                if (!accepted) {
+                    link.currentOperation = null
+                    servicesRequested.set(false)
+                    if (discoveryRequestAttempts < MAX_DISCOVERY_REQUEST_ATTEMPTS) {
+                        timeoutHandler.postDelayed({ requestServicesOnce(gatt) }, DISCOVERY_REQUEST_RETRY_MS)
+                    }
+                }
             }
         }
 
         fun finishConnectPhase(reason: String) {
             timeoutHandler.removeCallbacksAndMessages(null)
+            finishRadioHandshake(radioOwner, reason)
             if (!store.links.isCurrent(link)) return
             releaseConnectLock(macAddress, reason)
             if (store.connectingMacAddress == null) {
@@ -87,6 +114,7 @@ class GattClientManager(
         val connectTimeoutRunnable = Runnable {
             if (!store.links.isCurrent(link)) return@Runnable
             AppLogger.d("BLE_MESH", "GATT Connection timed out after 15s. Forcing lock release for long-distance retry.")
+            AppLogger.removeLink(macAddress, "CLIENT", link.generation)
             finishConnectPhase("connect timeout")
             store.links.transition(link, BleLinkState.DISCONNECTING)
             try { link.gatt?.disconnect(); link.gatt?.close() } catch (e: Exception) {}
@@ -112,7 +140,8 @@ class GattClientManager(
                     if (newState == BluetoothProfile.STATE_CONNECTED) {
                         if (!store.links.transition(link, BleLinkState.DISCOVERING)) return
                         AppLogger.d("BLE_MESH", "Link ${link.generation} CLIENT $macAddress: DISCOVERING radioStatus=$status")
-                        AppLogger.d("BLE_MESH", "GATT Socket locked with ${peerName}. Requesting MTU 512...")
+                        AppLogger.updateLink(macAddress, peerName, "CLIENT", link.generation, "DISCOVERING")
+                        AppLogger.d("BLE_MESH", "GATT Socket locked with ${peerName}. Starting service discovery with default MTU.")
                         store.activeConnections[macAddress] = gatt
                         store.connectedEndpointNames[macAddress] = peerName
                         NodeIdentity.idOf(peerName)?.let { store.endpointNodeIds[macAddress] = it }
@@ -122,35 +151,24 @@ class GattClientManager(
                         store.connectionInteractionTimes.putIfAbsent(macAddress, System.currentTimeMillis())
                         store.connectionEstablishTime[macAddress] = System.currentTimeMillis()
 
-                        // DEADLOCK FIX: the connect timeout used to be cancelled here for both
-                        // CONNECTED and DISCONNECTED, which removed the only safety net while the
-                        // lock was still held. Readiness then depended on
-                        // onMtuChanged -> discoverServices -> onServicesDiscovered, so a single
-                        // dropped OEM callback stranded the lock for the whole session. Now the
-                        // connect timeout is swapped for a handshake watchdog that always fires.
+                        // The connect timeout is swapped for a handshake watchdog that always fires,
+                        // so a dropped OEM discovery/descriptor callback cannot strand the lock.
                         timeoutHandler.removeCallbacks(connectTimeoutRunnable)
                         timeoutHandler.postDelayed({
                             if (store.links.isCurrent(link) && link.state != BleLinkState.READY) {
+                                if (link.state == BleLinkState.DISCOVERING && stablePeerId != null &&
+                                    store.explicitLeTransportPeers.add(stablePeerId)) {
+                                    AppLogger.d(
+                                        "BLE_MESH",
+                                        "AUTO transport received no ATT discovery response from $peerName; next attempt will force LE"
+                                    )
+                                }
                                 AppLogger.d("BLE_MESH", "Handshake watchdog fired for CLIENT link ${link.generation} $peerName in ${link.state}. Disconnecting.")
                                 finishConnectPhase("handshake watchdog")
                                 forceGattDisconnect(macAddress, gatt)
                             }
                         }, HANDSHAKE_WATCHDOG_MS)
 
-                        // MTU is an optimisation, never a gate. If onMtuChanged never arrives we
-                        // still start discovery ourselves.
-                        timeoutHandler.postDelayed({
-                            if (store.links.isCurrent(link) && !servicesRequested.get()) {
-                                AppLogger.d("BLE_MESH", "onMtuChanged never arrived for $peerName. Starting discovery with default MTU.")
-                                store.connectionMtu.putIfAbsent(macAddress, 20)
-                                requestServicesOnce(gatt)
-                            }
-                        }, MTU_FALLBACK_MS)
-
-                        handler.postDelayed({
-                            updateInvisibilityCloak()
-                        }, 2000)
-                        
                         handler.post {
                             onDeviceConnected?.invoke(
                                 ConnectedDevice(
@@ -164,17 +182,29 @@ class GattClientManager(
                             )
                         }
                         gatt.requestConnectionPriority(BluetoothGatt.CONNECTION_PRIORITY_HIGH)
-                        gatt.requestMtu(512)
+                        // Default ATT payload size is reliable on every supported Android version.
+                        // Negotiate no larger MTU until the link is READY and the setup queue is idle.
+                        store.connectionMtu[macAddress] = 20
+                        link.mtu = 20
+                        requestServicesOnce(gatt)
                     } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
+                        val stateBeforeDisconnect = link.state
+                        if (useExplicitLeTransport && stateBeforeDisconnect == BleLinkState.CONNECTING &&
+                            store.explicitLeTransportPeers.remove(stablePeerId)) {
+                            AppLogger.d(
+                                "BLE_MESH",
+                                "Explicit LE disconnected before setup for $peerName; restoring AUTO transport"
+                            )
+                        }
                         store.links.transition(link, BleLinkState.DISCONNECTING)
                         AppLogger.d("BLE_MESH", "GATT Socket disconnected from ${peerName}.")
+                        AppLogger.removeLink(macAddress, "CLIENT", link.generation)
                         finishConnectPhase("disconnected")
                         store.activeConnections.remove(macAddress, gatt)
                         cleanupEndpointIfUnowned(macAddress)
                         if (!store.activeServerConnections.containsKey(macAddress)) {
                             store.connectionEstablishTime.remove(macAddress)
                         }
-                        updateInvisibilityCloak()
                         if (!store.activeServerConnections.containsKey(macAddress)) {
                             store.connectedEndpointIds.remove(macAddress)
                             store.connectedEndpointNames.remove(macAddress)
@@ -206,9 +236,11 @@ class GattClientManager(
     
                 override fun onServicesDiscovered(gatt: BluetoothGatt, status: Int) {
                     if (!owns(gatt, "services $status")) return
+                    link.currentOperation = null
                     if (status == BluetoothGatt.GATT_SUCCESS) {
                         if (!store.links.transition(link, BleLinkState.CONFIGURING)) return
                         AppLogger.d("BLE_MESH", "Link ${link.generation} CLIENT $macAddress: CONFIGURING serviceStatus=$status")
+                        AppLogger.updateLink(macAddress, peerName, "CLIENT", link.generation, "CONFIGURING")
                         AppLogger.d("BLE_MESH", "GATT Services discovered for ${macAddress}. Ready to transmit.")
                         
                         val service = gatt.getService(SERVICE_UUID)
@@ -219,6 +251,7 @@ class GattClientManager(
                             val descriptor = txChar.getDescriptor(CCC_DESCRIPTOR_UUID)
                             if (descriptor != null) {
                                 descriptorWritePending = true
+                                link.currentOperation = "WRITE_CCCD"
                                 if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
                                     gatt.writeDescriptor(descriptor, BluetoothGattDescriptor.ENABLE_INDICATION_VALUE)
                                 } else {
@@ -246,9 +279,11 @@ class GattClientManager(
     
                 override fun onDescriptorWrite(gatt: BluetoothGatt, descriptor: BluetoothGattDescriptor, status: Int) {
                     if (!owns(gatt, "descriptor $status")) return
+                    link.currentOperation = null
                     if (status == BluetoothGatt.GATT_SUCCESS) {
                         if (!store.links.transition(link, BleLinkState.READY)) return
                         AppLogger.d("BLE_MESH", "Link ${link.generation} CLIENT $macAddress: READY descriptorStatus=$status")
+                        AppLogger.updateLink(macAddress, peerName, "CLIENT", link.generation, "READY")
                         AppLogger.d("BLE_MESH", "GATT descriptor written successfully for ${macAddress}.")
                         handler.post {
                             if (store.links.isCurrent(link) && link.state == BleLinkState.READY) {
@@ -350,8 +385,16 @@ class GattClientManager(
             
             timeoutHandler.postDelayed(connectTimeoutRunnable, CONNECT_TIMEOUT_MS)
             
-            // Reverted TRANSPORT_LE because it causes instant disconnects on some OEM chipsets!
-            link.gatt = device.connectGatt(context, false, callback)
+            // AUTO remains the compatibility default because explicit LE caused immediate
+            // disconnects on older OEM pairs. A peer-specific retry switches to LE only after
+            // AUTO connected but failed at ATT primary-service discovery.
+            link.gatt = if (useExplicitLeTransport) {
+                AppLogger.d("BLE_MESH", "Connecting to $peerName with explicit LE transport after AUTO discovery timeout")
+                device.connectGatt(context, false, callback, BluetoothDevice.TRANSPORT_LE)
+            } else {
+                AppLogger.d("BLE_MESH", "Connecting to $peerName with AUTO transport")
+                device.connectGatt(context, false, callback)
+            }
         } catch (e: Exception) {
             AppLogger.d("BLE_MESH", "Exception in connectGatt: ${e.message}")
             finishConnectPhase("connectGatt threw")

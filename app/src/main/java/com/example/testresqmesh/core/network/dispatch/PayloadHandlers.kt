@@ -4,6 +4,7 @@ import com.example.testresqmesh.core.network.MeshPayload
 import com.example.testresqmesh.core.network.PayloadDispatcherCallback
 import com.example.testresqmesh.core.network.CryptoManager
 import com.example.testresqmesh.core.utils.AppLogger
+import com.example.testresqmesh.core.utils.TerminalLogCategory
 import kotlinx.serialization.encodeToByteArray
 import kotlinx.serialization.protobuf.ProtoBuf
 import android.util.Base64
@@ -23,6 +24,13 @@ class SystemPulseHandler : PayloadHandler {
         val sender = payload.senderName
         val msgId = payload.id
         callback.onDeviceNameSync(endpointId, sender)
+        AppLogger.event(
+            category = TerminalLogCategory.SYNC,
+            event = "IDENTITY_SYNCED",
+            message = "Peer identity confirmed from a SYSTEM pulse",
+            peerName = sender,
+            endpoint = endpointId
+        )
         
         if (payload.publicKey.isNotEmpty()) {
             callback.onPublicKeyReceived(endpointId, sender, payload.publicKey)
@@ -30,6 +38,13 @@ class SystemPulseHandler : PayloadHandler {
         if (payload.connectedNodes.isNotEmpty()) {
             callback.onRoutingTableReceived(sender, payload.connectedNodes)
         }
+        AppLogger.event(
+            category = TerminalLogCategory.SYNC,
+            event = "SYSTEM_RECEIVED",
+            message = "SYSTEM pulse received; ${payload.connectedNodes.size} advertised neighbor(s)",
+            peerName = sender,
+            endpoint = endpointId
+        )
         
         callback.onMessageReceived(endpointId, msgId, sender, "", false, true, null, null, null, null, "LOCAL", emptyList(), payload.channelId)
         
@@ -38,6 +53,14 @@ class SystemPulseHandler : PayloadHandler {
         val updatedPayload = payload.copy(routePath = routePath)
         val updatedBytes = ProtoBuf.encodeToByteArray(updatedPayload)
         callback.broadcastPayload(updatedBytes, endpointId)
+        AppLogger.event(
+            category = TerminalLogCategory.SYNC,
+            event = "SYSTEM_RELAYED",
+            message = "SYSTEM pulse forwarded to eligible direct peers",
+            peerName = sender,
+            endpoint = endpointId,
+            isVerbose = true
+        )
     }
 }
 
@@ -48,9 +71,25 @@ class PingHandler : PayloadHandler {
     override fun handle(endpointId: String, payload: MeshPayload, payloadBytes: ByteArray, callback: PayloadDispatcherCallback) {
         if (payload.type == "PONG") {
             callback.onHeartbeatAck(endpointId, payload.targetMessageId)
+            AppLogger.event(
+                category = TerminalLogCategory.SYNC,
+                event = "HEARTBEAT_ACK",
+                message = "Heartbeat acknowledgement received",
+                peerName = payload.senderName,
+                endpoint = endpointId,
+                isVerbose = true
+            )
             return
         }
         callback.onDeviceNameSync(endpointId, payload.senderName)
+        AppLogger.event(
+            category = TerminalLogCategory.SYNC,
+            event = "HEARTBEAT_RECEIVED",
+            message = "PING received; replying when it is a heartbeat challenge",
+            peerName = payload.senderName,
+            endpoint = endpointId,
+            isVerbose = true
+        )
         if (payload.id.startsWith("HB:")) {
             val reply = MeshPayload(
                 id = "HA:${java.util.UUID.randomUUID()}",

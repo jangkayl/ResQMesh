@@ -10,6 +10,8 @@ import com.example.testresqmesh.core.network.dispatch.SystemPulseHandler
 import com.example.testresqmesh.core.network.dispatch.PingHandler
 import com.example.testresqmesh.core.network.dispatch.UnblockHandler
 import com.example.testresqmesh.core.utils.AppLogger
+import com.example.testresqmesh.core.utils.TerminalLogCategory
+import com.example.testresqmesh.core.utils.TerminalLogLevel
 import kotlinx.serialization.decodeFromByteArray
 import kotlinx.serialization.protobuf.ProtoBuf
 import kotlinx.serialization.ExperimentalSerializationApi
@@ -51,10 +53,24 @@ class PayloadDispatcher(private val callback: PayloadDispatcherCallback) {
             // 2. STRATEGY ROUTING LOGIC
             val handler = handlers.firstOrNull { it.canHandle(payload.type) }
             handler?.handle(endpointId, payload, payloadBytes, callback)
-                ?: AppLogger.d("PAYLOAD_DISPATCHER", "No handler found for payload type: ${payload.type}")
+                ?: AppLogger.event(
+                    category = TerminalLogCategory.SYSTEM,
+                    event = "PAYLOAD_REJECTED",
+                    message = "No handler found for payload type ${payload.type}",
+                    level = TerminalLogLevel.WARN,
+                    tag = "PAYLOAD_DISPATCHER",
+                    endpoint = endpointId
+                )
                 
         } catch (e: Exception) {
-            AppLogger.d("PAYLOAD_DISPATCHER", "Error parsing Protobuf payload: ${e.message}")
+            AppLogger.event(
+                category = TerminalLogCategory.SYSTEM,
+                event = "PAYLOAD_PARSE_FAILED",
+                message = "Could not parse incoming payload: ${e.message}",
+                level = TerminalLogLevel.ERROR,
+                tag = "PAYLOAD_DISPATCHER",
+                endpoint = endpointId
+            )
         }
     }
 }

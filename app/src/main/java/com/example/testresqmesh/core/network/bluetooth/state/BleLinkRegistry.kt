@@ -55,6 +55,11 @@ class BleLinkRegistry {
 
     @Synchronized fun current(endpoint: String, role: BleLinkRole): BleLink? = links[endpoint to role]
 
+    @Synchronized fun hasLiveRole(endpoint: String, role: BleLinkRole): Boolean =
+        links[endpoint to role]?.state?.let {
+            it != BleLinkState.DISCONNECTING && it != BleLinkState.DISCONNECTED
+        } == true
+
     /** A redundant unfinished role must not cancel a ready path to the same peer. */
     @Synchronized fun hasReadyPeerExcept(link: BleLink): Boolean = links.values.any { other ->
         other !== link && other.state == BleLinkState.READY &&

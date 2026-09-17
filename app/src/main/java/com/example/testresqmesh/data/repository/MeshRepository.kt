@@ -225,6 +225,12 @@ class MeshRepository(
         networkManager.onRoutingTableReceived = { senderName, connectedNodes ->
             meshRouter.updateTopology(senderName, connectedNodes, myNodeName)
             meshRouter.recalculateKnownNodes(myNodeName, readyConnectedDevices())
+            AppLogger.event(
+                category = com.example.testresqmesh.core.utils.TerminalLogCategory.ROUTING,
+                event = "TOPOLOGY_UPDATED",
+                message = "Applied topology from peer; ${connectedNodes.size} advertised neighbor(s)",
+                peerName = senderName
+            )
         }
 
         networkManager.onDeviceBlocked = { senderName ->

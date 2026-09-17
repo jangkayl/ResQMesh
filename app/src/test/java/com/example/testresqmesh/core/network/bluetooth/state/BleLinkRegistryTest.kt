@@ -54,6 +54,16 @@ class BleLinkRegistryTest {
         assertFalse(registry.isReady(client.endpoint))
     }
 
+    @Test fun outboundAclRemainsLiveUntilClientStartsDisconnecting() {
+        val registry = BleLinkRegistry()
+        val client = registry.beginClient("shared-endpoint")
+        assertTrue(registry.hasLiveRole(client.endpoint, BleLinkRole.CLIENT))
+        assertTrue(registry.transition(client, BleLinkState.DISCOVERING))
+        assertTrue(registry.hasLiveRole(client.endpoint, BleLinkRole.CLIENT))
+        assertTrue(registry.transition(client, BleLinkState.DISCONNECTING))
+        assertFalse(registry.hasLiveRole(client.endpoint, BleLinkRole.CLIENT))
+    }
+
     @Test fun serverSetupDeadlineCannotCloseReadyOrReplacementLink() {
         val registry = BleLinkRegistry()
         val old = registry.begin("endpoint", BleLinkRole.SERVER, null, ConcurrentLinkedDeque(), AtomicBoolean(false), 100L)
