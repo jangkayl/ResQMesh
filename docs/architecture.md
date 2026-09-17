@@ -27,7 +27,7 @@ Compose screen
 
 ## Direct-link lifecycle
 
-`NativeBleManager` coordinates discovery, admission, role selection, payload routing, liveness, and transport fallback. `GattClientManager` and `GattServerManager` own Android callbacks. `BleLinkRegistry` stores per-attempt records with endpoint, role, generation, lifecycle state, GATT/server reference, queue/operation state, MTU, identity, and timestamps.
+`NativeBleManager` is the public facade and cross-component policy owner. `BleRadioController` owns Android advertising/scanning; `BlePeerAdmissionController` owns discovery identity/capacity/election policy; `GattTransferExecutor` owns callback-driven GATT transfers; `L2capTransport` owns socket I/O and GATT fallback; and `BleLifecycleSupervisor` owns bounded liveness, scan expiry, and stuck-lock recovery. `GattClientManager` and `GattServerManager` own Android callbacks. `BleLinkRegistry` stores per-attempt records with endpoint, role, generation, lifecycle state, GATT/server reference, queue/operation state, MTU, identity, and timestamps.
 
 The intended lifecycle distinguishes radio connection from payload readiness:
 
@@ -79,7 +79,7 @@ This is not yet a basis for claiming authenticated end-to-end encryption or forw
 
 | Area | Primary paths |
 | --- | --- |
-| BLE orchestration | `core/network/NativeBleManager.kt` |
+| BLE orchestration | `core/network/NativeBleManager.kt`, `core/network/bluetooth/BleRadioController.kt`, `BlePeerAdmissionController.kt`, `GattTransferExecutor.kt`, `L2capTransport.kt`, `BleLifecycleSupervisor.kt` |
 | GATT callbacks | `core/network/bluetooth/gatt/` |
 | Link ownership and liveness | `core/network/bluetooth/state/` |
 | Payload schema and dispatch | `core/network/MeshPayload.kt`, `PayloadDispatcher.kt`, `dispatch/` |

@@ -2,28 +2,27 @@ package com.example.testresqmesh.core.network
 
 import android.annotation.SuppressLint
 import android.bluetooth.*
-import android.bluetooth.le.*
 import android.content.Context
 import android.os.Handler
 import android.os.Looper
-import android.os.ParcelUuid
 import com.example.testresqmesh.core.model.ConnectedDevice
 import com.example.testresqmesh.core.model.NodeIdentity
+import com.example.testresqmesh.core.network.bluetooth.BleAdvertisement
+import com.example.testresqmesh.core.network.bluetooth.BleLifecycleSupervisor
+import com.example.testresqmesh.core.network.bluetooth.BlePeerAdmissionController
+import com.example.testresqmesh.core.network.bluetooth.BleRadioController
+import com.example.testresqmesh.core.network.bluetooth.GattTransferExecutor
+import com.example.testresqmesh.core.network.bluetooth.L2capTransport
 import com.example.testresqmesh.core.network.bluetooth.state.BleLinkRole
 import com.example.testresqmesh.core.network.bluetooth.state.BleLinkState
-import com.example.testresqmesh.core.network.bluetooth.state.BleLivenessPolicy
 import com.example.testresqmesh.core.network.bluetooth.state.GattTransfer
 import com.example.testresqmesh.core.network.bluetooth.state.GattTransferCoordinator
-import com.example.testresqmesh.core.network.bluetooth.state.GattTransferFlight
 import com.example.testresqmesh.core.network.bluetooth.state.HeartbeatCoordinator
-import com.example.testresqmesh.core.network.bluetooth.state.HandshakeRadioGate
 import com.example.testresqmesh.core.network.bluetooth.state.MeshFrameCodec
 import com.example.testresqmesh.core.network.bluetooth.state.payloadBytes
 import com.example.testresqmesh.core.utils.AppLogger
 import com.example.testresqmesh.core.utils.NotificationHelper
 import java.util.UUID
-import java.util.concurrent.ConcurrentLinkedDeque
-import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.serialization.encodeToByteArray
 import kotlinx.serialization.decodeFromByteArray
 import kotlinx.serialization.protobuf.ProtoBuf
@@ -60,18 +59,21 @@ class NativeBleManager(val context: Context) {
      */
     var myNodeId: String = ""
 
+    /** Shared platform handles retained for the GATT client/server managers. */
     val bluetoothManager = context.getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
     val bluetoothAdapter = bluetoothManager.adapter
-    val bleAdvertiser get() = bluetoothAdapter?.bluetoothLeAdvertiser
-    val bleScanner get() = bluetoothAdapter?.bluetoothLeScanner
-    private val scanActive = AtomicBoolean(false)
-    private val handshakeRadioGate = HandshakeRadioGate()
 
     val SERVICE_UUID = UUID.fromString("B9A34F5C-7462-4C61-8935-7C2D4A15A3E4") // ResQMesh Custom Service
     val RX_CHARACTERISTIC_UUID = UUID.fromString("6A81C2E5-309F-4D88-B270-4A9A65D8B6C7")
     val TX_CHARACTERISTIC_UUID = UUID.fromString("1E4D9C7B-6F2A-4B9E-981D-F8A32C5B4E10")
     val L2CAP_PSM_CHARACTERISTIC_UUID = UUID.fromString("8C91321D-4A22-4215-99A1-3E2A15C81F4B") // Exposes dynamic L2CAP Port
     val CCC_DESCRIPTOR_UUID = UUID.fromString("00002902-0000-1000-8000-00805F9B34FB") // Standard CCCD (Required for Notifications)
+    private val radioController = BleRadioController(
+        context = context,
+        serviceUuid = SERVICE_UUID,
+        isNodeActive = { store.isNodeActive.get() },
+        onAdvertisement = ::handleAdvertisement
+    )
 
     var gattServer: BluetoothGattServer? = null
     var l2capServerSocket: android.bluetooth.BluetoothServerSocket? = null
@@ -84,9 +86,6 @@ class NativeBleManager(val context: Context) {
     var isCloaked = false
     /** Direct radio links per phone. Larger meshes expand through routed neighbors. */
     val MAX_TOTAL_CONNECTIONS = 3 // MUST BE 3! If set to 1, it causes an infinite eviction loop.
-
-    /** Hard limit imposed by the BLE `0xFFFF` manufacturer data field. */
-    val MAX_ADVERT_PAYLOAD_BYTES = 26
 
     /**
      * How long an inbound server link may stay nameless before it is kicked. Raised from 5s because
@@ -108,7 +107,7 @@ class NativeBleManager(val context: Context) {
     val DISCOVERY_REQUEST_RETRY_MS = 300L
     val MAX_DISCOVERY_REQUEST_ATTEMPTS = 3
 
-    /** Hard ceiling on holding the connect lock, enforced by [timeoutRunnable]. */
+    /** Hard ceiling on holding the connect lock, enforced by [BleLifecycleSupervisor]. */
     val CONNECT_LOCK_MAX_HOLD_MS = 25_000L
 
     /**
@@ -168,95 +167,60 @@ class NativeBleManager(val context: Context) {
     private val heartbeatCoordinator = HeartbeatCoordinator()
     private val HEARTBEAT_ACK_TIMEOUT_MS = 8_000L
     private val GATT_CHUNK_TIMEOUT_MS = 4_000L
-    val timeoutRunnable = object : Runnable {
-        override fun run() {
-            if (!store.isNodeActive.get()) return
-            val now = System.currentTimeMillis()
-
-            // DEADLOCK BACKSTOP: if the connect lock has been held beyond any legitimate handshake
-            // duration, a GATT callback was dropped. Force-release it, otherwise this device can
-            // never initiate another outbound connection for the rest of the session.
-            val lockAge = now - store.connectLockAcquiredAt
-            if (store.isConnecting.get() && store.connectLockAcquiredAt > 0L && lockAge > CONNECT_LOCK_MAX_HOLD_MS) {
-                AppLogger.d("BLE_MESH", "Connect lock stuck for ${lockAge}ms on ${store.connectingMacAddress}. Force-releasing.")
-                releaseConnectLock(null, "stuck lock backstop", force = true)
-            }
-
-            // A peer process can restart while Android leaves its old GATT role alive. Check
-            // actual active roles, including central addresses absent from the scan cache.
-            val activeEndpoints = (store.activeConnections.keys + store.activeServerConnections.keys).toSet()
-            activeEndpoints.forEach { macAddress ->
-                val lastInbound = store.connectionInteractionTimes[macAddress]
-                    ?: store.connectionEstablishTime[macAddress] ?: now
-                onDeviceLivenessChanged?.invoke(macAddress, !BleLivenessPolicy.isUnresponsive(lastInbound, now))
-                if (!store.activeL2capSockets.containsKey(macAddress) &&
-                    now - lastInbound >= BleLivenessPolicy.UNRESPONSIVE_AFTER_MS &&
-                    !heartbeatCoordinator.contains(macAddress)) {
-                    startHeartbeatChallenge(macAddress)
-                }
-                if (BleLivenessPolicy.isStale(lastInbound, now)) {
-                    val probe = heartbeatCoordinator.pending(macAddress)
-                    if (probe != null && now - probe.createdAt < 30_000L &&
-                        (probe.sentAt == 0L || !probe.expired(now, HEARTBEAT_ACK_TIMEOUT_MS))) {
-                        AppLogger.d("BLE_MESH", "Waiting for generation-bound GATT heartbeat result on $macAddress")
-                        return@forEach
-                    }
-                    AppLogger.d("BLE_MESH", "No inbound progress from $macAddress for ${now - lastInbound}ms. Retiring stale GATT roles.")
-                    heartbeatCoordinator.remove(macAddress)
-                    store.activeConnections[macAddress]?.let { forceGattDisconnect(macAddress, it) }
-                    store.activeServerConnections[macAddress]?.let { gattServer?.cancelConnection(it) }
-                } else {
-                    store.endpointLastSeen[macAddress] = now
-                }
-            }
-
-            val iterator = store.endpointLastSeen.entries.iterator()
-            while (iterator.hasNext()) {
-                val entry = iterator.next()
-                val macAddress = entry.key
-                if (macAddress in activeEndpoints) continue
-                if (now - entry.value > 8000) {
-                    store.connectedEndpointIds.remove(macAddress)
-                    store.connectedEndpointNames.remove(macAddress)
-                    store.endpointLastSeen.remove(macAddress)
-                    store.endpointNodeIds.remove(macAddress)
-                    AppLogger.d("BLE_MESH", "Node Timed Out: ${macAddress}")
-                    onDeviceDisconnected?.invoke(macAddress)
-                    onDeviceScanRemoved?.invoke(macAddress)
-                    sendSystemPulse()
-                }
-            }
-            
-            // HEARTBEAT FIX: Periodically send a SYSTEM pulse to keep connections alive and prevent
-            // the other side's Watchdog from aggressively killing the connection as a Zombie Socket.
-            sendSystemPulse()
-            
-            handler.postDelayed(this, 5000)
-        }
-    }
-
-    companion object {
-        var activeAdvertiseCallback: AdvertiseCallback? = null
-        @SuppressLint("StaticFieldLeak")
-        var instance: NativeBleManager? = null
-    }
-
+    private val gattTransferExecutor = GattTransferExecutor(
+        store = store,
+        coordinator = transferCoordinator,
+        handler = handler,
+        serviceUuid = SERVICE_UUID,
+        receiveCharacteristicUuid = RX_CHARACTERISTIC_UUID,
+        transmitCharacteristicUuid = TX_CHARACTERISTIC_UUID,
+        gattServer = { gattServer },
+        readyLink = ::readyGattLink,
+        hasUsableL2cap = ::hasUsableL2cap,
+        promoteToL2cap = ::promoteGattWorkToL2cap,
+        resendPayload = ::sendDirectPayload,
+        onHeartbeatSent = ::markHeartbeatSent,
+        onFlightRemoved = { endpoint -> heartbeatCoordinator.remove(endpoint) },
+        isCurrentLink = { link -> store.links.isCurrent(link) },
+        disconnectClient = ::forceGattDisconnect,
+        disconnectServer = { device -> gattServer?.cancelConnection(device) },
+        chunkTimeoutMs = GATT_CHUNK_TIMEOUT_MS
+    )
+    private val l2capTransport = L2capTransport(
+        store, handler, ::hasLiveSocket, ::processBinaryPayload, ::promoteGattWorkToL2cap,
+        ::startHeartbeatChallenge, { endpoint, payload -> enqueueGattPayload(endpoint, payload) },
+        { sendSystemPulse(forceFull = true) }
+    )
+    private val lifecycleSupervisor = BleLifecycleSupervisor(
+        store, handler, heartbeatCoordinator, HEARTBEAT_ACK_TIMEOUT_MS, CONNECT_LOCK_MAX_HOLD_MS,
+        { releaseConnectLock(null, "stuck lock backstop", force = true) }, ::startHeartbeatChallenge,
+        { endpoint -> store.activeConnections[endpoint]?.let { forceGattDisconnect(endpoint, it) } },
+        { endpoint -> store.activeServerConnections[endpoint]?.let { gattServer?.cancelConnection(it) } },
+        { endpoint, responsive -> onDeviceLivenessChanged?.invoke(endpoint, responsive) },
+        { endpoint -> onDeviceDisconnected?.invoke(endpoint); onDeviceScanRemoved?.invoke(endpoint) },
+        ::sendSystemPulse
+    )
+    private val peerAdmissionController = BlePeerAdmissionController(
+        store, handler, { myDeviceName }, ::isDeviceBlocked, ::hasLinkToIdentity,
+        { peerName -> checkRouteExists?.invoke(peerName) == true }, ::distinctLinkCount,
+        { MAX_TOTAL_CONNECTIONS }, ::getElectionScore, ::latestEndpointForIdentity,
+        ::connectToPersistentGatt, { event -> onDeviceScanned?.invoke(event) },
+        { endpoint -> onDeviceDisconnected?.invoke(endpoint) }, ::sendSystemPulse
+    )
 
     fun startMeshNode(teamKey: String) {
         currentTeamKey = teamKey
         isCloaked = false
-        if (bleAdvertiser == null || bleScanner == null) {
+        if (!radioController.isSupported) {
             onStatusChanged?.invoke("Hardware not fully supported")
             return
         }
         store.isNodeActive.set(true)
-        activeAdvertiseCallback = advertiseCallback
-        instance = this
-        
+
         startGattServer()
         startAdvertising(teamKey)
         startScanning()
-        handler.post(timeoutRunnable)
+        lifecycleSupervisor.start()
         onStatusChanged?.invoke("Mesh Active [Persistent GATT/Protobuf]. Seeking peers...")
     }
     
@@ -314,9 +278,7 @@ class NativeBleManager(val context: Context) {
     fun stopMeshNode() {
         store.isNodeActive.set(false)
         AppLogger.clearLinks()
-        bleAdvertiser?.stopAdvertising(advertiseCallback)
-        if (scanActive.compareAndSet(true, false)) bleScanner?.stopScan(scanCallback)
-        handshakeRadioGate.clear()
+        radioController.stop()
         
         try {
             val goodbyePayload = MeshPayload(
@@ -348,13 +310,12 @@ class NativeBleManager(val context: Context) {
         store.gattFlights.clear()
         heartbeatCoordinator.clear()
         store.isWriting.clear()
-        handler.removeCallbacks(timeoutRunnable)
+        lifecycleSupervisor.stop()
         store.connectedEndpointIds.clear()
         store.connectedEndpointNames.clear()
         store.endpointLastSeen.clear()
         store.endpointFirstSeen.clear()
         store.endpointNodeIds.clear()
-        instance = null
         onStatusChanged?.invoke("Offline")
     }
 
@@ -376,95 +337,22 @@ class NativeBleManager(val context: Context) {
     }
 
     fun startAdvertising(teamKey: String) {
-        val settings = AdvertiseSettings.Builder()
-            .setAdvertiseMode(AdvertiseSettings.ADVERTISE_MODE_LOW_LATENCY)
-            .setConnectable(true)
-            .setTimeout(0)
-            .setTxPowerLevel(AdvertiseSettings.ADVERTISE_TX_POWER_HIGH)
-            .build()
-
-        // Advertise distinct peers, not raw socket count. Double-counting a peer linked on two MACs
-        // made neighbours believe this node was at capacity and skewed their orphan-rescue logic.
-        val totalConnections = distinctLinkCount()
-        val electionScore = getElectionScore()
-
-        // IDENTITY FIX: advertise the stable node ID as its own field. Previously the whole
-        // "score|connections|fullName" string was blindly cut at 26 bytes, which amputated the
-        // "[TAG]#NODE_ID" suffix on longer device names and left the mesh with no reliable way to
-        // tell two similarly named peers apart.
-        val nodeId = NodeIdentity.idOf(myDeviceName) ?: myNodeId.ifEmpty { myHex }
-        val prefix = "$electionScore|$totalConnections|$nodeId|"
-        val prefixBytes = prefix.toByteArray(Charsets.UTF_8)
-        val nameBudget = (MAX_ADVERT_PAYLOAD_BYTES - prefixBytes.size).coerceAtLeast(0)
-        val displayName = truncateToBytes(NodeIdentity.displayNameOf(myDeviceName), nameBudget)
-
-        var nameBytes = (prefix + displayName).toByteArray(Charsets.UTF_8)
-        if (nameBytes.size > MAX_ADVERT_PAYLOAD_BYTES) {
-            nameBytes = nameBytes.sliceArray(0 until MAX_ADVERT_PAYLOAD_BYTES)
-        }
-
-        val data = AdvertiseData.Builder()
-            .setIncludeDeviceName(false)
-            .addServiceUuid(ParcelUuid(SERVICE_UUID))
-            .build()
-            
-        val scanResponse = AdvertiseData.Builder()
-            .setIncludeDeviceName(false)
-            .addManufacturerData(0xFFFF, nameBytes)
-            .build()
-            
-        bleAdvertiser?.startAdvertising(settings, data, scanResponse, advertiseCallback)
+        radioController.startAdvertising(
+            electionScore = getElectionScore(),
+            directConnections = distinctLinkCount(),
+            deviceName = myDeviceName,
+            fallbackNodeId = myNodeId.ifEmpty { myHex }
+        )
     }
 
-    /**
-     * Truncates [value] so its UTF-8 encoding fits within [maxBytes], dropping whole characters so a
-     * multi-byte codepoint is never cut in half (which would corrupt the advertisement).
-     */
-    private fun truncateToBytes(value: String, maxBytes: Int): String {
-        if (maxBytes <= 0) return ""
-        if (value.toByteArray(Charsets.UTF_8).size <= maxBytes) return value
-        var end = value.length
-        while (end > 0) {
-            val candidate = value.substring(0, end)
-            if (candidate.toByteArray(Charsets.UTF_8).size <= maxBytes) return candidate
-            end--
-        }
-        return ""
-    }
+    fun startScanning() = radioController.startScanning()
 
-    val advertiseCallback = object : AdvertiseCallback() {}
+    fun beginRadioHandshake(owner: String) = radioController.beginHandshake(owner)
 
-    fun startScanning() {
-        val scanner = bleScanner ?: return
-        if (!scanActive.compareAndSet(false, true)) return
-        val filters = listOf(ScanFilter.Builder().setServiceUuid(ParcelUuid(SERVICE_UUID)).build())
-        val settings = ScanSettings.Builder()
-            .setScanMode(ScanSettings.SCAN_MODE_BALANCED)
-            .build()
+    fun isRadioHandshakeActive(): Boolean = radioController.isHandshakeActive()
 
-        try {
-            scanner.startScan(filters, settings, scanCallback)
-        } catch (e: Exception) {
-            scanActive.set(false)
-            AppLogger.d("BLE_MESH", "Scanner start failed: ${e.message}")
-        }
-    }
-
-    fun beginRadioHandshake(owner: String) {
-        if (!handshakeRadioGate.begin(owner)) return
-        if (scanActive.compareAndSet(true, false)) {
-            try { bleScanner?.stopScan(scanCallback) } catch (_: Exception) {}
-        }
-        AppLogger.d("BLE_MESH", "Radio handshake gate acquired by $owner; scanning paused")
-    }
-
-    fun isRadioHandshakeActive(): Boolean = handshakeRadioGate.isActive()
-
-    fun finishRadioHandshake(owner: String, reason: String) {
-        if (!handshakeRadioGate.finish(owner)) return
-        AppLogger.d("BLE_MESH", "Radio handshake gate released by $owner ($reason); scanning resumed")
-        if (store.isNodeActive.get()) startScanning()
-    }
+    fun finishRadioHandshake(owner: String, reason: String) =
+        radioController.finishHandshake(owner, reason)
 
     fun latestEndpointForIdentity(peerName: String, fallback: String): String {
         val targetId = NodeIdentity.idOf(peerName)
@@ -479,181 +367,8 @@ class NativeBleManager(val context: Context) {
             ?.key ?: fallback
     }
 
-    val scanCallback = object : ScanCallback() {
-        override fun onScanFailed(errorCode: Int) {
-            scanActive.set(false)
-            AppLogger.d("BLE_MESH", "Scanner failed with errorCode=$errorCode")
-        }
-
-        override fun onScanResult(callbackType: Int, result: ScanResult) {
-            val device = result.device
-            val manufacturerData = result.scanRecord?.getManufacturerSpecificData(0xFFFF)
-            if (manufacturerData == null) return
-            
-            val serviceDataStr = String(manufacturerData, Charsets.UTF_8).replace("\u0000", "").trim()
-            val parts = serviceDataStr.split("|")
-
-            // STRICT FILTER: If the advertisement does not match the ResQMesh signature, ignore it.
-            // Format is "score|connections|nodeId|displayName". Three-part advertisements are the
-            // legacy "score|connections|fullName" layout and are still accepted so a partially
-            // upgraded mesh keeps working.
-            val peerScore: String
-            val peerConnections: Int
-            val advertisedName: String
-            val advertisedNodeId: String
-            when {
-                parts.size >= 4 -> {
-                    peerScore = parts[0]
-                    peerConnections = parts[1].toIntOrNull() ?: -1
-                    advertisedNodeId = parts[2].trim().uppercase()
-                    advertisedName = parts.drop(3).joinToString("|")
-                }
-                parts.size == 3 -> {
-                    peerScore = parts[0]
-                    peerConnections = parts[1].toIntOrNull() ?: -1
-                    advertisedName = parts[2]
-                    advertisedNodeId = NodeIdentity.idOf(parts[2]).orEmpty()
-                }
-                else -> {
-                    AppLogger.d("BLE_MESH", "Scanner: Ignored alien device ${device.address}. Invalid signature: $serviceDataStr")
-                    return
-                }
-            }
-
-            val peerName = if (advertisedNodeId.isNotEmpty()) {
-                NodeIdentity.compose(advertisedName, advertisedNodeId)
-            } else {
-                advertisedName.trim()
-            }
-            if (peerName.isEmpty()) return
-            val macAddress = device.address
-
-            if (isDeviceBlocked(peerName)) {
-                return
-            }
-
-            // GHOST NODE EVICTION & DUAL-MAC SPLIT-BRAIN FIX:
-            // Android uses different MACs for scanning (Central) vs advertising (Peripheral).
-            val oldMac = store.connectedEndpointNames.entries
-                .find { NodeIdentity.matches(it.value, peerName) }?.key
-            if (oldMac != null && oldMac != macAddress) {
-                val isOldMacPhysicallyConnected = store.activeConnections.containsKey(oldMac) || store.activeServerConnections.containsKey(oldMac)
-                
-                if (isOldMacPhysicallyConnected) {
-                    // We are physically connected to this peer on oldMac. The macAddress we just scanned 
-                    // is simply their advertising MAC. If we evict it, we will destroy a perfectly healthy connection!
-                    // Just ignore the advertisement to prevent a split-brain loop.
-                    return
-                } else {
-                    // We are NOT physically connected. This is a true MAC rotation from a previously scanned device.
-                    AppLogger.d("BLE_MESH", "GHOST EVICTION: $peerName rotated MAC from $oldMac to $macAddress. Purging ghost.")
-                    store.connectedEndpointIds.remove(oldMac)
-                    store.connectedEndpointNames.remove(oldMac)
-                    store.endpointLastSeen.remove(oldMac)
-                    store.endpointNodeIds.remove(oldMac)
-                    handler.post {
-                        onDeviceDisconnected?.invoke(oldMac)
-                    }
-                }
-            }
-
-            if (!NodeIdentity.matches(peerName, myDeviceName)) {
-                val now = System.currentTimeMillis()
-                store.endpointLastSeen[macAddress] = now
-                store.endpointLastScore[macAddress] = peerScore
-                if (advertisedNodeId.isNotEmpty()) {
-                    store.endpointNodeIds[macAddress] = advertisedNodeId
-                }
-                if (!store.endpointFirstSeen.containsKey(macAddress)) {
-                    store.endpointFirstSeen[macAddress] = now
-                }
-
-                if (!store.connectedEndpointIds.contains(macAddress)) {
-                    store.connectedEndpointIds.add(macAddress)
-                    store.connectedEndpointNames[macAddress] = peerName
-                    
-                    handler.post {
-                        onDeviceScanned?.invoke(
-                            com.example.testresqmesh.core.model.ScanEvent(
-                                endpointId = macAddress,
-                                name = peerName,
-                                nodeId = advertisedNodeId,
-                                peerConnections = peerConnections,
-                                peerScore = peerScore,
-                                isConnecting = false
-                            )
-                        )
-                        sendSystemPulse()
-                    }
-                }
-
-                val isAlreadyConnected = hasLinkToIdentity(peerName) ||
-                    store.activeConnections.containsKey(macAddress) ||
-                    store.activeServerConnections.containsKey(macAddress)
-                val hasIndirectRoute = checkRouteExists?.invoke(peerName) == true
-
-                if (!isAlreadyConnected && !hasIndirectRoute) {
-                    val totalConnections = distinctLinkCount()
-                    
-                    if (totalConnections >= MAX_TOTAL_CONNECTIONS || (totalConnections >= 2 && peerConnections > 0)) {
-                        if (peerConnections == 0 && totalConnections >= MAX_TOTAL_CONNECTIONS) {
-                            if (!store.orphanDetectionTime.containsKey(macAddress)) {
-                                store.orphanDetectionTime[macAddress] = now
-                            } else {
-                                if (now - (store.orphanDetectionTime[macAddress] ?: now) > 5000) {
-                                    AppLogger.d("BLE_MESH", "Orphan Preemption: Found orphan $peerName. Dropping weakest link to rescue.")
-                                    val lruMac = store.connectionInteractionTimes
-                                        .filterKeys { store.activeConnections.containsKey(it) }
-                                        .filterKeys { store.pendingQueues[it]?.isEmpty() != false } // QA FIX: Only evict idle connections
-                                        .minByOrNull { it.value }?.key
-                                        
-                                    if (lruMac != null) {
-                                        store.activeConnections[lruMac]?.disconnect()
-                                        store.activeConnections[lruMac]?.close()
-                                        store.activeConnections.remove(lruMac)
-                                        store.pendingQueues.remove(lruMac)
-                                        store.isWriting.remove(lruMac)
-                                        store.chunkBuffers.remove(lruMac)
-                                        store.connectionInteractionTimes.remove(lruMac)
-                                        handler.post {
-                                            onDeviceDisconnected?.invoke(lruMac)
-                                        }
-                                        connectToPersistentGatt(macAddress, peerName)
-                                    }
-                                }
-                            }
-                        } else {
-                            store.orphanDetectionTime.remove(macAddress)
-                        }
-                    } else {
-                        val lastAttempt = store.connectionAttempts[macAddress] ?: 0L
-                        // WATCHDOG LIMIT: Enforce strict 15-second cool-down backoff timer to prevent GATT 133 Crash Loops!
-                        if (now - lastAttempt > 15000) {
-                            store.connectionAttempts[macAddress] = now
-                            
-                            val myScore = getElectionScore()
-                            if (peerScore.isNotEmpty() && myScore > peerScore) {
-                                AppLogger.d("BLE_MESH", "Battery Master Election: $myScore > $peerScore. Initiating connection with jitter.")
-                                handler.postDelayed({
-                                    val latestEndpoint = latestEndpointForIdentity(peerName, macAddress)
-                                    if (latestEndpoint != macAddress) {
-                                        AppLogger.d("BLE_MESH", "Resolved rotated endpoint for $peerName: $macAddress -> $latestEndpoint")
-                                    }
-                                    connectToPersistentGatt(latestEndpoint, peerName)
-                                }, (100L..1000L).random())
-                            } else if (peerScore.isEmpty()) {
-                                if (myDeviceName > peerName) {
-                                    AppLogger.d("BLE_MESH", "Legacy Alphabetical Rule: $myDeviceName > $peerName. Initiating connection.")
-                                    connectToPersistentGatt(macAddress, peerName)
-                                }
-                            } else {
-                                AppLogger.d("BLE_MESH", "Battery Master Election: $myScore <= $peerScore. Yielding.")
-                            }
-                        }
-                    }
-                }
-            }
-        }
+    private fun handleAdvertisement(advertisement: BleAdvertisement) {
+        peerAdmissionController.handle(advertisement)
     }
 
     fun connectToPersistentGatt(macAddress: String, peerName: String) { gattClientManager.connectToPersistentGatt(macAddress, peerName) }
@@ -667,7 +382,7 @@ class NativeBleManager(val context: Context) {
      *
      * Android's GATT stack misbehaves badly with concurrent `connectGatt` calls, so outbound
      * connections are deliberately serialised. The lock records its acquisition time so
-     * [timeoutRunnable] can force-release it if a GATT callback is dropped by the OEM stack.
+     * [BleLifecycleSupervisor] can force-release it if a GATT callback is dropped by the OEM stack.
      */
     fun tryAcquireConnectLock(macAddress: String): Boolean {
         if (!store.isConnecting.compareAndSet(false, true)) return false
@@ -786,73 +501,7 @@ class NativeBleManager(val context: Context) {
     }
 
 
-    fun processNextPayload(macAddress: String) {
-        if (Looper.myLooper() != Looper.getMainLooper()) {
-            handler.post { processNextPayload(macAddress) }
-            return
-        }
-        if (hasUsableL2cap(macAddress)) {
-            promoteGattWorkToL2cap(macAddress)
-            return
-        }
-        val link = readyGattLink(macAddress)
-        if (link == null) return
-        val flight = transferCoordinator.claimNext(
-            macAddress, link,
-            if (link.role == BleLinkRole.CLIENT) store.activeConnections[macAddress] else null,
-            if (link.role == BleLinkRole.SERVER) store.activeServerConnections[macAddress] else null
-        ) ?: return
-        sendGattChunk(flight)
-    }
-
-    private fun sendGattChunk(flight: GattTransferFlight) {
-        val endpoint = flight.link.endpoint
-        if (!transferCoordinator.owns(flight)) return
-        val remaining = flight.transfer.frame.size - flight.offset
-        if (remaining <= 0) return
-        val mtu = (store.connectionMtu[endpoint] ?: 20).coerceAtLeast(1)
-        val chunk = flight.transfer.frame.copyOfRange(flight.offset, flight.offset + minOf(mtu, remaining))
-        val operationId = transferCoordinator.beginChunk(flight, chunk.size)
-        val initiated = if (flight.link.role == BleLinkRole.CLIENT) {
-            val gatt = flight.gatt
-            val characteristic = gatt?.getService(SERVICE_UUID)?.getCharacteristic(RX_CHARACTERISTIC_UUID)
-            if (gatt == null || characteristic == null || store.activeConnections[endpoint] !== gatt) false
-            else if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU)
-                gatt.writeCharacteristic(characteristic, chunk, BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT) ==
-                    android.bluetooth.BluetoothStatusCodes.SUCCESS
-            else {
-                characteristic.writeType = BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
-                characteristic.value = chunk
-                gatt.writeCharacteristic(characteristic)
-            }
-        } else {
-            val device = flight.serverDevice
-            val tx = gattServer?.getService(SERVICE_UUID)?.getCharacteristic(TX_CHARACTERISTIC_UUID)
-            if (device == null || tx == null || store.activeServerConnections[endpoint] !== device) false
-            else if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU)
-                gattServer?.notifyCharacteristicChanged(device, tx, true, chunk) ==
-                    android.bluetooth.BluetoothStatusCodes.SUCCESS
-            else {
-                tx.value = chunk
-                gattServer?.notifyCharacteristicChanged(device, tx, true) == true
-            }
-        }
-        if (!initiated) {
-            if (transferCoordinator.recordInitiationRejected(flight, maxAttempts = 5)) {
-                failGattFlight(flight, "GATT initiation rejected 5 times")
-            } else {
-                handler.postDelayed({
-                    if (store.gattFlights[endpoint] === flight && flight.operationId == operationId)
-                        sendGattChunk(flight)
-                }, 200)
-            }
-            return
-        }
-        handler.postDelayed({
-            if (store.gattFlights[endpoint] === flight && flight.operationId == operationId)
-                failGattFlight(flight, "GATT completion callback timed out")
-        }, GATT_CHUNK_TIMEOUT_MS)
-    }
+    fun processNextPayload(macAddress: String) = gattTransferExecutor.processNext(macAddress)
 
     fun completeGattChunk(
         endpoint: String,
@@ -860,89 +509,13 @@ class NativeBleManager(val context: Context) {
         status: Int,
         gatt: BluetoothGatt? = null,
         device: BluetoothDevice? = null
-    ) {
-        handler.post {
-            val flight = store.gattFlights[endpoint] ?: return@post
-            if (!transferCoordinator.callbackMatches(flight, role, gatt, device)) return@post
-            if (status != BluetoothGatt.GATT_SUCCESS) {
-                failGattFlight(flight, "GATT completion failed status=$status")
-                return@post
-            }
-            when (transferCoordinator.completeChunk(flight)) {
-                GattTransferCoordinator.Completion.MORE -> sendGattChunk(flight)
-                GattTransferCoordinator.Completion.DONE -> {
-                    flight.transfer.heartbeatId?.let { markHeartbeatSent(endpoint, flight.link, it) }
-                    processNextPayload(endpoint)
-                }
-                GattTransferCoordinator.Completion.STALE -> Unit
-            }
-        }
-    }
-
-    private fun failGattFlight(flight: GattTransferFlight, reason: String) {
-        val endpoint = flight.link.endpoint
-        if (!transferCoordinator.remove(flight)) return
-        heartbeatCoordinator.remove(endpoint)
-        if (hasUsableL2cap(endpoint)) {
-            AppLogger.d("BLE_MESH", "Link ${flight.link.generation} $endpoint: $reason; preserving healthy L2CAP and promoting payload")
-            sendDirectPayload(endpoint, flight.transfer.payloadBytes())
-            promoteGattWorkToL2cap(endpoint)
-            return
-        }
-        AppLogger.d("BLE_MESH", "Link ${flight.link.generation} $endpoint: $reason; retiring link")
-        if (!store.links.isCurrent(flight.link)) {
-            processNextPayload(endpoint)
-            return
-        }
-        if (flight.link.role == BleLinkRole.CLIENT)
-            flight.gatt?.let { forceGattDisconnect(endpoint, it) }
-        else
-            flight.serverDevice?.let { gattServer?.cancelConnection(it) }
-    }
+    ) = gattTransferExecutor.complete(endpoint, role, status, gatt, device)
     fun startGattServer() { gattServerManager.startGattServer() }
 
     fun startL2capServer() { gattServerManager.startL2capServer() }
 
-    fun handleL2capConnection(macAddress: String, socket: BluetoothSocket) {
-        store.activeL2capSockets.put(macAddress, socket)?.let { old ->
-            if (old !== socket) try { old.close() } catch (e: Exception) {}
-        }
-        AppLogger.updateLinkTransport(macAddress, "GATT+L2CAP")
-        // GATT becomes READY before the L2CAP socket on many phones. Any payload started in that
-        // small window must no longer be allowed to time out and tear down the now-healthy L2CAP
-        // transport. Promote both the active transfer and queued transfers on the main thread.
-        handler.post { promoteGattWorkToL2cap(macAddress) }
-        // A pulse queued before the app transport was ready may have become a keyless PING.
-        // Every new L2CAP socket needs a fresh, key-bearing pulse in both directions.
-        sendSystemPulse(forceFull = true)
-        Thread {
-            try {
-                val din = java.io.DataInputStream(socket.inputStream)
-                while (store.isNodeActive.get() && socket.isConnected &&
-                    store.activeL2capSockets[macAddress] === socket && hasLiveSocket(macAddress)) {
-                    val length = din.readInt()
-                    if (MeshFrameCodec.isValidPayloadLength(length)) {
-                        val payloadBytes = ByteArray(length)
-                        din.readFully(payloadBytes)
-                        store.connectionInteractionTimes[macAddress] = System.currentTimeMillis()
-                        AppLogger.d("BLE_MESH", "L2CAP Received ${length} bytes from $macAddress")
-                        if (store.activeL2capSockets[macAddress] === socket && hasLiveSocket(macAddress)) {
-                            processBinaryPayload(macAddress, payloadBytes)
-                        }
-                    } else {
-                        AppLogger.d("BLE_MESH", "Rejected invalid L2CAP payload length $length from $macAddress")
-                        break
-                    }
-                }
-            } catch (e: Exception) {
-                AppLogger.d("BLE_MESH", "L2CAP stream disconnected for $macAddress: ${e.message}")
-            } finally {
-                val removed = store.activeL2capSockets.remove(macAddress, socket)
-                try { socket.close() } catch (e: Exception) {}
-                if (removed) handler.post { startHeartbeatChallenge(macAddress) }
-            }
-        }.start()
-    }
+    fun handleL2capConnection(macAddress: String, socket: BluetoothSocket) =
+        l2capTransport.attach(macAddress, socket)
 
     fun processBinaryPayload(endpointId: String, payloadBytes: ByteArray) {
         if (!hasLiveSocket(endpointId)) {
@@ -1091,29 +664,7 @@ class NativeBleManager(val context: Context) {
         
         cacheOutgoingMessageId(payloadBytes)
 
-        // PHASE 2 L2CAP ROUTING: Bypass GATT entirely if high-speed socket is available
-        val l2capSocket = store.activeL2capSockets[targetMacAddress]
-        if (l2capSocket != null && l2capSocket.isConnected && hasLiveSocket(targetMacAddress)) {
-            Thread {
-                try {
-                    synchronized(l2capSocket) {
-                        val dout = java.io.DataOutputStream(l2capSocket.outputStream)
-                        dout.writeInt(payloadBytes.size)
-                        dout.write(payloadBytes)
-                        dout.flush()
-                    }
-                    AppLogger.d("BLE_MESH", "L2CAP Sent ${payloadBytes.size} bytes directly to $targetMacAddress")
-                } catch (e: Exception) {
-                    AppLogger.d("BLE_MESH", "L2CAP write failed to $targetMacAddress: ${e.message}")
-                    if (store.activeL2capSockets.remove(targetMacAddress, l2capSocket)) {
-                        try { l2capSocket.close() } catch (_: Exception) {}
-                        enqueueGattPayload(targetMacAddress, payloadBytes)
-                        handler.post { startHeartbeatChallenge(targetMacAddress) }
-                    }
-                }
-            }.start()
-            return
-        }
+        if (l2capTransport.send(targetMacAddress, payloadBytes)) return
         
         val isServerConnected = store.activeServerConnections.containsKey(targetMacAddress)
         val isClientConnected = store.activeConnections.containsKey(targetMacAddress)
@@ -1302,8 +853,7 @@ class NativeBleManager(val context: Context) {
     }
     
     fun rescan() {
-        bleScanner?.stopScan(scanCallback)
-        startScanning()
+        radioController.rescan()
     }
     
     fun forceConnectToDevice(endpointId: String, endpointName: String) {
