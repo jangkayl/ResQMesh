@@ -32,4 +32,15 @@
     <string name="permissions_recheck_action">Check again</string>
     <string name="permissions_continue_action">Continue</string>
     <string name="permissions_offline_note">Core nearby messaging is designed to work without cellular service or internet.</string>
+    <string name="identity_step">2 of 2</string>
+    <string name="identity_title">Choose your name</string>
+    <string name="identity_description">Nearby people will see this.</string>
+    <string name="identity_name_label">Name</string>
+    <string name="identity_name_placeholder">e.g. Ari Santos</string>
+    <string name="identity_name_error">Enter your name.</string>
+    <string name="identity_tag_label">Tag (optional)</string>
+    <string name="identity_tag_placeholder">e.g. TEAM1</string>
+    <string name="identity_tag_hint">Up to 6 letters or numbers.</string>
+    <string name="identity_start_action">Continue</string>
+    <string name="identity_change_note">Choose a name people know.</string>
 </resources>
