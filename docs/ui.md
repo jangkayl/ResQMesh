@@ -5,6 +5,11 @@ The UI uses Jetpack Compose and Material 3. Inspect the actual screen, ViewModel
 ## Component and state boundaries
 
 - Reuse shared components under `core/ui/components` and theme tokens before adding local styling.
+- The civilian-first system is light-only: a pale-white/lavender canvas, large near-black headings, purple emphasis, cyan identity accents, green truthful status banners, and raised white cards. Red is reserved for genuine emergency and destructive actions.
+- Use the reference-inspired mobile hierarchy: generous whitespace, strong left-aligned page titles, single-purpose circular or rounded-square actions, and a white capsule navigation dock with SOS floating above it. Do not preserve earlier screen layouts merely by recoloring them.
+- The visual system is stable across all supported Android versions and does not depend on system dark mode, blur, or other version-specific rendering effects.
+- New top-level screens use the reusable three-destination shell: Home, Messages, and Network, with SOS as a persistent action rather than a navigation destination.
+- Shared controls use at least 48 dp touch targets, semantic shapes, and text or icon-independent status descriptions.
 - Keep business, routing, and transport decisions out of composables. ViewModels/use cases expose UI state and user actions.
 - Prefer immutable screen state and explicit loading, success, empty, warning, and error states.
 - Do not perform blocking storage/network work during composition.
@@ -42,3 +47,5 @@ Avoid showing “connected” from a BLE callback alone. Counters and selected p
 ## Validation
 
 For UI-only presentation changes, run focused Compose/local checks where available and inspect affected states. For any label driven by BLE, route, key, delivery, or SOS behavior, use the corresponding physical test in `validation.md`; a screenshot alone cannot prove the underlying state is correct.
+
+The active civilian-first refactor is normally reviewed one screen at a time. The user may explicitly approve a continuous pass; phone review is still required before presentation behavior is accepted.

@@ -22,6 +22,8 @@ class CommunicationViewModel(
     val uiState: StateFlow<ChatUiState> = _uiState.asStateFlow()
     private val _privateSendErrors = MutableSharedFlow<String>(extraBufferCapacity = 1)
     val privateSendErrors: SharedFlow<String> = _privateSendErrors
+    private val _privateDrafts = MutableStateFlow<Map<String, String>>(emptyMap())
+    val privateDrafts: StateFlow<Map<String, String>> = _privateDrafts.asStateFlow()
     
     private val _activeSosMessageId = MutableStateFlow<String?>(null)
     val activeSosMessageId: StateFlow<String?> = _activeSosMessageId.asStateFlow()
@@ -36,6 +38,10 @@ class CommunicationViewModel(
     
     fun setChannel(channelId: String) {
         useCases.setChannel(channelId)
+    }
+
+    fun rescan() {
+        useCases.rescan()
     }
 
     init {
@@ -58,6 +64,16 @@ class CommunicationViewModel(
         viewModelScope.launch {
             useCases.observeKnownNodes().collect { nodes ->
                 _uiState.update { it.copy(knownNodes = nodes) }
+            }
+        }
+        viewModelScope.launch {
+            useCases.observeScannedDevices().collect { devices ->
+                _uiState.update { it.copy(scannedDevices = devices) }
+            }
+        }
+        viewModelScope.launch {
+            useCases.observeBlockedDeviceNames().collect { blocked ->
+                _uiState.update { it.copy(blockedDeviceNames = blocked) }
             }
         }
     }
@@ -118,7 +134,17 @@ class CommunicationViewModel(
     }
 
     private fun reportPrivateSendFailure() {
-        _privateSendErrors.tryEmit("Private message not sent. Waiting for a ready connection and current recipient key.")
+        _privateSendErrors.tryEmit("Not sent. Check the connection.")
+    }
+
+    fun updatePrivateDraft(targetName: String, draft: String) {
+        _privateDrafts.update { drafts ->
+            if (draft.isBlank()) drafts - targetName else drafts + (targetName to draft)
+        }
+    }
+
+    fun clearPrivateDraft(targetName: String) {
+        _privateDrafts.update { it - targetName }
     }
 
     fun disconnectDevice(endpointId: String) {

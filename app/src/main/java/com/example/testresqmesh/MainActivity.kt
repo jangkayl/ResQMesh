@@ -90,6 +90,8 @@ class MainActivity : ComponentActivity() {
             val commsViewModel: CommunicationViewModel = org.koin.androidx.compose.koinViewModel()
             val walkieTalkieViewModel: com.example.testresqmesh.feature.comms.viewmodel.WalkieTalkieViewModel = org.koin.androidx.compose.koinViewModel()
 
+            // ResQMesh uses one deliberately light, high-clarity appearance throughout setup and
+            // the main experience so emergency actions do not change presentation by system theme.
             TestResQMeshTheme {
                 val setupState by setupViewModel.uiState.collectAsState()
                 
@@ -141,8 +143,6 @@ class MainActivity : ComponentActivity() {
                             )
                         }
                         
-                        // GLOBAL DEBUG TERMINAL OVERLAY
-                        com.example.testresqmesh.core.ui.components.debug.DebugTerminal()
                     }
                 }
             }

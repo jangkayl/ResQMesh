@@ -12,3 +12,10 @@ object Spacing {
     val Huge = 48.dp
     val Giant = 64.dp
 }
+
+object ResQSize {
+    val MinimumTouchTarget = 48.dp
+    val BottomBarHeight = 80.dp
+    val SosAction = 64.dp
+    val ContentMaxWidth = 680.dp
+}

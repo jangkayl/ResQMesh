@@ -6,156 +6,37 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.example.testresqmesh.feature.sos.utils.MapDownloadManager
-import com.example.testresqmesh.feature.sos.utils.MapDownloadManager.DownloadState
 
 @Composable
-fun OfflineMapPromptModal(
-    downloadManager: MapDownloadManager,
-    onDismiss: () -> Unit
-) {
-    val downloadState by downloadManager.downloadState.collectAsState()
+fun OfflineMapPromptModal(downloadManager: MapDownloadManager, onDismiss: () -> Unit) {
+    val state by downloadManager.downloadState.collectAsState()
     val progress by downloadManager.progress.collectAsState()
-    val totalTiles by downloadManager.totalTiles.collectAsState()
-
-    Dialog(onDismissRequest = { 
-        if (downloadState != DownloadState.DOWNLOADING) onDismiss() 
-    }) {
-        Surface(
-            shape = RoundedCornerShape(16.dp),
-            color = Color(0xFF1E1E1E),
-            tonalElevation = 8.dp
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(24.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                
-                when (downloadState) {
-                    DownloadState.IDLE, DownloadState.ERROR -> {
-                        Icon(
-                            imageVector = Icons.Default.CloudDownload,
-                            contentDescription = "Download",
-                            tint = Color(0xFF2196F3),
-                            modifier = Modifier.size(64.dp)
-                        )
-                        Spacer(modifier = Modifier.height(16.dp))
-                        Text(
-                            text = "Download Offline Map?",
-                            color = Color.White,
-                            fontSize = 20.sp,
-                            fontWeight = FontWeight.Bold,
-                            textAlign = TextAlign.Center
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            text = "To ensure the SOS Tracker works during power outages or network blackouts, please download the local map of Cebu City.\n\nSize: ~25 MB",
-                            color = Color.LightGray,
-                            fontSize = 14.sp,
-                            textAlign = TextAlign.Center
-                        )
-                        if (downloadState == DownloadState.ERROR) {
-                            Text(
-                                text = "Download failed. Check internet and try again.",
-                                color = Color.Red,
-                                fontSize = 12.sp,
-                                modifier = Modifier.padding(top = 8.dp)
-                            )
-                        }
-                        
-                        Spacer(modifier = Modifier.height(24.dp))
-                        
-                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-                            TextButton(onClick = onDismiss) {
-                                Text("Later", color = Color.Gray)
-                            }
-                            Button(
-                                onClick = { downloadManager.startCebuDownload() },
-                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2196F3))
-                            ) {
-                                Text("Download", color = Color.White)
-                            }
-                        }
+    val total by downloadManager.totalTiles.collectAsState()
+    Dialog(onDismissRequest = { if (state != MapDownloadManager.DownloadState.DOWNLOADING) onDismiss() }) {
+        Surface(shape = RoundedCornerShape(28.dp), color = Color.White, tonalElevation = 4.dp) {
+            Column(Modifier.fillMaxWidth().padding(28.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                when (state) {
+                    MapDownloadManager.DownloadState.IDLE, MapDownloadManager.DownloadState.ERROR -> {
+                        Icon(Icons.Default.CloudDownload, null, tint = Color(0xFF7442C8), modifier = Modifier.size(48.dp))
+                        Spacer(Modifier.height(14.dp)); Text("Offline map", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Black)
+                        Spacer(Modifier.height(8.dp)); Text("Download the available Cebu map area for use when tiles are not cached.", textAlign = TextAlign.Center, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        if (state == MapDownloadManager.DownloadState.ERROR) Text("Download failed. Try again when online.", color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(top = 10.dp))
+                        Spacer(Modifier.height(20.dp)); Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) { TextButton(onClick = onDismiss) { Text("Later") }; Spacer(Modifier.width(8.dp)); Button(onClick = downloadManager::startCebuDownload) { Text("Download") } }
                     }
-                    
-                    DownloadState.DOWNLOADING -> {
-                        CircularProgressIndicator(
-                            color = Color(0xFF2196F3),
-                            modifier = Modifier.size(64.dp)
-                        )
-                        Spacer(modifier = Modifier.height(16.dp))
-                        Text(
-                            text = "Downloading Cebu Map...",
-                            color = Color.White,
-                            fontSize = 18.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        
-                        val percentage = if (totalTiles > 0) (progress.toFloat() / totalTiles) * 100 else 0f
-                        
-                        LinearProgressIndicator(
-                            progress = { if (totalTiles > 0) progress.toFloat() / totalTiles else 0f },
-                            modifier = Modifier.fillMaxWidth().height(8.dp),
-                            color = Color(0xFF2196F3),
-                            trackColor = Color.DarkGray,
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            text = "$progress / $totalTiles tiles (${String.format("%.1f", percentage)}%)",
-                            color = Color.LightGray,
-                            fontSize = 14.sp
-                        )
-                        Spacer(modifier = Modifier.height(16.dp))
-                        Text(
-                            text = "Please keep the app open.",
-                            color = Color.Yellow,
-                            fontSize = 12.sp
-                        )
+                    MapDownloadManager.DownloadState.DOWNLOADING -> {
+                        Text("Downloading map", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Black); Spacer(Modifier.height(16.dp)); LinearProgressIndicator(progress = { if (total > 0) progress.toFloat() / total else 0f }, modifier = Modifier.fillMaxWidth()); Spacer(Modifier.height(10.dp)); Text("$progress of $total tiles", color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
-                    
-                    DownloadState.COMPLETE -> {
-                        Icon(
-                            imageVector = Icons.Default.CheckCircle,
-                            contentDescription = "Complete",
-                            tint = Color.Green,
-                            modifier = Modifier.size(64.dp)
-                        )
-                        Spacer(modifier = Modifier.height(16.dp))
-                        Text(
-                            text = "Download Complete!",
-                            color = Color.White,
-                            fontSize = 20.sp,
-                            fontWeight = FontWeight.Bold,
-                            textAlign = TextAlign.Center
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            text = "The SOS map tracker will now work perfectly offline.",
-                            color = Color.LightGray,
-                            fontSize = 14.sp,
-                            textAlign = TextAlign.Center
-                        )
-                        Spacer(modifier = Modifier.height(24.dp))
-                        Button(
-                            onClick = onDismiss,
-                            colors = ButtonDefaults.buttonColors(containerColor = Color.Green)
-                        ) {
-                            Text("Done", color = Color.Black, fontWeight = FontWeight.Bold)
-                        }
+                    MapDownloadManager.DownloadState.COMPLETE -> {
+                        Icon(Icons.Default.CheckCircle, null, tint = Color(0xFF18A66A), modifier = Modifier.size(48.dp)); Spacer(Modifier.height(14.dp)); Text("Map downloaded", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Black); Spacer(Modifier.height(8.dp)); Text("Cached map tiles are ready for this area.", textAlign = TextAlign.Center, color = MaterialTheme.colorScheme.onSurfaceVariant); Spacer(Modifier.height(20.dp)); Button(onClick = onDismiss) { Text("Done") }
                     }
                 }
             }
