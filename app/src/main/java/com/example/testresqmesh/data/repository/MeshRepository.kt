@@ -12,7 +12,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
@@ -22,7 +21,8 @@ import java.util.UUID
 
 class MeshRepository(
     private val networkManager: NativeBleManager,
-    private val appDatabase: com.example.testresqmesh.data.local.AppDatabase
+    private val appDatabase: com.example.testresqmesh.data.local.AppDatabase,
+    private val repositoryScope: CoroutineScope
 ) {
 
     private val _connectionStatus = MutableStateFlow("Ready to deploy Mesh Node.")
@@ -57,8 +57,6 @@ class MeshRepository(
     private val meshRouter = MeshRouter()
     val knownNodes = meshRouter.knownNodes
     val topology = meshRouter.topology
-
-    private val repositoryScope = CoroutineScope(Dispatchers.Default)
 
     val publicMessages = appDatabase.messageDao().getPublicMessages().map { list ->
         list.map { it.toChatMessage() }
