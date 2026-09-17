@@ -90,7 +90,9 @@ class MainActivity : ComponentActivity() {
             val commsViewModel: CommunicationViewModel = org.koin.androidx.compose.koinViewModel()
             val walkieTalkieViewModel: com.example.testresqmesh.feature.comms.viewmodel.WalkieTalkieViewModel = org.koin.androidx.compose.koinViewModel()
 
-            TestResQMeshTheme {
+            // Keep unmigrated prototype screens on their original dark presentation. The new
+            // system-aware light/dark theme is enabled by each screen as it passes its review gate.
+            TestResQMeshTheme(darkTheme = true) {
                 val setupState by setupViewModel.uiState.collectAsState()
                 
                 // Track navigation stage - initialize with Splash to avoid black screen
@@ -141,8 +143,6 @@ class MainActivity : ComponentActivity() {
                             )
                         }
                         
-                        // GLOBAL DEBUG TERMINAL OVERLAY
-                        com.example.testresqmesh.core.ui.components.debug.DebugTerminal()
                     }
                 }
             }

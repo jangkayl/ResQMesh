@@ -5,6 +5,9 @@ The UI uses Jetpack Compose and Material 3. Inspect the actual screen, ViewModel
 ## Component and state boundaries
 
 - Reuse shared components under `core/ui/components` and theme tokens before adding local styling.
+- The civilian-first design system uses semantic Material colors plus extended success, warning, and SOS roles in both light and dark themes. Red is reserved for genuine emergency and destructive actions.
+- New top-level screens use the reusable three-destination shell: Home, Messages, and Network, with SOS as a persistent action rather than a navigation destination.
+- Shared controls use at least 48 dp touch targets, semantic shapes, and text or icon-independent status descriptions.
 - Keep business, routing, and transport decisions out of composables. ViewModels/use cases expose UI state and user actions.
 - Prefer immutable screen state and explicit loading, success, empty, warning, and error states.
 - Do not perform blocking storage/network work during composition.
@@ -42,3 +45,5 @@ Avoid showing “connected” from a BLE callback alone. Counters and selected p
 ## Validation
 
 For UI-only presentation changes, run focused Compose/local checks where available and inspect affected states. For any label driven by BLE, route, key, delivery, or SOS behavior, use the corresponding physical test in `validation.md`; a screenshot alone cannot prove the underlying state is correct.
+
+The active civilian-first refactor is reviewed one screen at a time. After each screen compiles and its focused checks pass, implementation pauses for user approval before moving to the next screen.

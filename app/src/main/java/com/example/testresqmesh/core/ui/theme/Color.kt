@@ -2,7 +2,36 @@ package com.example.testresqmesh.core.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-// --- Neutral / Base (Mockup Inspired) ---
+// Civilian-first semantic palette. Screens should prefer MaterialTheme colors and
+// ResQExtendedColors instead of referencing these primitives directly.
+val ResQBlue700 = Color(0xFF155E75)
+val ResQBlue600 = Color(0xFF0E7490)
+val ResQBlue300 = Color(0xFF67E8F9)
+val ResQBlue100 = Color(0xFFCFFAFE)
+
+val ResQRed700 = Color(0xFFB42318)
+val ResQRed600 = Color(0xFFD92D20)
+val ResQRed100 = Color(0xFFFEE4E2)
+
+val ResQGreen700 = Color(0xFF067647)
+val ResQGreen600 = Color(0xFF079455)
+val ResQGreen100 = Color(0xFFDCFAE6)
+
+val ResQAmber700 = Color(0xFFB54708)
+val ResQAmber500 = Color(0xFFF79009)
+val ResQAmber100 = Color(0xFFFEF0C7)
+
+val ResQSlate950 = Color(0xFF101828)
+val ResQSlate900 = Color(0xFF1D2939)
+val ResQSlate800 = Color(0xFF344054)
+val ResQSlate700 = Color(0xFF475467)
+val ResQSlate500 = Color(0xFF667085)
+val ResQSlate300 = Color(0xFFD0D5DD)
+val ResQSlate200 = Color(0xFFEAECF0)
+val ResQSlate100 = Color(0xFFF2F4F7)
+val ResQSlate50 = Color(0xFFF9FAFB)
+
+// Legacy aliases retained while existing screens are migrated one at a time.
 val InboxBackground = Color(0xFF2A343B) // Lightened from 1A2228 to avoid "pure black" appearance
 val InboxSurface = Color(0xFF232E35)
 val InboxDivider = Color(0xFF2D3748)

@@ -2,13 +2,12 @@ package com.example.testresqmesh.core.ui.components.buttons
 
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.RowScope
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.unit.dp
-import com.example.testresqmesh.core.ui.theme.Spacing
+import com.example.testresqmesh.core.ui.theme.ResQSize
 
 enum class ButtonVariant {
     Primary, Secondary, Outline, Ghost, Destructive
@@ -45,9 +44,9 @@ fun ResQButton(
 
     Button(
         onClick = onClick,
-        modifier = modifier,
+        modifier = modifier.defaultMinSize(minHeight = ResQSize.MinimumTouchTarget),
         enabled = enabled,
-        shape = RoundedCornerShape(8.dp),
+        shape = MaterialTheme.shapes.small,
         colors = ButtonDefaults.buttonColors(
             containerColor = containerColor,
             contentColor = contentColor,
