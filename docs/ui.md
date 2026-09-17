@@ -48,4 +48,4 @@ Avoid showing “connected” from a BLE callback alone. Counters and selected p
 
 For UI-only presentation changes, run focused Compose/local checks where available and inspect affected states. For any label driven by BLE, route, key, delivery, or SOS behavior, use the corresponding physical test in `validation.md`; a screenshot alone cannot prove the underlying state is correct.
 
-The active civilian-first refactor is reviewed one screen at a time. After each screen compiles and its focused checks pass, implementation pauses for user approval before moving to the next screen.
+The active civilian-first refactor is normally reviewed one screen at a time. The user may explicitly approve a continuous pass; phone review is still required before presentation behavior is accepted.

@@ -7,7 +7,7 @@ Baseline: branch `temp`, HEAD `d7cd5e3`, with substantial uncommitted Android, t
 
 Preserve the physically validated two-phone BLE/L2CAP improvement, then address the separate asymmetric block-policy defect and finish the remaining ownership, queue-bound, and framing work before broader multi-phone expansion.
 
-In parallel, the civilian-first UI refactor is proceeding through explicit review gates. User review replaced the prior direction with a light-only reference-inspired system: pale-white/lavender canvas, bold dark hierarchy, purple actions, cyan identity accents, green status, raised white cards, and a three-item capsule dock with SOS floating above it. The rebuilt community broadcast conversation is complete and awaiting review; Network will not begin without approval.
+In parallel, the civilian-first UI refactor now uses a light-only reference-inspired system: pale-white/lavender canvas, bold dark hierarchy, purple actions, cyan identity accents, green status, raised white cards, and a three-item capsule dock with SOS floating above it. The user approved completing the remaining screens in one pass. The active Home, Messages, Network, SOS, map, Settings, and Advanced routes have been rebuilt; full phone review remains pending.
 
 ## Implemented in the working tree
 
@@ -23,7 +23,7 @@ In parallel, the civilian-first UI refactor is proceeding through explicit revie
 - Focused unit tests for link lifecycle, liveness, heartbeat ownership, and private-message policy.
 - Lean pull-request CI for the debug build, unit tests, canonical-document checks, and diff hygiene; PR creation and merging remain explicit user actions.
 
-The latest recorded local build for these combined changes passed `:app:assembleDebug :app:testDebugUnitTest`. This establishes compilation and focused unit-test evidence only.
+The latest recorded local build for these combined changes passed `:app:compileDebugKotlin`. A broader debug build and unit-test run is still required after the final UI pass. Compilation evidence does not validate BLE, delivery, location, or SOS behavior on phones.
 
 ## Open blockers
 
