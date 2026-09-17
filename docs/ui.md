@@ -5,9 +5,9 @@ The UI uses Jetpack Compose and Material 3. Inspect the actual screen, ViewModel
 ## Component and state boundaries
 
 - Reuse shared components under `core/ui/components` and theme tokens before adding local styling.
-- The civilian-first ResQ Aurora Glass system uses lavender/cyan ambient backgrounds, translucent highlighted control surfaces, large rounded geometry, and soft depth in both light and dark themes. Red is reserved for genuine emergency and destructive actions.
-- Treat glass as a floating functional layer for navigation, toolbars, composers, and important controls. Prefer calm solid or lightly tinted content cards; do not stack multiple glass layers or let decoration reduce text contrast.
-- Cross-version glass must remain legible without live blur because the app supports Android versions before API 31. Blur may enhance supported devices later, but layout, hierarchy, and status meaning cannot depend on it.
+- The civilian-first clean-white system uses a bright white canvas, large dark headings, purple primary actions, cyan identity accents, green truthful status, and white elevated cards. Red is reserved for genuine emergency and destructive actions.
+- Use elevated white surfaces for cards, composers, and the floating navigation dock. Keep decorative effects subtle so information, contrast, and status meaning stay clear.
+- The visual system is stable across all supported Android versions and does not depend on blur or other version-specific rendering effects.
 - New top-level screens use the reusable three-destination shell: Home, Messages, and Network, with SOS as a persistent action rather than a navigation destination.
 - Shared controls use at least 48 dp touch targets, semantic shapes, and text or icon-independent status descriptions.
 - Keep business, routing, and transport decisions out of composables. ViewModels/use cases expose UI state and user actions.

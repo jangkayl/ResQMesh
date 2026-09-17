@@ -23,9 +23,8 @@ import androidx.compose.ui.unit.dp
 import com.example.testresqmesh.core.ui.theme.ResQTheme
 
 /**
- * Cross-version frosted-glass surface. The translucent gradient, highlight border, and soft
- * shadow are intentionally stable back to API 24; screens can add richer effects later without
- * making readability or layout depend on Android 12-only blur support.
+ * A clean, elevated white surface used for cards, controls, and the floating navigation dock.
+ * It stays intentionally simple and legible on every Android version the app supports.
  */
 @Composable
 fun ResQGlassSurface(
@@ -46,18 +45,9 @@ fun ResQGlassSurface(
                 spotColor = colors.glassShadow
             )
             .clip(shape)
-            .background(
-                Brush.linearGradient(
-                    colors = listOf(colors.glassFill, colors.glassTint)
-                )
-            )
+            .background(colors.glassFill)
             .border(
-                border = BorderStroke(
-                    1.dp,
-                    Brush.linearGradient(
-                        listOf(colors.glassBorder, colors.glassBorder.copy(alpha = 0.28f))
-                    )
-                ),
+                border = BorderStroke(1.dp, colors.glassBorder),
                 shape = shape
             )
             .padding(contentPadding),
@@ -79,26 +69,6 @@ fun ResQAuroraBackground(
                 brush = Brush.verticalGradient(
                     colors = listOf(colors.backgroundStart, colors.backgroundEnd)
                 )
-            )
-            val primaryRadius = size.minDimension * 0.72f
-            drawCircle(
-                brush = Brush.radialGradient(
-                    colors = listOf(colors.glowPrimary, colors.glowPrimary.copy(alpha = 0f)),
-                    center = Offset(size.width * 0.12f, size.height * 0.12f),
-                    radius = primaryRadius
-                ),
-                radius = primaryRadius,
-                center = Offset(size.width * 0.12f, size.height * 0.12f)
-            )
-            val secondaryRadius = size.minDimension * 0.66f
-            drawCircle(
-                brush = Brush.radialGradient(
-                    colors = listOf(colors.glowSecondary, colors.glowSecondary.copy(alpha = 0f)),
-                    center = Offset(size.width * 0.88f, size.height * 0.72f),
-                    radius = secondaryRadius
-                ),
-                radius = secondaryRadius,
-                center = Offset(size.width * 0.88f, size.height * 0.72f)
             )
         },
         contentAlignment = contentAlignment,

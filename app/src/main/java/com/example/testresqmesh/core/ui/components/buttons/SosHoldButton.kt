@@ -24,7 +24,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -108,18 +107,8 @@ fun SosHoldButton(
             )
             .clip(CircleShape)
             .background(
-                if (enabled) {
-                    Brush.linearGradient(
-                        listOf(ResQTheme.colors.sos.copy(alpha = 0.82f), ResQTheme.colors.sos)
-                    )
-                } else {
-                    Brush.linearGradient(
-                        listOf(
-                            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.10f),
-                            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.16f)
-                        )
-                    )
-                }
+                if (enabled) ResQTheme.colors.sos
+                else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)
             )
             .semantics(mergeDescendants = true) {
                 role = Role.Button

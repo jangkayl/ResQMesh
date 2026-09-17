@@ -36,9 +36,9 @@ fun ResQTextField(
             focusedBorderColor = MaterialTheme.colorScheme.primary,
             unfocusedBorderColor = ResQTheme.colors.glassBorder,
             errorBorderColor = MaterialTheme.colorScheme.error,
-            focusedContainerColor = ResQTheme.colors.glassFill,
-            unfocusedContainerColor = ResQTheme.colors.glassFill,
-            disabledContainerColor = ResQTheme.colors.glassFill.copy(alpha = 0.48f)
+            focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+            unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+            disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.48f)
         ),
         supportingText = errorMessage?.let { { Text(it, color = MaterialTheme.colorScheme.error) } }
     )

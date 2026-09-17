@@ -3,13 +3,10 @@ package com.example.testresqmesh.core.ui.components.buttons
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.defaultMinSize
-import androidx.compose.foundation.background
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import com.example.testresqmesh.core.ui.theme.ResQSize
 import com.example.testresqmesh.core.ui.theme.ResQTheme
@@ -30,8 +27,8 @@ fun ResQButton(
 ) {
     val shape = MaterialTheme.shapes.extraLarge
     val containerColor = when (variant) {
-        ButtonVariant.Primary -> Color.Transparent
-        ButtonVariant.Secondary -> ResQTheme.colors.glassFill
+        ButtonVariant.Primary -> MaterialTheme.colorScheme.primary
+        ButtonVariant.Secondary -> MaterialTheme.colorScheme.surface
         ButtonVariant.Outline -> Color.Transparent
         ButtonVariant.Ghost -> Color.Transparent
         ButtonVariant.Destructive -> MaterialTheme.colorScheme.error
@@ -55,18 +52,11 @@ fun ResQButton(
         .defaultMinSize(minHeight = ResQSize.MinimumTouchTarget)
         .then(
             if (variant == ButtonVariant.Primary && enabled) {
-                Modifier
-                    .shadow(
-                        elevation = 12.dp,
+                Modifier.shadow(
+                        elevation = 8.dp,
                         shape = shape,
-                        ambientColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.28f),
-                        spotColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.32f)
-                    )
-                    .clip(shape)
-                    .background(
-                        Brush.linearGradient(
-                            listOf(MaterialTheme.colorScheme.secondary, MaterialTheme.colorScheme.primary)
-                        )
+                        ambientColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.18f),
+                        spotColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.22f)
                     )
             } else Modifier
         )

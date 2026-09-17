@@ -48,17 +48,17 @@ private val LightColorScheme = lightColorScheme(
     secondaryContainer = Color(0xFFCFFAFE),
     onSecondaryContainer = Color(0xFF164E63),
     background = AuroraCanvasLight,
-    surface = Color(0xFFFDFDFF),
-    surfaceVariant = Color(0xFFF0EFF8),
+    surface = Color.White,
+    surfaceVariant = Color(0xFFF6F5FA),
     onBackground = Color(0xFF171426),
     onSurface = Color(0xFF171426),
-    onSurfaceVariant = Color(0xFF686579),
+    onSurfaceVariant = Color(0xFF777383),
     error = ResQRed700,
     onError = Color.White,
     errorContainer = ResQRed100,
     onErrorContainer = Color(0xFF7A271A),
-    outline = Color(0xFFC9C6D8),
-    outlineVariant = Color(0xFFE7E4F0),
+    outline = Color(0xFFC8C4D2),
+    outlineVariant = Color(0xFFE9E7EF),
     surfaceTint = AuroraPurple600
 )
 
@@ -101,12 +101,12 @@ private val LightExtendedColors = ResQExtendedColors(
     onSosContainer = Color(0xFF7A271A),
     backgroundStart = AuroraCanvasLight,
     backgroundEnd = AuroraCanvasLightEnd,
-    glowPrimary = Color(0x337C3AED),
-    glowSecondary = Color(0x2E06B6D4),
-    glassFill = Color(0xB8FFFFFF),
-    glassTint = Color(0x70F1ECFF),
-    glassBorder = Color(0xD9FFFFFF),
-    glassShadow = Color(0x260F0A25)
+    glowPrimary = Color.Transparent,
+    glowSecondary = Color.Transparent,
+    glassFill = Color.White,
+    glassTint = Color.White,
+    glassBorder = Color(0xFFE9E7EF),
+    glassShadow = Color(0x160F0A25)
 )
 
 private val DarkExtendedColors = ResQExtendedColors(
