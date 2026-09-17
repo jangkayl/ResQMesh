@@ -1,12 +1,10 @@
 package com.example.testresqmesh.core.ui.components.inputs
 
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.unit.dp
+import com.example.testresqmesh.core.ui.theme.ResQTheme
 
 @Composable
 fun ResQTextField(
@@ -33,11 +31,14 @@ fun ResQTextField(
         isError = isError,
         enabled = enabled,
         singleLine = singleLine,
-        shape = RoundedCornerShape(8.dp),
+        shape = MaterialTheme.shapes.extraLarge,
         colors = OutlinedTextFieldDefaults.colors(
             focusedBorderColor = MaterialTheme.colorScheme.primary,
-            unfocusedBorderColor = MaterialTheme.colorScheme.outline,
-            errorBorderColor = MaterialTheme.colorScheme.error
+            unfocusedBorderColor = ResQTheme.colors.glassBorder,
+            errorBorderColor = MaterialTheme.colorScheme.error,
+            focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+            unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+            disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.48f)
         ),
         supportingText = errorMessage?.let { { Text(it, color = MaterialTheme.colorScheme.error) } }
     )

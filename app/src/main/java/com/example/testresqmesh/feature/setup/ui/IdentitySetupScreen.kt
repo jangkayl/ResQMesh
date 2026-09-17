@@ -1,46 +1,62 @@
 package com.example.testresqmesh.feature.setup.ui
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.*
+import android.os.Build
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.outlined.Person
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.dp
+import com.example.testresqmesh.R
 import com.example.testresqmesh.core.ui.components.buttons.ResQButton
-import com.example.testresqmesh.core.ui.theme.*
-import android.os.Build
-import androidx.compose.ui.platform.LocalContext
+import com.example.testresqmesh.core.ui.components.inputs.ResQTextField
+import com.example.testresqmesh.core.ui.components.layout.ResQAuroraBackground
+import com.example.testresqmesh.core.ui.theme.Spacing
+import com.example.testresqmesh.core.ui.theme.TestResQMeshTheme
 import com.example.testresqmesh.feature.setup.viewmodel.SetupViewModel
 
 @Composable
 fun IdentitySetupScreen(viewModel: SetupViewModel, onIdentityGenerated: () -> Unit) {
     val context = LocalContext.current
-    val uiState by viewModel.uiState.collectAsState()
     var customName by remember { mutableStateOf(viewModel.getSavedName(context)) }
     var nodeTag by remember { mutableStateOf(viewModel.getSavedTag(context)) }
-    
+
     IdentitySetupContent(
-        connectionStatus = uiState.connectionStatus,
         customName = customName,
         onCustomNameChange = { customName = it },
         nodeTag = nodeTag,
         onNodeTagChange = { nodeTag = it },
         onIdentityGenerated = {
-            viewModel.checkHardwareAndGoOnline(context, customName.ifEmpty { android.os.Build.MODEL }, nodeTag.ifEmpty { "NODE" }, "PUBLIC")
+            viewModel.checkHardwareAndGoOnline(
+                context = context,
+                customName = customName.ifEmpty { Build.MODEL },
+                nodeTag = nodeTag.ifEmpty { "NODE" },
+                teamKey = "PUBLIC"
+            )
             onIdentityGenerated()
         }
     )
@@ -48,7 +64,6 @@ fun IdentitySetupScreen(viewModel: SetupViewModel, onIdentityGenerated: () -> Un
 
 @Composable
 fun IdentitySetupContent(
-    connectionStatus: String,
     customName: String,
     onCustomNameChange: (String) -> Unit,
     nodeTag: String,
@@ -56,228 +71,118 @@ fun IdentitySetupContent(
     onIdentityGenerated: () -> Unit
 ) {
     val scrollState = rememberScrollState()
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(InboxBackground)
-            .verticalScroll(scrollState)
-            .padding(Spacing.Large),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Spacer(modifier = Modifier.height(24.dp))
-        
-        Text(
-            text = "Step 2: Identity Setup",
-            style = MaterialTheme.typography.labelMedium,
-            color = InboxAccentBlue,
+    var submitAttempted by remember { mutableStateOf(false) }
+    val isNameInvalid = submitAttempted && customName.isBlank()
+    val avatarInitial = customName.trim().firstOrNull()?.uppercaseChar()?.toString() ?: "?"
+
+    ResQAuroraBackground(modifier = Modifier.fillMaxSize()) {
+        Column(
             modifier = Modifier
-                .align(Alignment.Start)
-                .clip(RoundedCornerShape(12.dp))
-                .background(InboxAccentBlue.copy(alpha = 0.1f))
-                .padding(horizontal = 12.dp, vertical = 4.dp)
-        )
-
-        Spacer(modifier = Modifier.height(24.dp))
-
-        Text(
-            text = "No Signal?\nNo Problem.",
-            style = MaterialTheme.typography.displayMedium,
-            fontWeight = FontWeight.Black,
-            color = Color.White,
-            modifier = Modifier.align(Alignment.Start),
-            lineHeight = 44.sp
-        )
-
-        Spacer(modifier = Modifier.height(Spacing.Medium))
-
-        Text(
-            text = "ResQMesh creates a secure, private identity that works entirely without cellular or internet connectivity.",
-            style = MaterialTheme.typography.bodyLarge,
-            color = Color.White.copy(alpha = 0.6f),
-            modifier = Modifier.align(Alignment.Start)
-        )
-
-        Spacer(modifier = Modifier.height(48.dp))
-
-        // Large Logo Surface
-        Surface(
-            modifier = Modifier.size(120.dp),
-            shape = CircleShape,
-            color = Color.White.copy(alpha = 0.1f)
-        ) {
-            Box(contentAlignment = Alignment.Center) {
-                Surface(
-                    modifier = Modifier.size(80.dp),
-                    shape = RoundedCornerShape(20.dp),
-                    color = Color.White
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Text("⚡", fontSize = 32.sp)
-                    }
-                }
-            }
-        }
-
-        Spacer(modifier = Modifier.height(Spacing.Medium))
-
-        Surface(
-            color = if (connectionStatus.contains("ERROR")) Color.Red.copy(alpha = 0.4f) else Color.Black.copy(alpha = 0.4f),
-            shape = RoundedCornerShape(16.dp),
-            border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.2f))
+                .fillMaxSize()
+                .verticalScroll(scrollState)
+                .padding(horizontal = Spacing.Large, vertical = Spacing.ExtraLarge),
+            horizontalAlignment = Alignment.Start
         ) {
             Text(
-                if (connectionStatus.contains("ERROR")) "SYSTEM ERROR" else "READY TO SYNC",
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
-                style = MaterialTheme.typography.labelSmall,
-                fontWeight = FontWeight.Bold,
-                color = Color.White
+                text = stringResource(R.string.identity_step),
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.primary
             )
-        }
+            Spacer(Modifier.height(Spacing.Medium))
+            Text(
+                text = stringResource(R.string.identity_title),
+                style = MaterialTheme.typography.displayLarge,
+                fontWeight = FontWeight.Bold
+            )
+            Spacer(Modifier.height(Spacing.Small))
+            Text(
+                text = stringResource(R.string.identity_description),
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
 
-        Spacer(modifier = Modifier.height(48.dp))
-
-        // Secure Terminal Output
-        Surface(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(160.dp),
-            color = Color(0xFF1E293B), // Darker slate
-            shape = RoundedCornerShape(12.dp),
-            border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.1f))
-        ) {
-            Column(modifier = Modifier.padding(Spacing.Medium)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+            Spacer(Modifier.height(Spacing.ExtraLarge))
+            Box(
+                modifier = Modifier.fillMaxWidth(),
+                contentAlignment = Alignment.Center
+            ) {
+                Surface(
+                    modifier = Modifier.size(96.dp),
+                    shape = CircleShape,
+                    color = MaterialTheme.colorScheme.secondary
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(">_", color = Color.White, fontWeight = FontWeight.Bold)
-                        Spacer(modifier = Modifier.width(8.dp))
+                    Box(contentAlignment = Alignment.Center) {
                         Text(
-                            "SECURE TERMINAL OUTPUT",
-                            style = MaterialTheme.typography.labelSmall,
+                            text = avatarInitial,
+                            style = MaterialTheme.typography.displayLarge,
                             fontWeight = FontWeight.Bold,
-                            color = Color.White
+                            color = MaterialTheme.colorScheme.onSecondary
                         )
                     }
-                    Icon(Icons.Default.Lock, contentDescription = null, modifier = Modifier.size(14.dp), tint = Color.White.copy(alpha = 0.3f))
                 }
-                HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = Color.White.copy(alpha = 0.1f))
-                Text(
-                    text = connectionStatus,
-                    style = MaterialTheme.typography.bodySmall,
-                    fontFamily = FontFamily.Monospace,
-                    color = if (connectionStatus.contains("ERROR")) Color.Red.copy(alpha = 0.7f) else Color.White.copy(alpha = 0.5f)
-                )
             }
-        }
 
-        Spacer(modifier = Modifier.height(24.dp))
-
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            TechnicalInfoCard(
-                icon = "⚙️",
-                title = "On-Device Encryption",
-                modifier = Modifier.weight(1f)
+            Spacer(Modifier.height(Spacing.ExtraLarge))
+            ResQTextField(
+                value = customName,
+                onValueChange = onCustomNameChange,
+                label = stringResource(R.string.identity_name_label),
+                placeholder = stringResource(R.string.identity_name_placeholder),
+                leadingIcon = { Icon(Icons.Outlined.Person, contentDescription = null) },
+                isError = isNameInvalid,
+                errorMessage = if (isNameInvalid) stringResource(R.string.identity_name_error) else null
             )
-            TechnicalInfoCard(
-                icon = "🔗",
-                title = "Zero-Cloud Dependency",
-                modifier = Modifier.weight(1f)
+            Spacer(Modifier.height(Spacing.Medium))
+            ResQTextField(
+                value = nodeTag,
+                onValueChange = { value ->
+                    if (value.length <= 6 && value.all { it.isLetterOrDigit() }) {
+                        onNodeTagChange(value.uppercase())
+                    }
+                },
+                label = stringResource(R.string.identity_tag_label),
+                placeholder = stringResource(R.string.identity_tag_placeholder)
+            )
+            Spacer(Modifier.height(Spacing.ExtraSmall))
+            Text(
+                text = stringResource(R.string.identity_tag_hint),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+
+            Spacer(Modifier.height(Spacing.Large))
+            ResQButton(
+                onClick = {
+                    submitAttempted = true
+                    if (customName.isNotBlank()) onIdentityGenerated()
+                },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(stringResource(R.string.identity_start_action), fontWeight = FontWeight.SemiBold)
+            }
+            Spacer(Modifier.height(Spacing.Small))
+            Text(
+                text = stringResource(R.string.identity_change_note),
+                modifier = Modifier.fillMaxWidth(),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center
             )
         }
-
-        Spacer(modifier = Modifier.height(24.dp))
-        
-        OutlinedTextField(
-            value = customName,
-            onValueChange = onCustomNameChange,
-            label = { Text("Display Name", color = Color.White.copy(alpha = 0.7f)) },
-            modifier = Modifier.fillMaxWidth(),
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedTextColor = Color.White,
-                unfocusedTextColor = Color.White,
-                focusedBorderColor = InboxAccentBlue,
-                unfocusedBorderColor = Color.White.copy(alpha = 0.3f)
-            ),
-            singleLine = true
-        )
-        
-        Spacer(modifier = Modifier.height(12.dp))
-
-        OutlinedTextField(
-            value = nodeTag,
-            onValueChange = { if (it.length <= 6) onNodeTagChange(it.uppercase()) },
-            label = { Text("Node Tag (Max 6 chars)", color = Color.White.copy(alpha = 0.7f)) },
-            modifier = Modifier.fillMaxWidth(),
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedTextColor = Color.White,
-                unfocusedTextColor = Color.White,
-                focusedBorderColor = InboxAccentBlue,
-                unfocusedBorderColor = Color.White.copy(alpha = 0.3f)
-            ),
-            singleLine = true
-        )
-
-        Spacer(modifier = Modifier.height(48.dp))
-
-        ResQButton(
-            onClick = onIdentityGenerated,
-            modifier = Modifier.fillMaxWidth().height(56.dp)
-        ) {
-            Text("Generate Secure ID", fontWeight = FontWeight.Black)
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        Text(
-            text = "RESQMESH UTILIZES 256-BIT ENCRYPTION.\nYOUR KEYS NEVER LEAVE THIS DEVICE.",
-            style = MaterialTheme.typography.labelSmall,
-            fontSize = 9.sp,
-            textAlign = TextAlign.Center,
-            color = Color.White.copy(alpha = 0.4f),
-            letterSpacing = 0.5.sp
-        )
     }
 }
 
-@Preview(showBackground = true)
+@Preview(name = "Identity setup", showBackground = true, widthDp = 390, heightDp = 844)
 @Composable
-fun IdentitySetupScreenPreview() {
+private fun IdentitySetupPreview() {
     TestResQMeshTheme {
         IdentitySetupContent(
-            connectionStatus = "READY TO SYNC",
-            customName = "John Doe",
+            customName = "Ari Santos",
             onCustomNameChange = {},
-            nodeTag = "NODE",
+            nodeTag = "TEAM1",
             onNodeTagChange = {},
             onIdentityGenerated = {}
         )
-    }
-}
-
-@Composable
-fun TechnicalInfoCard(icon: String, title: String, modifier: Modifier = Modifier) {
-    Surface(
-        modifier = modifier,
-        color = Color.White.copy(alpha = 0.05f),
-        shape = RoundedCornerShape(12.dp),
-        border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.1f))
-    ) {
-        Row(
-            modifier = Modifier.padding(Spacing.Small),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(icon, fontSize = 16.sp)
-            Spacer(modifier = Modifier.width(8.dp))
-            Text(
-                title,
-                style = MaterialTheme.typography.labelSmall,
-                fontWeight = FontWeight.Bold,
-                color = Color.White.copy(alpha = 0.8f),
-                lineHeight = 12.sp
-            )
-        }
     }
 }

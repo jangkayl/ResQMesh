@@ -1,0 +1,12 @@
+<resources>
+    <string name="onboarding_splash_description">Message nearby people without service.</string>
+    <string name="onboarding_permissions_access_description">Find nearby people when service is down.</string>
+    <string name="onboarding_permissions_hardware_description">Turn these on to find nearby people.</string>
+    <string name="onboarding_permissions_ready_description">Nearby messaging is ready.</string>
+    <string name="onboarding_permissions_bluetooth_description">Find and message nearby phones.</string>
+    <string name="onboarding_permissions_location_description">Find devices and share your location.</string>
+    <string name="onboarding_permissions_hardware_warning_description">Turn them on, then check again.</string>
+    <string name="onboarding_permissions_extra_access_note">Android may also ask for notifications or microphone access.</string>
+    <string name="onboarding_permissions_allow_action">Allow access</string>
+    <string name="onboarding_permissions_offline_note">Works without cellular service or internet.</string>
+</resources>

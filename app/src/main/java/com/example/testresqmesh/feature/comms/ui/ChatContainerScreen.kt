@@ -1,51 +1,99 @@
 package com.example.testresqmesh.feature.comms.ui
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material.icons.outlined.AddBox
-import androidx.compose.material.icons.outlined.Shield
-import androidx.compose.material.icons.outlined.SettingsInputAntenna
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.Campaign
+import androidx.compose.material.icons.outlined.ChevronRight
+import androidx.compose.material.icons.outlined.ChatBubbleOutline
+import androidx.compose.material3.BottomSheetDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
-import com.example.testresqmesh.core.ui.theme.TestResQMeshTheme
+import androidx.compose.ui.unit.dp
+import com.example.testresqmesh.R
+import com.example.testresqmesh.core.model.ChatMessage
+import com.example.testresqmesh.core.model.NodeIdentity
+import com.example.testresqmesh.core.ui.components.feedback.ResQEmptyState
+import com.example.testresqmesh.core.ui.components.layout.ResQGlassSurface
+import com.example.testresqmesh.core.ui.theme.ResQTheme
 import com.example.testresqmesh.core.ui.theme.Spacing
+import com.example.testresqmesh.core.ui.theme.TestResQMeshTheme
 import com.example.testresqmesh.core.utils.MediaHelper
-
 import com.example.testresqmesh.feature.comms.viewmodel.CommunicationViewModel
-import com.example.testresqmesh.core.utils.AppLogger
+import com.example.testresqmesh.ui.state.ChatUiState
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
+@OptIn(ExperimentalMaterial3Api::class)
 fun ChatContainerScreen(
-    viewModel: CommunicationViewModel, 
+    viewModel: CommunicationViewModel,
     walkieTalkieViewModel: com.example.testresqmesh.feature.comms.viewmodel.WalkieTalkieViewModel,
     mediaHelper: MediaHelper,
-    onChatSelected: (String) -> Unit
+    onChatSelected: (String) -> Unit,
+    onCommunityConversationChanged: (Boolean) -> Unit
 ) {
-    val selectedTabIndex = remember { mutableIntStateOf(0) }
+    @Suppress("UNUSED_VARIABLE")
+    val retainedWalkieTalkieViewModel = walkieTalkieViewModel
+    val uiState by viewModel.uiState.collectAsState()
+    val currentChannel by viewModel.currentChannelId.collectAsState()
+    val conversations = remember(uiState) { conversationPreviews(uiState) }
+    val communityPreview = remember(uiState.publicMessages) {
+        uiState.publicMessages.maxByOrNull { it.timestamp }
+    }
     var showNewMessageModal by remember { mutableStateOf(false) }
+    var showCommunityConversation by remember { mutableStateOf(false) }
+
+    DisposableEffect(showCommunityConversation) {
+        onCommunityConversationChanged(showCommunityConversation)
+        onDispose { onCommunityConversationChanged(false) }
+    }
 
     if (showNewMessageModal) {
-        val uiState by viewModel.uiState.collectAsState()
         ModalBottomSheet(
             onDismissRequest = { showNewMessageModal = false },
-            containerColor = Color(0xFF232E35),
+            containerColor = MaterialTheme.colorScheme.surface,
             dragHandle = { BottomSheetDefaults.DragHandle() }
         ) {
             NewMessageModal(
                 uiState = uiState,
                 onDismiss = { showNewMessageModal = false },
+                onRefresh = viewModel::rescan,
                 onNodeSelected = {
                     showNewMessageModal = false
                     onChatSelected(it)
@@ -54,206 +102,365 @@ fun ChatContainerScreen(
         }
     }
 
-    val currentChannel by viewModel.currentChannelId.collectAsState()
+    if (showCommunityConversation) {
+        PublicChatTab(
+            viewModel = viewModel,
+            mediaHelper = mediaHelper,
+            onBack = { showCommunityConversation = false }
+        )
+        return
+    }
 
-    ChatContainerScreenContent(
-        selectedTabIndex = selectedTabIndex.intValue,
-        onTabSelected = { selectedTabIndex.intValue = it },
+    MessagesInboxContent(
+        channelId = currentChannel,
+        communityPreview = communityPreview,
+        conversations = conversations,
         onNewMessageClick = { showNewMessageModal = true },
-        walkieTalkieViewModel = walkieTalkieViewModel,
-        currentChannel = currentChannel,
-        onChannelSelected = { viewModel.setChannel(it) },
-        privateTabContent = { PrivateChatTab(viewModel, mediaHelper, onChatSelected) },
-        publicTabContent = { PublicChatTab(viewModel, mediaHelper, onChatSelected) }
+        onCommunityClick = { showCommunityConversation = true },
+        onChannelSelected = viewModel::setChannel,
+        onConversationClick = onChatSelected,
+        onConversationSeen = { message, peer ->
+            if (!message.isMine && !message.seenBy.contains("Me")) {
+                viewModel.markMessageAsSeen(message.id, isPrivate = true, targetId = peer)
+            }
+        }
     )
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ChatContainerScreenContent(
-    selectedTabIndex: Int,
-    onTabSelected: (Int) -> Unit,
+internal fun MessagesInboxContent(
+    channelId: String,
+    communityPreview: ChatMessage?,
+    conversations: List<ConversationPreview>,
     onNewMessageClick: () -> Unit,
-    walkieTalkieViewModel: com.example.testresqmesh.feature.comms.viewmodel.WalkieTalkieViewModel = androidx.lifecycle.viewmodel.compose.viewModel(),
-    currentChannel: String,
+    onCommunityClick: () -> Unit,
     onChannelSelected: (String) -> Unit,
-    privateTabContent: @Composable () -> Unit,
-    publicTabContent: @Composable () -> Unit
+    onConversationClick: (String) -> Unit,
+    onConversationSeen: (ChatMessage, String) -> Unit,
+    modifier: Modifier = Modifier
 ) {
-    val isWalkieTalkieMode by walkieTalkieViewModel.isWalkieTalkieMode.collectAsState()
-    var expanded by remember { mutableStateOf(false) }
+    LazyColumn(
+        modifier = modifier.fillMaxSize(),
+        contentPadding = PaddingValues(
+            start = Spacing.Large,
+            top = Spacing.ExtraLarge,
+            end = Spacing.Large,
+            bottom = 156.dp
+        ),
+        verticalArrangement = Arrangement.spacedBy(Spacing.Medium)
+    ) {
+        item {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = stringResource(R.string.messages_title),
+                        style = MaterialTheme.typography.displayLarge,
+                        fontWeight = FontWeight.Black
+                    )
+                    Text(
+                        text = stringResource(R.string.messages_subtitle),
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Surface(
+                    modifier = Modifier.size(52.dp),
+                    shape = RoundedCornerShape(18.dp),
+                    color = MaterialTheme.colorScheme.primary,
+                    shadowElevation = 10.dp,
+                    onClick = onNewMessageClick
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = Icons.Outlined.Add,
+                            contentDescription = stringResource(R.string.messages_new_action),
+                            tint = MaterialTheme.colorScheme.onPrimary
+                        )
+                    }
+                }
+            }
+        }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            "Inbox",
-                            style = MaterialTheme.typography.headlineMedium,
-                            fontWeight = FontWeight.Black,
-                            color = Color.White
-                        )
-                    }
-                },
-                actions = {
-                    Box {
-                        TextButton(onClick = { expanded = true }) {
-                            Text("CH $currentChannel", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
-                        }
-                        DropdownMenu(
-                            expanded = expanded,
-                            onDismissRequest = { expanded = false }
-                        ) {
-                            for (i in 1..5) {
-                                DropdownMenuItem(
-                                    text = { Text("Channel $i") },
-                                    onClick = {
-                                        onChannelSelected(i.toString())
-                                        expanded = false
-                                    }
-                                )
-                            }
-                        }
-                    }
-
-                    IconButton(onClick = { walkieTalkieViewModel.toggleWalkieTalkieMode() }) {
-                        Icon(
-                            Icons.Outlined.SettingsInputAntenna,
-                            contentDescription = "Toggle Walkie Talkie Auto-Play",
-                            tint = if (isWalkieTalkieMode) com.example.testresqmesh.core.ui.theme.SuccessGreen else Color.White.copy(alpha = 0.5f),
-                            modifier = Modifier.size(28.dp)
-                        )
-                    }
-                    IconButton(onClick = { AppLogger.toggleTerminal() }) {
-                        Icon(
-                            Icons.Outlined.Shield,
-                            contentDescription = "Debug Terminal",
-                            tint = Color.White,
-                            modifier = Modifier.size(28.dp)
-                        )
-                    }
-                    IconButton(onClick = onNewMessageClick) {
-                        Icon(
-                            Icons.Outlined.AddBox,
-                            contentDescription = "New Message",
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(28.dp)
-                        )
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.background
-                )
+        item {
+            CommunityInboxCard(
+                channelId = channelId,
+                preview = communityPreview,
+                onClick = onCommunityClick,
+                onChannelSelected = onChannelSelected
             )
         }
-    ) { innerPadding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-                .background(MaterialTheme.colorScheme.background)
-        ) {
-            // Custom Segmented Control
-            Surface(
-                modifier = Modifier
-                    .padding(Spacing.Medium)
-                    .fillMaxWidth()
-                    .height(56.dp)
-                    .clip(RoundedCornerShape(12.dp)),
-                color = Color.Black.copy(alpha = 0.3f)
-            ) {
-                Row(modifier = Modifier.fillMaxSize()) {
-                    // Private Tab
-                    SegmentedTabItem(
-                        title = "Private",
-                        icon = Icons.Outlined.Shield,
-                        isSelected = selectedTabIndex == 0,
-                        modifier = Modifier.weight(1f),
-                        onClick = { onTabSelected(0) }
-                    )
-                    // Broadcast Tab
-                    SegmentedTabItem(
-                        title = "Broadcast",
-                        icon = Icons.Outlined.SettingsInputAntenna,
-                        isSelected = selectedTabIndex == 1,
-                        modifier = Modifier.weight(1f),
-                        onClick = { onTabSelected(1) }
+
+        item {
+            Text(
+                text = stringResource(R.string.messages_private_section),
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(top = Spacing.Small)
+            )
+        }
+
+        if (conversations.isEmpty()) {
+            item {
+                ResQGlassSurface(
+                    shape = RoundedCornerShape(28.dp),
+                    contentPadding = PaddingValues(vertical = Spacing.Medium)
+                ) {
+                    ResQEmptyState(
+                        title = stringResource(R.string.messages_empty_title),
+                        message = stringResource(R.string.messages_empty_description),
+                        icon = Icons.Outlined.ChatBubbleOutline
                     )
                 }
             }
-
-            Spacer(modifier = Modifier.height(Spacing.Small))
-
-            // Content Area
-            Box(modifier = Modifier.weight(1f)) {
-                when (selectedTabIndex) {
-                    0 -> privateTabContent()
-                    1 -> publicTabContent()
+        } else {
+            items(conversations, key = { it.id }) { conversation ->
+                LaunchedEffect(conversation.lastMessage.id) {
+                    onConversationSeen(conversation.lastMessage, conversation.id)
                 }
+                ConversationInboxRow(
+                    conversation = conversation,
+                    onClick = { onConversationClick(conversation.id) }
+                )
             }
         }
     }
 }
 
 @Composable
-fun SegmentedTabItem(
-    title: String,
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    isSelected: Boolean,
-    modifier: Modifier = Modifier,
-    onClick: () -> Unit
+private fun CommunityInboxCard(
+    channelId: String,
+    preview: ChatMessage?,
+    onClick: () -> Unit,
+    onChannelSelected: (String) -> Unit
 ) {
-    val backgroundColor = if (isSelected) MaterialTheme.colorScheme.secondary else Color.Transparent
-    val contentColor = if (isSelected) Color.White else Color.White.copy(alpha = 0.6f)
-
-    Box(
-        modifier = modifier
-            .fillMaxHeight()
-            .padding(4.dp)
-            .clip(RoundedCornerShape(8.dp))
-            .background(backgroundColor)
-            .clickable { onClick() },
-        contentAlignment = Alignment.Center
+    var channelPickerExpanded by remember { mutableStateOf(false) }
+    ResQGlassSurface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(28.dp),
+        contentPadding = PaddingValues(Spacing.Medium),
+        shadowElevation = 14.dp
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(
-                icon,
-                contentDescription = null,
-                tint = contentColor,
-                modifier = Modifier.size(18.dp)
-            )
-            Spacer(modifier = Modifier.width(8.dp))
-            Text(
-                text = title,
-                style = MaterialTheme.typography.bodyLarge,
-                fontWeight = FontWeight.Bold,
-                color = contentColor
-            )
+            Surface(
+                modifier = Modifier.size(52.dp),
+                shape = RoundedCornerShape(18.dp),
+                color = MaterialTheme.colorScheme.primaryContainer
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = Icons.Outlined.Campaign,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                }
+            }
+            Spacer(Modifier.width(Spacing.Medium))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = stringResource(R.string.messages_community_title),
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = preview?.text?.ifBlank { stringResource(R.string.messages_attachment_preview) }
+                        ?: stringResource(R.string.messages_community_description, channelId),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Box {
+                    TextButton(
+                        onClick = { channelPickerExpanded = true },
+                        contentPadding = PaddingValues(0.dp)
+                    ) {
+                        Text(
+                            text = stringResource(R.string.messages_channel_short, channelId),
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+                    DropdownMenu(
+                        expanded = channelPickerExpanded,
+                        onDismissRequest = { channelPickerExpanded = false }
+                    ) {
+                        (1..5).forEach { channel ->
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.messages_channel_option, channel)) },
+                                onClick = {
+                                    onChannelSelected(channel.toString())
+                                    channelPickerExpanded = false
+                                }
+                            )
+                        }
+                    }
+                }
+            }
+            IconButton(onClick = onClick) {
+                Icon(
+                    imageVector = Icons.Outlined.ChevronRight,
+                    contentDescription = stringResource(R.string.messages_open_community),
+                    tint = MaterialTheme.colorScheme.primary
+                )
+            }
         }
     }
 }
 
-@Preview(showBackground = true)
 @Composable
-fun ChatContainerScreenPreview() {
-    TestResQMeshTheme {
-        ChatContainerScreenContent(
-            selectedTabIndex = 0,
-            onTabSelected = {},
-            onNewMessageClick = {},
-            currentChannel = "1",
-            onChannelSelected = {},
-            privateTabContent = {
-                Column {
-                    // Previews updated to be empty (Production state)
-                }
-            },
-            publicTabContent = {
-                Column {
-                    // Previews updated to be empty (Production state)
+private fun ConversationInboxRow(
+    conversation: ConversationPreview,
+    onClick: () -> Unit
+) {
+    ResQGlassSurface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(24.dp),
+        contentPadding = PaddingValues(Spacing.Medium),
+        shadowElevation = 10.dp
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Surface(
+                modifier = Modifier.size(52.dp),
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.secondaryContainer
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Text(
+                        text = conversation.initial,
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer
+                    )
                 }
             }
+            Spacer(Modifier.width(Spacing.Medium))
+            Column(modifier = Modifier.weight(1f)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = conversation.displayName,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f)
+                    )
+                    Spacer(Modifier.width(Spacing.Small))
+                    Text(
+                        text = conversation.timeLabel,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    text = conversation.preview.ifBlank { stringResource(R.string.messages_attachment_preview) },
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Spacer(Modifier.height(Spacing.ExtraSmall))
+                Text(
+                    text = conversation.status.label(),
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = conversation.status.color()
+                )
+            }
+            IconButton(onClick = onClick) {
+                Icon(
+                    imageVector = Icons.Outlined.ChevronRight,
+                    contentDescription = stringResource(R.string.messages_open_conversation, conversation.displayName),
+                    tint = MaterialTheme.colorScheme.primary
+                )
+            }
+        }
+    }
+}
+
+internal enum class ConversationStatus {
+    Direct,
+    Checking,
+    Relayed,
+    Offline;
+
+    @Composable
+    fun label(): String = stringResource(
+        when (this) {
+            Direct -> R.string.messages_status_direct
+            Checking -> R.string.messages_status_checking
+            Relayed -> R.string.messages_status_relayed
+            Offline -> R.string.messages_status_offline
+        }
+    )
+
+    @Composable
+    fun color() = when (this) {
+        Direct -> ResQTheme.colors.success
+        Checking -> ResQTheme.colors.warning
+        Relayed -> MaterialTheme.colorScheme.primary
+        Offline -> MaterialTheme.colorScheme.onSurfaceVariant
+    }
+}
+
+internal data class ConversationPreview(
+    val id: String,
+    val displayName: String,
+    val initial: String,
+    val preview: String,
+    val timeLabel: String,
+    val status: ConversationStatus,
+    val lastMessage: ChatMessage
+)
+
+internal fun conversationPreviews(state: ChatUiState): List<ConversationPreview> =
+    state.privateMessages.mapNotNull { (id, messages) ->
+        val latest = messages.maxByOrNull { it.timestamp } ?: return@mapNotNull null
+        val displayName = NodeIdentity.displayNameOf(id).ifBlank { id }
+        val directLink = state.connectedDevices.firstOrNull { NodeIdentity.matches(it.name, id) }
+        val status = when {
+            directLink?.isPayloadReady == true && directLink.isPeerResponsive && !directLink.isProvisional -> ConversationStatus.Direct
+            directLink != null -> ConversationStatus.Checking
+            state.knownNodes.any { NodeIdentity.matches(it.name, id) && !it.isDirect } -> ConversationStatus.Relayed
+            else -> ConversationStatus.Offline
+        }
+        ConversationPreview(
+            id = id,
+            displayName = displayName,
+            initial = displayName.firstOrNull()?.uppercase() ?: "?",
+            preview = latest.text,
+            timeLabel = inboxTimeLabel(latest.timestamp),
+            status = status,
+            lastMessage = latest
+        )
+    }.sortedByDescending { it.lastMessage.timestamp }
+
+internal fun inboxTimeLabel(timestamp: Long, now: Long = System.currentTimeMillis()): String {
+    val minutes = ((now - timestamp).coerceAtLeast(0L) / 60_000L)
+    return when {
+        minutes == 0L -> "Now"
+        minutes < 60L -> "${minutes}m"
+        minutes < 1_440L -> "${minutes / 60}h"
+        else -> "${minutes / 1_440}d"
+    }
+}
+
+@Preview(showBackground = true, widthDp = 390, heightDp = 844)
+@Composable
+private fun MessagesInboxPreview() {
+    TestResQMeshTheme {
+        MessagesInboxContent(
+            channelId = "1",
+            communityPreview = null,
+            conversations = emptyList(),
+            onNewMessageClick = {},
+            onCommunityClick = {},
+            onChannelSelected = {},
+            onConversationClick = {},
+            onConversationSeen = { _, _ -> }
         )
     }
 }

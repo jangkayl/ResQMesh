@@ -6,40 +6,27 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.imePadding
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.systemBars
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.unit.dp
 import androidx.compose.runtime.collectAsState
 import com.example.testresqmesh.feature.comms.ui.ActiveChatScreen
 import com.example.testresqmesh.feature.comms.ui.ChatContainerScreen
-import com.example.testresqmesh.feature.radar.ui.RadarScreen
+import com.example.testresqmesh.feature.comms.ui.WalkieTalkieScreen
+import com.example.testresqmesh.feature.radar.ui.NetworkScreen
 import com.example.testresqmesh.feature.radar.ui.ResponderTrackerScreen
+import com.example.testresqmesh.feature.home.ui.HomeScreen
 import com.example.testresqmesh.feature.sos.ui.SOSBroadcastScreen
 import com.example.testresqmesh.feature.sos.ui.FullScreenSosAlarm
 import com.example.testresqmesh.feature.sos.ui.ActiveSOSMonitoringScreen
 import com.example.testresqmesh.feature.sos.ui.SosMapScreen
-import com.example.testresqmesh.feature.sos.ui.OfflineMapPromptModal
-import com.example.testresqmesh.feature.sos.utils.MapDownloadManager
 import com.example.testresqmesh.feature.profile.ui.ProfileScreen
+import com.example.testresqmesh.feature.profile.ui.AdvancedScreen
 import com.example.testresqmesh.feature.comms.viewmodel.CommunicationViewModel
 import com.example.testresqmesh.feature.radar.viewmodel.RadarViewModel
 import com.example.testresqmesh.feature.setup.viewmodel.SetupViewModel
 import com.example.testresqmesh.core.utils.MediaHelper
-
-sealed class NavItem(val route: String, val icon: ImageVector, val label: String) {
-    object Radar : NavItem("radar", Icons.Default.Adjust, "Radar")
-    object Messages : NavItem("messages", Icons.Default.ChatBubble, "Messages")
-    object Walkie : NavItem("walkie", Icons.Default.Mic, "Walkie")
-    object SOS : NavItem("sos", Icons.Default.Notifications, "SOS")
-    object Settings : NavItem("settings", Icons.Default.Settings, "Settings")
-}
+import com.example.testresqmesh.core.ui.components.layout.ResQAppShell
+import com.example.testresqmesh.core.ui.components.layout.ResQDestination
 
 @Composable
 fun MainContainerScreen(
@@ -49,17 +36,19 @@ fun MainContainerScreen(
     walkieTalkieViewModel: com.example.testresqmesh.feature.comms.viewmodel.WalkieTalkieViewModel,
     mediaHelper: MediaHelper
 ) {
-    var currentItem by remember { mutableStateOf<NavItem>(NavItem.Radar) }
+    var currentDestination by remember { mutableStateOf(ResQDestination.Home) }
     
     // Sub-navigation state for prototype
     var activeChatNode by remember { mutableStateOf<String?>(null) }
     var trackingNode by remember { mutableStateOf<String?>(null) }
     var isSOSActive by remember { mutableStateOf(false) }
     var mapSosAlert by remember { mutableStateOf<com.example.testresqmesh.core.model.ChatMessage?>(null) }
-    
-    val context = LocalContext.current
-    val mapDownloadManager = remember { MapDownloadManager(context) }
-    var showMapDownloadPrompt by remember { mutableStateOf(!mapDownloadManager.isMapDownloaded()) }
+    var showProfile by remember { mutableStateOf(false) }
+    var showAdvanced by remember { mutableStateOf(false) }
+    var isCommunityConversationOpen by remember { mutableStateOf(false) }
+
+    // OfflineMapPromptModal and the legacy Radar screen remain in source intentionally. Their
+    // entry points are hidden while the new shell is evaluated and can be restored later.
     
     val incomingSosAlert by commsViewModel.incomingSosAlert.collectAsState()
     val activeSosMessageId by commsViewModel.activeSosMessageId.collectAsState()
@@ -72,8 +61,6 @@ fun MainContainerScreen(
             commsViewModel.stopLocationTracking()
         }
     }
-
-    val items = listOf(NavItem.Radar, NavItem.Messages, NavItem.Walkie, NavItem.SOS, NavItem.Settings)
 
     if (incomingSosAlert != null) {
         FullScreenSosAlarm(
@@ -106,7 +93,6 @@ fun MainContainerScreen(
     }
 
     if (isSOSActive) {
-        val context = LocalContext.current
         SOSBroadcastScreen(
             onCancel = { isSOSActive = false },
             onSosTriggered = { type ->
@@ -116,13 +102,6 @@ fun MainContainerScreen(
         )
         BackHandler { isSOSActive = false }
         return
-    }
-
-    if (showMapDownloadPrompt) {
-        OfflineMapPromptModal(
-            downloadManager = mapDownloadManager,
-            onDismiss = { showMapDownloadPrompt = false }
-        )
     }
 
     if (activeChatNode != null) {
@@ -162,39 +141,30 @@ fun MainContainerScreen(
         return
     }
 
-    Scaffold(
-        contentWindowInsets = WindowInsets.systemBars,
-        bottomBar = {
-            NavigationBar(
-                containerColor = MaterialTheme.colorScheme.background,
-                tonalElevation = 0.dp
-            ) {
-                items.forEach { item ->
-                    NavigationBarItem(
-                        icon = { Icon(item.icon, contentDescription = item.label) },
-                        label = { Text(item.label) },
-                        selected = currentItem == item,
-                        onClick = { 
-                            if (item == NavItem.SOS) {
-                                isSOSActive = true
-                            } else {
-                                currentItem = item 
-                            }
-                        },
-                        colors = NavigationBarItemDefaults.colors(
-                            selectedIconColor = MaterialTheme.colorScheme.primary,
-                            selectedTextColor = MaterialTheme.colorScheme.primary,
-                            unselectedIconColor = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
-                            unselectedTextColor = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
-                            indicatorColor = androidx.compose.ui.graphics.Color.Transparent
-                        )
-                    )
-                }
-            }
-        }
+    if (showAdvanced) {
+        AdvancedScreen(walkieTalkieViewModel = walkieTalkieViewModel, onBack = { showAdvanced = false })
+        BackHandler { showAdvanced = false }
+        return
+    }
+
+    if (showProfile) {
+        ProfileScreen(
+            viewModel = setupViewModel,
+            onAdvanced = { showAdvanced = true },
+            onBack = { showProfile = false }
+        )
+        BackHandler { showProfile = false }
+        return
+    }
+
+    ResQAppShell(
+        selectedDestination = currentDestination,
+        onDestinationSelected = { currentDestination = it },
+        onSosActivated = { isSOSActive = true },
+        showNavigation = !isCommunityConversationOpen
     ) { innerPadding ->
         AnimatedContent(
-            targetState = currentItem,
+            targetState = currentDestination,
             modifier = Modifier
                 .padding(innerPadding)
                 .consumeWindowInsets(innerPadding)
@@ -206,20 +176,26 @@ fun MainContainerScreen(
             label = "ScreenTransition"
         ) { targetScreen ->
             when (targetScreen) {
-                NavItem.Radar -> RadarScreen(radarViewModel)
-                NavItem.Messages -> ChatContainerScreen(
+                ResQDestination.Home -> HomeScreen(
+                    setupViewModel = setupViewModel,
+                    radarViewModel = radarViewModel,
+                    onMessagesClick = { currentDestination = ResQDestination.Messages },
+                    onNetworkClick = { currentDestination = ResQDestination.Network },
+                    onProfileClick = { showProfile = true }
+                )
+                ResQDestination.Messages -> ChatContainerScreen(
                     viewModel = commsViewModel, 
                     walkieTalkieViewModel = walkieTalkieViewModel,
                     mediaHelper = mediaHelper, 
-                    onChatSelected = { activeChatNode = it }
-                ) 
-                NavItem.Walkie -> com.example.testresqmesh.feature.comms.ui.WalkieTalkieScreen(
+                    onChatSelected = { activeChatNode = it },
+                    onCommunityConversationChanged = { isCommunityConversationOpen = it }
+                )
+                ResQDestination.WalkieTalkie -> WalkieTalkieScreen(
                     commsViewModel = commsViewModel,
                     walkieTalkieViewModel = walkieTalkieViewModel,
                     mediaHelper = mediaHelper
                 )
-                NavItem.Settings -> ProfileScreen(setupViewModel)
-                else -> {}
+                ResQDestination.Network -> NetworkScreen(radarViewModel)
             }
         }
     }

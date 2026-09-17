@@ -2,9 +2,24 @@ package com.example.testresqmesh.feature.comms.ui
 
 import android.Manifest
 import android.content.pm.PackageManager
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -12,158 +27,150 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material.icons.outlined.CheckCircle
-import androidx.compose.material.icons.outlined.LinkOff
-import androidx.compose.material.icons.outlined.Lock
-import androidx.compose.material.icons.outlined.RadioButtonChecked
-import androidx.compose.material.icons.outlined.Wifi
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import androidx.compose.material.icons.automirrored.outlined.Send
+import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.DeleteOutline
+import androidx.compose.material.icons.outlined.Image
+import androidx.compose.material.icons.outlined.LocationOn
+import androidx.compose.material.icons.outlined.Mic
+import androidx.compose.material.icons.outlined.PlayArrow
+import androidx.compose.material.icons.outlined.Stop
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
-import com.example.testresqmesh.core.model.ConnectedDevice
-import com.example.testresqmesh.core.ui.theme.TestResQMeshTheme
-import com.example.testresqmesh.core.ui.theme.InboxBackground
-import com.example.testresqmesh.core.ui.theme.InboxAccentBlue
+import com.example.testresqmesh.R
+import com.example.testresqmesh.core.model.ChatMessage
+import com.example.testresqmesh.core.model.NodeIdentity
+import com.example.testresqmesh.core.ui.components.feedback.ResQEmptyState
+import com.example.testresqmesh.core.ui.components.layout.ResQAuroraBackground
+import com.example.testresqmesh.core.ui.components.layout.ResQGlassSurface
+import com.example.testresqmesh.core.ui.theme.ResQTheme
 import com.example.testresqmesh.core.ui.theme.Spacing
-import com.example.testresqmesh.feature.comms.viewmodel.CommunicationViewModel
-import com.example.testresqmesh.feature.comms.ui.components.ActiveChatHeader
-import com.example.testresqmesh.feature.comms.ui.components.ChatInput
+import com.example.testresqmesh.core.ui.theme.TestResQMeshTheme
 import com.example.testresqmesh.core.utils.MediaHelper
+import com.example.testresqmesh.feature.comms.viewmodel.CommunicationViewModel
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
-data class ChatMessageData(
-    val id: String,
-    val text: String,
-    val imageBase64: String? = null,
-    val audioBase64: String? = null,
-    val time: String,
-    val hops: String,
-    val receiveMedium: String,
-    val deliveredTo: List<String>,
-    val seenBy: List<String>,
-    val locationLat: Double? = null,
-    val locationLng: Double? = null,
-    val isMine: Boolean,
-    val isSent: Boolean = false,
-    val outboundRoute: List<String> = emptyList(),
-    val returnRoute: List<String> = emptyList()
-)
-
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ActiveChatScreen(
-    name: String, 
+    name: String,
     viewModel: CommunicationViewModel,
     mediaHelper: MediaHelper,
     onBack: () -> Unit,
     onViewMap: (Double, Double, String, String) -> Unit = { _, _, _, _ -> }
 ) {
     val uiState by viewModel.uiState.collectAsState()
-    
-    // Messages for this specific target (name is treated as endpointId here)
-    val messages = uiState.privateMessages[name] ?: emptyList()
-    
-    // Sort messages newest first for reverseLayout
+    val drafts by viewModel.privateDrafts.collectAsState()
+    val messages = uiState.privateMessages[name].orEmpty()
     val sortedMessages = remember(messages) { messages.sortedByDescending { it.timestamp } }
-    
-    // LazyListState to control scrolling if needed
+    val candidate = remember(uiState, name) {
+        recipientCandidates(uiState).firstOrNull { NodeIdentity.matches(it.name, name) }
+    }
+    val displayName = remember(name) { NodeIdentity.displayNameOf(name).ifBlank { name } }
+    val context = LocalContext.current
+    val voiceNoteText = stringResource(R.string.private_chat_voice_note)
+    val photoText = stringResource(R.string.private_chat_photo)
     val listState = rememberLazyListState()
-
-    var inputText by remember { mutableStateOf("") }
+    val snackbarHostState = remember { SnackbarHostState() }
     var pendingImage by remember { mutableStateOf<String?>(null) }
     var pendingAudio by remember { mutableStateOf<String?>(null) }
     var isRecording by remember { mutableStateOf(false) }
     var showDeleteDialog by remember { mutableStateOf(false) }
-    val snackbarHostState = remember { SnackbarHostState() }
+
     LaunchedEffect(viewModel) {
         viewModel.privateSendErrors.collect { snackbarHostState.showSnackbar(it) }
     }
 
-    // Fix: Prioritize connected device name, then look for the first message not sent by "Me"
-    val displayName = name
-    val isDirect = uiState.knownNodes.find {
-        com.example.testresqmesh.core.model.NodeIdentity.matches(it.name, displayName)
-    }?.isDirect ?: false
-
     if (showDeleteDialog) {
-        AlertDialog(
-            onDismissRequest = { showDeleteDialog = false },
-            title = { Text("Delete Conversation") },
-            text = { Text("Are you sure you want to delete the entire conversation with $displayName? This action cannot be undone.") },
-            confirmButton = {
-                TextButton(onClick = {
-                    showDeleteDialog = false
-                    viewModel.deleteConversationWith(displayName)
-                    onBack()
-                }) {
-                    Text("Delete", color = Color.Red)
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showDeleteDialog = false }) {
-                    Text("Cancel")
-                }
+        DeleteConversationDialog(
+            name = displayName,
+            onDismiss = { showDeleteDialog = false },
+            onDelete = {
+                viewModel.deleteConversationWith(name)
+                onBack()
             }
         )
     }
 
-    Scaffold(
-        snackbarHost = { SnackbarHost(snackbarHostState) },
-        topBar = {
-            ActiveChatHeader(
-                displayName = displayName,
-                isDirect = isDirect,
-                onBack = onBack,
-                onDelete = { showDeleteDialog = true }
-            )
-        },
-        containerColor = InboxBackground,
-        bottomBar = {
-            val context = androidx.compose.ui.platform.LocalContext.current
-            androidx.compose.foundation.layout.Box(modifier = Modifier.imePadding()) {
-                ChatInput(
-                    inputText = inputText,
-                    onTextChange = { inputText = it },
+    ResQAuroraBackground(Modifier.fillMaxSize()) {
+        Scaffold(
+            containerColor = androidx.compose.ui.graphics.Color.Transparent,
+            snackbarHost = { SnackbarHost(snackbarHostState) },
+            topBar = {
+                PrivateChatHeader(
+                    name = displayName,
+                    availability = candidate?.availability ?: RecipientAvailability.Offline,
+                    onBack = onBack,
+                    onDelete = { showDeleteDialog = true }
+                )
+            },
+            bottomBar = {
+                PrivateChatComposer(
+                    draft = drafts[name].orEmpty(),
+                    onDraftChange = { viewModel.updatePrivateDraft(name, it) },
                     pendingImage = pendingImage,
                     onImageSelected = { pendingImage = it },
                     onClearImage = { pendingImage = null },
                     pendingAudio = pendingAudio,
                     onClearAudio = { pendingAudio = null },
                     isRecording = isRecording,
-                    onToggleRecord = {
-                        if (!isRecording) {
-                            val started = mediaHelper.startRecording()
-                            if (started) isRecording = true
-                        } else {
+                    onToggleRecording = {
+                        if (isRecording) {
                             isRecording = false
-                            val audioBase64 = mediaHelper.stopRecording()
-                            if (audioBase64 != null) {
-                                pendingAudio = audioBase64
-                            }
+                            mediaHelper.stopRecording()?.let { pendingAudio = it }
+                        } else {
+                            isRecording = mediaHelper.startRecording()
                         }
                     },
                     onSend = {
-                        val hasAudio = pendingAudio != null
-                        val finalMessage = if (hasAudio && inputText.isBlank()) "🎤 Voice Note" else inputText.trim()
-                        
+                        val text = drafts[name].orEmpty().trim()
+                        val messageText = when {
+                            text.isNotBlank() -> text
+                            pendingAudio != null -> voiceNoteText
+                            pendingImage != null -> photoText
+                            else -> ""
+                        }
+                        if (messageText.isBlank() && pendingImage == null && pendingAudio == null) return@PrivateChatComposer
                         val sent = viewModel.sendPrivateMessage(
-                            targetName = displayName,
-                            text = finalMessage,
+                            targetName = name,
+                            text = messageText,
                             imageBase64 = pendingImage,
                             audioBase64 = pendingAudio
                         )
-                        
                         if (sent) {
-                            inputText = ""
+                            viewModel.clearPrivateDraft(name)
                             pendingImage = null
                             pendingAudio = null
                         }
@@ -172,240 +179,211 @@ fun ActiveChatScreen(
                         if (ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
                             ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
                         ) {
-                            viewModel.broadcastLocation(context, isPrivate = true, targetName = displayName)
+                            viewModel.broadcastLocation(
+                                context = context,
+                                isPrivate = true,
+                                targetName = name
+                            )
                         }
                     },
                     mediaHelper = mediaHelper
                 )
             }
-        }
-    ) { innerPadding ->
-        LazyColumn(
-            state = listState,
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-                .padding(horizontal = Spacing.Medium),
-            reverseLayout = true
-        ) {
-            items(sortedMessages) { msg ->
-                if (!msg.isMine && !msg.seenBy.contains("Me")) {
-                    LaunchedEffect(msg.id) {
-                        viewModel.markMessageAsSeen(msg.id, isPrivate = true, targetId = name)
-                    }
-                }
-
-                HighFidelityChatBubble(
-                    ChatMessageData(
-                        id = msg.id,
-                        text = msg.text,
-                        imageBase64 = msg.imageBase64,
-                        audioBase64 = msg.audioBase64,
-                        time = java.text.SimpleDateFormat("hh:mm a", java.util.Locale.getDefault()).format(java.util.Date(msg.timestamp)),
-                        hops = if (msg.isHopped) "🌐 MESH HOPPED" else "🟢 DIRECT",
-                        receiveMedium = msg.receiveMedium,
-                        deliveredTo = msg.deliveredTo,
-                        seenBy = msg.seenBy,
-                        locationLat = msg.locationLat,
-                        locationLng = msg.locationLng,
-                        isMine = msg.isMine,
-                        isSent = msg.isMine,
-                        outboundRoute = msg.outboundRoute,
-                        returnRoute = msg.returnRoute
-                    ),
-                    mediaHelper = mediaHelper,
-                    onViewMap = { lat, lng ->
-                        onViewMap(lat, lng, msg.senderName, msg.text)
-                    }
+        ) { innerPadding ->
+            if (sortedMessages.isEmpty()) {
+                ResQEmptyState(
+                    title = stringResource(R.string.private_chat_empty_title),
+                    message = stringResource(R.string.private_chat_empty_description),
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(innerPadding)
                 )
-            }
-
-            item {
-                Spacer(modifier = Modifier.height(24.dp))
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
-                    HorizontalDivider(modifier = Modifier.width(60.dp), color = Color.White.copy(alpha = 0.1f))
-                    Text(
-                        "TODAY • OCTOBER 24",
-                        modifier = Modifier.padding(horizontal = 16.dp),
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.Black,
-                        color = Color.White.copy(alpha = 0.3f),
-                        letterSpacing = 1.sp
-                    )
-                    HorizontalDivider(modifier = Modifier.width(60.dp), color = Color.White.copy(alpha = 0.1f))
+            } else {
+                LazyColumn(
+                    state = listState,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(innerPadding),
+                    contentPadding = PaddingValues(
+                        start = Spacing.Large,
+                        top = Spacing.Small,
+                        end = Spacing.Large,
+                        bottom = Spacing.Large
+                    ),
+                    verticalArrangement = Arrangement.spacedBy(Spacing.Small),
+                    reverseLayout = true
+                ) {
+                    items(sortedMessages, key = { it.id }) { message ->
+                        if (!message.isMine && !message.seenBy.contains("Me")) {
+                            LaunchedEffect(message.id) {
+                                viewModel.markMessageAsSeen(message.id, isPrivate = true, targetId = name)
+                            }
+                        }
+                        PrivateMessageBubble(
+                            message = message,
+                            mediaHelper = mediaHelper,
+                            onViewMap = { latitude, longitude ->
+                                onViewMap(latitude, longitude, message.senderName, message.text)
+                            }
+                        )
+                    }
                 }
-                Spacer(modifier = Modifier.height(32.dp))
             }
         }
     }
 }
 
 @Composable
-fun HighFidelityChatBubble(msg: ChatMessageData, mediaHelper: MediaHelper, onViewMap: (Double, Double) -> Unit = { _, _ -> }) {
-    val bubbleColor = if (msg.isMine) InboxAccentBlue else Color(0xFF35424D) // Lighter slate for others
-    val alignment = if (msg.isMine) Alignment.End else Alignment.Start
-    val shape = if (msg.isMine) {
-        RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp, bottomStart = 16.dp, bottomEnd = 2.dp)
+internal fun PrivateChatHeader(
+    name: String,
+    availability: RecipientAvailability,
+    onBack: () -> Unit,
+    onDelete: () -> Unit
+) {
+    Surface(color = MaterialTheme.colorScheme.surface) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = Spacing.Small, vertical = Spacing.Small),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            IconButton(onClick = onBack) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Outlined.ArrowBack,
+                    contentDescription = stringResource(R.string.private_chat_back_action)
+                )
+            }
+            Surface(
+                modifier = Modifier.size(44.dp),
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.secondaryContainer
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Text(
+                        text = name.firstOrNull()?.uppercase() ?: "?",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer
+                    )
+                }
+            }
+            Spacer(Modifier.width(Spacing.Small))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = name,
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = availability.label(),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = availability.color(),
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+            IconButton(onClick = onDelete) {
+                Icon(
+                    imageVector = Icons.Outlined.DeleteOutline,
+                    contentDescription = stringResource(R.string.private_chat_delete_action),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun PrivateMessageBubble(
+    message: ChatMessage,
+    mediaHelper: MediaHelper,
+    onViewMap: (Double, Double) -> Unit
+) {
+    val mine = message.isMine
+    val bubbleColor = if (mine) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface
+    val contentColor = if (mine) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
+    val shape = if (mine) {
+        RoundedCornerShape(22.dp, 22.dp, 6.dp, 22.dp)
     } else {
-        RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp, bottomStart = 2.dp, bottomEnd = 16.dp)
+        RoundedCornerShape(22.dp, 22.dp, 22.dp, 6.dp)
     }
 
     Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 10.dp),
-        horizontalAlignment = alignment
+        modifier = Modifier.fillMaxWidth(),
+        horizontalAlignment = if (mine) Alignment.End else Alignment.Start
     ) {
         Surface(
-            color = bubbleColor,
+            modifier = Modifier.widthIn(max = 300.dp),
             shape = shape,
-            modifier = Modifier.widthIn(max = 280.dp),
-            border = if (!msg.isMine) androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.1f)) else null
+            color = bubbleColor,
+            contentColor = contentColor,
+            shadowElevation = if (mine) 4.dp else 8.dp
         ) {
-            Column(modifier = Modifier.padding(14.dp)) {
-                if (msg.locationLat != null && msg.locationLng != null) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.LocationOn, contentDescription = null, tint = Color.White)
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            "📍 Shared Location:\n[${String.format(java.util.Locale.US, "%.4f", msg.locationLat)}, ${String.format(java.util.Locale.US, "%.4f", msg.locationLng)}]",
-                            color = Color.White,
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Button(
-                        onClick = { onViewMap(msg.locationLat, msg.locationLng) },
-                        colors = ButtonDefaults.buttonColors(containerColor = Color.Black.copy(alpha = 0.3f)),
-                        modifier = Modifier.fillMaxWidth().height(36.dp),
-                        contentPadding = PaddingValues(0.dp)
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.Map, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text("VIEW IN MAP", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                        }
-                    }
-                    Spacer(modifier = Modifier.height(8.dp))
-                }
-                
-                if (msg.imageBase64 != null) {
-                    val bitmap = remember(msg.imageBase64) { mediaHelper.decodeBase64ToBitmap(msg.imageBase64) }
-                    bitmap?.let { 
-                        androidx.compose.foundation.Image(
-                            bitmap = it.asImageBitmap(), 
-                            contentDescription = "Attached Image", 
+            Column(modifier = Modifier.padding(Spacing.Medium)) {
+                message.imageBase64?.let { image ->
+                    val bitmap = remember(image) { mediaHelper.decodeBase64ToBitmap(image) }
+                    if (bitmap != null) {
+                        Image(
+                            bitmap = bitmap.asImageBitmap(),
+                            contentDescription = stringResource(R.string.private_chat_image_description),
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(200.dp)
-                                .clip(RoundedCornerShape(8.dp))
-                                .padding(bottom = Spacing.ExtraSmall),
-                            contentScale = androidx.compose.ui.layout.ContentScale.Crop
-                        ) 
+                                .height(180.dp)
+                                .clip(RoundedCornerShape(14.dp)),
+                            contentScale = ContentScale.Crop
+                        )
+                        Spacer(Modifier.height(Spacing.Small))
                     }
                 }
-                
-                if (msg.audioBase64 != null) {
+                message.audioBase64?.let { audio ->
+                    TextButton(onClick = { mediaHelper.playVoiceMail(audio) }) {
+                        Icon(Icons.Outlined.PlayArrow, contentDescription = null)
+                        Spacer(Modifier.width(Spacing.ExtraSmall))
+                        Text(stringResource(R.string.private_chat_voice_note))
+                    }
+                }
+                if (message.locationLat != null && message.locationLng != null) {
                     Surface(
-                        onClick = { mediaHelper.playVoiceMail(msg.audioBase64) },
-                        color = Color.Black.copy(alpha = 0.2f),
-                        shape = RoundedCornerShape(8.dp),
-                        modifier = Modifier.fillMaxWidth().padding(bottom = Spacing.ExtraSmall)
+                        shape = RoundedCornerShape(14.dp),
+                        color = contentColor.copy(alpha = 0.12f)
                     ) {
                         Row(
                             modifier = Modifier.padding(Spacing.Small),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text("▶️", fontSize = 14.sp)
-                            Spacer(modifier = Modifier.width(Spacing.Small))
-                            Text(
-                                "Voice Note", 
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = Color.White,
-                                fontWeight = FontWeight.Bold
-                            )
+                            Icon(Icons.Outlined.LocationOn, contentDescription = null)
+                            Spacer(Modifier.width(Spacing.ExtraSmall))
+                            Text(stringResource(R.string.private_chat_location_shared))
+                            Spacer(Modifier.width(Spacing.Small))
+                            TextButton(onClick = { onViewMap(message.locationLat, message.locationLng) }) {
+                                Text(stringResource(R.string.private_chat_view_map_action))
+                            }
                         }
                     }
+                    Spacer(Modifier.height(Spacing.Small))
                 }
-                
-                if (msg.text.isNotBlank()) {
-                    Text(
-                        text = msg.text,
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = Color.White,
-                        lineHeight = 22.sp
-                    )
+                if (message.text.isNotBlank()) {
+                    Text(text = message.text, style = MaterialTheme.typography.bodyLarge)
                 }
-            }
-        }
-        
-        Row(
-            modifier = Modifier.padding(top = 6.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            if (!msg.isMine) {
-                val mediumColor = if (msg.receiveMedium.contains("Wi-Fi")) com.example.testresqmesh.core.ui.theme.SuccessGreen else InboxAccentBlue
-                Text("📶 ${msg.receiveMedium}", style = MaterialTheme.typography.labelSmall, color = mediumColor.copy(alpha = 0.8f), fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                DotSeparator()
-                Text(msg.time, style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.5f), fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                DotSeparator()
-                Icon(Icons.Outlined.Lock, contentDescription = null, tint = Color.White.copy(alpha = 0.3f), modifier = Modifier.size(10.dp))
-                Spacer(modifier = Modifier.width(4.dp))
-                val hopsColor = if (msg.hops.contains("HOPPED")) Color(0xFFF59E0B) else Color.White.copy(alpha = 0.5f)
-                Text(msg.hops, style = MaterialTheme.typography.labelSmall, color = hopsColor, fontSize = 10.sp, fontWeight = FontWeight.Bold)
-            } else {
-                val statusText = when {
-                    msg.seenBy.isNotEmpty() -> "READ"
-                    msg.deliveredTo.isNotEmpty() -> "DELIVERED"
-                    else -> "SENT"
-                }
-                
-                val statusColor = when {
-                    msg.seenBy.isNotEmpty() -> com.example.testresqmesh.core.ui.theme.SuccessGreen
-                    else -> Color.White.copy(alpha = 0.7f)
-                }
-                
-                Text(statusText, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Black, color = statusColor, fontSize = 9.sp)
-                DotSeparator()
-                Icon(Icons.Outlined.Lock, contentDescription = null, tint = Color.White.copy(alpha = 0.3f), modifier = Modifier.size(10.dp))
-                Spacer(modifier = Modifier.width(4.dp))
-                Text(msg.hops, style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.5f), fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                DotSeparator()
-                Text(msg.time, style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.5f), fontSize = 10.sp, fontWeight = FontWeight.Bold)
-            }
-        }
-
-        // --- Visual Mesh Route Tracer UI ---
-        if (msg.hops.contains("HOPPED")) {
-            var showRoute by remember { mutableStateOf(false) }
-
-            Text(
-                "Trace Route 📍",
-                modifier = Modifier
-                    .padding(top = 4.dp)
-                    .clickable { showRoute = !showRoute },
-                style = MaterialTheme.typography.labelSmall,
-                color = InboxAccentBlue.copy(alpha = 0.8f),
-                fontWeight = FontWeight.Bold
-            )
-
-            if (showRoute) {
-                Surface(
-                    modifier = Modifier.padding(top = 8.dp).widthIn(max = 280.dp),
-                    color = Color.Black.copy(alpha = 0.3f),
-                    shape = RoundedCornerShape(8.dp),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.1f))
+                Spacer(Modifier.height(Spacing.ExtraSmall))
+                Row(
+                    modifier = Modifier.align(Alignment.End),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Column(modifier = Modifier.padding(12.dp)) {
-                        Text("Outbound Path:", color = Color.White.copy(alpha = 0.5f), fontSize = 9.sp, fontWeight = FontWeight.Black)
-                        val outboundStr = if (msg.outboundRoute.isNotEmpty()) msg.outboundRoute.joinToString(" -> ") else "Unknown"
-                        Text(outboundStr, color = Color.White, fontSize = 11.sp, modifier = Modifier.padding(bottom = 6.dp))
-
-                        Text("Return Receipt Path:", color = Color.White.copy(alpha = 0.5f), fontSize = 9.sp, fontWeight = FontWeight.Black)
-                        val returnStr = if (msg.returnRoute.isNotEmpty()) msg.returnRoute.joinToString(" -> ") else "Pending..."
-                        Text(returnStr, color = Color(0xFF10B981), fontSize = 11.sp)
+                    if (mine) {
+                        Text(
+                            text = deliveryLabel(message),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = contentColor.copy(alpha = 0.72f)
+                        )
+                        Spacer(Modifier.width(Spacing.Small))
                     }
+                    Text(
+                        text = messageTime(message.timestamp),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = contentColor.copy(alpha = 0.72f)
+                    )
                 }
             }
         }
@@ -413,8 +391,178 @@ fun HighFidelityChatBubble(msg: ChatMessageData, mediaHelper: MediaHelper, onVie
 }
 
 @Composable
-fun DotSeparator() {
-    Box(modifier = Modifier.padding(horizontal = 8.dp).size(3.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.3f)))
+private fun PrivateChatComposer(
+    draft: String,
+    onDraftChange: (String) -> Unit,
+    pendingImage: String?,
+    onImageSelected: (String) -> Unit,
+    onClearImage: () -> Unit,
+    pendingAudio: String?,
+    onClearAudio: () -> Unit,
+    isRecording: Boolean,
+    onToggleRecording: () -> Unit,
+    onSend: () -> Unit,
+    onSendLocation: () -> Unit,
+    mediaHelper: MediaHelper
+) {
+    val context = LocalContext.current
+    val imagePicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
+        uri?.let {
+            val bitmap = android.graphics.BitmapFactory.decodeStream(context.contentResolver.openInputStream(it))
+            if (bitmap != null) onImageSelected(mediaHelper.compressBitmapToBase64(bitmap))
+        }
+    }
+    val canSend = (draft.isNotBlank() || pendingImage != null || pendingAudio != null) && !isRecording
+
+    ResQGlassSurface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = Spacing.Small, vertical = Spacing.Small),
+        shape = RoundedCornerShape(28.dp),
+        contentPadding = PaddingValues(Spacing.Small),
+        shadowElevation = 18.dp
+    ) {
+        Column {
+            if (pendingImage != null || pendingAudio != null) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = if (pendingImage != null) stringResource(R.string.private_chat_photo) else stringResource(R.string.private_chat_voice_note),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.weight(1f)
+                    )
+                    IconButton(onClick = {
+                        if (pendingImage != null) onClearImage() else onClearAudio()
+                    }) {
+                        Icon(
+                            imageVector = Icons.Outlined.Close,
+                            contentDescription = stringResource(R.string.private_chat_remove_attachment)
+                        )
+                    }
+                }
+            }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                IconButton(onClick = { imagePicker.launch("image/*") }) {
+                    Icon(
+                        imageVector = Icons.Outlined.Image,
+                        contentDescription = stringResource(R.string.private_chat_add_image_action),
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                }
+                IconButton(onClick = onSendLocation) {
+                    Icon(
+                        imageVector = Icons.Outlined.LocationOn,
+                        contentDescription = stringResource(R.string.private_chat_share_location_action),
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                }
+                IconButton(onClick = onToggleRecording) {
+                    Icon(
+                        imageVector = if (isRecording) Icons.Outlined.Stop else Icons.Outlined.Mic,
+                        contentDescription = stringResource(
+                            if (isRecording) R.string.private_chat_stop_recording_action else R.string.private_chat_record_action
+                        ),
+                        tint = if (isRecording) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
+                    )
+                }
+                Surface(
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(48.dp),
+                    shape = RoundedCornerShape(20.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant
+                ) {
+                    BasicTextField(
+                        value = draft,
+                        onValueChange = onDraftChange,
+                        enabled = !isRecording,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(horizontal = Spacing.Medium, vertical = 13.dp),
+                        textStyle = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onSurface),
+                        decorationBox = { input ->
+                            if (draft.isEmpty() && !isRecording) {
+                                Text(
+                                    text = stringResource(R.string.private_chat_message_placeholder),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            input()
+                        }
+                    )
+                }
+                IconButton(onClick = onSend, enabled = canSend) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Outlined.Send,
+                        contentDescription = stringResource(R.string.private_chat_send_action),
+                        tint = if (canSend) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        }
+    }
 }
 
+@Composable
+private fun DeleteConversationDialog(
+    name: String,
+    onDismiss: () -> Unit,
+    onDelete: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.private_chat_delete_title)) },
+        text = { Text(stringResource(R.string.private_chat_delete_description, name)) },
+        confirmButton = {
+            Button(
+                onClick = onDelete,
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+            ) { Text(stringResource(R.string.private_chat_delete_confirm)) }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.private_chat_cancel_action)) }
+        }
+    )
+}
 
+internal enum class DeliveryFeedback {
+    Sent,
+    Delivered,
+    Read
+}
+
+internal fun deliveryFeedback(message: ChatMessage): DeliveryFeedback = when {
+    message.seenBy.isNotEmpty() -> DeliveryFeedback.Read
+    message.deliveredTo.isNotEmpty() -> DeliveryFeedback.Delivered
+    else -> DeliveryFeedback.Sent
+}
+
+@Composable
+internal fun deliveryLabel(message: ChatMessage): String = stringResource(
+    when (deliveryFeedback(message)) {
+        DeliveryFeedback.Sent -> R.string.private_chat_status_sent
+        DeliveryFeedback.Delivered -> R.string.private_chat_status_delivered
+        DeliveryFeedback.Read -> R.string.private_chat_status_read
+    }
+)
+
+internal fun messageTime(timestamp: Long): String =
+    SimpleDateFormat("h:mm a", Locale.getDefault()).format(Date(timestamp))
+
+@Preview(showBackground = true, widthDp = 390, heightDp = 844)
+@Composable
+private fun PrivateChatEmptyPreview() {
+    TestResQMeshTheme {
+        ResQAuroraBackground(Modifier.fillMaxSize()) {
+            ResQEmptyState(
+                title = "No messages yet",
+                message = "Say hello to start.",
+                modifier = Modifier.fillMaxSize()
+            )
+        }
+    }
+}

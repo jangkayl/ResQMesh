@@ -5,6 +5,11 @@ The UI uses Jetpack Compose and Material 3. Inspect the actual screen, ViewModel
 ## Component and state boundaries
 
 - Reuse shared components under `core/ui/components` and theme tokens before adding local styling.
+- The civilian-first system is light-only: a pale-white/lavender canvas, large near-black headings, purple emphasis, cyan identity accents, green truthful status banners, and raised white cards. Red is reserved for genuine emergency and destructive actions.
+- Use the reference-inspired mobile hierarchy: generous whitespace, strong left-aligned page titles, single-purpose circular or rounded-square actions, and a white capsule navigation dock with SOS floating above it. Do not preserve earlier screen layouts merely by recoloring them.
+- The visual system is stable across all supported Android versions and does not depend on system dark mode, blur, or other version-specific rendering effects.
+- New top-level screens use the reusable shell: Home, Messages, Walkie-talkie, and Network, with SOS as a persistent action rather than a navigation destination.
+- Shared controls use at least 48 dp touch targets, semantic shapes, and text or icon-independent status descriptions.
 - Keep business, routing, and transport decisions out of composables. ViewModels/use cases expose UI state and user actions.
 - Keep route-level composables responsible for state collection and side effects; move reusable stateless presentation into feature `ui/components` files.
 - Prefer immutable screen state and explicit loading, success, empty, warning, and error states.
@@ -41,6 +46,12 @@ Avoid showing “connected” from a BLE callback alone. Counters and selected p
 - Display newest events first. When the user scrolls into older events, pause live follow, show a new-event count, and provide controls to jump to Latest or the latest Sync event.
 - Keep heartbeat and relay chatter behind the Details control so connection state, setup failures, and topology changes remain readable by default. Last Sync is a one-time jump, not an instruction to resume live follow.
 
+## Hidden legacy UI restoration checklist
+
+- `OfflineMapPromptModal`, the legacy `RadarScreen`, and the debug terminal remain in source but are intentionally hidden from the current shell; do not delete their backing logic while the new design is evaluated.
+- Before restoring one, choose and document its user entry point, reconnect the existing callbacks without changing mesh policy, and retain its accessibility label.
+- Validate the restored flow's empty, permission-denied, and error states. For a transport-, SOS-, or location-driven screen, also run its corresponding focused phone test.
+
 ## Accessibility and interaction
 
 - Provide readable contrast, touch targets, content descriptions, and text equivalents for color/status indicators.
@@ -51,3 +62,5 @@ Avoid showing “connected” from a BLE callback alone. Counters and selected p
 ## Validation
 
 For UI-only presentation changes, run focused Compose/local checks where available and inspect affected states. For any label driven by BLE, route, key, delivery, or SOS behavior, use the corresponding physical test in `validation.md`; a screenshot alone cannot prove the underlying state is correct.
+
+The active civilian-first refactor is normally reviewed one screen at a time. The user may explicitly approve a continuous pass; phone review is still required before presentation behavior is accepted.
