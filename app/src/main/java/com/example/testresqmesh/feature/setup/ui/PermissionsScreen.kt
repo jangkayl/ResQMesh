@@ -14,7 +14,9 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bluetooth
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.WarningAmber
 import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.Security
 import androidx.compose.material3.Icon
@@ -41,11 +43,9 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import com.example.testresqmesh.R
 import com.example.testresqmesh.core.ui.components.buttons.ResQButton
-import com.example.testresqmesh.core.ui.components.feedback.ResQStateCard
-import com.example.testresqmesh.core.ui.components.feedback.ResQStatusChip
-import com.example.testresqmesh.core.ui.components.feedback.ResQStatusTone
 import com.example.testresqmesh.core.ui.components.layout.ResQAuroraBackground
 import com.example.testresqmesh.core.ui.components.layout.ResQGlassSurface
+import com.example.testresqmesh.core.ui.components.layout.ResQGradientOrb
 import com.example.testresqmesh.core.ui.theme.Spacing
 import com.example.testresqmesh.core.ui.theme.TestResQMeshTheme
 
@@ -116,6 +116,11 @@ private fun PermissionsContent(
         SetupAccessState.EnableHardware -> stringResource(R.string.permissions_recheck_action)
         SetupAccessState.Ready -> stringResource(R.string.permissions_continue_action)
     }
+    val heroIcon = when (state) {
+        SetupAccessState.RequestAccess -> Icons.Outlined.Security
+        SetupAccessState.EnableHardware -> Icons.Default.Bluetooth
+        SetupAccessState.Ready -> Icons.Default.Check
+    }
 
     ResQAuroraBackground(modifier = Modifier.fillMaxSize()) {
         Column(
@@ -125,27 +130,14 @@ private fun PermissionsContent(
                 .padding(horizontal = Spacing.Large, vertical = Spacing.ExtraLarge),
             horizontalAlignment = Alignment.Start
         ) {
-            Surface(
-                modifier = Modifier.size(72.dp),
-                shape = MaterialTheme.shapes.extraLarge,
-                color = MaterialTheme.colorScheme.primaryContainer
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Icon(
-                        imageVector = Icons.Outlined.Security,
-                        contentDescription = null,
-                        modifier = Modifier.size(32.dp),
-                        tint = MaterialTheme.colorScheme.primary
-                    )
-                }
-            }
-            Spacer(Modifier.height(Spacing.Large))
-            ResQStatusChip(
-                label = stringResource(
+            Text(
+                text = stringResource(
                     if (state == SetupAccessState.RequestAccess) R.string.permissions_step_one
                     else R.string.permissions_step_two
                 ),
-                tone = if (state == SetupAccessState.EnableHardware) ResQStatusTone.Warning else ResQStatusTone.Information
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.primary
             )
             Spacer(Modifier.height(Spacing.Medium))
             Text(
@@ -160,7 +152,33 @@ private fun PermissionsContent(
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
 
-            Spacer(Modifier.height(Spacing.ExtraLarge))
+            Spacer(Modifier.height(Spacing.Huge))
+            Box(
+                modifier = Modifier.fillMaxWidth(),
+                contentAlignment = Alignment.Center
+            ) {
+                Surface(
+                    modifier = Modifier.size(144.dp),
+                    shape = androidx.compose.foundation.shape.CircleShape,
+                    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.62f),
+                    border = androidx.compose.foundation.BorderStroke(
+                        1.dp,
+                        MaterialTheme.colorScheme.primary.copy(alpha = 0.18f)
+                    )
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        ResQGradientOrb(modifier = Modifier.size(96.dp)) {
+                            Icon(
+                                imageVector = heroIcon,
+                                contentDescription = null,
+                                modifier = Modifier.size(44.dp),
+                                tint = MaterialTheme.colorScheme.onPrimary
+                            )
+                        }
+                    }
+                }
+            }
+            Spacer(Modifier.height(Spacing.Huge))
             PermissionRequirementCard(
                 icon = Icons.Default.Bluetooth,
                 title = stringResource(R.string.permissions_bluetooth_title),
@@ -175,11 +193,7 @@ private fun PermissionsContent(
 
             if (state == SetupAccessState.EnableHardware) {
                 Spacer(Modifier.height(Spacing.Medium))
-                ResQStateCard(
-                    title = stringResource(R.string.permissions_hardware_warning_title),
-                    message = stringResource(R.string.permissions_hardware_warning_description),
-                    tone = ResQStatusTone.Warning
-                )
+                HardwareWarning()
             }
 
             Spacer(Modifier.height(Spacing.Medium))
@@ -233,13 +247,21 @@ private fun PermissionRequirementCard(
             Surface(
                 modifier = Modifier.size(48.dp),
                 shape = MaterialTheme.shapes.small,
-                color = MaterialTheme.colorScheme.primaryContainer
+                color = if (icon == Icons.Default.Bluetooth) {
+                    MaterialTheme.colorScheme.secondaryContainer
+                } else {
+                    MaterialTheme.colorScheme.primaryContainer
+                }
             ) {
                 androidx.compose.foundation.layout.Box(contentAlignment = Alignment.Center) {
                     Icon(
                         imageVector = icon,
                         contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onPrimaryContainer
+                        tint = if (icon == Icons.Default.Bluetooth) {
+                            MaterialTheme.colorScheme.secondary
+                        } else {
+                            MaterialTheme.colorScheme.primary
+                        }
                     )
                 }
             }
@@ -250,6 +272,41 @@ private fun PermissionRequirementCard(
                     text = description,
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun HardwareWarning() {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.large,
+        color = com.example.testresqmesh.core.ui.theme.ResQTheme.colors.warningContainer
+    ) {
+        androidx.compose.foundation.layout.Row(
+            modifier = Modifier.padding(Spacing.Medium),
+            horizontalArrangement = Arrangement.spacedBy(Spacing.Small),
+            verticalAlignment = Alignment.Top
+        ) {
+            Icon(
+                imageVector = Icons.Default.WarningAmber,
+                contentDescription = null,
+                tint = com.example.testresqmesh.core.ui.theme.ResQTheme.colors.warning
+            )
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = stringResource(R.string.permissions_hardware_warning_title),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = com.example.testresqmesh.core.ui.theme.ResQTheme.colors.onWarningContainer
+                )
+                Spacer(Modifier.height(Spacing.ExtraSmall))
+                Text(
+                    text = stringResource(R.string.permissions_hardware_warning_description),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = com.example.testresqmesh.core.ui.theme.ResQTheme.colors.onWarningContainer
                 )
             }
         }
