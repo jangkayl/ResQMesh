@@ -7,7 +7,7 @@ Baseline: branch `temp`, HEAD `d7cd5e3`, with substantial uncommitted Android, t
 
 Preserve the physically validated two-phone BLE/L2CAP improvement, then address the separate asymmetric block-policy defect and finish the remaining ownership, queue-bound, and framing work before broader multi-phone expansion.
 
-In parallel, the civilian-first UI refactor is proceeding through explicit review gates. User review reset the visual direction to ResQ Aurora Glass before Home work began. The revised foundation adds lavender/cyan aurora backgrounds, cross-version glass surfaces, larger curvature, gradient actions, a floating capsule dock, and responsive SOS motion. It is awaiting approval before Splash, Permissions, and Identity Setup are restyled in that order.
+In parallel, the civilian-first UI refactor is proceeding through explicit review gates. User review reset the visual direction to ResQ Aurora Glass before Home work began. The revised foundation adds lavender/cyan aurora backgrounds, cross-version glass surfaces, larger curvature, gradient actions, a floating capsule dock, and responsive SOS motion. The Aurora Glass Splash screen is complete and awaiting review; Permissions and Identity Setup remain pending and will not begin without approval.
 
 ## Implemented in the working tree
 
