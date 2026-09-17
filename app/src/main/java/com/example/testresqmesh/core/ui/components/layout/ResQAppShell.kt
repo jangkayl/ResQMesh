@@ -89,15 +89,16 @@ private fun ResQBottomBar(
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(132.dp)
-            .padding(horizontal = Spacing.Large, vertical = Spacing.Medium),
+            .height(160.dp)
+            .padding(horizontal = Spacing.Large),
         contentAlignment = Alignment.Center
     ) {
         ResQGlassSurface(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(72.dp)
-                .align(Alignment.BottomCenter),
+                .align(Alignment.BottomCenter)
+                .padding(bottom = Spacing.Medium),
             shape = RoundedCornerShape(40.dp),
             shadowElevation = 18.dp,
             contentAlignment = Alignment.Center
@@ -131,7 +132,7 @@ private fun ResQBottomBar(
             enabled = sosEnabled,
             modifier = Modifier
                 .align(Alignment.TopEnd)
-                .padding(end = Spacing.Small)
+                .padding(top = Spacing.Small, end = Spacing.Small)
         )
     }
 }
