@@ -14,13 +14,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.clickable
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.ChatBubbleOutline
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Hub
 import androidx.compose.material.icons.outlined.Mic
-import androidx.compose.material.icons.outlined.WarningAmber
 import androidx.compose.material.icons.outlined.SignalWifiStatusbarConnectedNoInternet4
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -29,17 +28,9 @@ import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
@@ -49,10 +40,8 @@ import com.example.testresqmesh.core.ui.components.feedback.ResQStateCard
 import com.example.testresqmesh.core.ui.components.feedback.ResQStatusChip
 import com.example.testresqmesh.core.ui.components.feedback.ResQStatusTone
 import com.example.testresqmesh.core.ui.theme.Spacing
-import com.example.testresqmesh.core.ui.theme.ResQTheme
 import com.example.testresqmesh.core.ui.theme.TestResQMeshTheme
 import androidx.compose.ui.graphics.Color
-import kotlinx.coroutines.delay
 
 enum class ResQDestination(
     @StringRes val labelRes: Int,
@@ -133,14 +122,14 @@ private fun ResQBottomBar(
                     selected = selectedDestination == ResQDestination.Messages,
                     onClick = { onDestinationSelected(ResQDestination.Messages) }
                 )
+                SosNavigationItem(
+                    onClick = onSosActivated,
+                    enabled = sosEnabled
+                )
                 ResQNavigationItem(
                     destination = ResQDestination.WalkieTalkie,
                     selected = selectedDestination == ResQDestination.WalkieTalkie,
                     onClick = { onDestinationSelected(ResQDestination.WalkieTalkie) }
-                )
-                SosNavigationItem(
-                    onHoldComplete = onSosActivated,
-                    enabled = sosEnabled
                 )
                 ResQNavigationItem(
                     destination = ResQDestination.Network,
@@ -175,49 +164,21 @@ private fun androidx.compose.foundation.layout.RowScope.ResQNavigationItem(
 
 @Composable
 private fun androidx.compose.foundation.layout.RowScope.SosNavigationItem(
-    onHoldComplete: () -> Unit,
+    onClick: () -> Unit,
     enabled: Boolean
 ) {
-    val haptics = LocalHapticFeedback.current
-    var pressed by remember { mutableStateOf(false) }
-    var completed by remember { mutableStateOf(false) }
-    LaunchedEffect(pressed, enabled) {
-        if (pressed && enabled) {
-            completed = false
-            delay(2_000)
-            if (pressed && !completed) {
-                completed = true
-                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                onHoldComplete()
-            }
-        } else {
-            completed = false
-        }
-    }
     Box(
         modifier = Modifier
             .weight(1f)
             .fillMaxSize()
-            .pointerInput(enabled) {
-                detectTapGestures(
-                    onPress = {
-                        if (!enabled) return@detectTapGestures
-                        pressed = true
-                        try {
-                            tryAwaitRelease()
-                        } finally {
-                            pressed = false
-                        }
-                    }
-                )
-            },
+            .then(if (enabled) Modifier.clickable(onClick = onClick) else Modifier),
         contentAlignment = Alignment.Center
     ) {
-        Icon(
-            imageVector = Icons.Outlined.WarningAmber,
-            contentDescription = "Hold SOS for two seconds",
-            tint = if (enabled) ResQTheme.colors.sos else MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(24.dp)
+        Text(
+            text = "SOS",
+            color = if (enabled) Color(0xFFE5484D) else MaterialTheme.colorScheme.onSurfaceVariant,
+            style = MaterialTheme.typography.labelLarge,
+            fontWeight = FontWeight.Black
         )
     }
 }
