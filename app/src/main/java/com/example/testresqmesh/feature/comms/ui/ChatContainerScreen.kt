@@ -86,6 +86,7 @@ fun ChatContainerScreen(
             NewMessageModal(
                 uiState = uiState,
                 onDismiss = { showNewMessageModal = false },
+                onRefresh = viewModel::rescan,
                 onNodeSelected = {
                     showNewMessageModal = false
                     onChatSelected(it)

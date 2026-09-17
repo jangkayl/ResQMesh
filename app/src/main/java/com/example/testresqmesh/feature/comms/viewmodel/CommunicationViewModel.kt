@@ -38,6 +38,10 @@ class CommunicationViewModel(
         useCases.setChannel(channelId)
     }
 
+    fun rescan() {
+        useCases.rescan()
+    }
+
     init {
         viewModelScope.launch {
             useCases.observePublicMessages().collect { messages ->
@@ -58,6 +62,16 @@ class CommunicationViewModel(
         viewModelScope.launch {
             useCases.observeKnownNodes().collect { nodes ->
                 _uiState.update { it.copy(knownNodes = nodes) }
+            }
+        }
+        viewModelScope.launch {
+            useCases.observeScannedDevices().collect { devices ->
+                _uiState.update { it.copy(scannedDevices = devices) }
+            }
+        }
+        viewModelScope.launch {
+            useCases.observeBlockedDeviceNames().collect { blocked ->
+                _uiState.update { it.copy(blockedDeviceNames = blocked) }
             }
         }
     }

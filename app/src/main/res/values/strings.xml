@@ -78,4 +78,20 @@
     <string name="messages_status_relayed">Relayed</string>
     <string name="messages_status_offline">Offline</string>
     <string name="messages_attachment_preview">Attachment</string>
+    <string name="new_message_title">New message</string>
+    <string name="new_message_description">Choose a person.</string>
+    <string name="new_message_close_action">Close</string>
+    <string name="new_message_search_placeholder">Search people</string>
+    <string name="new_message_people_section">People</string>
+    <string name="new_message_refresh_action">Refresh people</string>
+    <string name="new_message_empty_title">No people found</string>
+    <string name="new_message_empty_description">Try again in a moment.</string>
+    <string name="new_message_choose_recipient">Choose %1$s</string>
+    <string name="recipient_status_direct">Direct</string>
+    <string name="recipient_status_checking">Checking</string>
+    <string name="recipient_status_relayed">Relayed</string>
+    <string name="recipient_status_nearby">Nearby</string>
+    <string name="recipient_status_connecting">Connecting</string>
+    <string name="recipient_status_offline">Offline</string>
+    <string name="recipient_status_blocked">Blocked</string>
 </resources>
