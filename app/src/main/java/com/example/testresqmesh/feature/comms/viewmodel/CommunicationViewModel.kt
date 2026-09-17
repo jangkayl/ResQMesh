@@ -2,6 +2,8 @@ package com.example.testresqmesh.feature.comms.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.testresqmesh.BuildConfig
+import com.example.testresqmesh.core.model.ChatMessage
 import com.example.testresqmesh.core.model.ConnectedDevice
 import com.example.testresqmesh.data.repository.MeshRepository
 import com.example.testresqmesh.ui.state.ChatUiState
@@ -17,6 +19,51 @@ class CommunicationViewModel(
     private val useCases: com.example.testresqmesh.core.domain.usecase.MeshUseCases,
     private val locationClient: com.example.testresqmesh.core.location.LocationClient
 ) : ViewModel() {
+
+    // Visual samples make the debug build reviewable without inventing transport activity.
+    // Real repository data replaces each sample group as soon as it is available.
+    private val sampleTimestamp = System.currentTimeMillis()
+    private val samplePublicMessages = listOf(
+        ChatMessage(
+            id = "sample-public-1",
+            senderName = "Community sample",
+            text = "Sample: Check in if you are safe.",
+            imageBase64 = null,
+            audioBase64 = null,
+            isMine = false,
+            timestamp = sampleTimestamp - 120_000L
+        )
+    )
+    private val samplePrivateMessages = mapOf(
+        "Alex (sample)" to listOf(
+            ChatMessage(
+                id = "sample-private-1",
+                senderName = "Alex (sample)",
+                text = "Sample: I am nearby and available.",
+                imageBase64 = null,
+                audioBase64 = null,
+                isMine = false,
+                isPrivate = true,
+                timestamp = sampleTimestamp - 300_000L
+            ),
+            ChatMessage(
+                id = "sample-private-2",
+                senderName = "Me",
+                text = "Sample: Thanks for checking in.",
+                imageBase64 = null,
+                audioBase64 = null,
+                isMine = true,
+                isPrivate = true,
+                timestamp = sampleTimestamp - 180_000L
+            )
+        )
+    )
+
+    private fun visiblePublicMessages(messages: List<ChatMessage>): List<ChatMessage> =
+        if (BuildConfig.DEBUG && messages.isEmpty()) samplePublicMessages else messages
+
+    private fun visiblePrivateMessages(messages: Map<String, List<ChatMessage>>): Map<String, List<ChatMessage>> =
+        if (BuildConfig.DEBUG && messages.isEmpty()) samplePrivateMessages else messages
 
     private val _uiState = MutableStateFlow(ChatUiState())
     val uiState: StateFlow<ChatUiState> = _uiState.asStateFlow()
@@ -47,12 +94,12 @@ class CommunicationViewModel(
     init {
         viewModelScope.launch {
             useCases.observePublicMessages().collect { messages ->
-                _uiState.update { it.copy(publicMessages = messages) }
+                _uiState.update { it.copy(publicMessages = visiblePublicMessages(messages)) }
             }
         }
         viewModelScope.launch {
             useCases.observePrivateMessages().collect { messagesMap ->
-                _uiState.update { it.copy(privateMessages = messagesMap) }
+                _uiState.update { it.copy(privateMessages = visiblePrivateMessages(messagesMap)) }
             }
         }
         viewModelScope.launch {
