@@ -4,6 +4,23 @@ import androidx.compose.ui.graphics.Color
 
 // Civilian-first semantic palette. Screens should prefer MaterialTheme colors and
 // ResQExtendedColors instead of referencing these primitives directly.
+val AuroraPurple800 = Color(0xFF4C1D95)
+val AuroraPurple700 = Color(0xFF5B21B6)
+val AuroraPurple600 = Color(0xFF7C3AED)
+val AuroraPurple500 = Color(0xFF8B5CF6)
+val AuroraPurple300 = Color(0xFFC4B5FD)
+val AuroraPurple100 = Color(0xFFEDE9FE)
+val AuroraPurple50 = Color(0xFFF7F5FF)
+
+val AuroraCyan600 = Color(0xFF0891B2)
+val AuroraCyan500 = Color(0xFF06B6D4)
+val AuroraCyan200 = Color(0xFFA5F3FC)
+
+val AuroraCanvasLight = Color(0xFFF8F7FF)
+val AuroraCanvasLightEnd = Color(0xFFEEF4FF)
+val AuroraCanvasDark = Color(0xFF090D1A)
+val AuroraCanvasDarkEnd = Color(0xFF151A30)
+
 val ResQBlue700 = Color(0xFF155E75)
 val ResQBlue600 = Color(0xFF0E7490)
 val ResQBlue300 = Color(0xFF67E8F9)

@@ -10,16 +10,16 @@ val Typography = Typography(
     displayLarge = TextStyle(
         fontFamily = FontFamily.Default,
         fontWeight = FontWeight.Bold,
-        fontSize = 36.sp,
-        lineHeight = 44.sp,
-        letterSpacing = 0.sp
+        fontSize = 40.sp,
+        lineHeight = 46.sp,
+        letterSpacing = (-0.6).sp
     ),
     headlineMedium = TextStyle(
         fontFamily = FontFamily.Default,
         fontWeight = FontWeight.SemiBold,
-        fontSize = 24.sp,
+        fontSize = 26.sp,
         lineHeight = 32.sp,
-        letterSpacing = 0.sp
+        letterSpacing = (-0.25).sp
     ),
     titleLarge = TextStyle(
         fontFamily = FontFamily.Default,

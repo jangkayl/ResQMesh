@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import com.example.testresqmesh.core.ui.theme.ResQTheme
 
 @Composable
 fun ResQTextField(
@@ -30,11 +31,14 @@ fun ResQTextField(
         isError = isError,
         enabled = enabled,
         singleLine = singleLine,
-        shape = MaterialTheme.shapes.small,
+        shape = MaterialTheme.shapes.extraLarge,
         colors = OutlinedTextFieldDefaults.colors(
             focusedBorderColor = MaterialTheme.colorScheme.primary,
-            unfocusedBorderColor = MaterialTheme.colorScheme.outline,
-            errorBorderColor = MaterialTheme.colorScheme.error
+            unfocusedBorderColor = ResQTheme.colors.glassBorder,
+            errorBorderColor = MaterialTheme.colorScheme.error,
+            focusedContainerColor = ResQTheme.colors.glassFill,
+            unfocusedContainerColor = ResQTheme.colors.glassFill,
+            disabledContainerColor = ResQTheme.colors.glassFill.copy(alpha = 0.48f)
         ),
         supportingText = errorMessage?.let { { Text(it, color = MaterialTheme.colorScheme.error) } }
     )

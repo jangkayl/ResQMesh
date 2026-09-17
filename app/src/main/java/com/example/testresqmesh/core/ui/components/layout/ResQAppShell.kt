@@ -18,14 +18,12 @@ import androidx.compose.material.icons.outlined.ChatBubbleOutline
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Hub
 import androidx.compose.material.icons.outlined.SignalWifiStatusbarConnectedNoInternet4
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -43,6 +41,7 @@ import com.example.testresqmesh.core.ui.components.feedback.ResQStatusTone
 import com.example.testresqmesh.core.ui.theme.ResQSize
 import com.example.testresqmesh.core.ui.theme.Spacing
 import com.example.testresqmesh.core.ui.theme.TestResQMeshTheme
+import androidx.compose.ui.graphics.Color
 
 enum class ResQDestination(
     @StringRes val labelRes: Int,
@@ -62,19 +61,21 @@ fun ResQAppShell(
     sosEnabled: Boolean = true,
     content: @Composable (PaddingValues) -> Unit
 ) {
-    Scaffold(
-        modifier = modifier,
-        containerColor = MaterialTheme.colorScheme.background,
-        bottomBar = {
-            ResQBottomBar(
-                selectedDestination = selectedDestination,
-                onDestinationSelected = onDestinationSelected,
-                onSosActivated = onSosActivated,
-                sosEnabled = sosEnabled
-            )
-        },
-        content = content
-    )
+    ResQAuroraBackground(modifier = modifier.fillMaxSize()) {
+        Scaffold(
+            modifier = Modifier.fillMaxSize(),
+            containerColor = Color.Transparent,
+            bottomBar = {
+                ResQBottomBar(
+                    selectedDestination = selectedDestination,
+                    onDestinationSelected = onDestinationSelected,
+                    onSosActivated = onSosActivated,
+                    sosEnabled = sosEnabled
+                )
+            },
+            content = content
+        )
+    }
 }
 
 @Composable
@@ -84,15 +85,25 @@ private fun ResQBottomBar(
     onSosActivated: () -> Unit,
     sosEnabled: Boolean
 ) {
-    Surface(
-        color = MaterialTheme.colorScheme.surface,
-        tonalElevation = 3.dp
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = Spacing.Medium, vertical = 10.dp),
+        contentAlignment = Alignment.Center
     ) {
-        Column {
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+        ResQGlassSurface(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(82.dp),
+            shape = MaterialTheme.shapes.extraLarge,
+            shadowElevation = 22.dp,
+            contentAlignment = Alignment.Center
+        ) {
             NavigationBar(
-                modifier = Modifier.height(ResQSize.BottomBarHeight),
-                containerColor = MaterialTheme.colorScheme.surface,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(ResQSize.BottomBarHeight),
+                containerColor = Color.Transparent,
                 tonalElevation = 0.dp
             ) {
                 ResQNavigationItem(
@@ -144,7 +155,7 @@ private fun androidx.compose.foundation.layout.RowScope.ResQNavigationItem(
         colors = NavigationBarItemDefaults.colors(
             selectedIconColor = MaterialTheme.colorScheme.primary,
             selectedTextColor = MaterialTheme.colorScheme.primary,
-            indicatorColor = MaterialTheme.colorScheme.primaryContainer,
+            indicatorColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.72f),
             unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
             unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant
         )
