@@ -192,7 +192,13 @@ class NativeBleManager(val context: Context) {
         onFlightRemoved = { endpoint -> heartbeatCoordinator.remove(endpoint) },
         isCurrentLink = { link -> store.links.isCurrent(link) },
         disconnectClient = ::forceGattDisconnect,
-        disconnectServer = { device -> gattServer?.cancelConnection(device) },
+        disconnectServer = { device ->
+            try {
+                gattServer?.cancelConnection(device)
+            } catch (e: SecurityException) {
+                AppLogger.d("BLE_MESH", "SERVER transfer cleanup skipped: BLUETOOTH_CONNECT was revoked")
+            }
+        },
         chunkTimeoutMs = GATT_CHUNK_TIMEOUT_MS
     )
     private val l2capTransport = L2capTransport(

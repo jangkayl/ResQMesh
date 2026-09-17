@@ -86,32 +86,38 @@ class GattTransferExecutor(
         val mtu = (store.connectionMtu[endpoint] ?: 20).coerceAtLeast(1)
         val chunk = flight.transfer.frame.copyOfRange(flight.offset, flight.offset + minOf(mtu, remaining))
         val operationId = coordinator.beginChunk(flight, chunk.size)
-        val initiated = if (flight.link.role == BleLinkRole.CLIENT) {
-            val gatt = flight.gatt
-            val characteristic = gatt?.getService(serviceUuid)?.getCharacteristic(receiveCharacteristicUuid)
-            if (gatt == null || characteristic == null || store.activeConnections[endpoint] !== gatt) false
-            else if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
-                gatt.writeCharacteristic(
-                    characteristic,
-                    chunk,
-                    android.bluetooth.BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
-                ) == android.bluetooth.BluetoothStatusCodes.SUCCESS
+        val initiated = try {
+            if (flight.link.role == BleLinkRole.CLIENT) {
+                val gatt = flight.gatt
+                val characteristic = gatt?.getService(serviceUuid)?.getCharacteristic(receiveCharacteristicUuid)
+                if (gatt == null || characteristic == null || store.activeConnections[endpoint] !== gatt) false
+                else if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+                    gatt.writeCharacteristic(
+                        characteristic,
+                        chunk,
+                        android.bluetooth.BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
+                    ) == android.bluetooth.BluetoothStatusCodes.SUCCESS
+                } else {
+                    characteristic.writeType = android.bluetooth.BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
+                    characteristic.value = chunk
+                    gatt.writeCharacteristic(characteristic)
+                }
             } else {
-                characteristic.writeType = android.bluetooth.BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
-                characteristic.value = chunk
-                gatt.writeCharacteristic(characteristic)
+                val device = flight.serverDevice
+                val characteristic = gattServer()?.getService(serviceUuid)?.getCharacteristic(transmitCharacteristicUuid)
+                if (device == null || characteristic == null || store.activeServerConnections[endpoint] !== device) false
+                else if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+                    gattServer()?.notifyCharacteristicChanged(device, characteristic, true, chunk) ==
+                        android.bluetooth.BluetoothStatusCodes.SUCCESS
+                } else {
+                    characteristic.value = chunk
+                    gattServer()?.notifyCharacteristicChanged(device, characteristic, true) == true
+                }
             }
-        } else {
-            val device = flight.serverDevice
-            val characteristic = gattServer()?.getService(serviceUuid)?.getCharacteristic(transmitCharacteristicUuid)
-            if (device == null || characteristic == null || store.activeServerConnections[endpoint] !== device) false
-            else if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
-                gattServer()?.notifyCharacteristicChanged(device, characteristic, true, chunk) ==
-                    android.bluetooth.BluetoothStatusCodes.SUCCESS
-            } else {
-                characteristic.value = chunk
-                gattServer()?.notifyCharacteristicChanged(device, characteristic, true) == true
-            }
+        } catch (e: SecurityException) {
+            AppLogger.d("BLE_MESH", "Link ${flight.link.generation} $endpoint: GATT initiation skipped because BLUETOOTH_CONNECT was revoked")
+            fail(flight, "Bluetooth permission revoked before GATT initiation")
+            return
         }
         if (!initiated) {
             if (coordinator.recordInitiationRejected(flight, MAX_INITIATION_ATTEMPTS)) {

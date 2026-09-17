@@ -124,8 +124,12 @@ class BlePeerAdmissionController(
             .filterKeys { store.activeConnections.containsKey(it) }
             .filterKeys { store.pendingQueues[it]?.isEmpty() != false }
             .minByOrNull { it.value }?.key ?: return
-        store.activeConnections[lruEndpoint]?.disconnect()
-        store.activeConnections[lruEndpoint]?.close()
+        try {
+            store.activeConnections[lruEndpoint]?.disconnect()
+            store.activeConnections[lruEndpoint]?.close()
+        } catch (e: SecurityException) {
+            AppLogger.d("BLE_MESH", "Orphan preemption could not close $lruEndpoint: BLUETOOTH_CONNECT was revoked")
+        }
         store.activeConnections.remove(lruEndpoint)
         store.pendingQueues.remove(lruEndpoint)
         store.isWriting.remove(lruEndpoint)

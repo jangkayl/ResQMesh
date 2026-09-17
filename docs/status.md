@@ -20,6 +20,7 @@ Make blocking reliably mutual across relays: deny direct links after identity, s
 - Direct-link admission now consistently uses three distinct neighbors; meshes larger than four devices depend on routed hops rather than a full direct-link graph.
 - A nearby routed peer is normally kept on its existing mesh path, avoiding redundant direct ACL churn. If no payload-ready direct neighbor remains, admission may bootstrap one direct link; explicit Radar **Connect Directly** uses the same block, duplicate, and capacity guards.
 - L2CAP socket identity checks, failure retirement, and GATT retry/fallback behavior.
+- Runtime `BLUETOOTH_CONNECT` revocation during orphan preemption or GATT transfer initiation now fails the affected operation safely instead of crashing the process.
 - Persistent Android Keystore RSA identity, fail-closed private sending, endpoint-aware key cache rules, encrypted private locations, and removal of private plaintext logging in the reviewed handlers.
 - Focused unit tests for link lifecycle, liveness, heartbeat ownership, and private-message policy.
 - Coordinators own GATT-flight/heartbeat state; shared framing rejects malformed or oversized payloads; pending GATT work is capped at 128 transfers per endpoint. Repository gateway/store boundaries hide Bluetooth/Room, while Active Chat and Radar models are separated without public UI changes.
