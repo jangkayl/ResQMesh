@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
@@ -68,6 +69,12 @@ fun PublicChatTab(
     val photoText = stringResource(R.string.private_chat_photo)
     val sortedMessages = remember(uiState.publicMessages) {
         uiState.publicMessages.sortedByDescending { it.timestamp }
+    }
+    val listState = rememberLazyListState()
+    val latestMessageId = sortedMessages.firstOrNull()?.id
+
+    LaunchedEffect(latestMessageId) {
+        if (latestMessageId != null) listState.scrollToItem(0)
     }
 
     ResQAuroraBackground(Modifier.fillMaxSize()) {
@@ -137,6 +144,7 @@ fun PublicChatTab(
                 )
             } else {
                 LazyColumn(
+                    state = listState,
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(innerPadding),
@@ -146,7 +154,7 @@ fun PublicChatTab(
                         end = Spacing.Large,
                         bottom = Spacing.Large
                     ),
-                    verticalArrangement = Arrangement.spacedBy(Spacing.Small),
+                    verticalArrangement = Arrangement.spacedBy(Spacing.Small, Alignment.Bottom),
                     reverseLayout = true
                 ) {
                     items(sortedMessages, key = { it.id }) { message ->

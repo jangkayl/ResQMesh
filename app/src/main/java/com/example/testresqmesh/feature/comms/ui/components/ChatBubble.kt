@@ -3,6 +3,7 @@ package com.example.testresqmesh.feature.comms.ui.components
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -25,6 +26,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
@@ -38,6 +40,7 @@ import com.example.testresqmesh.core.ui.theme.Spacing
 import com.example.testresqmesh.core.utils.MediaHelper
 import com.example.testresqmesh.feature.comms.ui.deliveryLabel
 import com.example.testresqmesh.feature.comms.ui.messageTime
+import kotlin.math.absoluteValue
 
 @Composable
 fun ChatBubble(message: ChatMessage, mediaHelper: MediaHelper) {
@@ -157,5 +160,41 @@ fun ChatBubble(message: ChatMessage, mediaHelper: MediaHelper) {
                 }
             }
         }
+        if (mine && message.seenBy.isNotEmpty()) {
+            Row(
+                modifier = Modifier.padding(top = Spacing.ExtraSmall, end = Spacing.ExtraSmall),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                message.seenBy.distinct().take(3).forEachIndexed { index, reader ->
+                    if (index > 0) Spacer(Modifier.width(2.dp))
+                    Surface(
+                        modifier = Modifier.size(18.dp),
+                        shape = CircleShape,
+                        color = communityReaderColor(reader)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Text(
+                                text = reader.take(1).uppercase(),
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White
+                            )
+                        }
+                    }
+                }
+                val additionalReaders = message.seenBy.distinct().size - 3
+                if (additionalReaders > 0) {
+                    Text(
+                        text = "+$additionalReaders",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(start = Spacing.ExtraSmall)
+                    )
+                }
+            }
+        }
     }
 }
+
+private fun communityReaderColor(reader: String): Color =
+    Color.hsv((reader.hashCode().absoluteValue % 360).toFloat(), 0.6f, 0.8f)

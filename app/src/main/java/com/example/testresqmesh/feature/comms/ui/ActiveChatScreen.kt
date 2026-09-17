@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -103,6 +104,7 @@ fun ActiveChatScreen(
     val voiceNoteText = stringResource(R.string.private_chat_voice_note)
     val photoText = stringResource(R.string.private_chat_photo)
     val listState = rememberLazyListState()
+    val latestMessageId = sortedMessages.firstOrNull()?.id
     val snackbarHostState = remember { SnackbarHostState() }
     var pendingImage by remember { mutableStateOf<String?>(null) }
     var pendingAudio by remember { mutableStateOf<String?>(null) }
@@ -111,6 +113,10 @@ fun ActiveChatScreen(
 
     LaunchedEffect(viewModel) {
         viewModel.privateSendErrors.collect { snackbarHostState.showSnackbar(it) }
+    }
+
+    LaunchedEffect(latestMessageId) {
+        if (latestMessageId != null) listState.scrollToItem(0)
     }
 
     if (showDeleteDialog) {
@@ -210,7 +216,7 @@ fun ActiveChatScreen(
                         end = Spacing.Large,
                         bottom = Spacing.Large
                     ),
-                    verticalArrangement = Arrangement.spacedBy(Spacing.Small),
+                    verticalArrangement = Arrangement.spacedBy(Spacing.Small, Alignment.Bottom),
                     reverseLayout = true
                 ) {
                     items(sortedMessages, key = { it.id }) { message ->
@@ -417,6 +423,7 @@ private fun PrivateChatComposer(
     ResQGlassSurface(
         modifier = Modifier
             .fillMaxWidth()
+            .imePadding()
             .padding(horizontal = Spacing.Small, vertical = Spacing.Small),
         shape = RoundedCornerShape(28.dp),
         contentPadding = PaddingValues(Spacing.Small),

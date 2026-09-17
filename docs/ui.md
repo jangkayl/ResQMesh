@@ -57,6 +57,7 @@ Avoid showing “connected” from a BLE callback alone. Counters and selected p
 - Provide readable contrast, touch targets, content descriptions, and text equivalents for color/status indicators.
 - Keep error and recovery messages actionable and concise.
 - Preserve user drafts when a recoverable send fails.
+- Active public and private conversations anchor the latest messages above the composer, keep it above the IME, and follow the newest message when the conversation changes. Sent community bubbles show reader circles only from recorded `seenBy` receipts.
 - Avoid rapid status flicker; state transitions should follow repository/link evidence rather than raw scan churn.
 
 ## Validation

@@ -26,6 +26,7 @@ Make blocking reliably mutual across relays: deny direct links after identity, s
 - Coordinators own GATT-flight/heartbeat state; shared framing rejects malformed or oversized payloads; pending GATT work is capped at 128 transfers per endpoint. Repository gateway/store boundaries hide Bluetooth/Room, while Active Chat and Radar models are separated without public UI changes.
 - BLE radio, GATT transfer, L2CAP socket, lifecycle/watchdog, and peer-admission work live in focused collaborators; `NativeBleManager` remains the public policy facade. Samsung and five-device smoke success are user-reported; recorded device evidence is still pending.
 - The diagnostic terminal uses structured events, a live direct-link summary, paused-follow scrolling, and Latest/Last Sync controls. Device validation must confirm that its lifecycle matches the phones.
+- Active public and private chats anchor the latest messages above the keyboard, automatically return to them, and show recorded community reader circles; phone interaction validation is pending.
 - Lean pull-request CI for the debug build, unit tests, error-free Android Lint, canonical-document checks, and diff hygiene; PR creation and merging remain explicit user actions.
 
 Local checks passed; physical BLE validation remains required.
