@@ -148,7 +148,7 @@ private fun SplashContent(loadingProgress: Float) {
                 )
                 Spacer(Modifier.height(Spacing.Small))
                 Text(
-                    text = stringResource(R.string.splash_description),
+                    text = stringResource(R.string.onboarding_splash_description),
                     modifier = Modifier.fillMaxWidth(),
                     style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,

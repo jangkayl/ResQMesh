@@ -31,7 +31,7 @@ class PermissionsScreenTest {
 
         composeRule.onNodeWithText("Allow essential access").assertIsDisplayed()
         composeRule.onNodeWithText("Nearby devices").assertIsDisplayed()
-        composeRule.onNodeWithText("Continue to permissions").performClick()
+        composeRule.onNodeWithText("Allow access").performClick()
 
         composeRule.runOnIdle { assertEquals(1, requests) }
     }

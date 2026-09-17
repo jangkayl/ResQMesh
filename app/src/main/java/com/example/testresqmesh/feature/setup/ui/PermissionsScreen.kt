@@ -107,12 +107,12 @@ private fun PermissionsContent(
         SetupAccessState.Ready -> stringResource(R.string.permissions_ready_title)
     }
     val description = when (state) {
-        SetupAccessState.RequestAccess -> stringResource(R.string.permissions_access_description)
-        SetupAccessState.EnableHardware -> stringResource(R.string.permissions_hardware_description)
-        SetupAccessState.Ready -> stringResource(R.string.permissions_ready_description)
+        SetupAccessState.RequestAccess -> stringResource(R.string.onboarding_permissions_access_description)
+        SetupAccessState.EnableHardware -> stringResource(R.string.onboarding_permissions_hardware_description)
+        SetupAccessState.Ready -> stringResource(R.string.onboarding_permissions_ready_description)
     }
     val buttonLabel = when (state) {
-        SetupAccessState.RequestAccess -> stringResource(R.string.permissions_allow_action)
+        SetupAccessState.RequestAccess -> stringResource(R.string.onboarding_permissions_allow_action)
         SetupAccessState.EnableHardware -> stringResource(R.string.permissions_recheck_action)
         SetupAccessState.Ready -> stringResource(R.string.permissions_continue_action)
     }
@@ -182,13 +182,13 @@ private fun PermissionsContent(
             PermissionRequirementCard(
                 icon = Icons.Default.Bluetooth,
                 title = stringResource(R.string.permissions_bluetooth_title),
-                description = stringResource(R.string.permissions_bluetooth_description)
+                description = stringResource(R.string.onboarding_permissions_bluetooth_description)
             )
             Spacer(Modifier.height(Spacing.Medium))
             PermissionRequirementCard(
                 icon = Icons.Default.LocationOn,
                 title = stringResource(R.string.permissions_location_title),
-                description = stringResource(R.string.permissions_location_description)
+                description = stringResource(R.string.onboarding_permissions_location_description)
             )
 
             if (state == SetupAccessState.EnableHardware) {
@@ -203,7 +203,7 @@ private fun PermissionsContent(
                 color = MaterialTheme.colorScheme.surfaceVariant
             ) {
                 Text(
-                    text = stringResource(R.string.permissions_extra_access_note),
+                    text = stringResource(R.string.onboarding_permissions_extra_access_note),
                     modifier = Modifier.padding(Spacing.Medium),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -219,7 +219,7 @@ private fun PermissionsContent(
             }
             Spacer(Modifier.height(Spacing.Small))
             Text(
-                text = stringResource(R.string.permissions_offline_note),
+                text = stringResource(R.string.onboarding_permissions_offline_note),
                 modifier = Modifier.fillMaxWidth(),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -304,7 +304,7 @@ private fun HardwareWarning() {
                 )
                 Spacer(Modifier.height(Spacing.ExtraSmall))
                 Text(
-                    text = stringResource(R.string.permissions_hardware_warning_description),
+                    text = stringResource(R.string.onboarding_permissions_hardware_warning_description),
                     style = MaterialTheme.typography.bodyMedium,
                     color = com.example.testresqmesh.core.ui.theme.ResQTheme.colors.onWarningContainer
                 )
