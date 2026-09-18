@@ -20,6 +20,8 @@ data class MeshUseCases(
     val rescan: RescanUseCase,
     val sendPublicMessage: SendPublicMessageUseCase,
     val sendPrivateMessage: SendPrivateMessageUseCase,
+    val hasPendingPublicKeyChange: HasPendingPublicKeyChangeUseCase,
+    val acceptPendingPublicKeyChange: AcceptPendingPublicKeyChangeUseCase,
     val deleteConversationWith: DeleteConversationWithUseCase,
     val broadcastLiveAudioChunk: BroadcastLiveAudioChunkUseCase,
     val broadcastSeenReceipt: BroadcastSeenReceiptUseCase,
@@ -97,6 +99,14 @@ class SendPublicMessageUseCase(private val repository: MeshRepository) {
 class SendPrivateMessageUseCase(private val repository: MeshRepository) {
     operator fun invoke(targetName: String, text: String, imageBase64: String?, audioBase64: String?, locationLat: Double? = null, locationLng: Double? = null): Boolean =
         repository.sendPrivateMessage(targetName, text, imageBase64, audioBase64, locationLat, locationLng)
+}
+
+class HasPendingPublicKeyChangeUseCase(private val repository: MeshRepository) {
+    operator fun invoke(peerName: String): Boolean = repository.hasPendingPublicKeyChange(peerName)
+}
+
+class AcceptPendingPublicKeyChangeUseCase(private val repository: MeshRepository) {
+    operator fun invoke(peerName: String): Boolean = repository.acceptPendingPublicKeyChange(peerName)
 }
 
 class DeleteConversationWithUseCase(private val repository: MeshRepository) {

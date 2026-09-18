@@ -43,9 +43,9 @@ If Android revokes `BLUETOOTH_CONNECT` during orphan preemption or an in-flight 
 
 Client setup treats the default 20-byte ATT payload as the reliable baseline: service discovery and CCCD subscription establish `READY` without waiting for MTU negotiation. A GATT-server connection callback for an endpoint already owned by a live outbound client is treated as another local view of that ACL, not as a second configuring mesh role with its own destructive timeout.
 
-A generation-owned radio handshake gate pauses discovery scanning while any client or server link is configuring. Advertising starts once with the mesh session and is not restarted when the direct-link count changes; local admission remains authoritative even though the advertised count can be stale until the next session. Existing ready links continue carrying traffic, and only the last setup owner may resume balanced scanning. The higher election score is the sole initiator; the yielding peer no longer schedules a delayed role reversal. An inbound setup also blocks a previously scheduled outbound attempt, keeping setup single-flight even when the two roles use different private addresses.
+A generation-owned radio handshake gate pauses discovery scanning while any client or server link is configuring. Advertising starts once with the mesh session and is not restarted when the direct-link count changes; local admission remains authoritative even though the advertised count can be stale until the next session. Existing ready links continue carrying traffic, and only the last setup owner may resume balanced scanning. The higher election score is the sole initiator; yielding peers do not schedule a delayed role reversal. Elected peers enter a stable-identity bootstrap queue: a busy gate or connect lock retains the candidate, and only one outbound `connectGatt` attempt may run at once.
 
-The elected client owns a 15-second setup deadline covering connect, discovery, and CCCD subscription. The server's 20-second configuring deadline is only an orphan backstop if the client and its disconnect callback vanish. A provisional peer's 10-second identity deadline starts only after CCCD reaches `READY`, so identity waiting cannot abort ATT discovery.
+The elected client owns a five-second setup deadline covering connect, discovery, and CCCD subscription. A candidate that has not reached `READY` is rechecked by the bootstrap queue after setup cleanup; busy candidates retry after 750 ms and failed starts use bounded backoff. The server's 20-second configuring deadline is only an orphan backstop if the client and its disconnect callback vanish. A provisional peer's 10-second identity deadline starts only after CCCD reaches `READY`, so identity waiting cannot abort ATT discovery.
 
 Outbound GATT uses Android's `AUTO` transport for known-good peers because the project previously observed immediate disconnects with globally forced LE on some OEM pairs. If `AUTO` reaches `CONNECTED` but receives no ATT service-discovery response, the stable peer identity is marked for explicit `TRANSPORT_LE` on the next attempt in that app session. This is a per-peer compatibility fallback, not a Samsung model allowlist.
 
@@ -69,13 +69,13 @@ Keep these states distinct:
 - Advertising/recently seen but not connected.
 - Offline after a previously known link disappears.
 
-Topology freshness, empty topology withdrawal, deduplication lifetime, and hop/expiry bounds remain separate routing concerns in `docs/status.md`.
+Topology is now recorded by stable node ID for private routes. SYSTEM pulses may relay a node's public key and stable-neighbor IDs, but a relayed pulse never changes the identity of its physical forwarding endpoint. SYSTEM forwarding is bounded to four hops. Name-only legacy topology remains visible but is not eligible for indirect private routing; topology freshness, empty topology withdrawal, and deduplication lifetime remain separate concerns in `docs/status.md`.
 
 ## Private messaging
 
-`CryptoManager` uses an Android Keystore RSA key pair and per-message AES-GCM content encryption. The working tree refuses private sends without a usable recipient public key, drops unencrypted or undecryptable private envelopes, and keeps private locations inside encrypted content. `PeerPublicKeyCache` associates keys with peer/endpoint observations.
+`CryptoManager` uses an Android Keystore RSA key pair and per-message AES-GCM content encryption. The working tree refuses private sends without a payload-ready local link, stable directed route, and usable recipient key; private relays and private receipts never broadcast when their next hop is unavailable. Public keys learned in SYSTEM pulses are persisted by stable node ID using trust on first use: a changed key is held pending rather than silently replacing the pinned key. Public keys are public metadata, not secret material.
 
-This is not yet a basis for claiming authenticated end-to-end encryption or forward secrecy. Public-key authentication, identity binding, key epochs/current-key acknowledgment, and backup/storage policy remain open production concerns.
+This is not yet a basis for claiming authenticated end-to-end encryption or forward secrecy. TOFU can detect a later substitution but does not authenticate the first observation; key verification UI, key epochs/current-key acknowledgment, and backup/storage policy remain open production concerns.
 
 ## Persistence and UI
 

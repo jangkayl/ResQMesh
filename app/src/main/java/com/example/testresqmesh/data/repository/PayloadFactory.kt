@@ -2,6 +2,7 @@ package com.example.testresqmesh.data.repository
 
 import com.example.testresqmesh.core.network.MeshPayload
 import com.example.testresqmesh.core.network.CryptoManager
+import com.example.testresqmesh.core.model.NodeIdentity
 import kotlinx.serialization.encodeToByteArray
 import kotlinx.serialization.protobuf.ProtoBuf
 
@@ -74,12 +75,15 @@ object PayloadFactory {
             type = "MESSAGE",
             senderName = senderName,
             targetName = targetName,
+            senderNodeId = NodeIdentity.idOf(senderName).orEmpty(),
+            targetNodeId = NodeIdentity.idOf(targetName).orEmpty(),
             isPrivate = true,
             isEncrypted = true,
             encryptedData = encrypted.first,
             encryptedKey = encrypted.second,
             routePath = listOf(senderName),
             directedRoute = directedRoute,
+            directedRouteNodeIds = directedRoute.mapNotNull(NodeIdentity::idOf),
             channelId = channelId
         )
         return ProtoBuf.encodeToByteArray(payload)
@@ -102,12 +106,15 @@ object PayloadFactory {
             type = payloadType,
             senderName = senderName,
             targetName = targetName,
+            senderNodeId = NodeIdentity.idOf(senderName).orEmpty(),
+            targetNodeId = NodeIdentity.idOf(targetName).orEmpty(),
             isPrivate = true,
             isEncrypted = true,
             encryptedData = encrypted.first,
             encryptedKey = encrypted.second,
             routePath = listOf(senderName),
             directedRoute = directedRoute,
+            directedRouteNodeIds = directedRoute.mapNotNull(NodeIdentity::idOf),
             targetMessageId = operationId
         )
         return ProtoBuf.encodeToByteArray(payload)
@@ -123,8 +130,10 @@ object PayloadFactory {
             id = msgId,
             type = "SYSTEM",
             senderName = senderName,
+            senderNodeId = NodeIdentity.idOf(senderName).orEmpty(),
             publicKey = publicKey,
-            connectedNodes = connectedNodes
+            connectedNodes = connectedNodes,
+            connectedNodeIds = connectedNodes.mapNotNull(NodeIdentity::idOf)
         )
         return ProtoBuf.encodeToByteArray(payload)
     }

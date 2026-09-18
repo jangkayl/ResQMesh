@@ -28,7 +28,14 @@ data class MeshPayload(
     @ProtoNumber(21) val connectedNodes: List<String> = emptyList(),
     @ProtoNumber(22) val targetMessageId: String = "",
     @ProtoNumber(23) val reader: String = "",
-    @ProtoNumber(24) val liveAudioChunk: ByteArray? = null
+    @ProtoNumber(24) val liveAudioChunk: ByteArray? = null,
+    /** Stable identity fields are optional so older peers can still decode the envelope. */
+    @ProtoNumber(25) val senderNodeId: String = "",
+    @ProtoNumber(26) val targetNodeId: String = "",
+    @ProtoNumber(27) val connectedNodeIds: List<String> = emptyList(),
+    @ProtoNumber(28) val directedRouteNodeIds: List<String> = emptyList(),
+    @ProtoNumber(29) val returnRouteNodeIds: List<String> = emptyList(),
+    @ProtoNumber(30) val relayHopCount: Int = 0
 ) {
     override fun equals(other: Any?): Boolean {
         if (this === other) return true

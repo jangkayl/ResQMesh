@@ -44,6 +44,7 @@ The raw capture may contain broad Android buffers so crashes, process death, per
 - Heartbeat challenge, send completion, acknowledgment, and timeout.
 - Public-key receipt, missing-key refusal, and decrypt failure without content.
 - Route creation/withdrawal, relay, dedupe, and delivery state.
+- Stable node ID route selection, key trust/change state, and a private route-unavailable decision. Private payloads and receipts must not broadcast after such a decision.
 
 Inspect `AndroidRuntime`, process lifecycle, permission errors, or system Bluetooth/GATT lines only when focused markers cannot explain the observation. Never load or summarize a whole capture, and never reproduce private plaintext, ciphertext previews, or key material.
 
@@ -60,6 +61,8 @@ Restart each app separately, toggle Bluetooth on one phone, move out of range an
 ### Level 3: three-phone relay
 
 Arrange A-B-C so A and C depend on B; send both directions, remove and restore B, verify route withdrawal/recovery, and check duplicates and direct-versus-indirect status.
+
+For the stable-route build, use four phones when available: arrange A-B-C-D with A and D indirect; wait for SYSTEM sync; send five private messages in each direction; then force one relay reconnect. Record each sender's selected next-hop marker, each receiver's delivery receipt, and any GATT retirement. A failed route must report route unavailable and must not produce a private broadcast/relay loop.
 
 ### Level 4: release/capstone matrix
 
@@ -89,5 +92,6 @@ Keep only meaningful milestones; raw captures remain under `captures/`.
 
 | 2026-09-17 | Current working tree (user report) | Samsung pair and five-device mesh; models/API/build/capture not supplied | Samsung readiness and five-device availability | User reports Samsung now succeeds and all five nodes were available in the mesh. This is meaningful device evidence, but the missing matrix, repetitions, conditions, and capture prevent capacity or production-reliability claims. | Not supplied |
 | 2026-09-18 | Mutual-block working tree | V2424 API 34, CPH2219 API 31, CPH2127 API 31, SM-P615 API 33, SM-A236E API 33 | KAY and LAL block over a five-phone mesh | Both endpoints logged acknowledgement-driven direct teardown. Public and encrypted private traffic then crossed the V2424 relay and decrypted at both endpoints. The capture does not establish restart persistence, unilateral/bilateral unblock, 70-second route stability, or production reliability. | `captures/ble-logcat/20260918-011613/` |
+| 2026-09-18 | Stable-ID relay working tree | V2424 API 34, CPH2219 API 31, CPH2127 API 31, SM-P615 API 33 | Indirect private relay both directions | Selected routes relayed and decrypted both ways without private broadcast fallback. Some return receipts lacked a next hop; SM-P615 repeatedly retired one GATT callback link. | `captures/ble-logcat/20260918-233006/` |
 
 The transport-promotion run supports that tested behavior only. The historical Samsung failures are superseded by the later user-reported success, pending its recorded device evidence. The five-device report does not yet establish direct-link capacity, route recovery, block semantics, all disconnect paths, or production reliability; BLOCK-01 remains active.

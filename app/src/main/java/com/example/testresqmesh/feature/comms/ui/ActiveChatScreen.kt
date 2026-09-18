@@ -110,9 +110,15 @@ fun ActiveChatScreen(
     var pendingAudio by remember { mutableStateOf<String?>(null) }
     var isRecording by remember { mutableStateOf(false) }
     var showDeleteDialog by remember { mutableStateOf(false) }
+    var showKeyChangeDialog by remember { mutableStateOf(false) }
 
     LaunchedEffect(viewModel) {
         viewModel.privateSendErrors.collect { snackbarHostState.showSnackbar(it) }
+    }
+    LaunchedEffect(viewModel, name) {
+        viewModel.pendingKeyVerification.collect { peer ->
+            if (NodeIdentity.matches(peer, name)) showKeyChangeDialog = true
+        }
     }
 
     LaunchedEffect(latestMessageId) {
@@ -127,6 +133,20 @@ fun ActiveChatScreen(
                 viewModel.deleteConversationWith(name)
                 onBack()
             }
+        )
+    }
+    if (showKeyChangeDialog) {
+        AlertDialog(
+            onDismissRequest = { showKeyChangeDialog = false },
+            title = { Text("Recipient key changed") },
+            text = { Text("This device advertised a different encryption key. Accept it only after verifying the recipient through a separate channel, then resend your message.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    viewModel.acceptPendingPublicKeyChange(name)
+                    showKeyChangeDialog = false
+                }) { Text("Accept new key") }
+            },
+            dismissButton = { TextButton(onClick = { showKeyChangeDialog = false }) { Text("Keep existing key") } }
         )
     }
 

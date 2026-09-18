@@ -21,7 +21,7 @@ interface MeshNetworkGateway {
     var onLiveAudioChunk: ((String, String, ByteArray) -> Unit)?
     var onMessageDelivered: ((String, String, List<String>) -> Unit)?
     var onPublicKeyReceived: ((String, String, String) -> Unit)?
-    var onRoutingTableReceived: ((String, List<String>) -> Unit)?
+    var onRoutingTableReceived: ((String, String, List<String>, List<String>) -> Unit)?
     var onSosCancelled: (() -> Unit)?
     var onStatusChanged: ((String) -> Unit)?
     var onDeviceBlocked: ((String) -> Unit)?

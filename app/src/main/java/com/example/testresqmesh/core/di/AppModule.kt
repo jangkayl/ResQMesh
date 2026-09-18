@@ -14,6 +14,7 @@ import com.example.testresqmesh.data.repository.MeshRepository
 import com.example.testresqmesh.data.repository.MessageStore
 import com.example.testresqmesh.data.repository.RoomMessageStore
 import com.example.testresqmesh.data.repository.BlockRelationshipStore
+import com.example.testresqmesh.data.repository.PeerPublicKeyDirectory
 import com.example.testresqmesh.feature.comms.viewmodel.CommunicationViewModel
 import com.example.testresqmesh.feature.comms.viewmodel.WalkieTalkieViewModel
 import com.example.testresqmesh.feature.radar.viewmodel.RadarViewModel
@@ -29,8 +30,9 @@ val appModule = module {
     single { AppDatabase.getDatabase(androidContext()) }
     single<MessageStore> { RoomMessageStore(get<AppDatabase>().messageDao()) }
     single { BlockRelationshipStore(androidContext()) }
+    single { PeerPublicKeyDirectory(androidContext()) }
     single(createdAtStart = true) { AppCoroutineScope(Dispatchers.IO) }
-    single { MeshRepository(get(), get(), get(), get<AppCoroutineScope>().scope) }
+    single { MeshRepository(get(), get(), get(), get(), get<AppCoroutineScope>().scope) }
     single { MediaHelper(androidContext()) }
     single<LocationClient> { DefaultLocationClient(androidContext()) }
     
@@ -53,6 +55,8 @@ val appModule = module {
             rescan = RescanUseCase(get()),
             sendPublicMessage = SendPublicMessageUseCase(get()),
             sendPrivateMessage = SendPrivateMessageUseCase(get()),
+            hasPendingPublicKeyChange = HasPendingPublicKeyChangeUseCase(get()),
+            acceptPendingPublicKeyChange = AcceptPendingPublicKeyChangeUseCase(get()),
             deleteConversationWith = DeleteConversationWithUseCase(get()),
             broadcastLiveAudioChunk = BroadcastLiveAudioChunkUseCase(get()),
             broadcastSeenReceipt = BroadcastSeenReceiptUseCase(get()),
