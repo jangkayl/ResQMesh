@@ -23,7 +23,7 @@ import com.example.testresqmesh.feature.comms.viewmodel.WalkieTalkieViewModel
 @Composable
 fun AdvancedScreen(walkieTalkieViewModel: WalkieTalkieViewModel, onBack: () -> Unit) {
     val enabled by walkieTalkieViewModel.isWalkieTalkieMode.collectAsState()
-    LazyColumn(Modifier.fillMaxSize().background(Color(0xFFFBFAFF)).padding(horizontal = Spacing.Large), contentPadding = PaddingValues(bottom = 32.dp)) {
+    LazyColumn(Modifier.fillMaxSize().background(Color(0xFFFBFAFF)).padding(horizontal = Spacing.Medium), contentPadding = PaddingValues(bottom = 24.dp)) {
         item {
             Spacer(Modifier.height(10.dp)); Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) { IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, "Back") }; Text("Advanced", style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.Black) }
             Text("Experimental tools. Use only when needed.", color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(start = 48.dp)); Spacer(Modifier.height(24.dp))

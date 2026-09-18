@@ -195,7 +195,10 @@ fun MainContainerScreen(
                     walkieTalkieViewModel = walkieTalkieViewModel,
                     mediaHelper = mediaHelper
                 )
-                ResQDestination.Network -> NetworkScreen(radarViewModel)
+                ResQDestination.Network -> NetworkScreen(
+                    viewModel = radarViewModel,
+                    onMessagePeer = { peer -> activeChatNode = peer }
+                )
             }
         }
     }

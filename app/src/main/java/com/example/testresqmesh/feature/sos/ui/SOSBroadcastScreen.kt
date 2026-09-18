@@ -17,7 +17,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import com.example.testresqmesh.core.ui.components.buttons.SosHoldButton
+import com.example.testresqmesh.core.ui.components.buttons.SosSlideToSend
 import com.example.testresqmesh.core.ui.theme.Spacing
 
 @Composable
@@ -33,7 +33,7 @@ fun SOSBroadcastScreen(onCancel: () -> Unit, onSosTriggered: (String) -> Unit = 
         Spacer(Modifier.height(20.dp))
         Text("Send an SOS", style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.Black)
         Spacer(Modifier.height(8.dp))
-        Text("Choose the emergency, then hold to send.", textAlign = TextAlign.Center, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text("Choose the emergency, then slide to send.", textAlign = TextAlign.Center, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Spacer(Modifier.height(28.dp))
         Text("Emergency type", modifier = Modifier.fillMaxWidth(), fontWeight = FontWeight.Bold)
         Spacer(Modifier.height(12.dp))
@@ -50,9 +50,9 @@ fun SOSBroadcastScreen(onCancel: () -> Unit, onSosTriggered: (String) -> Unit = 
             }
         }
         Spacer(Modifier.weight(1f))
-        Text("Hold for 2 seconds", fontWeight = FontWeight.Bold)
+        Text("Slide only when you need help", fontWeight = FontWeight.Bold)
         Spacer(Modifier.height(14.dp))
-        SosHoldButton(onHoldComplete = { onSosTriggered(selectedType.uppercase()) }, modifier = Modifier.size(116.dp))
+        SosSlideToSend(onSlideComplete = { onSosTriggered(selectedType.uppercase()) })
         Spacer(Modifier.height(14.dp))
         Text("Your alert uses available nearby connections. Location is included only when available.", textAlign = TextAlign.Center, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }

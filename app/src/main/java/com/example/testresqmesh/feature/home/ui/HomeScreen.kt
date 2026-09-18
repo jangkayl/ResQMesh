@@ -16,6 +16,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.ChatBubbleOutline
 import androidx.compose.material.icons.outlined.ChevronRight
@@ -93,9 +94,9 @@ fun HomeScreenContent(
     Column(
         modifier = modifier
             .verticalScroll(rememberScrollState())
-            .padding(horizontal = Spacing.Large)
-            .padding(top = Spacing.ExtraLarge, bottom = 156.dp),
-        verticalArrangement = Arrangement.spacedBy(Spacing.Large)
+            .padding(horizontal = Spacing.Medium)
+            .padding(top = Spacing.Large, bottom = 120.dp),
+        verticalArrangement = Arrangement.spacedBy(Spacing.Medium)
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -138,9 +139,12 @@ fun HomeScreenContent(
         )
 
         ResQGlassSurface(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(onClick = onMessagesClick),
             shape = RoundedCornerShape(28.dp),
-            contentPadding = androidx.compose.foundation.layout.PaddingValues(Spacing.Large),
-            shadowElevation = 14.dp
+            contentPadding = androidx.compose.foundation.layout.PaddingValues(Spacing.Medium),
+            shadowElevation = 10.dp
         ) {
             Column {
                 HomeCardIcon(
@@ -148,7 +152,7 @@ fun HomeScreenContent(
                     color = MaterialTheme.colorScheme.primaryContainer,
                     contentColor = MaterialTheme.colorScheme.primary
                 )
-                Spacer(Modifier.height(Spacing.Medium))
+                Spacer(Modifier.height(Spacing.Small))
                 Text(
                     text = stringResource(R.string.home_message_title),
                     style = MaterialTheme.typography.titleLarge,
@@ -160,20 +164,23 @@ fun HomeScreenContent(
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-                Spacer(Modifier.height(Spacing.Medium))
-                ResQButton(
-                    onClick = onMessagesClick,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text(stringResource(R.string.home_message_action))
-                }
+                Spacer(Modifier.height(Spacing.Small))
+                Text(
+                    text = stringResource(R.string.home_message_action),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.Bold
+                )
             }
         }
 
         ResQGlassSurface(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(onClick = onNetworkClick),
             shape = RoundedCornerShape(28.dp),
-            contentPadding = androidx.compose.foundation.layout.PaddingValues(Spacing.Large),
-            shadowElevation = 14.dp
+            contentPadding = androidx.compose.foundation.layout.PaddingValues(Spacing.Medium),
+            shadowElevation = 10.dp
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 HomeCardIcon(
@@ -195,13 +202,11 @@ fun HomeScreenContent(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
-                IconButton(onClick = onNetworkClick) {
-                    Icon(
-                        imageVector = Icons.Outlined.ChevronRight,
-                        contentDescription = stringResource(R.string.home_network_action),
-                        tint = MaterialTheme.colorScheme.primary
-                    )
-                }
+                Icon(
+                    imageVector = Icons.Outlined.ChevronRight,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary
+                )
             }
         }
 

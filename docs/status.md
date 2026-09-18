@@ -1,6 +1,6 @@
 # Current status
 
-Last reviewed: 2026-09-18
+Last reviewed: 2026-09-19
 Baseline: uncommitted `fix/startup-bootstrap-admission` working tree; the 2026-09-18 focused five-phone capture confirms block acknowledgement, direct teardown, and public/private relay, while direct-upgrade behavior is awaiting a fresh APK run.
 
 ## Current objective

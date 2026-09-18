@@ -4,17 +4,16 @@ The UI uses Jetpack Compose and Material 3. Inspect the actual screen, ViewModel
 
 ## Component and state boundaries
 
-- Reuse shared components under `core/ui/components` and theme tokens before adding local styling.
+- Reuse shared components and theme tokens before local styling.
 - The civilian-first system is light-only: a pale-white/lavender canvas, large near-black headings, purple emphasis, cyan identity accents, green truthful status banners, and raised white cards. Red is reserved for genuine emergency and destructive actions.
 - Use the reference-inspired mobile hierarchy: generous whitespace, strong left-aligned page titles, single-purpose circular or rounded-square actions, and a white capsule navigation dock with SOS floating above it. Do not preserve earlier screen layouts merely by recoloring them.
 - The visual system is stable across all supported Android versions and does not depend on system dark mode, blur, or other version-specific rendering effects.
+- Use compact 16 dp gutters, 8–12 dp rhythm, smaller titles, and 48 dp touch targets. Reserve glass for navigation and summaries.
 - New top-level screens use the reusable shell: Home, Messages, Walkie-talkie, and Network, with SOS as a persistent action rather than a navigation destination.
 - Shared controls use at least 48 dp touch targets, semantic shapes, and text or icon-independent status descriptions.
 - Keep business, routing, and transport decisions out of composables. ViewModels/use cases expose UI state and user actions.
 - Keep route-level composables responsible for state collection and side effects; move reusable stateless presentation into feature `ui/components` files.
-- Prefer immutable screen state and explicit loading, success, empty, warning, and error states.
-- Do not perform blocking storage/network work during composition.
-- Preserve previews or focused UI tests where they provide meaningful coverage.
+- Keep state immutable/nonblocking; retain tests.
 
 ## Connection language
 
@@ -36,6 +35,7 @@ Avoid showing “connected” from a BLE callback alone. Counters and selected p
 - A failed private send remains unsent/unstored and explains whether readiness or a usable key is missing without exposing cryptographic details.
 - Distinguish queued, sending, delivered, failed, and blocked outcomes; do not imply peer receipt from local enqueue or transport initiation.
 - SOS alerts and cancellation feedback must identify the relevant alert/sender once the model supports it.
+- SOS uses one accessible slide after type selection; early release resets it and no second confirmation is shown.
 - Never render debug plaintext, keys, ciphertext previews, or sensitive location content in the terminal/debug UI.
 
 ## Diagnostic terminal
@@ -59,6 +59,7 @@ Avoid showing “connected” from a BLE callback alone. Counters and selected p
 - Preserve user drafts when a recoverable send fails.
 - Active public and private conversations anchor the latest messages above the composer, keep it above the IME, and follow the newest message when the conversation changes. Sent community bubbles show reader circles only from recorded `seenBy` receipts.
 - Avoid rapid status flicker; state transitions should follow repository/link evidence rather than raw scan churn.
+- Peer rows are fully clickable. Message requires an unblocked direct/relayed peer; “Known mesh path” is only a topology hint.
 
 ## Validation
 

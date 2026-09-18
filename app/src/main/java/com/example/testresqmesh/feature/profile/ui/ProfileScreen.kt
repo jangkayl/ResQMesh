@@ -21,21 +21,21 @@ import com.example.testresqmesh.feature.setup.viewmodel.SetupViewModel
 @Composable
 fun ProfileScreen(viewModel: SetupViewModel, onAdvanced: () -> Unit, onBack: () -> Unit) {
     val state by viewModel.uiState.collectAsState()
-    LazyColumn(Modifier.fillMaxSize().background(Color(0xFFFBFAFF)).padding(horizontal = Spacing.Large), contentPadding = PaddingValues(bottom = 32.dp)) {
+    LazyColumn(Modifier.fillMaxSize().background(Color(0xFFFBFAFF)).padding(horizontal = Spacing.Medium), contentPadding = PaddingValues(bottom = 24.dp)) {
         item {
             Spacer(Modifier.height(10.dp))
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, "Back") }
                 Text("Settings", style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.Black)
             }
-            Spacer(Modifier.height(22.dp))
+            Spacer(Modifier.height(Spacing.Medium))
             Surface(Modifier.fillMaxWidth(), RoundedCornerShape(28.dp), color = Color.White, shadowElevation = 4.dp) {
                 Row(Modifier.padding(18.dp), verticalAlignment = Alignment.CenterVertically) {
                     Surface(Modifier.size(52.dp), CircleShape, color = Color(0xFF16BCD4)) { Box(contentAlignment = Alignment.Center) { Text(state.myNodeName.firstOrNull()?.uppercase() ?: "R", color = Color.White, fontWeight = FontWeight.Black, style = MaterialTheme.typography.titleLarge) } }
                     Spacer(Modifier.width(14.dp)); Column { Text(state.myNodeName.ifBlank { "ResQMesh user" }, fontWeight = FontWeight.Black, style = MaterialTheme.typography.titleMedium); Text(if (state.isOnline) "Available nearby" else "Offline", color = if (state.isOnline) Color(0xFF18A66A) else MaterialTheme.colorScheme.onSurfaceVariant) }
                 }
             }
-            Spacer(Modifier.height(28.dp)); Text("APP", fontWeight = FontWeight.Black, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.labelMedium)
+            Spacer(Modifier.height(Spacing.Large)); Text("APP", fontWeight = FontWeight.Black, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.labelMedium)
             Spacer(Modifier.height(10.dp))
         }
         item { SettingsCard { SettingRow(Icons.Default.Palette, "Appearance", "Light mode") ; DividerLine(); SettingRow(Icons.Default.Key, "Permissions", "Bluetooth, location, microphone") ; DividerLine(); SettingRow(Icons.Default.Map, "Offline maps", "Download from an SOS map") } }

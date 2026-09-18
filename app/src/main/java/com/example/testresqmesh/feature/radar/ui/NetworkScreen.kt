@@ -25,6 +25,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.AlertDialog
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -45,7 +46,10 @@ import com.example.testresqmesh.core.ui.theme.Spacing
 import com.example.testresqmesh.feature.radar.viewmodel.RadarViewModel
 
 @Composable
-fun NetworkScreen(viewModel: RadarViewModel) {
+fun NetworkScreen(
+    viewModel: RadarViewModel,
+    onMessagePeer: (String) -> Unit = {}
+) {
     val state by viewModel.uiState.collectAsState()
     val nodes = remember(state) { classifyRadarNodes(state) }
     var selectedNode by remember { mutableStateOf<NodeItemData?>(null) }
@@ -54,12 +58,13 @@ fun NetworkScreen(viewModel: RadarViewModel) {
     if (selectedNode != null) {
         NetworkPeerDetails(
             node = selectedNode!!,
-            routes = state.topology[selectedNode!!.name].orEmpty().toList(),
+            knownPath = knownMeshPath(selectedNode!!, nodes, state.topology),
             onBack = { selectedNode = null },
             onDisconnect = { viewModel.disconnectDevice(selectedNode!!.endpointId) },
             onConnect = { viewModel.forceConnect(selectedNode!!.endpointId, selectedNode!!.name) },
             onBlock = { viewModel.blockDevice(selectedNode!!.name) },
-            onUnblock = { viewModel.unblockDevice(selectedNode!!.name) }
+            onUnblock = { viewModel.unblockDevice(selectedNode!!.name) },
+            onMessage = { onMessagePeer(selectedNode!!.name) }
         )
         return
     }
@@ -89,8 +94,8 @@ internal fun NetworkList(
 ) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(start = Spacing.Large, top = Spacing.ExtraLarge, end = Spacing.Large, bottom = 156.dp),
-        verticalArrangement = Arrangement.spacedBy(Spacing.Medium)
+        contentPadding = PaddingValues(start = Spacing.Medium, top = Spacing.Large, end = Spacing.Medium, bottom = 120.dp),
+        verticalArrangement = Arrangement.spacedBy(Spacing.Small)
     ) {
         item {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -138,7 +143,7 @@ internal fun NetworkList(
 private fun NetworkNodeRow(node: NodeItemData, onClick: () -> Unit) {
     val status = networkStatus(node.kind)
     ResQGlassSurface(
-        modifier = Modifier.fillMaxWidth().then(Modifier),
+        modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(24.dp),
         contentPadding = PaddingValues(Spacing.Medium),
         shadowElevation = 10.dp
@@ -163,34 +168,80 @@ private fun NetworkNodeRow(node: NodeItemData, onClick: () -> Unit) {
 @Composable
 private fun NetworkPeerDetails(
     node: NodeItemData,
-    routes: List<String>,
+    knownPath: List<String>,
     onBack: () -> Unit,
     onDisconnect: () -> Unit,
     onConnect: () -> Unit,
     onBlock: () -> Unit,
-    onUnblock: () -> Unit
+    onUnblock: () -> Unit,
+    onMessage: () -> Unit
 ) {
-    Column(Modifier.fillMaxSize().padding(Spacing.Large), verticalArrangement = Arrangement.spacedBy(Spacing.Large)) {
+    var confirmBlock by remember { mutableStateOf(false) }
+    val canMessage = !node.isBlocked && node.kind in setOf(NodeKind.DIRECT, NodeKind.RELAY, NodeKind.HOPPED)
+    Column(Modifier.fillMaxSize().padding(Spacing.Medium), verticalArrangement = Arrangement.spacedBy(Spacing.Medium)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Outlined.ArrowBack, "Back") }
             Text(node.label, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Black, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
-        ResQGlassSurface(shape = RoundedCornerShape(28.dp), contentPadding = PaddingValues(Spacing.Large)) {
+        ResQGlassSurface(shape = RoundedCornerShape(28.dp), contentPadding = PaddingValues(Spacing.Medium)) {
             Column(verticalArrangement = Arrangement.spacedBy(Spacing.Small)) {
                 Text(networkStatus(node.kind), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = networkStatusColor(node.kind))
                 Text("Status follows current network evidence.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
-        if (routes.isNotEmpty()) {
-            Text("Routes", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-            routes.forEach { route -> Text(route, style = MaterialTheme.typography.bodyMedium) }
-        }
+        Text("Known mesh path", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+        Text(
+            if (knownPath.isEmpty()) "Path unavailable right now. This is not a delivery guarantee."
+            else knownPath.joinToString("  →  "),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
         Row(horizontalArrangement = Arrangement.spacedBy(Spacing.Small)) {
+            if (canMessage) TextButton(onClick = onMessage) { Text("Message") }
             if (node.kind == NodeKind.DIRECT || node.kind == NodeKind.UNRESPONSIVE) TextButton(onClick = onDisconnect) { Text("Disconnect") }
             if (node.endpointId.isNotEmpty() && (node.kind == NodeKind.DISCOVERED || node.kind == NodeKind.SYNCING)) TextButton(onClick = onConnect) { Text("Connect") }
-            if (node.isBlocked) TextButton(onClick = onUnblock) { Text("Unblock") } else TextButton(onClick = onBlock) { Text("Block") }
+            if (node.isBlocked) TextButton(onClick = onUnblock) { Text("Unblock") } else TextButton(onClick = { confirmBlock = true }) { Text("Block") }
         }
     }
+    if (confirmBlock) {
+        AlertDialog(
+            onDismissRequest = { confirmBlock = false },
+            title = { Text("Block ${node.label}?") },
+            text = { Text("This denies a direct link on both phones after acknowledgement. Each phone must unblock locally before direct contact can resume. Relayed messages may still be available.") },
+            confirmButton = { TextButton(onClick = { confirmBlock = false; onBlock() }) { Text("Block") } },
+            dismissButton = { TextButton(onClick = { confirmBlock = false }) { Text("Cancel") } }
+        )
+    }
+}
+
+/** A current topology hint, deliberately not a promise of the next delivery route. */
+internal fun knownMeshPath(
+    target: NodeItemData,
+    nodes: List<NodeItemData>,
+    topology: Map<String, Set<String>>
+): List<String> {
+    if (target.kind == NodeKind.DIRECT) return listOf("You", target.label)
+    val direct = nodes.filter { it.kind == NodeKind.DIRECT }.map { it.name }
+    if (direct.isEmpty()) return emptyList()
+    val adjacency = mutableMapOf<String, MutableSet<String>>()
+    topology.forEach { (from, to) ->
+        adjacency.getOrPut(from) { mutableSetOf() }.addAll(to)
+        to.forEach { neighbor -> adjacency.getOrPut(neighbor) { mutableSetOf() }.add(from) }
+    }
+    val queue = ArrayDeque<List<String>>()
+    direct.forEach { queue.add(listOf(it)) }
+    val visited = direct.toMutableSet()
+    while (queue.isNotEmpty()) {
+        val path = queue.removeFirst()
+        val current = path.last()
+        if (com.example.testresqmesh.core.model.NodeIdentity.matches(current, target.name)) {
+            return listOf("You") + path.map { name -> nodes.firstOrNull { com.example.testresqmesh.core.model.NodeIdentity.matches(it.name, name) }?.label ?: name }
+        }
+        adjacency[current].orEmpty().forEach { next ->
+            if (visited.add(next)) queue.add(path + next)
+        }
+    }
+    return emptyList()
 }
 
 @Composable

@@ -18,6 +18,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.example.testresqmesh.core.utils.MediaHelper
+import com.example.testresqmesh.core.ui.theme.Spacing
 import com.example.testresqmesh.feature.comms.viewmodel.CommunicationViewModel
 import com.example.testresqmesh.feature.comms.viewmodel.WalkieTalkieViewModel
 
@@ -36,10 +37,10 @@ fun WalkieTalkieScreen(
     val purple = Color(0xFF7442C8)
 
     Column(
-        Modifier.fillMaxSize().background(Color(0xFFFBFAFF)).padding(horizontal = 24.dp),
+        Modifier.fillMaxSize().background(Color(0xFFFBFAFF)).padding(horizontal = Spacing.Medium),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Spacer(Modifier.height(30.dp))
+        Spacer(Modifier.height(Spacing.Large))
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) { Text("Walkie-talkie", style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.Black); Text("Voice for the current channel.", color = MaterialTheme.colorScheme.onSurfaceVariant) }
             Box {
@@ -47,14 +48,14 @@ fun WalkieTalkieScreen(
                 DropdownMenu(expanded = channelsOpen, onDismissRequest = { channelsOpen = false }) { (1..5).forEach { number -> DropdownMenuItem(text = { Text("Channel $number") }, onClick = { walkieTalkieViewModel.setChannel(number.toString()); channelsOpen = false }) } }
             }
         }
-        Spacer(Modifier.height(28.dp))
+        Spacer(Modifier.height(Spacing.Large))
         Surface(Modifier.fillMaxWidth(), RoundedCornerShape(28.dp), color = Color.White, shadowElevation = 4.dp) {
             Column(Modifier.padding(20.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) { Icon(Icons.Outlined.GraphicEq, null, tint = if (receiverOn) Color(0xFF18A66A) else purple); Spacer(Modifier.width(10.dp)); Column(Modifier.weight(1f)) { Text("Voice receiver", fontWeight = FontWeight.Black); Text(if (receiverOn) "On" else "Off", color = if (receiverOn) Color(0xFF18A66A) else MaterialTheme.colorScheme.onSurfaceVariant) }; Switch(checked = receiverOn, onCheckedChange = { walkieTalkieViewModel.toggleWalkieTalkieMode() }) }
                 if (speaker != null && receiverOn) { Spacer(Modifier.height(14.dp)); Text("$speaker is speaking", fontWeight = FontWeight.Bold, color = Color(0xFF18A66A)) }
             }
         }
-        Spacer(Modifier.height(20.dp))
+        Spacer(Modifier.height(Spacing.Medium))
         Row(verticalAlignment = Alignment.CenterVertically) { Text("Voice note", fontWeight = if (!liveAudio) FontWeight.Black else FontWeight.Normal); Switch(checked = liveAudio, onCheckedChange = { liveAudio = it }, modifier = Modifier.padding(horizontal = 10.dp)); Text("Live audio", fontWeight = if (liveAudio) FontWeight.Black else FontWeight.Normal) }
         Spacer(Modifier.weight(1f))
         Surface(

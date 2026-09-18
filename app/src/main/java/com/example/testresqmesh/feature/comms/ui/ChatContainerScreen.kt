@@ -1,6 +1,7 @@
 package com.example.testresqmesh.feature.comms.ui
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -142,12 +143,12 @@ internal fun MessagesInboxContent(
     LazyColumn(
         modifier = modifier.fillMaxSize(),
         contentPadding = PaddingValues(
-            start = Spacing.Large,
-            top = Spacing.ExtraLarge,
-            end = Spacing.Large,
-            bottom = 156.dp
+            start = Spacing.Medium,
+            top = Spacing.Large,
+            end = Spacing.Medium,
+            bottom = 120.dp
         ),
-        verticalArrangement = Arrangement.spacedBy(Spacing.Medium)
+        verticalArrangement = Arrangement.spacedBy(Spacing.Small)
     ) {
         item {
             Row(
@@ -238,7 +239,7 @@ private fun CommunityInboxCard(
 ) {
     var channelPickerExpanded by remember { mutableStateOf(false) }
     ResQGlassSurface(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
         shape = RoundedCornerShape(28.dp),
         contentPadding = PaddingValues(Spacing.Medium),
         shadowElevation = 14.dp
@@ -299,13 +300,11 @@ private fun CommunityInboxCard(
                     }
                 }
             }
-            IconButton(onClick = onClick) {
-                Icon(
-                    imageVector = Icons.Outlined.ChevronRight,
-                    contentDescription = stringResource(R.string.messages_open_community),
-                    tint = MaterialTheme.colorScheme.primary
-                )
-            }
+            Icon(
+                imageVector = Icons.Outlined.ChevronRight,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary
+            )
         }
     }
 }
@@ -316,7 +315,7 @@ private fun ConversationInboxRow(
     onClick: () -> Unit
 ) {
     ResQGlassSurface(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
         shape = RoundedCornerShape(24.dp),
         contentPadding = PaddingValues(Spacing.Medium),
         shadowElevation = 10.dp
@@ -370,13 +369,11 @@ private fun ConversationInboxRow(
                     color = conversation.status.color()
                 )
             }
-            IconButton(onClick = onClick) {
-                Icon(
-                    imageVector = Icons.Outlined.ChevronRight,
-                    contentDescription = stringResource(R.string.messages_open_conversation, conversation.displayName),
-                    tint = MaterialTheme.colorScheme.primary
-                )
-            }
+            Icon(
+                imageVector = Icons.Outlined.ChevronRight,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary
+            )
         }
     }
 }

@@ -231,10 +231,10 @@ fun ActiveChatScreen(
                         .fillMaxSize()
                         .padding(innerPadding),
                     contentPadding = PaddingValues(
-                        start = Spacing.Large,
+                        start = Spacing.Medium,
                         top = Spacing.Small,
-                        end = Spacing.Large,
-                        bottom = Spacing.Large
+                        end = Spacing.Medium,
+                        bottom = Spacing.Medium
                     ),
                     verticalArrangement = Arrangement.spacedBy(Spacing.Small, Alignment.Bottom),
                     reverseLayout = true
@@ -346,7 +346,7 @@ private fun PrivateMessageBubble(
             contentColor = contentColor,
             shadowElevation = if (mine) 4.dp else 8.dp
         ) {
-            Column(modifier = Modifier.padding(Spacing.Medium)) {
+            Column(modifier = Modifier.padding(horizontal = Spacing.Medium, vertical = 10.dp)) {
                 message.imageBase64?.let { image ->
                     val bitmap = remember(image) { mediaHelper.decodeBase64ToBitmap(image) }
                     if (bitmap != null) {
