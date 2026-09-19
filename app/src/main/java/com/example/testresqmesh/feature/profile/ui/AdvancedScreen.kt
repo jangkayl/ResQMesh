@@ -1,11 +1,10 @@
 package com.example.testresqmesh.feature.profile.ui
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Science
 import androidx.compose.material3.*
@@ -23,9 +22,9 @@ import com.example.testresqmesh.feature.comms.viewmodel.WalkieTalkieViewModel
 @Composable
 fun AdvancedScreen(walkieTalkieViewModel: WalkieTalkieViewModel, onBack: () -> Unit) {
     val enabled by walkieTalkieViewModel.isWalkieTalkieMode.collectAsState()
-    LazyColumn(Modifier.fillMaxSize().background(Color(0xFFFBFAFF)).padding(horizontal = Spacing.Large), contentPadding = PaddingValues(bottom = 32.dp)) {
+    LazyColumn(Modifier.fillMaxSize().padding(horizontal = Spacing.Medium), contentPadding = PaddingValues(bottom = 24.dp)) {
         item {
-            Spacer(Modifier.height(10.dp)); Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) { IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, "Back") }; Text("Advanced", style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.Black) }
+            Spacer(Modifier.height(10.dp)); Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") }; Text("Advanced", style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.Black) }
             Text("Experimental tools. Use only when needed.", color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(start = 48.dp)); Spacer(Modifier.height(24.dp))
         }
         item { AdvancedCard(Icons.Default.GraphicEq, "Walkie-talkie", "Play incoming voice messages", trailing = { Switch(checked = enabled, onCheckedChange = { walkieTalkieViewModel.toggleWalkieTalkieMode() }) }) }
@@ -36,4 +35,4 @@ fun AdvancedScreen(walkieTalkieViewModel: WalkieTalkieViewModel, onBack: () -> U
     if (BuildConfig.DEBUG) DebugTerminal()
 }
 
-@Composable private fun AdvancedCard(icon: androidx.compose.ui.graphics.vector.ImageVector, title: String, subtitle: String, trailing: @Composable (() -> Unit)? = null) { Surface(Modifier.fillMaxWidth(), RoundedCornerShape(28.dp), color = Color.White, shadowElevation = 3.dp) { Row(Modifier.padding(20.dp), verticalAlignment = Alignment.CenterVertically) { Icon(icon, null, tint = Color(0xFF7442C8)); Spacer(Modifier.width(14.dp)); Column(Modifier.weight(1f)) { Text(title, fontWeight = FontWeight.Black); Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }; trailing?.invoke() } } }
+@Composable private fun AdvancedCard(icon: androidx.compose.ui.graphics.vector.ImageVector, title: String, subtitle: String, trailing: @Composable (() -> Unit)? = null) { Surface(Modifier.fillMaxWidth(), RoundedCornerShape(28.dp), color = MaterialTheme.colorScheme.surfaceVariant, shadowElevation = 3.dp) { Row(Modifier.padding(20.dp), verticalAlignment = Alignment.CenterVertically) { Icon(icon, null, tint = MaterialTheme.colorScheme.primary); Spacer(Modifier.width(14.dp)); Column(Modifier.weight(1f)) { Text(title, fontWeight = FontWeight.Black); Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }; trailing?.invoke() } } }

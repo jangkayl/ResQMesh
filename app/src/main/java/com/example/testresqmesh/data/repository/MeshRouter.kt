@@ -14,6 +14,9 @@ import java.util.concurrent.ConcurrentHashMap
 
 class MeshRouter {
     private val networkGraph = ConcurrentHashMap<String, Set<String>>()
+    /** Private routes use only stable node IDs; [networkGraph] remains display-oriented for UI/STP. */
+    private val stableRouteGraph = ConcurrentHashMap<String, Set<String>>()
+    private val stableNames = ConcurrentHashMap<String, String>()
     private val lastSeenMap = ConcurrentHashMap<String, Long>()
     
     private val _topology = MutableStateFlow<Map<String, Set<String>>>(emptyMap())
@@ -22,7 +25,13 @@ class MeshRouter {
     private val _knownNodes = MutableStateFlow<List<KnownNode>>(emptyList())
     val knownNodes: StateFlow<List<KnownNode>> = _knownNodes.asStateFlow()
 
-    fun updateTopology(senderName: String, connectedNodes: List<String>, myNodeName: String) {
+    fun updateTopology(
+        senderName: String,
+        senderNodeId: String,
+        connectedNodes: List<String>,
+        connectedNodeIds: List<String>,
+        myNodeName: String
+    ) {
         if (NodeIdentity.matches(senderName, myNodeName) || NodeIdentity.isPlaceholder(senderName)) return
 
         markNodeSeen(senderName)
@@ -39,6 +48,15 @@ class MeshRouter {
         }
         
         currentTopology[senderName] = validNodes.toSet()
+        val stableSender = senderNodeId.ifBlank { NodeIdentity.idOf(senderName).orEmpty() }
+        if (stableSender.isNotBlank()) {
+            stableNames[stableSender] = senderName
+            val stableNeighbors = connectedNodeIds.map { it.trim().uppercase() }.filter { it.isNotBlank() }.toSet()
+            stableRouteGraph[stableSender] = stableNeighbors
+            connectedNodes.zip(connectedNodeIds).forEach { (name, nodeId) ->
+                if (nodeId.isNotBlank()) stableNames[nodeId.trim().uppercase()] = name
+            }
+        }
 
         // Prune stale or self-referential routes
         currentTopology.remove(myNodeName)
@@ -61,6 +79,11 @@ class MeshRouter {
         networkGraph.remove(nodeName)
         _topology.value = networkGraph.toMap()
         lastSeenMap.remove(nodeName)
+        NodeIdentity.idOf(nodeName)?.let { id ->
+            stableRouteGraph.remove(id)
+            stableRouteGraph.replaceAll { _, neighbors -> neighbors - id }
+            stableNames.remove(id)
+        }
     }
 
     fun recalculateKnownNodes(myNodeName: String, connectedDevices: List<ConnectedDevice>) {
@@ -154,25 +177,33 @@ class MeshRouter {
     }
 
     fun findShortestPath(myNodeName: String, targetName: String, connectedDevices: List<ConnectedDevice>): List<String> {
+        val myNodeId = NodeIdentity.idOf(myNodeName) ?: return emptyList()
+        val targetNodeId = NodeIdentity.idOf(targetName) ?: return emptyList()
+        stableNames[myNodeId] = myNodeName
+        stableNames[targetNodeId] = targetName
+        connectedDevices.forEach { device ->
+            val nodeId = device.nodeId.ifBlank { NodeIdentity.idOf(device.name).orEmpty() }
+            if (nodeId.isNotBlank()) stableNames[nodeId] = device.name
+        }
         val queue = ArrayDeque<List<String>>()
         val visited = mutableSetOf<String>()
         
-        queue.add(listOf(myNodeName))
-        visited.add(myNodeName)
+        queue.add(listOf(myNodeId))
+        visited.add(myNodeId)
         
         while (queue.isNotEmpty()) {
             val path = queue.removeFirst()
             val currentNode = path.last()
             
-            if (currentNode == targetName) {
-                return path
+            if (currentNode == targetNodeId) {
+                return path.map { stableNames[it] ?: "#$it" }
             }
             
             val neighbors = mutableSetOf<String>()
-            if (currentNode == myNodeName) {
-                neighbors.addAll(connectedDevices.map { it.name })
+            if (currentNode == myNodeId) {
+                neighbors.addAll(connectedDevices.mapNotNull { it.nodeId.ifBlank { NodeIdentity.idOf(it.name).orEmpty() }.takeIf(String::isNotBlank) })
             } else {
-                networkGraph[currentNode]?.let { neighbors.addAll(it) }
+                stableRouteGraph[currentNode]?.let { neighbors.addAll(it) }
             }
             
             for (neighbor in neighbors) {

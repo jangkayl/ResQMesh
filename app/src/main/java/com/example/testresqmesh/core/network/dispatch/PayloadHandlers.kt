@@ -5,6 +5,7 @@ import com.example.testresqmesh.core.network.BlockControlEnvelope
 import com.example.testresqmesh.core.network.BlockControlKind
 import com.example.testresqmesh.core.network.PayloadDispatcherCallback
 import com.example.testresqmesh.core.network.CryptoManager
+import com.example.testresqmesh.core.model.NodeIdentity
 import com.example.testresqmesh.core.utils.AppLogger
 import com.example.testresqmesh.core.utils.TerminalLogCategory
 import kotlinx.serialization.encodeToByteArray
@@ -25,20 +26,14 @@ class SystemPulseHandler : PayloadHandler {
     override fun handle(endpointId: String, payload: MeshPayload, payloadBytes: ByteArray, callback: PayloadDispatcherCallback) {
         val sender = payload.senderName
         val msgId = payload.id
-        callback.onDeviceNameSync(endpointId, sender)
-        AppLogger.event(
-            category = TerminalLogCategory.SYNC,
-            event = "IDENTITY_SYNCED",
-            message = "Peer identity confirmed from a SYSTEM pulse",
-            peerName = sender,
-            endpoint = endpointId
-        )
-        
+        // Direct-link identity binding happens before dispatch in NativeBleManager. A SYSTEM pulse
+        // can be forwarded by a different physical peer, so it must never rename this endpoint.
+        val senderNodeId = payload.senderNodeId.ifBlank { com.example.testresqmesh.core.model.NodeIdentity.idOf(sender).orEmpty() }
         if (payload.publicKey.isNotEmpty()) {
-            callback.onPublicKeyReceived(endpointId, sender, payload.publicKey)
+            callback.onPublicKeyReceived(sender, senderNodeId, payload.publicKey)
         }
-        if (payload.connectedNodes.isNotEmpty()) {
-            callback.onRoutingTableReceived(sender, payload.connectedNodes)
+        if (payload.connectedNodes.isNotEmpty() || payload.connectedNodeIds.isNotEmpty()) {
+            callback.onRoutingTableReceived(sender, senderNodeId, payload.connectedNodes, payload.connectedNodeIds)
         }
         AppLogger.event(
             category = TerminalLogCategory.SYNC,
@@ -50,9 +45,10 @@ class SystemPulseHandler : PayloadHandler {
         
         callback.onMessageReceived(endpointId, msgId, sender, "", false, true, null, null, null, null, "LOCAL", emptyList(), payload.channelId)
         
+        if (payload.relayHopCount >= MAX_SYSTEM_RELAY_HOPS) return
         val routePath = payload.routePath.toMutableList()
         routePath.add(callback.getMyDeviceName())
-        val updatedPayload = payload.copy(routePath = routePath)
+        val updatedPayload = payload.copy(routePath = routePath, relayHopCount = payload.relayHopCount + 1)
         val updatedBytes = ProtoBuf.encodeToByteArray(updatedPayload)
         callback.broadcastPayload(updatedBytes, endpointId)
         AppLogger.event(
@@ -63,6 +59,10 @@ class SystemPulseHandler : PayloadHandler {
             endpoint = endpointId,
             isVerbose = true
         )
+    }
+
+    private companion object {
+        const val MAX_SYSTEM_RELAY_HOPS = 4
     }
 }
 
@@ -124,16 +124,24 @@ class ReceiptHandler : PayloadHandler {
         returnRoute.add(callback.getMyDeviceName())
         val updatedPayload = payload.copy(returnRoute = returnRoute)
         
+        val routeIds = payload.directedRouteNodeIds
+        if (payload.isPrivate) {
+            val myIndex = routeIds.indexOf(callback.getMyNodeId())
+            val nextEndpoint = routeIds.getOrNull(myIndex + 1)?.let(callback::getConnectedEndpointIdByNodeId)
+            if (nextEndpoint != null) {
+                AppLogger.d("PayloadDispatcher", "Private receipt forwarding to selected next hop")
+                callback.sendDirectPayload(nextEndpoint, ProtoBuf.encodeToByteArray(updatedPayload))
+            } else {
+                AppLogger.d("PayloadDispatcher", "Private receipt route unavailable; not broadcasting")
+            }
+            return
+        }
         if (directedRoute.isNotEmpty()) {
             val myIndex = directedRoute.indexOf(callback.getMyDeviceName())
-            if (myIndex != -1 && myIndex + 1 < directedRoute.size) {
-                val nextHopName = directedRoute[myIndex + 1]
-                val nextHopEndpointId = callback.getConnectedEndpointIdByName(nextHopName)
-                if (nextHopEndpointId != null) {
-                    val bytes = ProtoBuf.encodeToByteArray(updatedPayload)
-                    callback.sendDirectPayload(nextHopEndpointId, bytes)
-                    return
-                }
+            val nextHopEndpointId = directedRoute.getOrNull(myIndex + 1)?.let(callback::getConnectedEndpointIdByName)
+            if (nextHopEndpointId != null) {
+                callback.sendDirectPayload(nextHopEndpointId, ProtoBuf.encodeToByteArray(updatedPayload))
+                return
             }
         }
         
@@ -153,15 +161,15 @@ class GoodbyeHandler : PayloadHandler {
 private fun forwardBlockControl(endpointId: String, payload: MeshPayload, callback: PayloadDispatcherCallback) {
     val routePath = (payload.routePath + callback.getMyDeviceName()).distinct()
     val forwarded = payload.copy(routePath = routePath)
-    val directed = forwarded.directedRoute
-    val index = directed.indexOf(callback.getMyDeviceName())
-    if (index >= 0 && index + 1 < directed.size) {
-        callback.getConnectedEndpointIdByName(directed[index + 1])?.let { nextEndpoint ->
+    val routeIds = forwarded.directedRouteNodeIds
+    val index = routeIds.indexOf(callback.getMyNodeId())
+    if (index >= 0 && index + 1 < routeIds.size) {
+        callback.getConnectedEndpointIdByNodeId(routeIds[index + 1])?.let { nextEndpoint ->
             callback.sendPriorityPayload(nextEndpoint, ProtoBuf.encodeToByteArray(forwarded))
             return
         }
     }
-    callback.broadcastPayload(ProtoBuf.encodeToByteArray(forwarded), endpointId)
+    AppLogger.d("PayloadDispatcher", "Private control route unavailable; not broadcasting")
 }
 
 private fun decryptBlockControl(payload: MeshPayload): BlockControlEnvelope? {
@@ -174,13 +182,13 @@ class BlockRequestHandler : PayloadHandler {
     override fun canHandle(payloadType: String) = payloadType == "BLOCK_REQUEST"
 
     override fun handle(endpointId: String, payload: MeshPayload, payloadBytes: ByteArray, callback: PayloadDispatcherCallback) {
-        if (payload.targetName != callback.getMyDeviceName()) {
+        if (!payload.targetNodeId.equals(callback.getMyNodeId(), ignoreCase = true)) {
             forwardBlockControl(endpointId, payload, callback)
             return
         }
         val envelope = decryptBlockControl(payload) ?: return
         if (envelope.kind != BlockControlKind.REQUEST || envelope.operationId != payload.targetMessageId ||
-            envelope.targetName != callback.getMyDeviceName() || envelope.initiatorName != payload.senderName
+            !NodeIdentity.matches(envelope.targetName, callback.getMyDeviceName()) || !NodeIdentity.matches(envelope.initiatorName, payload.senderName)
         ) return
         callback.onBlockRequest(endpointId, payload, envelope)
     }
@@ -190,13 +198,13 @@ class BlockAckHandler : PayloadHandler {
     override fun canHandle(payloadType: String) = payloadType == "BLOCK_ACK"
 
     override fun handle(endpointId: String, payload: MeshPayload, payloadBytes: ByteArray, callback: PayloadDispatcherCallback) {
-        if (payload.targetName != callback.getMyDeviceName()) {
+        if (!payload.targetNodeId.equals(callback.getMyNodeId(), ignoreCase = true)) {
             forwardBlockControl(endpointId, payload, callback)
             return
         }
         val envelope = decryptBlockControl(payload) ?: return
         if (envelope.kind != BlockControlKind.ACK || envelope.operationId != payload.targetMessageId ||
-            envelope.targetName != callback.getMyDeviceName() || envelope.initiatorName != payload.senderName
+            !NodeIdentity.matches(envelope.targetName, callback.getMyDeviceName()) || !NodeIdentity.matches(envelope.initiatorName, payload.senderName)
         ) return
         callback.onBlockAck(endpointId, payload, envelope)
     }
@@ -215,8 +223,6 @@ class LiveAudioHandler : PayloadHandler {
         val chunk = payload.liveAudioChunk ?: return
         val channelId = payload.channelId
         callback.onLiveAudioChunk(payload.senderName, channelId, chunk)
-        
-        // STP Directed Routing
         val stpNeighbors = callback.getStpNeighbors()
         if (stpNeighbors.isEmpty()) return
 
@@ -257,7 +263,9 @@ class StandardMessageHandler : PayloadHandler {
             AppLogger.d("MeshNetwork_E2EE", "INBOUND PUBLIC PAYLOAD DETECTED from $sender. No encryption applied.")
         }
 
-        if (isEncrypted && targetName == callback.getMyDeviceName()) {
+        val isTarget = payload.targetNodeId.isNotBlank() && payload.targetNodeId.equals(callback.getMyNodeId(), ignoreCase = true) ||
+            (payload.targetNodeId.isBlank() && NodeIdentity.matches(targetName, callback.getMyDeviceName()))
+        if (isEncrypted && isTarget) {
             val encryptedData = payload.encryptedData
             val encryptedKey = payload.encryptedKey
             
@@ -297,7 +305,7 @@ class StandardMessageHandler : PayloadHandler {
         val directedRoute = payload.directedRoute
 
         if (isPrivate) {
-            if (targetName == callback.getMyDeviceName()) {
+            if (isTarget) {
                 callback.showNotification(sender, text)
                 callback.onMessageReceived(endpointId, msgId, sender, text, isPrivate, false, imageBase64, audioBase64, locationLat, locationLng, medium, routePath, payload.channelId)
             } else {
@@ -306,19 +314,17 @@ class StandardMessageHandler : PayloadHandler {
                 val updatedPayload = payload.copy(routePath = routePath)
                 val updatedBytes = ProtoBuf.encodeToByteArray(updatedPayload)
                 
-                if (directedRoute.isNotEmpty()) {
-                    val myIndex = directedRoute.indexOf(callback.getMyDeviceName())
-                    if (myIndex != -1 && myIndex + 1 < directedRoute.size) {
-                        val nextHopName = directedRoute[myIndex + 1]
-                        val nextHopEndpointId = callback.getConnectedEndpointIdByName(nextHopName)
-                        if (nextHopEndpointId != null) {
-                            callback.sendDirectPayload(nextHopEndpointId, updatedBytes)
-                            return
-                        }
+                val routeIds = payload.directedRouteNodeIds
+                if (routeIds.isNotEmpty()) {
+                    val myIndex = routeIds.indexOf(callback.getMyNodeId())
+                    val nextEndpoint = routeIds.getOrNull(myIndex + 1)?.let(callback::getConnectedEndpointIdByNodeId)
+                    if (nextEndpoint != null) {
+                        AppLogger.d("PayloadDispatcher", "Private relay forwarding to selected next hop")
+                        callback.sendDirectPayload(nextEndpoint, updatedBytes)
+                        return
                     }
                 }
-                
-                callback.broadcastPayload(updatedBytes, endpointId)
+                AppLogger.d("PayloadDispatcher", "Private relay route unavailable; not broadcasting")
             }
         } else {
             if (payload.isSOSCancel) {

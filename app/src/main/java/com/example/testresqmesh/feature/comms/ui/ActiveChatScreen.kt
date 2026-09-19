@@ -7,6 +7,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -29,6 +30,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import androidx.compose.material.icons.automirrored.outlined.Reply
 import androidx.compose.material.icons.automirrored.outlined.Send
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.DeleteOutline
@@ -37,6 +39,12 @@ import androidx.compose.material.icons.outlined.LocationOn
 import androidx.compose.material.icons.outlined.Mic
 import androidx.compose.material.icons.outlined.PlayArrow
 import androidx.compose.material.icons.outlined.Stop
+import com.example.testresqmesh.core.ui.components.dialogs.ResQConfirmationDialog
+import com.example.testresqmesh.feature.comms.ui.components.ChatInput
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -59,15 +67,16 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import com.example.testresqmesh.R
 import com.example.testresqmesh.core.model.ChatMessage
@@ -79,6 +88,8 @@ import com.example.testresqmesh.core.ui.theme.ResQTheme
 import com.example.testresqmesh.core.ui.theme.Spacing
 import com.example.testresqmesh.core.ui.theme.TestResQMeshTheme
 import com.example.testresqmesh.core.utils.MediaHelper
+import com.example.testresqmesh.feature.comms.ui.components.FullscreenImageViewer
+import com.example.testresqmesh.feature.comms.ui.components.ModernVoicePlayer
 import com.example.testresqmesh.feature.comms.viewmodel.CommunicationViewModel
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -109,10 +120,17 @@ fun ActiveChatScreen(
     var pendingImage by remember { mutableStateOf<String?>(null) }
     var pendingAudio by remember { mutableStateOf<String?>(null) }
     var isRecording by remember { mutableStateOf(false) }
+    var replyingToMessage by remember { mutableStateOf<ChatMessage?>(null) }
     var showDeleteDialog by remember { mutableStateOf(false) }
+    var showKeyChangeDialog by remember { mutableStateOf(false) }
 
     LaunchedEffect(viewModel) {
         viewModel.privateSendErrors.collect { snackbarHostState.showSnackbar(it) }
+    }
+    LaunchedEffect(viewModel, name) {
+        viewModel.pendingKeyVerification.collect { peer ->
+            if (NodeIdentity.matches(peer, name)) showKeyChangeDialog = true
+        }
     }
 
     LaunchedEffect(latestMessageId) {
@@ -129,6 +147,20 @@ fun ActiveChatScreen(
             }
         )
     }
+    if (showKeyChangeDialog) {
+        AlertDialog(
+            onDismissRequest = { showKeyChangeDialog = false },
+            title = { Text("Recipient key changed") },
+            text = { Text("This device advertised a different encryption key. Accept it only after verifying the recipient through a separate channel, then resend your message.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    viewModel.acceptPendingPublicKeyChange(name)
+                    showKeyChangeDialog = false
+                }) { Text("Accept new key") }
+            },
+            dismissButton = { TextButton(onClick = { showKeyChangeDialog = false }) { Text("Keep existing key") } }
+        )
+    }
 
     ResQAuroraBackground(Modifier.fillMaxSize()) {
         Scaffold(
@@ -143,16 +175,16 @@ fun ActiveChatScreen(
                 )
             },
             bottomBar = {
-                PrivateChatComposer(
-                    draft = drafts[name].orEmpty(),
-                    onDraftChange = { viewModel.updatePrivateDraft(name, it) },
+                ChatInput(
+                    inputText = drafts[name].orEmpty(),
+                    onTextChange = { viewModel.updatePrivateDraft(name, it) },
                     pendingImage = pendingImage,
                     onImageSelected = { pendingImage = it },
                     onClearImage = { pendingImage = null },
                     pendingAudio = pendingAudio,
                     onClearAudio = { pendingAudio = null },
                     isRecording = isRecording,
-                    onToggleRecording = {
+                    onToggleRecord = {
                         if (isRecording) {
                             isRecording = false
                             mediaHelper.stopRecording()?.let { pendingAudio = it }
@@ -160,18 +192,31 @@ fun ActiveChatScreen(
                             isRecording = mediaHelper.startRecording()
                         }
                     },
+                    replyingTo = replyingToMessage,
+                    onCancelReply = { replyingToMessage = null },
                     onSend = {
                         val text = drafts[name].orEmpty().trim()
-                        val messageText = when {
+                        val rawMessage = when {
                             text.isNotBlank() -> text
                             pendingAudio != null -> voiceNoteText
                             pendingImage != null -> photoText
                             else -> ""
                         }
-                        if (messageText.isBlank() && pendingImage == null && pendingAudio == null) return@PrivateChatComposer
+                        if (rawMessage.isBlank() && pendingImage == null && pendingAudio == null) return@ChatInput
+                        val finalMessage = if (replyingToMessage != null && rawMessage.isNotBlank()) {
+                            val quoteSender = if (replyingToMessage!!.isMine) "Me" else displayName
+                            val quoteSnippet = replyingToMessage!!.text.take(60).ifBlank {
+                                if (replyingToMessage!!.imageBase64 != null) photoText
+                                else if (replyingToMessage!!.audioBase64 != null) voiceNoteText
+                                else "Attachment"
+                            }
+                            "> $quoteSender: $quoteSnippet\n$rawMessage"
+                        } else {
+                            rawMessage
+                        }
                         val sent = viewModel.sendPrivateMessage(
                             targetName = name,
-                            text = messageText,
+                            text = finalMessage,
                             imageBase64 = pendingImage,
                             audioBase64 = pendingAudio
                         )
@@ -179,6 +224,7 @@ fun ActiveChatScreen(
                             viewModel.clearPrivateDraft(name)
                             pendingImage = null
                             pendingAudio = null
+                            replyingToMessage = null
                         }
                     },
                     onSendLocation = {
@@ -211,10 +257,10 @@ fun ActiveChatScreen(
                         .fillMaxSize()
                         .padding(innerPadding),
                     contentPadding = PaddingValues(
-                        start = Spacing.Large,
+                        start = Spacing.Medium,
                         top = Spacing.Small,
-                        end = Spacing.Large,
-                        bottom = Spacing.Large
+                        end = Spacing.Medium,
+                        bottom = Spacing.Medium
                     ),
                     verticalArrangement = Arrangement.spacedBy(Spacing.Small, Alignment.Bottom),
                     reverseLayout = true
@@ -230,7 +276,8 @@ fun ActiveChatScreen(
                             mediaHelper = mediaHelper,
                             onViewMap = { latitude, longitude ->
                                 onViewMap(latitude, longitude, message.senderName, message.text)
-                            }
+                            },
+                            onReplyClick = { replyingToMessage = it }
                         )
                     }
                 }
@@ -304,209 +351,184 @@ internal fun PrivateChatHeader(
 private fun PrivateMessageBubble(
     message: ChatMessage,
     mediaHelper: MediaHelper,
-    onViewMap: (Double, Double) -> Unit
+    onViewMap: (Double, Double) -> Unit,
+    onReplyClick: ((ChatMessage) -> Unit)? = null
 ) {
     val mine = message.isMine
     val bubbleColor = if (mine) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface
     val contentColor = if (mine) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
     val shape = if (mine) {
-        RoundedCornerShape(22.dp, 22.dp, 6.dp, 22.dp)
+        RoundedCornerShape(10.dp, 10.dp, 3.dp, 10.dp)
     } else {
-        RoundedCornerShape(22.dp, 22.dp, 22.dp, 6.dp)
+        RoundedCornerShape(10.dp, 10.dp, 10.dp, 3.dp)
+    }
+
+    var fullScreenImage by remember { mutableStateOf<String?>(null) }
+    var showMenu by remember { mutableStateOf(false) }
+
+    if (fullScreenImage != null) {
+        FullscreenImageViewer(
+            imageBase64 = fullScreenImage!!,
+            mediaHelper = mediaHelper,
+            onDismiss = { fullScreenImage = null }
+        )
     }
 
     Column(
         modifier = Modifier.fillMaxWidth(),
         horizontalAlignment = if (mine) Alignment.End else Alignment.Start
     ) {
-        Surface(
-            modifier = Modifier.widthIn(max = 300.dp),
-            shape = shape,
-            color = bubbleColor,
-            contentColor = contentColor,
-            shadowElevation = if (mine) 4.dp else 8.dp
-        ) {
-            Column(modifier = Modifier.padding(Spacing.Medium)) {
-                message.imageBase64?.let { image ->
-                    val bitmap = remember(image) { mediaHelper.decodeBase64ToBitmap(image) }
-                    if (bitmap != null) {
-                        Image(
-                            bitmap = bitmap.asImageBitmap(),
-                            contentDescription = stringResource(R.string.private_chat_image_description),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(180.dp)
-                                .clip(RoundedCornerShape(14.dp)),
-                            contentScale = ContentScale.Crop
+        Box {
+            Surface(
+                modifier = Modifier
+                    .widthIn(max = 260.dp)
+                    .clickable { showMenu = true },
+                shape = shape,
+                color = bubbleColor,
+                contentColor = contentColor,
+                shadowElevation = if (mine) 3.dp else 4.dp
+            ) {
+                Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)) {
+                    message.imageBase64?.let { image ->
+                        val bitmap = remember(image) { mediaHelper.decodeBase64ToBitmap(image) }
+                        if (bitmap != null) {
+                            Image(
+                                bitmap = bitmap.asImageBitmap(),
+                                contentDescription = stringResource(R.string.private_chat_image_description),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(180.dp)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .clickable { fullScreenImage = image },
+                                contentScale = ContentScale.Crop
+                            )
+                            Spacer(Modifier.height(Spacing.Small))
+                        }
+                    }
+                    message.audioBase64?.let { audio ->
+                        ModernVoicePlayer(
+                            audioBase64 = audio,
+                            mediaHelper = mediaHelper,
+                            modifier = Modifier.padding(vertical = 4.dp)
                         )
+                        Spacer(Modifier.height(Spacing.ExtraSmall))
+                    }
+                    if (message.locationLat != null && message.locationLng != null) {
+                        Surface(
+                            shape = RoundedCornerShape(14.dp),
+                            color = contentColor.copy(alpha = 0.12f)
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(Spacing.Small),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(Icons.Outlined.LocationOn, contentDescription = null)
+                                Spacer(Modifier.width(Spacing.ExtraSmall))
+                                Text(stringResource(R.string.private_chat_location_shared))
+                                Spacer(Modifier.width(Spacing.Small))
+                                TextButton(onClick = { onViewMap(message.locationLat, message.locationLng) }) {
+                                    Text(stringResource(R.string.private_chat_view_map_action))
+                                }
+                            }
+                        }
                         Spacer(Modifier.height(Spacing.Small))
                     }
-                }
-                message.audioBase64?.let { audio ->
-                    TextButton(onClick = { mediaHelper.playVoiceMail(audio) }) {
-                        Icon(Icons.Outlined.PlayArrow, contentDescription = null)
-                        Spacer(Modifier.width(Spacing.ExtraSmall))
-                        Text(stringResource(R.string.private_chat_voice_note))
+
+                    val (replyQuote, actualText) = remember(message.text) {
+                        if (message.text.startsWith("> ") && message.text.contains("\n")) {
+                            val firstNewline = message.text.indexOf("\n")
+                            val quote = message.text.substring(2, firstNewline).trim()
+                            val rest = message.text.substring(firstNewline + 1).trim()
+                            quote to rest
+                        } else {
+                            null to message.text
+                        }
                     }
-                }
-                if (message.locationLat != null && message.locationLng != null) {
-                    Surface(
-                        shape = RoundedCornerShape(14.dp),
-                        color = contentColor.copy(alpha = 0.12f)
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(Spacing.Small),
-                            verticalAlignment = Alignment.CenterVertically
+
+                    if (replyQuote != null) {
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = contentColor.copy(alpha = 0.12f),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(bottom = 6.dp)
                         ) {
-                            Icon(Icons.Outlined.LocationOn, contentDescription = null)
-                            Spacer(Modifier.width(Spacing.ExtraSmall))
-                            Text(stringResource(R.string.private_chat_location_shared))
-                            Spacer(Modifier.width(Spacing.Small))
-                            TextButton(onClick = { onViewMap(message.locationLat, message.locationLng) }) {
-                                Text(stringResource(R.string.private_chat_view_map_action))
+                            Row(
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .width(3.dp)
+                                        .height(20.dp)
+                                        .clip(RoundedCornerShape(1.5.dp))
+                                        .background(if (mine) Color.White.copy(alpha = 0.85f) else MaterialTheme.colorScheme.primary)
+                                )
+                                Spacer(Modifier.width(6.dp))
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Outlined.Reply,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(13.dp),
+                                    tint = if (mine) Color.White.copy(alpha = 0.85f) else MaterialTheme.colorScheme.primary
+                                )
+                                Spacer(Modifier.width(4.dp))
+                                Text(
+                                    text = replyQuote,
+                                    style = MaterialTheme.typography.labelSmall.copy(
+                                        fontSize = 11.sp,
+                                        fontFamily = FontFamily.Monospace
+                                    ),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    color = contentColor.copy(alpha = 0.9f)
+                                )
                             }
                         }
                     }
-                    Spacer(Modifier.height(Spacing.Small))
-                }
-                if (message.text.isNotBlank()) {
-                    Text(text = message.text, style = MaterialTheme.typography.bodyLarge)
-                }
-                Spacer(Modifier.height(Spacing.ExtraSmall))
-                Row(
-                    modifier = Modifier.align(Alignment.End),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    if (mine) {
+
+                    if (actualText.isNotBlank()) {
+                        Text(text = actualText, style = MaterialTheme.typography.bodyLarge)
+                    }
+
+                    Spacer(Modifier.height(Spacing.ExtraSmall))
+                    Row(
+                        modifier = Modifier.align(Alignment.End),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        if (mine) {
+                            Text(
+                                text = deliveryLabel(message),
+                                style = MaterialTheme.typography.labelMedium,
+                                color = contentColor.copy(alpha = 0.72f)
+                            )
+                            Spacer(Modifier.width(Spacing.Small))
+                        }
                         Text(
-                            text = deliveryLabel(message),
+                            text = messageTime(message.timestamp),
                             style = MaterialTheme.typography.labelMedium,
                             color = contentColor.copy(alpha = 0.72f)
                         )
-                        Spacer(Modifier.width(Spacing.Small))
-                    }
-                    Text(
-                        text = messageTime(message.timestamp),
-                        style = MaterialTheme.typography.labelMedium,
-                        color = contentColor.copy(alpha = 0.72f)
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun PrivateChatComposer(
-    draft: String,
-    onDraftChange: (String) -> Unit,
-    pendingImage: String?,
-    onImageSelected: (String) -> Unit,
-    onClearImage: () -> Unit,
-    pendingAudio: String?,
-    onClearAudio: () -> Unit,
-    isRecording: Boolean,
-    onToggleRecording: () -> Unit,
-    onSend: () -> Unit,
-    onSendLocation: () -> Unit,
-    mediaHelper: MediaHelper
-) {
-    val context = LocalContext.current
-    val imagePicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
-        uri?.let {
-            val bitmap = android.graphics.BitmapFactory.decodeStream(context.contentResolver.openInputStream(it))
-            if (bitmap != null) onImageSelected(mediaHelper.compressBitmapToBase64(bitmap))
-        }
-    }
-    val canSend = (draft.isNotBlank() || pendingImage != null || pendingAudio != null) && !isRecording
-
-    ResQGlassSurface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .imePadding()
-            .padding(horizontal = Spacing.Small, vertical = Spacing.Small),
-        shape = RoundedCornerShape(28.dp),
-        contentPadding = PaddingValues(Spacing.Small),
-        shadowElevation = 18.dp
-    ) {
-        Column {
-            if (pendingImage != null || pendingAudio != null) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = if (pendingImage != null) stringResource(R.string.private_chat_photo) else stringResource(R.string.private_chat_voice_note),
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.weight(1f)
-                    )
-                    IconButton(onClick = {
-                        if (pendingImage != null) onClearImage() else onClearAudio()
-                    }) {
-                        Icon(
-                            imageVector = Icons.Outlined.Close,
-                            contentDescription = stringResource(R.string.private_chat_remove_attachment)
-                        )
                     }
                 }
             }
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = { imagePicker.launch("image/*") }) {
-                    Icon(
-                        imageVector = Icons.Outlined.Image,
-                        contentDescription = stringResource(R.string.private_chat_add_image_action),
-                        tint = MaterialTheme.colorScheme.primary
-                    )
-                }
-                IconButton(onClick = onSendLocation) {
-                    Icon(
-                        imageVector = Icons.Outlined.LocationOn,
-                        contentDescription = stringResource(R.string.private_chat_share_location_action),
-                        tint = MaterialTheme.colorScheme.primary
-                    )
-                }
-                IconButton(onClick = onToggleRecording) {
-                    Icon(
-                        imageVector = if (isRecording) Icons.Outlined.Stop else Icons.Outlined.Mic,
-                        contentDescription = stringResource(
-                            if (isRecording) R.string.private_chat_stop_recording_action else R.string.private_chat_record_action
-                        ),
-                        tint = if (isRecording) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
-                    )
-                }
-                Surface(
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(48.dp),
-                    shape = RoundedCornerShape(20.dp),
-                    color = MaterialTheme.colorScheme.surfaceVariant
+
+            if (onReplyClick != null) {
+                DropdownMenu(
+                    expanded = showMenu,
+                    onDismissRequest = { showMenu = false }
                 ) {
-                    BasicTextField(
-                        value = draft,
-                        onValueChange = onDraftChange,
-                        enabled = !isRecording,
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(horizontal = Spacing.Medium, vertical = 13.dp),
-                        textStyle = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onSurface),
-                        decorationBox = { input ->
-                            if (draft.isEmpty() && !isRecording) {
-                                Text(
-                                    text = stringResource(R.string.private_chat_message_placeholder),
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                            input()
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.chat_reply_action)) },
+                        leadingIcon = {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Outlined.Reply,
+                                contentDescription = null
+                            )
+                        },
+                        onClick = {
+                            showMenu = false
+                            onReplyClick.invoke(message)
                         }
-                    )
-                }
-                IconButton(onClick = onSend, enabled = canSend) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Outlined.Send,
-                        contentDescription = stringResource(R.string.private_chat_send_action),
-                        tint = if (canSend) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
@@ -520,19 +542,15 @@ private fun DeleteConversationDialog(
     onDismiss: () -> Unit,
     onDelete: () -> Unit
 ) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.private_chat_delete_title)) },
-        text = { Text(stringResource(R.string.private_chat_delete_description, name)) },
-        confirmButton = {
-            Button(
-                onClick = onDelete,
-                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
-            ) { Text(stringResource(R.string.private_chat_delete_confirm)) }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) { Text(stringResource(R.string.private_chat_cancel_action)) }
-        }
+    ResQConfirmationDialog(
+        title = stringResource(R.string.private_chat_delete_title),
+        message = stringResource(R.string.private_chat_delete_description, name),
+        confirmText = stringResource(R.string.private_chat_delete_confirm),
+        cancelText = stringResource(R.string.private_chat_cancel_action),
+        icon = Icons.Outlined.DeleteOutline,
+        isDestructive = true,
+        onConfirm = onDelete,
+        onDismiss = onDismiss
     )
 }
 

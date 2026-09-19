@@ -37,15 +37,15 @@ DISCONNECTED -> CONNECTING -> DISCOVERING -> CONFIGURING -> READY
       +------------------- DISCONNECTING <---------------------+
 ```
 
-Client readiness follows required GATT configuration such as service discovery and CCCD completion. Server readiness follows subscription. Server-to-client GATT fallback uses acknowledged indications so queue advancement is tied to `onNotificationSent` rather than an unacknowledged notification accepted only by the local stack. `GattTransferCoordinator` owns deterministic flight claiming, generation checks, bounded queue admission, chunk completion, removal, and L2CAP queue promotion. `MeshFrameCodec` applies the same length-prefix and payload bounds to GATT and L2CAP. `HeartbeatCoordinator` owns one generation-bound challenge per endpoint; Android scheduling and radio I/O remain in `NativeBleManager`. Same-address late server callback ownership and queue overflow/retry behavior still require review and device evidence.
+Client readiness requires discovery/CCCD; server readiness requires subscription. Fallback uses acknowledged indications, and coordinators own generation checks, bounded queues, frame bounds, L2CAP promotion, and one heartbeat per endpoint. Same-address callback ownership and queue behavior still need device evidence.
 
 If Android revokes `BLUETOOTH_CONNECT` during orphan preemption or an in-flight GATT write/indication, the operation is caught, logged without payload content, and retired through the existing flight/link cleanup path rather than crashing the process.
 
-Client setup treats the default 20-byte ATT payload as the reliable baseline: service discovery and CCCD subscription establish `READY` without waiting for MTU negotiation. A GATT-server connection callback for an endpoint already owned by a live outbound client is treated as another local view of that ACL, not as a second configuring mesh role with its own destructive timeout.
+Client setup uses the reliable 20-byte ATT baseline; `READY` does not wait for MTU negotiation. A server callback for a live outbound endpoint is another view of that ACL, not a second destructive role.
 
-A generation-owned radio handshake gate pauses discovery scanning while any client or server link is configuring. Advertising starts once with the mesh session and is not restarted when the direct-link count changes; local admission remains authoritative even though the advertised count can be stale until the next session. Existing ready links continue carrying traffic, and only the last setup owner may resume balanced scanning. The higher election score is the sole initiator; the yielding peer no longer schedules a delayed role reversal. An inbound setup also blocks a previously scheduled outbound attempt, keeping setup single-flight even when the two roles use different private addresses.
+A generation-owned gate pauses scanning during setup while ready links continue traffic. Advertising is session-owned; higher election score is the sole initiator. Busy candidates stay in a stable-ID bootstrap queue, with one outbound `connectGatt` at a time.
 
-The elected client owns a 15-second setup deadline covering connect, discovery, and CCCD subscription. The server's 20-second configuring deadline is only an orphan backstop if the client and its disconnect callback vanish. A provisional peer's 10-second identity deadline starts only after CCCD reaches `READY`, so identity waiting cannot abort ATT discovery.
+The elected client has a five-second connect/discovery/CCCD deadline; bootstrap retries are bounded. Server configuration is an orphan backstop, and provisional identity waiting starts only after `READY`.
 
 Outbound GATT uses Android's `AUTO` transport for known-good peers because the project previously observed immediate disconnects with globally forced LE on some OEM pairs. If `AUTO` reaches `CONNECTED` but receives no ATT service-discovery response, the stable peer identity is marked for explicit `TRANSPORT_LE` on the next attempt in that app session. This is a per-peer compatibility fallback, not a Samsung model allowlist.
 
@@ -69,13 +69,13 @@ Keep these states distinct:
 - Advertising/recently seen but not connected.
 - Offline after a previously known link disappears.
 
-Topology freshness, empty topology withdrawal, deduplication lifetime, and hop/expiry bounds remain separate routing concerns in `docs/status.md`.
+Topology is now recorded by stable node ID for private routes. SYSTEM pulses may relay a node's public key and stable-neighbor IDs, but a relayed pulse never changes the identity of its physical forwarding endpoint. SYSTEM forwarding is bounded to four hops. Name-only legacy topology remains visible but is not eligible for indirect private routing; topology freshness, empty topology withdrawal, and deduplication lifetime remain separate concerns in `docs/status.md`.
 
 ## Private messaging
 
-`CryptoManager` uses an Android Keystore RSA key pair and per-message AES-GCM content encryption. The working tree refuses private sends without a usable recipient public key, drops unencrypted or undecryptable private envelopes, and keeps private locations inside encrypted content. `PeerPublicKeyCache` associates keys with peer/endpoint observations.
+`CryptoManager` uses an Android Keystore RSA key pair and per-message AES-GCM content encryption. The working tree refuses private sends without a payload-ready local link, stable directed route, and usable recipient key; private relays and private receipts never broadcast when their next hop is unavailable. Public keys learned in SYSTEM pulses are persisted by stable node ID using trust on first use: a changed key is held pending rather than silently replacing the pinned key. Public keys are public metadata, not secret material.
 
-This is not yet a basis for claiming authenticated end-to-end encryption or forward secrecy. Public-key authentication, identity binding, key epochs/current-key acknowledgment, and backup/storage policy remain open production concerns.
+This is not yet a basis for claiming authenticated end-to-end encryption or forward secrecy. TOFU can detect a later substitution but does not authenticate the first observation; key verification UI, key epochs/current-key acknowledgment, and backup/storage policy remain open production concerns.
 
 ## Persistence and UI
 

@@ -12,6 +12,7 @@ import com.example.testresqmesh.core.model.ConnectedDevice
 import com.example.testresqmesh.core.model.NodeIdentity
 import com.example.testresqmesh.core.model.ScanEvent
 import com.example.testresqmesh.core.network.NativeBleManager
+import com.example.testresqmesh.core.network.bluetooth.BleConnectStartResult
 import com.example.testresqmesh.core.network.bluetooth.state.BleLinkRole
 import com.example.testresqmesh.core.network.bluetooth.state.BleLinkState
 import com.example.testresqmesh.core.network.bluetooth.state.MeshFrameCodec
@@ -39,36 +40,36 @@ class GattClientManager(
         )
     }
 
-    fun connectToPersistentGatt(macAddress: String, peerName: String) {
+    fun connectToPersistentGatt(macAddress: String, peerName: String): BleConnectStartResult {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
             ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED
         ) {
             AppLogger.d("BLE_MESH", "GATT connect skipped for $peerName: BLUETOOTH_CONNECT is not granted")
-            return
+            return BleConnectStartResult.REJECTED
         }
         with(manager) {
         if (isDeviceBlocked(peerName)) {
             AppLogger.d("BLE_MESH", "Skipping GATT connect to blocked peer $peerName")
-            return
+            return BleConnectStartResult.REJECTED
         }
         // DUPLICATE LINK GUARD: resolve by identity, not by MAC. A peer already connected inbound
         // on its Central MAC used to look absent here, so we would open a second redundant link.
         val existingEndpoint = findLinkEndpointByIdentity(peerName)
         if (existingEndpoint != null) {
             AppLogger.d("BLE_MESH", "Skipping connect to $peerName: already linked on $existingEndpoint.")
-            return
+            return BleConnectStartResult.REJECTED
         }
 
         // A delayed election/reversal may fire after an inbound setup has already started on a
         // different private address. Do not create a second ACL while that handshake is alive.
         if (isRadioHandshakeActive()) {
             AppLogger.d("BLE_MESH", "Deferring outbound GATT to $peerName; another handshake owns the radio")
-            return
+            return BleConnectStartResult.DEFERRED
         }
 
         if (!tryAcquireConnectLock(macAddress)) {
             AppLogger.d("BLE_MESH", "Connect already in progress; deferring $peerName until its cooldown expires.")
-            return
+            return BleConnectStartResult.DEFERRED
         }
 
         handler.post {
@@ -469,8 +470,13 @@ class GattClientManager(
             AppLogger.d("BLE_MESH", "Exception in connectGatt: ${e.message}")
             finishConnectPhase("connectGatt threw")
             store.links.forget(link)
+            return BleConnectStartResult.REJECTED
         }
-    
+        return if (link.gatt != null) BleConnectStartResult.STARTED else {
+            finishConnectPhase("connectGatt returned null")
+            store.links.forget(link)
+            BleConnectStartResult.REJECTED
+        }
         }
     }
 }

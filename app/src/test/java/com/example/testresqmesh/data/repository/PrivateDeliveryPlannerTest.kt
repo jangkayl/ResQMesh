@@ -25,9 +25,9 @@ class PrivateDeliveryPlannerTest {
         )
     }
 
-    @Test fun unavailableNextHopFallsBackToMeshBroadcast() {
+    @Test fun unavailableNextHopFailsClosedInsteadOfBroadcastingPrivatePayload() {
         assertEquals(
-            PrivateDeliveryPlanner.Target.Broadcast,
+            PrivateDeliveryPlanner.Target.Unavailable,
             PrivateDeliveryPlanner.select("recipient", listOf("me", "missing", "recipient"), emptyList())
         )
     }

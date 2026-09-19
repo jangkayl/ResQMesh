@@ -5,6 +5,7 @@ import androidx.compose.animation.*
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.consumeWindowInsets
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -26,7 +27,10 @@ import com.example.testresqmesh.feature.radar.viewmodel.RadarViewModel
 import com.example.testresqmesh.feature.setup.viewmodel.SetupViewModel
 import com.example.testresqmesh.core.utils.MediaHelper
 import com.example.testresqmesh.core.ui.components.layout.ResQAppShell
+import com.example.testresqmesh.core.ui.components.layout.ResQAuroraBackground
 import com.example.testresqmesh.core.ui.components.layout.ResQDestination
+import com.example.testresqmesh.core.ui.theme.AppAppearance
+import com.example.testresqmesh.core.ui.theme.ResQMotion
 
 @Composable
 fun MainContainerScreen(
@@ -34,9 +38,11 @@ fun MainContainerScreen(
     radarViewModel: RadarViewModel,
     commsViewModel: CommunicationViewModel,
     walkieTalkieViewModel: com.example.testresqmesh.feature.comms.viewmodel.WalkieTalkieViewModel,
-    mediaHelper: MediaHelper
+    mediaHelper: MediaHelper,
+    appearance: AppAppearance,
+    onAppearanceSelected: (AppAppearance) -> Unit
 ) {
-    var currentDestination by remember { mutableStateOf(ResQDestination.Home) }
+    var currentDestination by remember { mutableStateOf(ResQDestination.Mission) }
     
     // Sub-navigation state for prototype
     var activeChatNode by remember { mutableStateOf<String?>(null) }
@@ -45,6 +51,7 @@ fun MainContainerScreen(
     var mapSosAlert by remember { mutableStateOf<com.example.testresqmesh.core.model.ChatMessage?>(null) }
     var showProfile by remember { mutableStateOf(false) }
     var showAdvanced by remember { mutableStateOf(false) }
+    var showNetworkDetails by remember { mutableStateOf(false) }
     var isCommunityConversationOpen by remember { mutableStateOf(false) }
 
     // OfflineMapPromptModal and the legacy Radar screen remain in source intentionally. Their
@@ -105,55 +112,79 @@ fun MainContainerScreen(
     }
 
     if (activeChatNode != null) {
-        ActiveChatScreen(
-            name = activeChatNode!!,
-            viewModel = commsViewModel,
-            mediaHelper = mediaHelper,
-            onBack = { activeChatNode = null },
-            onViewMap = { lat, lng, sender, text ->
-                mapSosAlert = com.example.testresqmesh.core.model.ChatMessage(
-                    id = "view_map_${System.currentTimeMillis()}",
-                    senderName = sender,
-                    text = text,
-                    imageBase64 = null,
-                    audioBase64 = null,
-                    locationLat = lat,
-                    locationLng = lng,
-                    isMine = false,
-                    isPrivate = true
-                )
-            }
-        )
+        ResQAuroraBackground(modifier = Modifier.fillMaxSize()) {
+            ActiveChatScreen(
+                name = activeChatNode!!,
+                viewModel = commsViewModel,
+                mediaHelper = mediaHelper,
+                onBack = { activeChatNode = null },
+                onViewMap = { lat, lng, sender, text ->
+                    mapSosAlert = com.example.testresqmesh.core.model.ChatMessage(
+                        id = "view_map_${System.currentTimeMillis()}",
+                        senderName = sender,
+                        text = text,
+                        imageBase64 = null,
+                        audioBase64 = null,
+                        locationLat = lat,
+                        locationLng = lng,
+                        isMine = false,
+                        isPrivate = true
+                    )
+                }
+            )
+        }
         BackHandler { activeChatNode = null }
         return
     }
 
     if (trackingNode != null) {
-        ResponderTrackerScreen(
-            nodeName = trackingNode!!, 
-            onBack = { trackingNode = null },
-            onChat = { 
-                activeChatNode = trackingNode
-                trackingNode = null 
-            }
-        )
+        ResQAuroraBackground(modifier = Modifier.fillMaxSize()) {
+            ResponderTrackerScreen(
+                nodeName = trackingNode!!,
+                onBack = { trackingNode = null },
+                onChat = {
+                    activeChatNode = trackingNode
+                    trackingNode = null
+                }
+            )
+        }
         BackHandler { trackingNode = null }
         return
     }
 
     if (showAdvanced) {
-        AdvancedScreen(walkieTalkieViewModel = walkieTalkieViewModel, onBack = { showAdvanced = false })
+        ResQAuroraBackground(modifier = Modifier.fillMaxSize()) {
+            AdvancedScreen(walkieTalkieViewModel = walkieTalkieViewModel, onBack = { showAdvanced = false })
+        }
         BackHandler { showAdvanced = false }
         return
     }
 
     if (showProfile) {
-        ProfileScreen(
-            viewModel = setupViewModel,
-            onAdvanced = { showAdvanced = true },
-            onBack = { showProfile = false }
-        )
+        ResQAuroraBackground(modifier = Modifier.fillMaxSize()) {
+            ProfileScreen(
+                viewModel = setupViewModel,
+                appearance = appearance,
+                onAppearanceSelected = onAppearanceSelected,
+                onAdvanced = { showAdvanced = true },
+                onBack = { showProfile = false }
+            )
+        }
         BackHandler { showProfile = false }
+        return
+    }
+
+    if (showNetworkDetails) {
+        ResQAuroraBackground(modifier = Modifier.fillMaxSize()) {
+            NetworkScreen(
+                viewModel = radarViewModel,
+                onMessagePeer = { peer ->
+                    showNetworkDetails = false
+                    activeChatNode = peer
+                }
+            )
+        }
+        BackHandler { showNetworkDetails = false }
         return
     }
 
@@ -170,32 +201,31 @@ fun MainContainerScreen(
                 .consumeWindowInsets(innerPadding)
                 .imePadding(),
             transitionSpec = {
-                fadeIn(animationSpec = tween(220, delayMillis = 90)) togetherWith
-                fadeOut(animationSpec = tween(90))
+                fadeIn(animationSpec = tween(ResQMotion.ScreenMillis, delayMillis = 60)) togetherWith
+                fadeOut(animationSpec = tween(ResQMotion.PressMillis))
             },
             label = "ScreenTransition"
         ) { targetScreen ->
             when (targetScreen) {
-                ResQDestination.Home -> HomeScreen(
+                ResQDestination.Mission -> HomeScreen(
                     setupViewModel = setupViewModel,
                     radarViewModel = radarViewModel,
                     onMessagesClick = { currentDestination = ResQDestination.Messages },
-                    onNetworkClick = { currentDestination = ResQDestination.Network },
-                    onProfileClick = { showProfile = true }
+                    onNetworkClick = { showNetworkDetails = true },
+                    onProfileClick = { showProfile = true },
+                    onVoiceClick = { currentDestination = ResQDestination.Voice }
                 )
                 ResQDestination.Messages -> ChatContainerScreen(
                     viewModel = commsViewModel, 
-                    walkieTalkieViewModel = walkieTalkieViewModel,
                     mediaHelper = mediaHelper, 
                     onChatSelected = { activeChatNode = it },
                     onCommunityConversationChanged = { isCommunityConversationOpen = it }
                 )
-                ResQDestination.WalkieTalkie -> WalkieTalkieScreen(
+                ResQDestination.Voice -> WalkieTalkieScreen(
                     commsViewModel = commsViewModel,
                     walkieTalkieViewModel = walkieTalkieViewModel,
                     mediaHelper = mediaHelper
                 )
-                ResQDestination.Network -> NetworkScreen(radarViewModel)
             }
         }
     }

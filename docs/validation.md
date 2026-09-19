@@ -44,6 +44,7 @@ The raw capture may contain broad Android buffers so crashes, process death, per
 - Heartbeat challenge, send completion, acknowledgment, and timeout.
 - Public-key receipt, missing-key refusal, and decrypt failure without content.
 - Route creation/withdrawal, relay, dedupe, and delivery state.
+- Stable node ID route selection, key trust/change state, and a private route-unavailable decision. Private payloads and receipts must not broadcast after such a decision.
 
 Inspect `AndroidRuntime`, process lifecycle, permission errors, or system Bluetooth/GATT lines only when focused markers cannot explain the observation. Never load or summarize a whole capture, and never reproduce private plaintext, ciphertext previews, or key material.
 
@@ -61,13 +62,15 @@ Restart each app separately, toggle Bluetooth on one phone, move out of range an
 
 Arrange A-B-C so A and C depend on B; send both directions, remove and restore B, verify route withdrawal/recovery, and check duplicates and direct-versus-indirect status.
 
+For A-B-C-D, make A/D indirect, send five private messages each way, then reconnect one relay. Record next hop, receipt, and GATT retirement; failed routes must not private-broadcast or loop.
+
 ### Level 4: release/capstone matrix
 
-Across representative devices, measure delivery success, reconnect time, latency, range conditions, battery behavior, SOS correctness, private-message failure policy, and hardware-specific failures. Do not infer production guarantees from a single run.
+Across representative devices, measure delivery, recovery, range, battery, SOS, private-send failure, and hardware-specific failures. Do not infer production guarantees from one run.
 
 ## Required test card
 
-For every device-facing change, Codex provides: build identity and APK path; devices/setup; exact steps; expected results; failure indicators; relevant markers; and the observations the user should report. If the test fails, continue the same task with its capture and timestamp.
+Record APK, setup, steps, result, failures, markers, and report items. Continue failures with capture/timestamp.
 
 ## Latest verified results
 
@@ -89,5 +92,6 @@ Keep only meaningful milestones; raw captures remain under `captures/`.
 
 | 2026-09-17 | Current working tree (user report) | Samsung pair and five-device mesh; models/API/build/capture not supplied | Samsung readiness and five-device availability | User reports Samsung now succeeds and all five nodes were available in the mesh. This is meaningful device evidence, but the missing matrix, repetitions, conditions, and capture prevent capacity or production-reliability claims. | Not supplied |
 | 2026-09-18 | Mutual-block working tree | V2424 API 34, CPH2219 API 31, CPH2127 API 31, SM-P615 API 33, SM-A236E API 33 | KAY and LAL block over a five-phone mesh | Both endpoints logged acknowledgement-driven direct teardown. Public and encrypted private traffic then crossed the V2424 relay and decrypted at both endpoints. The capture does not establish restart persistence, unilateral/bilateral unblock, 70-second route stability, or production reliability. | `captures/ble-logcat/20260918-011613/` |
+| 2026-09-18 | Stable-ID relay working tree | V2424 API 34, CPH2219 API 31, CPH2127 API 31, SM-P615 API 33 | Indirect private relay both directions | Selected routes relayed and decrypted both ways without private broadcast fallback. Some return receipts lacked a next hop; SM-P615 repeatedly retired one GATT callback link. | `captures/ble-logcat/20260918-233006/` |
 
 The transport-promotion run supports that tested behavior only. The historical Samsung failures are superseded by the later user-reported success, pending its recorded device evidence. The five-device report does not yet establish direct-link capacity, route recovery, block semantics, all disconnect paths, or production reliability; BLOCK-01 remains active.
