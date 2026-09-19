@@ -58,6 +58,7 @@ import com.example.testresqmesh.feature.comms.ui.components.ChatBubble
 import com.example.testresqmesh.feature.comms.ui.components.ChatInput
 import com.example.testresqmesh.feature.comms.ui.components.SeenByBottomSheet
 import com.example.testresqmesh.feature.comms.viewmodel.CommunicationViewModel
+import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -65,10 +66,12 @@ fun PublicChatTab(
     viewModel: CommunicationViewModel,
     mediaHelper: MediaHelper,
     onBack: () -> Unit,
-    onChatSelected: (String) -> Unit = {}
+    onChatSelected: (String) -> Unit = {},
+    onViewMap: (Double, Double, String, String) -> Unit = { _, _, _, _ -> }
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val channelId by viewModel.currentChannelId.collectAsState()
+    val isAcquiringLocation by viewModel.isAcquiringLocation.collectAsState()
 
     BackHandler {
         onBack()
@@ -161,10 +164,13 @@ fun PublicChatTab(
                         val currentReply = replyingToMessage
                         val finalMessage = if (currentReply != null && rawMessage.isNotBlank()) {
                             val quoteSender = NodeIdentity.displayNameOf(currentReply.senderName).ifBlank { currentReply.senderName }
-                            val quoteSnippet = currentReply.text.take(60).ifBlank {
-                                if (currentReply.imageBase64 != null) photoText
-                                else if (currentReply.audioBase64 != null) voiceNoteText
-                                else "Attachment"
+                            val quoteSnippet = when {
+                                currentReply.locationLat != null && currentReply.locationLng != null -> {
+                                    "📍 Shared Location (%.4f, %.4f)".format(Locale.US, currentReply.locationLat, currentReply.locationLng)
+                                }
+                                currentReply.imageBase64 != null -> photoText
+                                currentReply.audioBase64 != null -> voiceNoteText
+                                else -> currentReply.text.take(60).ifBlank { "Attachment" }
                             }
                             "> $quoteSender: $quoteSnippet\n$rawMessage"
                         } else {
@@ -188,7 +194,8 @@ fun PublicChatTab(
                             )
                         }
                     },
-                    mediaHelper = mediaHelper
+                    mediaHelper = mediaHelper,
+                    isAcquiringLocation = isAcquiringLocation
                 )
             }
         ) { innerPadding ->
@@ -230,7 +237,8 @@ fun PublicChatTab(
                             showSenderName = isLatestInBlock,
                             onUserClick = { onChatSelected(it) },
                             onShowSeenBy = { readers -> activeSeenReaders = readers },
-                            onReplyClick = { replyingToMessage = it }
+                            onReplyClick = { replyingToMessage = it },
+                            onViewMap = onViewMap
                         )
                     }
                 }

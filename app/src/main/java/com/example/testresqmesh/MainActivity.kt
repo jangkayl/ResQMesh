@@ -71,11 +71,6 @@ class MainActivity : ComponentActivity() {
         // Let Compose handle window insets (stops bottom nav bar from being pushed up by keyboard)
         androidx.core.view.WindowCompat.setDecorFitsSystemWindows(window, false)
         
-        // BUG FIX: Required for OSMDroid to fetch tiles online on certain devices!
-        org.osmdroid.config.Configuration.getInstance().load(
-            applicationContext,
-            applicationContext.getSharedPreferences("osmdroid", android.content.Context.MODE_PRIVATE)
-        )
 
         lifecycle.addObserver(LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_START || event == Lifecycle.Event.ON_RESUME) {

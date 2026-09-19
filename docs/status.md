@@ -24,6 +24,7 @@ Make blocking reliably mutual across relays: deny direct links after identity, s
   - Phase 9: Context-Aware Chat Composer (auto-expanding multi-line text input with seamless floating media actions) and Tactical People & Paths operator cards with a 2D Visual Holographic mesh map.
   - Phase 10: Tactical Radar Sweep Splash screen, Secure Digital Passport Identity onboarding, and high-trust Permissions & Hardware screen.
   - Phase 11: Field Light ("Daylight") mode support across SOS broadcast, Walkie-Talkie tactical PTT, People & Paths direct/relay operator cards, 2D holographic path visualizer, and Network Topology.
+- Cebu offline map pilot (Phases 1-3): MapPackageManifest domain model, Ed25519/SHA-256 ManifestVerifier, MapStorageGuard atomic staging/rollback preservation/deletion, Wi-Fi MapPackageDownloader, MapLibre Native Android integration in SosMapScreen, legacy osmdroid/raster download removal, high-vis mapless SOS coordinate fallback, Profile Offline Maps settings UI with downloading/verifying/extracting/update/storage/corrupt states, versioned GitHub Release catalog configuration, and unit tests implemented.
 
 Local checks passed; physical BLE validation remains required.
 
@@ -50,3 +51,5 @@ Local checks passed; physical BLE validation remains required.
 ## Scope guard
 
 Reliable text/SOS, honest status, recovery, and private fail-closed behavior remain ahead of speculative features.
+
+

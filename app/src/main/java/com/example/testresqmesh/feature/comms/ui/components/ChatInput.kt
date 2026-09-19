@@ -70,6 +70,7 @@ fun ChatInput(
     onSend: () -> Unit,
     onSendLocation: () -> Unit,
     mediaHelper: MediaHelper,
+    isAcquiringLocation: Boolean = false,
     replyingTo: ChatMessage? = null,
     onCancelReply: () -> Unit = {}
 ) {
@@ -171,12 +172,17 @@ fun ChatInput(
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.primary
                             )
+                            val replyPreview = when {
+                                replyingTo.locationLat != null && replyingTo.locationLng != null -> {
+                                    "📍 Shared Location (%.4f, %.4f)".format(java.util.Locale.US, replyingTo.locationLat, replyingTo.locationLng)
+                                }
+                                replyingTo.imageBase64 != null -> stringResource(R.string.private_chat_photo)
+                                replyingTo.audioBase64 != null -> stringResource(R.string.private_chat_voice_note)
+                                replyingTo.text.isNotBlank() -> replyingTo.text
+                                else -> stringResource(R.string.messages_attachment_preview)
+                            }
                             Text(
-                                text = replyingTo.text.ifBlank {
-                                    if (replyingTo.imageBase64 != null) stringResource(R.string.private_chat_photo)
-                                    else if (replyingTo.audioBase64 != null) stringResource(R.string.private_chat_voice_note)
-                                    else stringResource(R.string.messages_attachment_preview)
-                                },
+                                text = replyPreview,
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 maxLines = 1,
@@ -195,6 +201,70 @@ fun ChatInput(
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
+                    }
+                }
+            }
+        }
+
+        // GPS Satellite Acquisition Progress Banner
+        androidx.compose.animation.AnimatedVisibility(
+            visible = isAcquiringLocation,
+            enter = fadeIn() + androidx.compose.animation.expandVertically(),
+            exit = fadeOut() + androidx.compose.animation.shrinkVertically()
+        ) {
+            Surface(
+                shape = RoundedCornerShape(14.dp),
+                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.90f),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 8.dp, vertical = 4.dp),
+                shadowElevation = 6.dp
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(18.dp),
+                            strokeWidth = 2.2.dp,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Spacer(Modifier.width(10.dp))
+                        Column {
+                            Text(
+                                text = "ACQUIRING GPS LOCK...",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontFamily = FontFamily.Monospace,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer
+                            )
+                            Text(
+                                text = "Triangulating precision fix before sending",
+                                style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp),
+                                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.75f)
+                            )
+                        }
+                    }
+                    Surface(
+                        shape = RoundedCornerShape(6.dp),
+                        color = ResQTheme.colors.success.copy(alpha = 0.2f),
+                        border = BorderStroke(1.dp, ResQTheme.colors.success.copy(alpha = 0.4f))
+                    ) {
+                        Text(
+                            text = "SATELLITE",
+                            style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp, fontFamily = FontFamily.Monospace),
+                            fontWeight = FontWeight.Bold,
+                            color = ResQTheme.colors.success,
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                        )
                     }
                 }
             }
@@ -294,19 +364,29 @@ fun ChatInput(
                             color = ResQTheme.colors.success.copy(alpha = 0.15f),
                             border = BorderStroke(1.dp, ResQTheme.colors.success.copy(alpha = 0.35f)),
                             onClick = {
-                                haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                onSendLocation()
-                                isPopupExpanded = false
+                                if (!isAcquiringLocation) {
+                                    haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                    onSendLocation()
+                                    isPopupExpanded = false
+                                }
                             },
                             modifier = Modifier.size(38.dp)
                         ) {
                             Box(contentAlignment = Alignment.Center) {
-                                Icon(
-                                    imageVector = Icons.Outlined.LocationOn,
-                                    contentDescription = stringResource(R.string.private_chat_share_location_action),
-                                    tint = ResQTheme.colors.success,
-                                    modifier = Modifier.size(19.dp)
-                                )
+                                if (isAcquiringLocation) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(18.dp),
+                                        strokeWidth = 2.dp,
+                                        color = ResQTheme.colors.success
+                                    )
+                                } else {
+                                    Icon(
+                                        imageVector = Icons.Outlined.LocationOn,
+                                        contentDescription = stringResource(R.string.private_chat_share_location_action),
+                                        tint = ResQTheme.colors.success,
+                                        modifier = Modifier.size(19.dp)
+                                    )
+                                }
                             }
                         }
 
@@ -371,14 +451,23 @@ fun ChatInput(
 
                         IconButton(
                             onClick = onSendLocation,
+                            enabled = !isAcquiringLocation,
                             modifier = Modifier.size(38.dp)
                         ) {
-                            Icon(
-                                imageVector = Icons.Outlined.LocationOn,
-                                contentDescription = stringResource(R.string.private_chat_share_location_action),
-                                tint = ResQTheme.colors.success,
-                                modifier = Modifier.size(20.dp)
-                            )
+                            if (isAcquiringLocation) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(18.dp),
+                                    strokeWidth = 2.dp,
+                                    color = ResQTheme.colors.success
+                                )
+                            } else {
+                                Icon(
+                                    imageVector = Icons.Outlined.LocationOn,
+                                    contentDescription = stringResource(R.string.private_chat_share_location_action),
+                                    tint = ResQTheme.colors.success,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
                         }
 
                         IconButton(

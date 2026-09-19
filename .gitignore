@@ -14,3 +14,9 @@ local.properties
 /app/ui/
 /archive/**/.obsidian/workspace.json
 docs/.obsidian/
+*.pem
+*.key
+*.sig.key
+*.pk8
+*.part
+cebu-*.zip

@@ -30,6 +30,7 @@ fun ProfileScreen(
     appearance: AppAppearance,
     onAppearanceSelected: (AppAppearance) -> Unit,
     onAdvanced: () -> Unit,
+    onOfflineMaps: () -> Unit = {},
     onBack: () -> Unit
 ) {
     val state by viewModel.uiState.collectAsState()
@@ -158,7 +159,7 @@ fun ProfileScreen(
             SettingsCard {
                 SettingRow(Icons.Default.Key, "Permissions", "Bluetooth, location, and microphone")
                 DividerLine()
-                SettingRow(Icons.Default.Map, "Offline maps", "Download from an SOS map")
+                SettingRow(Icons.Default.Map, "Offline maps", "Manage Cebu tactical vector packages", onClick = onOfflineMaps)
             }
         }
         item { SettingsLabel("MORE") }

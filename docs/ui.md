@@ -51,7 +51,7 @@ Avoid showing “connected” from a BLE callback alone. Counters and selected p
 - Keep heartbeat/relay chatter behind Details to preserve readability.
 
 ## Hidden legacy UI
-- `OfflineMapPromptModal`, legacy `RadarScreen`, and debug terminal are hidden; do not delete logic during evaluation.
+- Legacy `RadarScreen` and debug terminal are hidden; do not delete logic during evaluation. Offline maps are managed via Profile/Settings.
 - Before restoring, choose entry point, reconnect callbacks without changing mesh policy, and retain accessibility labels.
 - Validate empty, permission-denied, and error states. For transport/SOS/location screens, run focused phone tests.
 

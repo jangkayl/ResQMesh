@@ -51,11 +51,11 @@ fun MainContainerScreen(
     var mapSosAlert by remember { mutableStateOf<com.example.testresqmesh.core.model.ChatMessage?>(null) }
     var showProfile by remember { mutableStateOf(false) }
     var showAdvanced by remember { mutableStateOf(false) }
+    var showOfflineMaps by remember { mutableStateOf(false) }
     var showNetworkDetails by remember { mutableStateOf(false) }
     var isCommunityConversationOpen by remember { mutableStateOf(false) }
 
-    // OfflineMapPromptModal and the legacy Radar screen remain in source intentionally. Their
-    // entry points are hidden while the new shell is evaluated and can be restored later.
+    // Legacy Radar screen remains in source intentionally. Offline maps are managed via Profile/Settings.
     
     val incomingSosAlert by commsViewModel.incomingSosAlert.collectAsState()
     val activeSosMessageId by commsViewModel.activeSosMessageId.collectAsState()
@@ -74,7 +74,9 @@ fun MainContainerScreen(
             alertMessage = incomingSosAlert!!,
             onDismiss = { commsViewModel.clearSosAlert() },
             onViewMap = { 
-                mapSosAlert = incomingSosAlert
+                val alert = incomingSosAlert
+                commsViewModel.clearSosAlert()
+                mapSosAlert = alert
             }
         )
         BackHandler { commsViewModel.clearSosAlert() }
@@ -160,6 +162,16 @@ fun MainContainerScreen(
         return
     }
 
+    if (showOfflineMaps) {
+        ResQAuroraBackground(modifier = Modifier.fillMaxSize()) {
+            com.example.testresqmesh.feature.profile.ui.OfflineMapSettingsScreen(
+                onBack = { showOfflineMaps = false }
+            )
+        }
+        BackHandler { showOfflineMaps = false }
+        return
+    }
+
     if (showProfile) {
         ResQAuroraBackground(modifier = Modifier.fillMaxSize()) {
             ProfileScreen(
@@ -167,6 +179,7 @@ fun MainContainerScreen(
                 appearance = appearance,
                 onAppearanceSelected = onAppearanceSelected,
                 onAdvanced = { showAdvanced = true },
+                onOfflineMaps = { showOfflineMaps = true },
                 onBack = { showProfile = false }
             )
         }
@@ -219,7 +232,20 @@ fun MainContainerScreen(
                     viewModel = commsViewModel, 
                     mediaHelper = mediaHelper, 
                     onChatSelected = { activeChatNode = it },
-                    onCommunityConversationChanged = { isCommunityConversationOpen = it }
+                    onCommunityConversationChanged = { isCommunityConversationOpen = it },
+                    onViewMap = { lat, lng, sender, text ->
+                        mapSosAlert = com.example.testresqmesh.core.model.ChatMessage(
+                            id = "view_map_${System.currentTimeMillis()}",
+                            senderName = sender,
+                            text = text,
+                            imageBase64 = null,
+                            audioBase64 = null,
+                            locationLat = lat,
+                            locationLng = lng,
+                            isMine = false,
+                            isPrivate = false
+                        )
+                    }
                 )
                 ResQDestination.Voice -> WalkieTalkieScreen(
                     commsViewModel = commsViewModel,

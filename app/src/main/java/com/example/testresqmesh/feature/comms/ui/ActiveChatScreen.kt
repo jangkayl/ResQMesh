@@ -41,6 +41,7 @@ import androidx.compose.material.icons.outlined.PlayArrow
 import androidx.compose.material.icons.outlined.Stop
 import com.example.testresqmesh.core.ui.components.dialogs.ResQConfirmationDialog
 import com.example.testresqmesh.feature.comms.ui.components.ChatInput
+import com.example.testresqmesh.feature.comms.ui.components.TacticalLocationCard
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.ui.text.font.FontFamily
@@ -105,6 +106,7 @@ fun ActiveChatScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val drafts by viewModel.privateDrafts.collectAsState()
+    val isAcquiringLocation by viewModel.isAcquiringLocation.collectAsState()
     val messages = uiState.privateMessages[name].orEmpty()
     val sortedMessages = remember(messages) { messages.sortedByDescending { it.timestamp } }
     val candidate = remember(uiState, name) {
@@ -205,10 +207,13 @@ fun ActiveChatScreen(
                         if (rawMessage.isBlank() && pendingImage == null && pendingAudio == null) return@ChatInput
                         val finalMessage = if (replyingToMessage != null && rawMessage.isNotBlank()) {
                             val quoteSender = if (replyingToMessage!!.isMine) "Me" else displayName
-                            val quoteSnippet = replyingToMessage!!.text.take(60).ifBlank {
-                                if (replyingToMessage!!.imageBase64 != null) photoText
-                                else if (replyingToMessage!!.audioBase64 != null) voiceNoteText
-                                else "Attachment"
+                            val quoteSnippet = when {
+                                replyingToMessage!!.locationLat != null && replyingToMessage!!.locationLng != null -> {
+                                    "📍 Shared Location (%.4f, %.4f)".format(Locale.US, replyingToMessage!!.locationLat, replyingToMessage!!.locationLng)
+                                }
+                                replyingToMessage!!.imageBase64 != null -> photoText
+                                replyingToMessage!!.audioBase64 != null -> voiceNoteText
+                                else -> replyingToMessage!!.text.take(60).ifBlank { "Attachment" }
                             }
                             "> $quoteSender: $quoteSnippet\n$rawMessage"
                         } else {
@@ -238,7 +243,8 @@ fun ActiveChatScreen(
                             )
                         }
                     },
-                    mediaHelper = mediaHelper
+                    mediaHelper = mediaHelper,
+                    isAcquiringLocation = isAcquiringLocation
                 )
             }
         ) { innerPadding ->
@@ -381,7 +387,7 @@ private fun PrivateMessageBubble(
         Box {
             Surface(
                 modifier = Modifier
-                    .widthIn(max = 260.dp)
+                    .widthIn(max = if (message.locationLat != null || message.imageBase64 != null) 300.dp else 260.dp)
                     .clickable { showMenu = true },
                 shape = shape,
                 color = bubbleColor,
@@ -412,26 +418,6 @@ private fun PrivateMessageBubble(
                             modifier = Modifier.padding(vertical = 4.dp)
                         )
                         Spacer(Modifier.height(Spacing.ExtraSmall))
-                    }
-                    if (message.locationLat != null && message.locationLng != null) {
-                        Surface(
-                            shape = RoundedCornerShape(14.dp),
-                            color = contentColor.copy(alpha = 0.12f)
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(Spacing.Small),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Icon(Icons.Outlined.LocationOn, contentDescription = null)
-                                Spacer(Modifier.width(Spacing.ExtraSmall))
-                                Text(stringResource(R.string.private_chat_location_shared))
-                                Spacer(Modifier.width(Spacing.Small))
-                                TextButton(onClick = { onViewMap(message.locationLat, message.locationLng) }) {
-                                    Text(stringResource(R.string.private_chat_view_map_action))
-                                }
-                            }
-                        }
-                        Spacer(Modifier.height(Spacing.Small))
                     }
 
                     val (replyQuote, actualText) = remember(message.text) {
@@ -486,7 +472,21 @@ private fun PrivateMessageBubble(
                         }
                     }
 
-                    if (actualText.isNotBlank()) {
+                    val isDefaultLocation = message.locationLat != null && (actualText.isBlank() || actualText.contains("I am sharing my location"))
+
+                    if (message.locationLat != null && message.locationLng != null) {
+                        TacticalLocationCard(
+                            latitude = message.locationLat,
+                            longitude = message.locationLng,
+                            senderName = message.senderName,
+                            noteText = if (!isDefaultLocation) actualText else null,
+                            isMine = mine,
+                            onTrackOnMap = { onViewMap(message.locationLat, message.locationLng) }
+                        )
+                        Spacer(Modifier.height(Spacing.Small))
+                    }
+
+                    if (actualText.isNotBlank() && !isDefaultLocation) {
                         Text(text = actualText, style = MaterialTheme.typography.bodyLarge)
                     }
 

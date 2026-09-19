@@ -63,7 +63,8 @@ fun ChatBubble(
     showSenderName: Boolean = true,
     onUserClick: ((String) -> Unit)? = null,
     onShowSeenBy: ((List<String>) -> Unit)? = null,
-    onReplyClick: ((ChatMessage) -> Unit)? = null
+    onReplyClick: ((ChatMessage) -> Unit)? = null,
+    onViewMap: ((Double, Double, String, String) -> Unit)? = null
 ) {
     val mine = message.isMine
     val isSos = message.isSOS
@@ -167,7 +168,7 @@ fun ChatBubble(
                 )
             }
             Surface(
-                modifier = Modifier.widthIn(max = 260.dp),
+                modifier = Modifier.widthIn(max = if (message.locationLat != null || message.imageBase64 != null) 300.dp else 260.dp),
                 shape = shape,
                 color = bubbleColor,
                 contentColor = contentColor,
@@ -206,22 +207,7 @@ fun ChatBubble(
                         )
                         Spacer(Modifier.height(2.dp))
                     }
-                    if (message.locationLat != null && message.locationLng != null) {
-                        Surface(
-                            shape = RoundedCornerShape(10.dp),
-                            color = contentColor.copy(alpha = 0.12f)
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Icon(Icons.Outlined.LocationOn, contentDescription = null, modifier = Modifier.size(16.dp))
-                                Spacer(Modifier.width(4.dp))
-                                Text(stringResource(R.string.community_location_shared), style = MaterialTheme.typography.labelMedium)
-                            }
-                        }
-                        Spacer(Modifier.height(4.dp))
-                    }
+
                     val (replyQuote, actualText) = remember(message.text) {
                         if (message.text.startsWith("> ") && message.text.contains("\n")) {
                             val firstNewline = message.text.indexOf("\n")
@@ -274,7 +260,28 @@ fun ChatBubble(
                         }
                     }
 
-                    if (actualText.isNotBlank()) {
+                    val isDefaultLocation = message.locationLat != null && (actualText.isBlank() || actualText.contains("I am sharing my location"))
+
+                    if (message.locationLat != null && message.locationLng != null) {
+                        TacticalLocationCard(
+                            latitude = message.locationLat,
+                            longitude = message.locationLng,
+                            senderName = message.senderName,
+                            noteText = if (!isDefaultLocation) actualText else null,
+                            isMine = mine,
+                            onTrackOnMap = {
+                                onViewMap?.invoke(
+                                    message.locationLat,
+                                    message.locationLng,
+                                    message.senderName,
+                                    message.text
+                                )
+                            }
+                        )
+                        Spacer(Modifier.height(4.dp))
+                    }
+
+                    if (actualText.isNotBlank() && !isDefaultLocation) {
                         Text(
                             text = actualText,
                             style = MaterialTheme.typography.bodyMedium,

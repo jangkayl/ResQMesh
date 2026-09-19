@@ -104,7 +104,7 @@ test_resqmesh/
 - **Payload encoding:** Kotlin Serialization with Protobuf
 - **Persistence:** Room
 - **Dependency injection:** Koin
-- **Maps/location:** osmdroid and Google Play Services Location
+- **Maps/location:** MapLibre Native and Google Play Services Location
 - **Security building blocks:** Android Keystore RSA and AES-GCM
 - **Android support:** minimum SDK 24, target SDK 36
 

@@ -94,5 +94,6 @@ This is not yet a basis for claiming authenticated end-to-end encryption or forw
 | Room | `data/local/` |
 | Compose features | `feature/` and `core/ui/` |
 | UI state | `ui/state/UiStates.kt` |
+| MapLibre / Offline Maps | `core/map/`, `feature/sos/ui/SosMapScreen.kt` |
 
 Source code and focused device traces take precedence over this summary.

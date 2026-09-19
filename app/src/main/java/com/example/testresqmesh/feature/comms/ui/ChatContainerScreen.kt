@@ -87,7 +87,8 @@ fun ChatContainerScreen(
     viewModel: CommunicationViewModel,
     mediaHelper: MediaHelper,
     onChatSelected: (String) -> Unit,
-    onCommunityConversationChanged: (Boolean) -> Unit
+    onCommunityConversationChanged: (Boolean) -> Unit,
+    onViewMap: (Double, Double, String, String) -> Unit = { _, _, _, _ -> }
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val currentChannel by viewModel.currentChannelId.collectAsState()
@@ -129,7 +130,8 @@ fun ChatContainerScreen(
             onChatSelected = { user ->
                 showCommunityConversation = false
                 onChatSelected(user)
-            }
+            },
+            onViewMap = onViewMap
         )
         return
     }

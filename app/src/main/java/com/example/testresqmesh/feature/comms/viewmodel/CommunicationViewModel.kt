@@ -29,6 +29,9 @@ class CommunicationViewModel(
     
     private val _activeSosMessageId = MutableStateFlow<String?>(null)
     val activeSosMessageId: StateFlow<String?> = _activeSosMessageId.asStateFlow()
+
+    private val _isAcquiringLocation = MutableStateFlow(false)
+    val isAcquiringLocation: StateFlow<Boolean> = _isAcquiringLocation.asStateFlow()
     
     val incomingSosAlert = useCases.observeIncomingSosAlert()
     
@@ -164,6 +167,7 @@ class CommunicationViewModel(
 
     @androidx.annotation.RequiresPermission(anyOf = ["android.permission.ACCESS_FINE_LOCATION", "android.permission.ACCESS_COARSE_LOCATION"])
     fun broadcastLocation(context: android.content.Context, isPrivate: Boolean, targetName: String? = null) {
+        _isAcquiringLocation.value = true
         // The BEST way to get location on Android (Handles indoors via Wi-Fi/Cell + outdoors via GPS seamlessly)
         val fusedLocationClient = com.google.android.gms.location.LocationServices.getFusedLocationProviderClient(context.applicationContext)
         
@@ -172,22 +176,29 @@ class CommunicationViewModel(
                 com.google.android.gms.location.Priority.PRIORITY_HIGH_ACCURACY, 
                 null
             ).addOnSuccessListener { location ->
+                _isAcquiringLocation.value = false
                 if (location != null) {
                     sendLocationMessage(location, isPrivate, targetName)
                 } else {
                     // Fallback to cache if fresh fetch miraculously fails
                     fusedLocationClient.lastLocation.addOnSuccessListener { lastLoc ->
+                        _isAcquiringLocation.value = false
                         if (lastLoc != null) {
                             sendLocationMessage(lastLoc, isPrivate, targetName)
                         } else {
                             sendLocationError(isPrivate, targetName)
                         }
-                    }.addOnFailureListener { sendLocationError(isPrivate, targetName) }
+                    }.addOnFailureListener {
+                        _isAcquiringLocation.value = false
+                        sendLocationError(isPrivate, targetName)
+                    }
                 }
             }.addOnFailureListener {
+                _isAcquiringLocation.value = false
                 sendLocationError(isPrivate, targetName)
             }
         } catch (e: SecurityException) {
+            _isAcquiringLocation.value = false
             sendLocationError(isPrivate, targetName)
         }
     }

@@ -56,3 +56,6 @@ Discovery retains a healthy routed path instead of forming a redundant direct AC
 ## Considering new work
 
 Before selecting a difficult fix or feature, compare the smallest viable change, a structural alternative, and a non-code/operational alternative when relevant. Evaluate capstone value, production value, reliability impact, Android/device support, security, complexity, migration risk, and physical-test cost. Do not treat an explored option as an accepted requirement.
+## D13: Offline maps use MapLibre and local PMTiles
+
+Replaced osmdroid and dynamic public raster tile downloading with MapLibre Native and downloaded local PMTiles packages. This ensures true offline reliability, avoids violating OSM tile scraping policies, and provides high-performance vector rendering.

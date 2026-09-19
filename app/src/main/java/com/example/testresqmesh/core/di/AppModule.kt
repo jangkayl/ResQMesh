@@ -36,6 +36,20 @@ val appModule = module {
     single { MediaHelper(androidContext()) }
     single<LocationClient> { DefaultLocationClient(androidContext()) }
     
+    // Offline map package management
+    single { com.example.testresqmesh.core.map.storage.MapStorageGuard(androidContext()) }
+    single { com.example.testresqmesh.core.map.verifier.ManifestVerifier() }
+    single<com.example.testresqmesh.core.map.download.ConnectivityProvider> {
+        com.example.testresqmesh.core.map.download.AndroidConnectivityProvider(androidContext())
+    }
+    single {
+        com.example.testresqmesh.core.map.download.MapPackageDownloader(
+            storageGuard = get(),
+            verifier = get(),
+            connectivityProvider = get()
+        )
+    }
+
     single { 
         val repository = get<MeshRepository>()
         LiveAudioEngine(androidContext()) { chunk ->
@@ -81,4 +95,5 @@ val appModule = module {
     viewModel { RadarViewModel(get()) }
     viewModel { CommunicationViewModel(get(), get()) }
     viewModel { WalkieTalkieViewModel(get(), get(), get()) }
+    viewModel { com.example.testresqmesh.feature.profile.viewmodel.OfflineMapViewModel(get(), get(), get()) }
 }
