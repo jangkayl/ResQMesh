@@ -78,6 +78,11 @@ class CommunicationViewModel(
                 _uiState.update { it.copy(blockedDeviceNames = blocked) }
             }
         }
+        viewModelScope.launch {
+            useCases.observeAttachments().collect { attachments ->
+                _uiState.update { it.copy(attachments = attachments) }
+            }
+        }
     }
 
     fun sendPublicMessage(text: String, imageBase64: String? = null, audioBase64: String? = null) {
@@ -137,6 +142,21 @@ class CommunicationViewModel(
         }
         return sent
     }
+
+    fun sendPrivateImage(targetName: String, caption: String, uri: android.net.Uri, onResult: (Boolean) -> Unit) {
+        viewModelScope.launch {
+            val sent = useCases.sendPrivateImage(targetName, caption, uri)
+            if (!sent) {
+                if (useCases.hasPendingPublicKeyChange(targetName)) _pendingKeyVerification.tryEmit(targetName)
+                else _privateSendErrors.tryEmit("Image not offered. Keep the photo selected and wait for a ready route and current recipient key.")
+            }
+            onResult(sent)
+        }
+    }
+
+    fun requestAttachmentDownload(attachmentId: String) = useCases.requestAttachmentDownload(attachmentId)
+
+    fun cancelAttachment(attachmentId: String) = useCases.cancelAttachment(attachmentId)
 
     fun acceptPendingPublicKeyChange(targetName: String): Boolean = useCases.acceptPendingPublicKeyChange(targetName)
 

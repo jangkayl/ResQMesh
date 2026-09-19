@@ -38,6 +38,7 @@ class NativeBleManager(val context: Context) {
     var onDeviceScanned: ((com.example.testresqmesh.core.model.ScanEvent) -> Unit)? = null
     var onDeviceScanRemoved: ((String) -> Unit)? = null
     var onMessageReceived: ((String, String, String, String, Boolean, Boolean, String?, String?, Double?, Double?, String, List<String>, String) -> Unit)? = null
+    var onAttachmentPayload: ((String, MeshPayload) -> Unit)? = null
     var onMessageSeen: ((String, String) -> Unit)? = null
     var stpNeighborsProvider: (() -> Set<String>)? = null
     var onLiveAudioChunk: ((String, String, ByteArray) -> Unit)? = null
@@ -134,6 +135,8 @@ class NativeBleManager(val context: Context) {
         }
         override fun sendDirectPayload(endpointId: String, payload: ByteArray) = this@NativeBleManager.sendDirectPayload(endpointId, payload)
         override fun sendPriorityPayload(endpointId: String, payload: ByteArray) = this@NativeBleManager.sendPriorityPayload(endpointId, payload)
+        override fun sendEphemeralPayload(endpointId: String, payload: ByteArray, expiresAtMs: Long): Boolean =
+            this@NativeBleManager.sendEphemeralPayload(endpointId, payload, expiresAtMs)
         override fun sendGattPayload(endpointId: String, payload: ByteArray) {
             this@NativeBleManager.enqueueGattPayload(endpointId, payload, priority = true)
         }
@@ -147,6 +150,9 @@ class NativeBleManager(val context: Context) {
         }
         override fun onMessageReceived(endpointId: String, msgId: String, senderName: String, text: String, isPrivate: Boolean, isSystem: Boolean, imageBase64: String?, audioBase64: String?, locationLat: Double?, locationLng: Double?, medium: String, routePath: List<String>, channelId: String) {
             this@NativeBleManager.onMessageReceived?.invoke(endpointId, msgId, senderName, text, isPrivate, isSystem, imageBase64, audioBase64, locationLat, locationLng, medium, routePath, channelId)
+        }
+        override fun onAttachmentPayload(endpointId: String, payload: MeshPayload) {
+            this@NativeBleManager.onAttachmentPayload?.invoke(endpointId, payload)
         }
         override fun onLiveAudioChunk(sender: String, channelId: String, chunk: ByteArray) {
             this@NativeBleManager.onLiveAudioChunk?.invoke(sender, channelId, chunk)
@@ -625,16 +631,27 @@ class NativeBleManager(val context: Context) {
         }
     }
 
+    /** SOS/control callers may overtake a queued low-priority attachment frame. */
+    fun broadcastPriorityPayload(payloadBytes: ByteArray, excludeEndpointId: String? = null) {
+        cacheOutgoingMessageId(payloadBytes)
+        val targets = mutableSetOf<String>()
+        targets.addAll(store.activeConnections.keys)
+        targets.addAll(store.activeServerConnections.keys)
+        targets.remove(excludeEndpointId)
+        targets.forEach { sendPriorityPayload(it, payloadBytes) }
+    }
+
     /** Queue one complete framed payload, bypassing L2CAP for a GATT health check. */
     private fun enqueueGattPayload(
         endpoint: String,
         payloadBytes: ByteArray,
         priority: Boolean = false,
-        heartbeatId: String? = null
+        heartbeatId: String? = null,
+        expiresAtMs: Long = Long.MAX_VALUE
     ): Boolean {
         if (!hasReadyEndpoint(endpoint)) return false
         val frame = MeshFrameCodec.encode(payloadBytes) ?: return false
-        if (!transferCoordinator.enqueue(endpoint, GattTransfer(frame, heartbeatId), priority)) {
+        if (!transferCoordinator.enqueue(endpoint, GattTransfer(frame, heartbeatId, expiresAtMs), priority)) {
             AppLogger.d("BLE_MESH", "GATT queue full for $endpoint; rejected payload")
             return false
         }
@@ -759,6 +776,24 @@ class NativeBleManager(val context: Context) {
         }
     }
 
+    /**
+     * Sends current voice only over an already-ready link. GATT fallback remains available, but an
+     * expired frame is discarded from its queue and never triggers reconnection or VIP eviction.
+     */
+    fun sendEphemeralPayload(targetEndpointId: String, payloadBytes: ByteArray, expiresAtMs: Long): Boolean {
+        if (!BluetoothAdapter.checkBluetoothAddress(targetEndpointId) || !hasReadyEndpoint(targetEndpointId)) return false
+        if (System.currentTimeMillis() > expiresAtMs) return false
+        val frame = MeshFrameCodec.encode(payloadBytes) ?: return false
+        cacheOutgoingMessageId(payloadBytes)
+        if (l2capTransport.send(targetEndpointId, payloadBytes)) return true
+        if (!transferCoordinator.enqueue(targetEndpointId, GattTransfer(frame, expiresAtMs = expiresAtMs), priority = false)) {
+            AppLogger.d("BLE_MESH", "Live voice frame dropped: GATT queue full")
+            return false
+        }
+        processNextPayload(targetEndpointId)
+        return true
+    }
+
     fun cacheOutgoingMessageId(payloadBytes: ByteArray) {
         try {
             val payload = ProtoBuf.decodeFromByteArray<MeshPayload>(payloadBytes)
@@ -818,7 +853,7 @@ class NativeBleManager(val context: Context) {
         if (!hasUsableL2cap(endpoint)) return
 
         val activeHeartbeatId = store.gattFlights[endpoint]?.transfer?.heartbeatId
-        val promoted = transferCoordinator.drainForPromotion(endpoint)
+        val promoted = transferCoordinator.drainForPromotion(endpoint).filterNot { it.isExpired() }
         if (activeHeartbeatId != null) heartbeatCoordinator.remove(endpoint)
         if (promoted.isEmpty()) return
 

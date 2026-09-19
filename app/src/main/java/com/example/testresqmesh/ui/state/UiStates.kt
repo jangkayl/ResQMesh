@@ -4,6 +4,7 @@ import com.example.testresqmesh.core.model.ChatMessage
 import com.example.testresqmesh.core.model.ConnectedDevice
 import com.example.testresqmesh.core.model.ScannedDevice
 import com.example.testresqmesh.core.model.KnownNode
+import com.example.testresqmesh.core.model.AttachmentUiState
 
 data class ConnectionUiState(
     val isOnline: Boolean = false,
@@ -27,5 +28,6 @@ data class ChatUiState(
     val connectedDevices: List<ConnectedDevice> = emptyList(),
     val knownNodes: List<KnownNode> = emptyList(),
     val scannedDevices: List<ScannedDevice> = emptyList(),
-    val blockedDeviceNames: Set<String> = emptySet()
+    val blockedDeviceNames: Set<String> = emptySet(),
+    val attachments: Map<String, AttachmentUiState> = emptyMap()
 )

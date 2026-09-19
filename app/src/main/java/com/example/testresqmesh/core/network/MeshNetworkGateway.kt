@@ -17,6 +17,7 @@ interface MeshNetworkGateway {
     var onDeviceScanned: ((ScanEvent) -> Unit)?
     var onDeviceScanRemoved: ((String) -> Unit)?
     var onMessageReceived: MessageReceivedCallback?
+    var onAttachmentPayload: ((String, MeshPayload) -> Unit)?
     var onMessageSeen: ((String, String) -> Unit)?
     var onLiveAudioChunk: ((String, String, ByteArray) -> Unit)?
     var onMessageDelivered: ((String, String, List<String>) -> Unit)?
@@ -45,8 +46,11 @@ interface MeshNetworkGateway {
     fun disconnectDirectIdentity(deviceName: String, reason: String)
     fun isDeviceBlocked(deviceName: String): Boolean
     fun broadcastPayload(payloadBytes: ByteArray, excludeEndpointId: String? = null)
+    fun broadcastPriorityPayload(payloadBytes: ByteArray, excludeEndpointId: String? = null)
     fun sendDirectPayload(targetEndpointId: String, payloadBytes: ByteArray)
     fun sendPriorityPayload(targetEndpointId: String, payloadBytes: ByteArray)
+    /** Best-effort payload that never opens a link and expires before delayed replay. */
+    fun sendEphemeralPayload(targetEndpointId: String, payloadBytes: ByteArray, expiresAtMs: Long): Boolean
     fun broadcastSeenReceipt(messageId: String, isPrivate: Boolean, targetId: String? = null)
     fun broadcastDeliveredReceipt(
         messageId: String,
@@ -72,6 +76,7 @@ class NativeBleGateway(private val manager: NativeBleManager) : MeshNetworkGatew
     override var onDeviceScanned by manager::onDeviceScanned
     override var onDeviceScanRemoved by manager::onDeviceScanRemoved
     override var onMessageReceived by manager::onMessageReceived
+    override var onAttachmentPayload by manager::onAttachmentPayload
     override var onMessageSeen by manager::onMessageSeen
     override var onLiveAudioChunk by manager::onLiveAudioChunk
     override var onMessageDelivered by manager::onMessageDelivered
@@ -101,10 +106,14 @@ class NativeBleGateway(private val manager: NativeBleManager) : MeshNetworkGatew
     override fun isDeviceBlocked(deviceName: String) = manager.isDeviceBlocked(deviceName)
     override fun broadcastPayload(payloadBytes: ByteArray, excludeEndpointId: String?) =
         manager.broadcastPayload(payloadBytes, excludeEndpointId)
+    override fun broadcastPriorityPayload(payloadBytes: ByteArray, excludeEndpointId: String?) =
+        manager.broadcastPriorityPayload(payloadBytes, excludeEndpointId)
     override fun sendDirectPayload(targetEndpointId: String, payloadBytes: ByteArray) =
         manager.sendDirectPayload(targetEndpointId, payloadBytes)
     override fun sendPriorityPayload(targetEndpointId: String, payloadBytes: ByteArray) =
         manager.sendPriorityPayload(targetEndpointId, payloadBytes)
+    override fun sendEphemeralPayload(targetEndpointId: String, payloadBytes: ByteArray, expiresAtMs: Long): Boolean =
+        manager.sendEphemeralPayload(targetEndpointId, payloadBytes, expiresAtMs)
     override fun broadcastSeenReceipt(messageId: String, isPrivate: Boolean, targetId: String?) =
         manager.broadcastSeenReceipt(messageId, isPrivate, targetId)
     override fun broadcastDeliveredReceipt(

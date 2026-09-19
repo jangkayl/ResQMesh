@@ -121,4 +121,23 @@ object CryptoManager {
             return null
         }
     }
+
+    /** Encrypts a bounded attachment chunk with the key delivered in its private offer. */
+    fun encryptAttachmentChunk(keyBytes: ByteArray, attachmentId: String, sequence: Int, plain: ByteArray): Pair<ByteArray, ByteArray>? =
+        runCatching {
+            val iv = ByteArray(GCM_IV_LENGTH).also { java.security.SecureRandom().nextBytes(it) }
+            val cipher = Cipher.getInstance(AES_ALGO)
+            cipher.init(Cipher.ENCRYPT_MODE, SecretKeySpec(keyBytes, "AES"), GCMParameterSpec(GCM_TAG_LENGTH, iv))
+            cipher.updateAAD("$attachmentId:$sequence".toByteArray(Charsets.UTF_8))
+            iv to cipher.doFinal(plain)
+        }.getOrNull()
+
+    fun decryptAttachmentChunk(keyBytes: ByteArray, attachmentId: String, sequence: Int, nonce: ByteArray, cipherText: ByteArray): ByteArray? =
+        runCatching {
+            if (nonce.size != GCM_IV_LENGTH) return null
+            val cipher = Cipher.getInstance(AES_ALGO)
+            cipher.init(Cipher.DECRYPT_MODE, SecretKeySpec(keyBytes, "AES"), GCMParameterSpec(GCM_TAG_LENGTH, nonce))
+            cipher.updateAAD("$attachmentId:$sequence".toByteArray(Charsets.UTF_8))
+            cipher.doFinal(cipherText)
+        }.getOrNull()
 }

@@ -1,8 +1,5 @@
 package com.example.testresqmesh.feature.comms.ui.components
 
-import android.net.Uri
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -19,7 +16,6 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.Send
 import androidx.compose.material.icons.outlined.Close
-import androidx.compose.material.icons.outlined.Image
 import androidx.compose.material.icons.outlined.LocationOn
 import androidx.compose.material.icons.outlined.Mic
 import androidx.compose.material.icons.outlined.Stop
@@ -29,40 +25,26 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.example.testresqmesh.R
 import com.example.testresqmesh.core.ui.components.layout.ResQGlassSurface
 import com.example.testresqmesh.core.ui.theme.Spacing
-import com.example.testresqmesh.core.utils.MediaHelper
 
 @Composable
 fun ChatInput(
     inputText: String,
     onTextChange: (String) -> Unit,
-    pendingImage: String?,
-    onImageSelected: (String) -> Unit,
-    onClearImage: () -> Unit,
     pendingAudio: String?,
     onClearAudio: () -> Unit,
     isRecording: Boolean,
     onToggleRecord: () -> Unit,
     onSend: () -> Unit,
-    onSendLocation: () -> Unit,
-    mediaHelper: MediaHelper
+    onSendLocation: () -> Unit
 ) {
-    val context = LocalContext.current
-    val imagePicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
-        uri?.let {
-            val bitmap = android.graphics.BitmapFactory.decodeStream(context.contentResolver.openInputStream(it))
-            if (bitmap != null) onImageSelected(mediaHelper.compressBitmapToBase64(bitmap))
-        }
-    }
-    val canSend = (inputText.isNotBlank() || pendingImage != null || pendingAudio != null) && !isRecording
+    val canSend = (inputText.isNotBlank() || pendingAudio != null) && !isRecording
 
     ResQGlassSurface(
         modifier = Modifier
@@ -74,19 +56,19 @@ fun ChatInput(
         shadowElevation = 18.dp
     ) {
         Column {
-            if (pendingImage != null || pendingAudio != null) {
+            if (pendingAudio != null) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = if (pendingImage != null) stringResource(R.string.private_chat_photo) else stringResource(R.string.private_chat_voice_note),
+                        text = stringResource(R.string.private_chat_voice_note),
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.weight(1f)
                     )
                     IconButton(onClick = {
-                        if (pendingImage != null) onClearImage() else onClearAudio()
+                        onClearAudio()
                     }) {
                         Icon(
                             imageVector = Icons.Outlined.Close,
@@ -96,13 +78,6 @@ fun ChatInput(
                 }
             }
             Row(verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = { imagePicker.launch("image/*") }) {
-                    Icon(
-                        imageVector = Icons.Outlined.Image,
-                        contentDescription = stringResource(R.string.private_chat_add_image_action),
-                        tint = MaterialTheme.colorScheme.primary
-                    )
-                }
                 IconButton(onClick = onSendLocation) {
                     Icon(
                         imageVector = Icons.Outlined.LocationOn,

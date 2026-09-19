@@ -33,6 +33,7 @@ import com.example.testresqmesh.feature.comms.viewmodel.CommunicationViewModel
 import com.example.testresqmesh.feature.radar.viewmodel.RadarViewModel
 import com.example.testresqmesh.feature.setup.viewmodel.SetupViewModel
 import com.example.testresqmesh.core.utils.MediaHelper
+import com.example.testresqmesh.core.utils.AppLogger
 
 import android.bluetooth.BluetoothManager
 import android.content.Context
@@ -49,6 +50,7 @@ class MainActivity : ComponentActivity() {
 
     companion object {
         var isAppInForeground = false
+        const val BUILD_ID = "private-images-livevoice-20260919"
     }
 
     private val networkManager: NativeBleManager by inject()
@@ -66,6 +68,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        AppLogger.d("RESQMESH_BUILD", "BUILD_ID=$BUILD_ID")
         
         // Let Compose handle window insets (stops bottom nav bar from being pushed up by keyboard)
         androidx.core.view.WindowCompat.setDecorFitsSystemWindows(window, false)

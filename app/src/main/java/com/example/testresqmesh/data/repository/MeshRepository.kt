@@ -11,9 +11,11 @@ import com.example.testresqmesh.core.model.BlockRelationshipStatus
 import com.example.testresqmesh.core.network.BlockControlEnvelope
 import com.example.testresqmesh.core.network.BlockControlKind
 import com.example.testresqmesh.core.network.CryptoManager
+import com.example.testresqmesh.core.network.LiveVoicePolicy
 import com.example.testresqmesh.core.network.MeshNetworkGateway
 import com.example.testresqmesh.core.utils.AppLogger
 import android.util.Base64
+import android.net.Uri
 import kotlinx.serialization.decodeFromByteArray
 import kotlinx.serialization.encodeToByteArray
 import kotlinx.serialization.protobuf.ProtoBuf
@@ -23,6 +25,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -33,6 +36,7 @@ class MeshRepository(
     private val messageStore: MessageStore,
     private val blockStore: BlockRelationshipStore,
     private val publicKeys: PeerPublicKeyDirectory,
+    private val attachmentTransfers: AttachmentTransferManager,
     private val repositoryScope: CoroutineScope
 ) {
 
@@ -75,12 +79,18 @@ class MeshRepository(
     val privateMessages = messageStore.privateMessages
         .stateIn(repositoryScope, SharingStarted.Eagerly, emptyMap())
 
+    val attachments = attachmentTransfers.observeUiStates()
+        .stateIn(repositoryScope, SharingStarted.Eagerly, emptyMap())
+
     private val _isOnline = MutableStateFlow(false)
     val isOnline = _isOnline.asStateFlow()
 
     private var myNodeName: String = ""
     val blockRelationships = blockStore.relationships
     private val blockRetryJobs = mutableMapOf<String, Job>()
+    private var liveVoiceSessionId: String? = null
+    private var nextLiveVoiceSequence = 0
+    private var lastLiveVoiceFrameAtMs = 0L
 
     init {
         setupCallbacks()
@@ -381,6 +391,32 @@ class MeshRepository(
                 }
             }
         }
+
+        networkManager.onAttachmentPayload = { _, payload ->
+            repositoryScope.launch {
+                val result = attachmentTransfers.handleAtTarget(payload, myNodeName, networkManager.myNodeId)
+                if (result.messageId != null && result.attachmentId != null) {
+                    messageStore.save(
+                        ChatMessage(
+                            id = result.messageId,
+                            senderName = payload.senderName,
+                            text = result.caption.orEmpty(),
+                            imageBase64 = null,
+                            audioBase64 = null,
+                            isMine = false,
+                            isPrivate = true,
+                            timestamp = System.currentTimeMillis(),
+                            isHopped = payload.directedRouteNodeIds.size > 2,
+                            attachmentId = result.attachmentId
+                        ),
+                        targetName = payload.senderName
+                    )
+                }
+                result.reply?.let { reply ->
+                    if (!sendAttachmentPayload(reply)) attachmentTransfers.markRouteUnavailable(reply.attachmentId)
+                }
+            }
+        }
         
         networkManager.onMessageDelivered = { msgId, readerName, returnRoute ->
             val currentSos = _incomingSosAlert.value
@@ -618,16 +654,31 @@ class MeshRepository(
         const val BLOCK_DIRECT_GRACE_MS = 2_000L
         const val BLOCK_ACK_GRACE_MS = 1_000L
         const val BLOCK_RETRY_MS = 3_000L
+        const val VOICE_SESSION_GAP_MS = 1_000L
     }
 
+    @Synchronized
     fun broadcastLiveAudioChunk(chunk: ByteArray) {
-        val messageId = java.util.UUID.randomUUID().toString()
+        val nowMs = System.currentTimeMillis()
+        if (liveVoiceSessionId == null || nowMs - lastLiveVoiceFrameAtMs > VOICE_SESSION_GAP_MS) {
+            liveVoiceSessionId = UUID.randomUUID().toString()
+            nextLiveVoiceSequence = 0
+            AppLogger.d("LiveVoice", "VOICE_SESSION_STARTED id=${liveVoiceSessionId?.take(8)}")
+        }
+        val sessionId = liveVoiceSessionId ?: return
+        val sequence = nextLiveVoiceSequence++
+        lastLiveVoiceFrameAtMs = nowMs
+        val expiresAtMs = nowMs + LiveVoicePolicy.FRAME_TTL_MS
         val payload = com.example.testresqmesh.core.network.MeshPayload(
-            id = messageId,
+            id = UUID.randomUUID().toString(),
             type = "LIVE_AUDIO",
             senderName = myNodeName,
             channelId = _currentChannelId.value,
-            liveAudioChunk = chunk
+            liveAudioChunk = chunk,
+            liveVoiceSessionId = sessionId,
+            liveVoiceSequence = sequence,
+            liveVoiceCapturedAtMs = nowMs,
+            liveVoiceTtlMs = LiveVoicePolicy.FRAME_TTL_MS
         )
         val payloadBytes = kotlinx.serialization.protobuf.ProtoBuf.encodeToByteArray(com.example.testresqmesh.core.network.MeshPayload.serializer(), payload)
         
@@ -637,7 +688,7 @@ class MeshRepository(
         // Better yet: just send to connected devices whose name is in stpNeighbors
         _connectedDevices.value.forEach { device ->
             if (NodeIdentity.matchesAny(device.name, stpNeighbors)) {
-                networkManager.sendDirectPayload(device.endpointId, payloadBytes)
+                networkManager.sendEphemeralPayload(device.endpointId, payloadBytes, expiresAtMs)
             }
         }
     }
@@ -653,13 +704,15 @@ class MeshRepository(
     fun sendPublicMessage(text: String, imageBase64: String?, audioBase64: String?, locationLat: Double? = null, locationLng: Double? = null, isSOS: Boolean = false, isSOSCancel: Boolean = false): String {
         val messageId = UUID.randomUUID().toString()
         val timestamp = System.currentTimeMillis()
+        if (imageBase64 != null) AppLogger.d("AttachmentTransfer", "Rejected image attachment in Community/SOS")
         
         val payloadBytes = PayloadFactory.buildPublicPayload(
             msgId = messageId,
             timestamp = timestamp,
             senderName = myNodeName,
             text = text,
-            imageBase64 = imageBase64,
+            // Community and SOS never carry media: public payloads flood through the mesh.
+            imageBase64 = null,
             audioBase64 = audioBase64,
             locationLat = locationLat,
             locationLng = locationLng,
@@ -668,11 +721,11 @@ class MeshRepository(
             channelId = _currentChannelId.value
         )
 
-        val message = ChatMessage(messageId, myNodeName, text, imageBase64, audioBase64, locationLat, locationLng, true, false, timestamp, isSOS = isSOS)
+        val message = ChatMessage(messageId, myNodeName, text, null, audioBase64, locationLat, locationLng, true, false, timestamp, isSOS = isSOS)
         repositoryScope.launch {
             messageStore.save(message, targetName = null)
         }
-        networkManager.broadcastPayload(payloadBytes)
+        if (isSOS) networkManager.broadcastPriorityPayload(payloadBytes) else networkManager.broadcastPayload(payloadBytes)
         return messageId
     }
 
@@ -689,6 +742,7 @@ class MeshRepository(
     fun sendPrivateMessage(targetName: String, text: String, imageBase64: String?, audioBase64: String?, locationLat: Double? = null, locationLng: Double? = null): Boolean {
         val msgId = UUID.randomUUID().toString()
         val timestamp = System.currentTimeMillis()
+        if (imageBase64 != null) AppLogger.d("AttachmentTransfer", "Rejected legacy Base64 private image; use attachment offer")
         
         val readyDevices = readyConnectedDevices()
         if (readyDevices.isEmpty()) {
@@ -716,7 +770,8 @@ class MeshRepository(
             senderName = myNodeName,
             targetName = targetName,
             text = text,
-            imageBase64 = imageBase64,
+            // New private photos use AttachmentTransferManager; retain Base64 only for legacy reads.
+            imageBase64 = null,
             audioBase64 = audioBase64,
             locationLat = locationLat,
             locationLng = locationLng,
@@ -735,7 +790,7 @@ class MeshRepository(
         }
 
         val isDirect = readyDevices.any { NodeIdentity.matches(it.name, targetName) }
-        val message = ChatMessage(msgId, myNodeName, text, imageBase64, audioBase64, locationLat, locationLng, true, true, timestamp, isHopped = !isDirect, outboundRoute = directedRouteList)
+        val message = ChatMessage(msgId, myNodeName, text, null, audioBase64, locationLat, locationLng, true, true, timestamp, isHopped = !isDirect, outboundRoute = directedRouteList)
         
         repositoryScope.launch {
             messageStore.save(message, targetName = targetName)
@@ -748,6 +803,67 @@ class MeshRepository(
             }
             PrivateDeliveryPlanner.Target.Unavailable -> error("Checked before saving the outbound message")
         }
+        return true
+    }
+
+    suspend fun sendPrivateImage(targetName: String, caption: String, uri: Uri): Boolean {
+        val readyDevices = readyConnectedDevices()
+        if (readyDevices.isEmpty() || publicKeys.hasPendingChange(targetName)) return false
+        val targetPubKey = publicKeys.trustedKey(targetName) ?: return false
+        val routeNames = meshRouter.findShortestPath(myNodeName, targetName, readyDevices)
+        val routeNodeIds = routeNames.mapNotNull(NodeIdentity::idOf)
+        val targetNodeId = NodeIdentity.idOf(targetName) ?: return false
+        if (routeNames.isEmpty() || routeNodeIds.size != routeNames.size || routeNodeIds.firstOrNull() != networkManager.myNodeId || routeNodeIds.lastOrNull() != targetNodeId) return false
+        val firstHop = routeNodeIds.getOrNull(1)?.let { nodeId -> readyDevices.firstOrNull { it.nodeId == nodeId } } ?: return false
+        if (!networkManager.hasReadyEndpoint(firstHop.endpointId)) return false
+        val offer = attachmentTransfers.createOffer(uri, caption, myNodeName, networkManager.myNodeId, targetName, targetNodeId, routeNodeIds, targetPubKey) ?: return false
+        messageStore.save(
+            ChatMessage(
+                id = offer.messageId,
+                senderName = myNodeName,
+                text = caption,
+                imageBase64 = null,
+                audioBase64 = null,
+                isMine = true,
+                isPrivate = true,
+                timestamp = System.currentTimeMillis(),
+                isHopped = routeNodeIds.size > 2,
+                outboundRoute = routeNames,
+                attachmentId = offer.attachment.attachmentId
+            ),
+            targetName = targetName
+        )
+        if (!sendAttachmentPayload(offer.payload)) {
+            attachmentTransfers.markRouteUnavailable(offer.attachment.attachmentId)
+            return false
+        }
+        return true
+    }
+
+    fun requestAttachmentDownload(attachmentId: String) {
+        repositoryScope.launch {
+            val payload = attachmentTransfers.requestDownload(attachmentId, myNodeName, networkManager.myNodeId) ?: return@launch
+            if (!sendAttachmentPayload(payload)) attachmentTransfers.markRouteUnavailable(attachmentId)
+        }
+    }
+
+    fun cancelAttachment(attachmentId: String) {
+        repositoryScope.launch {
+            val payload = attachmentTransfers.cancel(attachmentId, myNodeName, networkManager.myNodeId) ?: return@launch
+            if (!sendAttachmentPayload(payload)) attachmentTransfers.markRouteUnavailable(attachmentId)
+        }
+    }
+
+    /** Attachment routing is directed and fails closed; it never creates a Bluetooth link or broadcasts. */
+    @OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
+    private fun sendAttachmentPayload(payload: com.example.testresqmesh.core.network.MeshPayload): Boolean {
+        val myIndex = payload.directedRouteNodeIds.indexOf(networkManager.myNodeId)
+        val nextNodeId = payload.directedRouteNodeIds.getOrNull(myIndex + 1) ?: return false
+        val endpoint = readyConnectedDevices().firstOrNull { it.nodeId == nextNodeId }?.endpointId ?: return false
+        if (!networkManager.hasReadyEndpoint(endpoint)) return false
+        val bytes = ProtoBuf.encodeToByteArray(payload)
+        if (payload.type == AttachmentTransferManager.TYPE_CHUNK) networkManager.sendDirectPayload(endpoint, bytes)
+        else networkManager.sendPriorityPayload(endpoint, bytes)
         return true
     }
 }

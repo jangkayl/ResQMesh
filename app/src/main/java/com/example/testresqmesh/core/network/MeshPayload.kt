@@ -35,7 +35,18 @@ data class MeshPayload(
     @ProtoNumber(27) val connectedNodeIds: List<String> = emptyList(),
     @ProtoNumber(28) val directedRouteNodeIds: List<String> = emptyList(),
     @ProtoNumber(29) val returnRouteNodeIds: List<String> = emptyList(),
-    @ProtoNumber(30) val relayHopCount: Int = 0
+    @ProtoNumber(30) val relayHopCount: Int = 0,
+    /** Attachment fields are metadata/chunks only; an image is never embedded in this envelope. */
+    @ProtoNumber(31) val attachmentId: String = "",
+    @ProtoNumber(32) val attachmentSequence: Int = 0,
+    @ProtoNumber(33) val attachmentTotalChunks: Int = 0,
+    @ProtoNumber(34) val attachmentCiphertext: ByteArray? = null,
+    @ProtoNumber(35) val attachmentNonce: ByteArray? = null,
+    /** Realtime voice metadata. These fields bound frames; audio itself is never persisted here. */
+    @ProtoNumber(36) val liveVoiceSessionId: String = "",
+    @ProtoNumber(37) val liveVoiceSequence: Int = 0,
+    @ProtoNumber(38) val liveVoiceCapturedAtMs: Long = 0L,
+    @ProtoNumber(39) val liveVoiceTtlMs: Long = 0L
 ) {
     override fun equals(other: Any?): Boolean {
         if (this === other) return true

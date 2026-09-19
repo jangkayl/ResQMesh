@@ -17,7 +17,9 @@ data class ChatMessage(
     val seenBy: List<String> = emptyList(),
     val outboundRoute: List<String> = emptyList(),
     val returnRoute: List<String> = emptyList(),
-    val isSOS: Boolean = false
+    val isSOS: Boolean = false,
+    /** Null for ordinary messages and legacy inline Base64 images. */
+    val attachmentId: String? = null
 )
 
 data class ConnectedDevice(

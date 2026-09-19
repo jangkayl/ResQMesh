@@ -32,7 +32,10 @@ class GattTransferCoordinator(private val store: BleStateStore) {
             if (store.gattFlights.remove(endpoint, stale)) stale.writing.set(false)
         }
         if (!writing.compareAndSet(false, true)) return null
-        val transfer = queue.pollFirst()
+        var transfer: GattTransfer?
+        do {
+            transfer = queue.pollFirst()
+        } while (transfer != null && transfer.isExpired())
         if (transfer == null) {
             writing.set(false)
             return null

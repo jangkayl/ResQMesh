@@ -6,7 +6,14 @@ import java.util.concurrent.ConcurrentLinkedDeque
 import java.util.concurrent.atomic.AtomicBoolean
 
 /** Keep all chunks of one framed payload together; a probe may only overtake whole transfers. */
-class GattTransfer(val frame: ByteArray, val heartbeatId: String? = null)
+class GattTransfer(
+    val frame: ByteArray,
+    val heartbeatId: String? = null,
+    /** Long.MAX_VALUE means the payload is durable transport work. */
+    val expiresAtMs: Long = Long.MAX_VALUE
+) {
+    fun isExpired(nowMs: Long = System.currentTimeMillis()): Boolean = nowMs > expiresAtMs
+}
 
 /** Return the unframed payload so a queued GATT transfer can be promoted to L2CAP safely. */
 fun GattTransfer.payloadBytes(): ByteArray =

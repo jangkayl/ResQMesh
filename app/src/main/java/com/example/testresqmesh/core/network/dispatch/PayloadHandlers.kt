@@ -5,6 +5,8 @@ import com.example.testresqmesh.core.network.BlockControlEnvelope
 import com.example.testresqmesh.core.network.BlockControlKind
 import com.example.testresqmesh.core.network.PayloadDispatcherCallback
 import com.example.testresqmesh.core.network.CryptoManager
+import com.example.testresqmesh.core.network.AttachmentTransferPolicy
+import com.example.testresqmesh.core.network.LiveVoicePolicy
 import com.example.testresqmesh.core.model.NodeIdentity
 import com.example.testresqmesh.core.utils.AppLogger
 import com.example.testresqmesh.core.utils.TerminalLogCategory
@@ -218,22 +220,87 @@ class LegacyBlockControlHandler : PayloadHandler {
 }
 
 class LiveAudioHandler : PayloadHandler {
+    private val lastSequenceBySession = LinkedHashMap<String, Int>()
+    private val loggedDrops = LinkedHashSet<String>()
+
     override fun canHandle(payloadType: String) = payloadType == "LIVE_AUDIO"
     override fun handle(endpointId: String, payload: MeshPayload, payloadBytes: ByteArray, callback: PayloadDispatcherCallback) {
         val chunk = payload.liveAudioChunk ?: return
+        val sessionKey = "${payload.senderNodeId.ifBlank { payload.senderName }}:${payload.liveVoiceSessionId}"
+        val decision = synchronized(lastSequenceBySession) {
+            val result = LiveVoicePolicy.validate(
+                sessionId = payload.liveVoiceSessionId,
+                sequence = payload.liveVoiceSequence,
+                capturedAtMs = payload.liveVoiceCapturedAtMs,
+                relayHopCount = payload.relayHopCount,
+                lastAcceptedSequence = lastSequenceBySession[sessionKey],
+                nowMs = System.currentTimeMillis()
+            )
+            if (result == LiveVoicePolicy.FrameDecision.ACCEPT) {
+                lastSequenceBySession[sessionKey] = payload.liveVoiceSequence
+                while (lastSequenceBySession.size > MAX_TRACKED_VOICE_SESSIONS) {
+                    lastSequenceBySession.entries.iterator().next().also { lastSequenceBySession.remove(it.key) }
+                }
+            }
+            result
+        }
+        if (decision != LiveVoicePolicy.FrameDecision.ACCEPT) {
+            logDropOnce(sessionKey, decision)
+            return
+        }
         val channelId = payload.channelId
         callback.onLiveAudioChunk(payload.senderName, channelId, chunk)
-        
-        // STP Directed Routing
+        if (payload.relayHopCount >= LiveVoicePolicy.MAX_RELAY_HOPS) return
+
+        // Realtime frames are best effort: no direct-link creation or delayed relay queue.
+        val expiresAtMs = payload.liveVoiceCapturedAtMs + LiveVoicePolicy.FRAME_TTL_MS
+        val relayedPayload = payload.copy(relayHopCount = payload.relayHopCount + 1)
+        val relayedBytes = ProtoBuf.encodeToByteArray(relayedPayload)
         val stpNeighbors = callback.getStpNeighbors()
         if (stpNeighbors.isEmpty()) return
 
         for (neighborName in stpNeighbors) {
             val neighborEndpointId = callback.getConnectedEndpointIdByName(neighborName)
             if (neighborEndpointId != null && neighborEndpointId != endpointId) {
-                callback.sendDirectPayload(neighborEndpointId, payloadBytes)
+                callback.sendEphemeralPayload(neighborEndpointId, relayedBytes, expiresAtMs)
             }
         }
+    }
+
+    private fun logDropOnce(sessionKey: String, decision: LiveVoicePolicy.FrameDecision) {
+        synchronized(loggedDrops) {
+            if (!loggedDrops.add("$sessionKey:$decision")) return
+            while (loggedDrops.size > MAX_TRACKED_VOICE_SESSIONS) loggedDrops.remove(loggedDrops.first())
+        }
+        AppLogger.d("LiveVoice", "VOICE_FRAME_DROPPED reason=$decision session=${sessionKey.takeLast(8)}")
+    }
+
+    private companion object {
+        const val MAX_TRACKED_VOICE_SESSIONS = 128
+    }
+}
+
+/** Private attachment traffic never broadcasts and has no fallback route. */
+@OptIn(ExperimentalSerializationApi::class)
+class AttachmentPayloadHandler : PayloadHandler {
+    override fun canHandle(payloadType: String) = payloadType.startsWith("ATTACHMENT_")
+
+    override fun handle(endpointId: String, payload: MeshPayload, payloadBytes: ByteArray, callback: PayloadDispatcherCallback) {
+        if (!payload.isPrivate || payload.attachmentId.isBlank()) return
+        if (payload.targetNodeId.equals(callback.getMyNodeId(), ignoreCase = true)) {
+            callback.onAttachmentPayload(endpointId, payload)
+            return
+        }
+        val route = payload.directedRouteNodeIds
+        val index = route.indexOf(callback.getMyNodeId())
+        val nextEndpoint = route.getOrNull(index + 1)?.let(callback::getConnectedEndpointIdByNodeId)
+        if (nextEndpoint == null) {
+            AppLogger.d("AttachmentTransfer", "Attachment route unavailable; not broadcasting")
+            return
+        }
+        // A chunk is bounded to 1 KiB and queued as normal traffic; control frames outrank it.
+        if (AttachmentTransferPolicy.trafficFor(payload.type) == AttachmentTransferPolicy.Traffic.LOW_ATTACHMENT) callback.sendDirectPayload(nextEndpoint, payloadBytes)
+        else callback.sendPriorityPayload(nextEndpoint, payloadBytes)
     }
 }
 

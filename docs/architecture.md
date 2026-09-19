@@ -37,15 +37,15 @@ DISCONNECTED -> CONNECTING -> DISCOVERING -> CONFIGURING -> READY
       +------------------- DISCONNECTING <---------------------+
 ```
 
-Client readiness follows required GATT configuration such as service discovery and CCCD completion. Server readiness follows subscription. Server-to-client GATT fallback uses acknowledged indications so queue advancement is tied to `onNotificationSent` rather than an unacknowledged notification accepted only by the local stack. `GattTransferCoordinator` owns deterministic flight claiming, generation checks, bounded queue admission, chunk completion, removal, and L2CAP queue promotion. `MeshFrameCodec` applies the same length-prefix and payload bounds to GATT and L2CAP. `HeartbeatCoordinator` owns one generation-bound challenge per endpoint; Android scheduling and radio I/O remain in `NativeBleManager`. Same-address late server callback ownership and queue overflow/retry behavior still require review and device evidence.
+Client readiness requires discovery/CCCD; server readiness requires subscription. Fallback uses acknowledged indications, and coordinators own generation checks, bounded queues, frame bounds, L2CAP promotion, and one heartbeat per endpoint. Same-address callback ownership and queue behavior still need device evidence.
 
 If Android revokes `BLUETOOTH_CONNECT` during orphan preemption or an in-flight GATT write/indication, the operation is caught, logged without payload content, and retired through the existing flight/link cleanup path rather than crashing the process.
 
-Client setup treats the default 20-byte ATT payload as the reliable baseline: service discovery and CCCD subscription establish `READY` without waiting for MTU negotiation. A GATT-server connection callback for an endpoint already owned by a live outbound client is treated as another local view of that ACL, not as a second configuring mesh role with its own destructive timeout.
+Client setup uses the reliable 20-byte ATT baseline; `READY` does not wait for MTU negotiation. A server callback for a live outbound endpoint is another view of that ACL, not a second destructive role.
 
-A generation-owned radio handshake gate pauses discovery scanning while any client or server link is configuring. Advertising starts once with the mesh session and is not restarted when the direct-link count changes; local admission remains authoritative even though the advertised count can be stale until the next session. Existing ready links continue carrying traffic, and only the last setup owner may resume balanced scanning. The higher election score is the sole initiator; yielding peers do not schedule a delayed role reversal. Elected peers enter a stable-identity bootstrap queue: a busy gate or connect lock retains the candidate, and only one outbound `connectGatt` attempt may run at once.
+A generation-owned gate pauses scanning during setup while ready links continue traffic. Advertising is session-owned; higher election score is the sole initiator. Busy candidates stay in a stable-ID bootstrap queue, with one outbound `connectGatt` at a time.
 
-The elected client owns a five-second setup deadline covering connect, discovery, and CCCD subscription. A candidate that has not reached `READY` is rechecked by the bootstrap queue after setup cleanup; busy candidates retry after 750 ms and failed starts use bounded backoff. The server's 20-second configuring deadline is only an orphan backstop if the client and its disconnect callback vanish. A provisional peer's 10-second identity deadline starts only after CCCD reaches `READY`, so identity waiting cannot abort ATT discovery.
+The elected client has a five-second connect/discovery/CCCD deadline; bootstrap retries are bounded. Server configuration is an orphan backstop, and provisional identity waiting starts only after `READY`.
 
 Outbound GATT uses Android's `AUTO` transport for known-good peers because the project previously observed immediate disconnects with globally forced LE on some OEM pairs. If `AUTO` reaches `CONNECTED` but receives no ATT service-discovery response, the stable peer identity is marked for explicit `TRANSPORT_LE` on the next attempt in that app session. This is a per-peer compatibility fallback, not a Samsung model allowlist.
 
@@ -77,6 +77,14 @@ Topology is now recorded by stable node ID for private routes. SYSTEM pulses may
 
 This is not yet a basis for claiming authenticated end-to-end encryption or forward secrecy. TOFU can detect a later substitution but does not authenticate the first observation; key verification UI, key epochs/current-key acknowledgment, and backup/storage policy remain open production concerns.
 
+## Private image attachments
+
+Community chat and SOS do not send images. A private image is an `ATTACHMENT_OFFER` on the stable-ID directed route. The offer encrypts caption, JPEG metadata, 160 px/8 KiB preview, SHA-256, and an attachment key for the recipient's current trusted key. The app-private source JPEG is orientation-corrected and capped at 1280 px/320 KiB.
+
+The recipient explicitly requests the original. `ATTACHMENT_CHUNK` carries one 1 KiB AES-GCM-authenticated chunk and is only forwarded to the next selected node ID; it is never broadcast. The recipient persists a checkpoint after each verified chunk and returns a directed checkpoint, so the sender has at most one unacknowledged attachment chunk in the mesh. Heartbeats, SOS, text, receipts, requests, and checkpoints use priority traffic before the next chunk. Relays retain no whole-file copy. Completion requires the receiver's SHA-256 verification and a directed completion signal; a missing route is a paused transfer, not successful delivery.
+
+Live voice is deliberately realtime-only: each frame has a session ID, sequence, capture time, TTL, and four-hop bound. Ready L2CAP/GATT links may send it, but transport queues discard expired frames and receivers/relays reject stale or replayed sequences. Reconnection can deliver newly captured speech only; voice notes remain the durable alternative.
+
 ## Persistence and UI
 
 `MeshRepository` joins network callbacks, `MeshRouter`, persistence, and UI-facing state through two boundaries: `MeshNetworkGateway` hides Android Bluetooth types, and `MessageStore` hides Room/DAO operations. `PrivateDeliveryPlanner` makes the pure direct/next-hop/broadcast selection before the gateway performs transport I/O. Production adapters are supplied by Koin. Room collection and background writes run in the process-owned `AppCoroutineScope`. Compose features cover setup, chat, Radar, SOS, profile, responder tracking, and audio; Active Chat header presentation and Radar row models are separated from their route-level screens. UI rules live in `docs/ui.md`; physical behavior must be checked against `docs/validation.md`.
@@ -92,6 +100,7 @@ This is not yet a basis for claiming authenticated end-to-end encryption or forw
 | Cryptography | `core/network/CryptoManager.kt`, `data/repository/PeerPublicKeyCache.kt` |
 | Repository and routing | `core/network/MeshNetworkGateway.kt`, `data/repository/MeshRepository.kt`, `MessageStore.kt`, `MeshRouter.kt`, `PayloadFactory.kt` |
 | Room | `data/local/` |
+| Private attachments | `data/repository/AttachmentTransferManager.kt`, `data/local/entity/AttachmentEntity.kt` |
 | Compose features | `feature/` and `core/ui/` |
 | UI state | `ui/state/UiStates.kt` |
 

@@ -81,6 +81,11 @@ class GattTransferExecutor(
     private fun sendChunk(flight: GattTransferFlight) {
         val endpoint = flight.link.endpoint
         if (!coordinator.owns(flight)) return
+        if (flight.transfer.isExpired()) {
+            coordinator.remove(flight)
+            processNext(endpoint)
+            return
+        }
         val remaining = flight.transfer.frame.size - flight.offset
         if (remaining <= 0) return
         val mtu = (store.connectionMtu[endpoint] ?: 20).coerceAtLeast(1)
@@ -140,6 +145,10 @@ class GattTransferExecutor(
         val endpoint = flight.link.endpoint
         if (!coordinator.remove(flight)) return
         onFlightRemoved(endpoint)
+        if (flight.transfer.isExpired()) {
+            processNext(endpoint)
+            return
+        }
         if (hasUsableL2cap(endpoint)) {
             AppLogger.d(
                 "BLE_MESH",

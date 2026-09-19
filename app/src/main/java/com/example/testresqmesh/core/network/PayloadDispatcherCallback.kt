@@ -11,6 +11,7 @@ interface PayloadDispatcherCallback {
     
     fun sendDirectPayload(endpointId: String, payload: ByteArray)
     fun sendPriorityPayload(endpointId: String, payload: ByteArray)
+    fun sendEphemeralPayload(endpointId: String, payload: ByteArray, expiresAtMs: Long): Boolean
     fun sendGattPayload(endpointId: String, payload: ByteArray)
     fun onHeartbeatAck(endpointId: String, challengeId: String)
     fun broadcastPayload(payload: ByteArray, excludeEndpointId: String?)
@@ -21,6 +22,8 @@ interface PayloadDispatcherCallback {
     fun onRoutingTableReceived(senderName: String, senderNodeId: String, connectedNodes: List<String>, connectedNodeIds: List<String>)
     fun onMessageReceived(endpointId: String, msgId: String, senderName: String, text: String, isPrivate: Boolean, isSystem: Boolean, imageBase64: String?, audioBase64: String?, locationLat: Double?, locationLng: Double?, medium: String, routePath: List<String>, channelId: String)
     fun onLiveAudioChunk(sender: String, channelId: String, chunk: ByteArray)
+    /** Delivered only to the intended endpoint; relays forward attachment frames blindly. */
+    fun onAttachmentPayload(endpointId: String, payload: MeshPayload)
     
     fun onDeviceNameSync(endpointId: String, realName: String)
     fun onDeviceGoodbye(endpointId: String)

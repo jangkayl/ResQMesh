@@ -3,6 +3,7 @@ package com.example.testresqmesh.core.domain.usecase
 import com.example.testresqmesh.core.model.ChatMessage
 import com.example.testresqmesh.core.model.ConnectedDevice
 import com.example.testresqmesh.core.model.KnownNode
+import com.example.testresqmesh.core.model.AttachmentUiState
 import com.example.testresqmesh.core.model.ScannedDevice
 import com.example.testresqmesh.data.repository.MeshRepository
 import kotlinx.coroutines.flow.Flow
@@ -25,6 +26,9 @@ data class MeshUseCases(
     val deleteConversationWith: DeleteConversationWithUseCase,
     val broadcastLiveAudioChunk: BroadcastLiveAudioChunkUseCase,
     val broadcastSeenReceipt: BroadcastSeenReceiptUseCase,
+    val sendPrivateImage: SendPrivateImageUseCase,
+    val requestAttachmentDownload: RequestAttachmentDownloadUseCase,
+    val cancelAttachment: CancelAttachmentUseCase,
     val clearSosAlert: ClearSosAlertUseCase,
 
     val observeConnectionStatus: ObserveConnectionStatusUseCase,
@@ -39,7 +43,8 @@ data class MeshUseCases(
     val observeTopology: ObserveTopologyUseCase,
     val observePublicMessages: ObservePublicMessagesUseCase,
     val observePrivateMessages: ObservePrivateMessagesUseCase,
-    val observeBlockedDeviceNames: ObserveBlockedDeviceNamesUseCase
+    val observeBlockedDeviceNames: ObserveBlockedDeviceNamesUseCase,
+    val observeAttachments: ObserveAttachmentsUseCase
 )
 
 class StartNodeUseCase(private val repository: MeshRepository) {
@@ -99,6 +104,19 @@ class SendPublicMessageUseCase(private val repository: MeshRepository) {
 class SendPrivateMessageUseCase(private val repository: MeshRepository) {
     operator fun invoke(targetName: String, text: String, imageBase64: String?, audioBase64: String?, locationLat: Double? = null, locationLng: Double? = null): Boolean =
         repository.sendPrivateMessage(targetName, text, imageBase64, audioBase64, locationLat, locationLng)
+}
+
+class SendPrivateImageUseCase(private val repository: MeshRepository) {
+    suspend operator fun invoke(targetName: String, caption: String, uri: android.net.Uri): Boolean =
+        repository.sendPrivateImage(targetName, caption, uri)
+}
+
+class RequestAttachmentDownloadUseCase(private val repository: MeshRepository) {
+    operator fun invoke(attachmentId: String) = repository.requestAttachmentDownload(attachmentId)
+}
+
+class CancelAttachmentUseCase(private val repository: MeshRepository) {
+    operator fun invoke(attachmentId: String) = repository.cancelAttachment(attachmentId)
 }
 
 class HasPendingPublicKeyChangeUseCase(private val repository: MeshRepository) {
@@ -183,4 +201,8 @@ class ObservePrivateMessagesUseCase(private val repository: MeshRepository) {
 
 class ObserveBlockedDeviceNamesUseCase(private val repository: MeshRepository) {
     operator fun invoke(): StateFlow<Set<String>> = repository.blockedDeviceNames
+}
+
+class ObserveAttachmentsUseCase(private val repository: MeshRepository) {
+    operator fun invoke(): StateFlow<Map<String, AttachmentUiState>> = repository.attachments
 }

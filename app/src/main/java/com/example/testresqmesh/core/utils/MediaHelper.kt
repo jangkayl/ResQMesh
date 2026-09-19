@@ -107,6 +107,10 @@ class MediaHelper(private val context: Context) {
         } catch (e: Exception) { null }
     }
 
+    fun decodeFileToBitmap(path: String): Bitmap? = runCatching {
+        BitmapFactory.decodeFile(path)
+    }.getOrNull()
+
     // --- PROCEDURAL EMERGENCY SIREN ---
     // Uses the system ToneGenerator to create a high-fidelity "Hi-Lo" emergency siren without requiring an external mp3 file.
     private var sirenThread: Thread? = null

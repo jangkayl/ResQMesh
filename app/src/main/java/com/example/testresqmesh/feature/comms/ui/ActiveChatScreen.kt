@@ -7,6 +7,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -42,6 +43,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
@@ -71,6 +73,8 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import com.example.testresqmesh.R
 import com.example.testresqmesh.core.model.ChatMessage
+import com.example.testresqmesh.core.model.AttachmentStatus
+import com.example.testresqmesh.core.model.AttachmentUiState
 import com.example.testresqmesh.core.model.NodeIdentity
 import com.example.testresqmesh.core.ui.components.feedback.ResQEmptyState
 import com.example.testresqmesh.core.ui.components.layout.ResQAuroraBackground
@@ -106,7 +110,7 @@ fun ActiveChatScreen(
     val listState = rememberLazyListState()
     val latestMessageId = sortedMessages.firstOrNull()?.id
     val snackbarHostState = remember { SnackbarHostState() }
-    var pendingImage by remember { mutableStateOf<String?>(null) }
+    var pendingImage by remember { mutableStateOf<Uri?>(null) }
     var pendingAudio by remember { mutableStateOf<String?>(null) }
     var isRecording by remember { mutableStateOf(false) }
     var showDeleteDialog by remember { mutableStateOf(false) }
@@ -167,7 +171,7 @@ fun ActiveChatScreen(
                     draft = drafts[name].orEmpty(),
                     onDraftChange = { viewModel.updatePrivateDraft(name, it) },
                     pendingImage = pendingImage,
-                    onImageSelected = { pendingImage = it },
+                    onImageSelected = { pendingImage = it; pendingAudio = null },
                     onClearImage = { pendingImage = null },
                     pendingAudio = pendingAudio,
                     onClearAudio = { pendingAudio = null },
@@ -182,23 +186,16 @@ fun ActiveChatScreen(
                     },
                     onSend = {
                         val text = drafts[name].orEmpty().trim()
-                        val messageText = when {
-                            text.isNotBlank() -> text
-                            pendingAudio != null -> voiceNoteText
-                            pendingImage != null -> photoText
-                            else -> ""
-                        }
+                        val messageText = when { text.isNotBlank() -> text; pendingAudio != null -> voiceNoteText; pendingImage != null -> photoText; else -> "" }
                         if (messageText.isBlank() && pendingImage == null && pendingAudio == null) return@PrivateChatComposer
-                        val sent = viewModel.sendPrivateMessage(
-                            targetName = name,
-                            text = messageText,
-                            imageBase64 = pendingImage,
-                            audioBase64 = pendingAudio
-                        )
-                        if (sent) {
-                            viewModel.clearPrivateDraft(name)
-                            pendingImage = null
-                            pendingAudio = null
+                        val selectedImage = pendingImage
+                        if (selectedImage != null) {
+                            viewModel.sendPrivateImage(name, messageText, selectedImage) { sent ->
+                                if (sent) { viewModel.clearPrivateDraft(name); pendingImage = null; pendingAudio = null }
+                            }
+                        } else {
+                            val sent = viewModel.sendPrivateMessage(name, messageText, audioBase64 = pendingAudio)
+                            if (sent) { viewModel.clearPrivateDraft(name); pendingAudio = null }
                         }
                     },
                     onSendLocation = {
@@ -247,7 +244,10 @@ fun ActiveChatScreen(
                         }
                         PrivateMessageBubble(
                             message = message,
+                            attachment = message.attachmentId?.let(uiState.attachments::get),
                             mediaHelper = mediaHelper,
+                            onDownload = viewModel::requestAttachmentDownload,
+                            onCancelAttachment = viewModel::cancelAttachment,
                             onViewMap = { latitude, longitude ->
                                 onViewMap(latitude, longitude, message.senderName, message.text)
                             }
@@ -323,7 +323,10 @@ internal fun PrivateChatHeader(
 @Composable
 private fun PrivateMessageBubble(
     message: ChatMessage,
+    attachment: AttachmentUiState?,
     mediaHelper: MediaHelper,
+    onDownload: (String) -> Unit,
+    onCancelAttachment: (String) -> Unit,
     onViewMap: (Double, Double) -> Unit
 ) {
     val mine = message.isMine
@@ -347,6 +350,15 @@ private fun PrivateMessageBubble(
             shadowElevation = if (mine) 4.dp else 8.dp
         ) {
             Column(modifier = Modifier.padding(horizontal = Spacing.Medium, vertical = 10.dp)) {
+                attachment?.let {
+                    PrivateAttachmentCard(
+                        attachment = it,
+                        mediaHelper = mediaHelper,
+                        onDownload = { onDownload(it.attachmentId) },
+                        onCancel = { onCancelAttachment(it.attachmentId) }
+                    )
+                    Spacer(Modifier.height(Spacing.Small))
+                }
                 message.imageBase64?.let { image ->
                     val bitmap = remember(image) { mediaHelper.decodeBase64ToBitmap(image) }
                     if (bitmap != null) {
@@ -417,11 +429,68 @@ private fun PrivateMessageBubble(
 }
 
 @Composable
+private fun PrivateAttachmentCard(
+    attachment: AttachmentUiState,
+    mediaHelper: MediaHelper,
+    onDownload: () -> Unit,
+    onCancel: () -> Unit
+) {
+    var showImage by remember(attachment.localPath) { mutableStateOf(false) }
+    val preview = remember(attachment.previewPath) { attachment.previewPath?.let(mediaHelper::decodeFileToBitmap) }
+    val full = remember(attachment.localPath) { attachment.localPath?.let(mediaHelper::decodeFileToBitmap) }
+    val complete = attachment.status == AttachmentStatus.COMPLETE
+    val progress = if (attachment.byteSize == 0) 0f else attachment.receivedBytes.toFloat() / attachment.byteSize
+    Column(modifier = Modifier.fillMaxWidth()) {
+        (if (complete) full else preview)?.let { bitmap ->
+            Image(
+                bitmap = bitmap.asImageBitmap(),
+                contentDescription = if (complete) "Private photo. Tap to view full size." else "Private photo preview.",
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxWidth().height(180.dp).clip(RoundedCornerShape(14.dp))
+                    .then(if (complete) Modifier.clickable { showImage = true } else Modifier)
+            )
+        }
+        Spacer(Modifier.height(Spacing.ExtraSmall))
+        Text(attachmentLabel(attachment), style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
+        if (attachment.status == AttachmentStatus.TRANSFERRING || attachment.status == AttachmentStatus.DOWNLOAD_REQUESTED) {
+            LinearProgressIndicator(progress = { progress.coerceIn(0f, 1f) }, modifier = Modifier.fillMaxWidth().padding(top = Spacing.ExtraSmall))
+        }
+        attachment.failureReason?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error) }
+        when (attachment.status) {
+            AttachmentStatus.OFFERED, AttachmentStatus.PAUSED_ROUTE_UNAVAILABLE, AttachmentStatus.CORRUPT_RETRY ->
+                Button(onClick = onDownload, modifier = Modifier.padding(top = Spacing.Small)) { Text(if (attachment.status == AttachmentStatus.OFFERED) "Download image" else "Retry download") }
+            AttachmentStatus.DOWNLOAD_REQUESTED, AttachmentStatus.TRANSFERRING ->
+                TextButton(onClick = onCancel) { Text("Cancel transfer") }
+            else -> Unit
+        }
+    }
+    if (showImage && full != null) {
+        AlertDialog(
+            onDismissRequest = { showImage = false },
+            confirmButton = { TextButton(onClick = { showImage = false }) { Text("Close") } },
+            text = { Image(full.asImageBitmap(), contentDescription = "Full private photo", modifier = Modifier.fillMaxWidth(), contentScale = ContentScale.Fit) }
+        )
+    }
+}
+
+private fun attachmentLabel(attachment: AttachmentUiState): String = when (attachment.status) {
+    AttachmentStatus.QUEUED_OFFER -> "Offering private image"
+    AttachmentStatus.OFFERED -> "Private image ready to download"
+    AttachmentStatus.DOWNLOAD_REQUESTED -> "Download requested"
+    AttachmentStatus.TRANSFERRING -> "Downloading ${(attachment.receivedBytes * 100 / attachment.byteSize.coerceAtLeast(1))}%"
+    AttachmentStatus.PAUSED_ROUTE_UNAVAILABLE -> "Paused — mesh route unavailable"
+    AttachmentStatus.COMPLETE -> "Private image delivered"
+    AttachmentStatus.CORRUPT_RETRY -> "Image needs another download"
+    AttachmentStatus.CANCELLED -> "Image transfer cancelled"
+    AttachmentStatus.SOURCE_UNAVAILABLE -> "Image is no longer available from sender"
+}
+
+@Composable
 private fun PrivateChatComposer(
     draft: String,
     onDraftChange: (String) -> Unit,
-    pendingImage: String?,
-    onImageSelected: (String) -> Unit,
+    pendingImage: Uri?,
+    onImageSelected: (Uri) -> Unit,
     onClearImage: () -> Unit,
     pendingAudio: String?,
     onClearAudio: () -> Unit,
@@ -433,10 +502,7 @@ private fun PrivateChatComposer(
 ) {
     val context = LocalContext.current
     val imagePicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
-        uri?.let {
-            val bitmap = android.graphics.BitmapFactory.decodeStream(context.contentResolver.openInputStream(it))
-            if (bitmap != null) onImageSelected(mediaHelper.compressBitmapToBase64(bitmap))
-        }
+        uri?.let(onImageSelected)
     }
     val canSend = (draft.isNotBlank() || pendingImage != null || pendingAudio != null) && !isRecording
 

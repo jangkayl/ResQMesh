@@ -15,6 +15,7 @@ import com.example.testresqmesh.data.repository.MessageStore
 import com.example.testresqmesh.data.repository.RoomMessageStore
 import com.example.testresqmesh.data.repository.BlockRelationshipStore
 import com.example.testresqmesh.data.repository.PeerPublicKeyDirectory
+import com.example.testresqmesh.data.repository.AttachmentTransferManager
 import com.example.testresqmesh.feature.comms.viewmodel.CommunicationViewModel
 import com.example.testresqmesh.feature.comms.viewmodel.WalkieTalkieViewModel
 import com.example.testresqmesh.feature.radar.viewmodel.RadarViewModel
@@ -31,8 +32,9 @@ val appModule = module {
     single<MessageStore> { RoomMessageStore(get<AppDatabase>().messageDao()) }
     single { BlockRelationshipStore(androidContext()) }
     single { PeerPublicKeyDirectory(androidContext()) }
+    single { AttachmentTransferManager(androidContext(), get<AppDatabase>().attachmentDao()) }
     single(createdAtStart = true) { AppCoroutineScope(Dispatchers.IO) }
-    single { MeshRepository(get(), get(), get(), get(), get<AppCoroutineScope>().scope) }
+    single { MeshRepository(get(), get(), get(), get(), get(), get<AppCoroutineScope>().scope) }
     single { MediaHelper(androidContext()) }
     single<LocationClient> { DefaultLocationClient(androidContext()) }
     
@@ -60,6 +62,9 @@ val appModule = module {
             deleteConversationWith = DeleteConversationWithUseCase(get()),
             broadcastLiveAudioChunk = BroadcastLiveAudioChunkUseCase(get()),
             broadcastSeenReceipt = BroadcastSeenReceiptUseCase(get()),
+            sendPrivateImage = SendPrivateImageUseCase(get()),
+            requestAttachmentDownload = RequestAttachmentDownloadUseCase(get()),
+            cancelAttachment = CancelAttachmentUseCase(get()),
             clearSosAlert = ClearSosAlertUseCase(get()),
             observeConnectionStatus = ObserveConnectionStatusUseCase(get()),
             observeIsOnline = ObserveIsOnlineUseCase(get()),
@@ -73,7 +78,8 @@ val appModule = module {
             observeTopology = ObserveTopologyUseCase(get()),
             observePublicMessages = ObservePublicMessagesUseCase(get()),
             observePrivateMessages = ObservePrivateMessagesUseCase(get()),
-            observeBlockedDeviceNames = ObserveBlockedDeviceNamesUseCase(get())
+            observeBlockedDeviceNames = ObserveBlockedDeviceNamesUseCase(get()),
+            observeAttachments = ObserveAttachmentsUseCase(get())
         )
     }
 

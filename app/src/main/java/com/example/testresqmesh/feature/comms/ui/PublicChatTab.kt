@@ -61,12 +61,10 @@ fun PublicChatTab(
     val uiState by viewModel.uiState.collectAsState()
     val channelId by viewModel.currentChannelId.collectAsState()
     var inputText by remember { mutableStateOf("") }
-    var pendingImage by remember { mutableStateOf<String?>(null) }
     var pendingAudio by remember { mutableStateOf<String?>(null) }
     var isRecording by remember { mutableStateOf(false) }
     val context = LocalContext.current
     val voiceNoteText = stringResource(R.string.private_chat_voice_note)
-    val photoText = stringResource(R.string.private_chat_photo)
     val sortedMessages = remember(uiState.publicMessages) {
         uiState.publicMessages.sortedByDescending { it.timestamp }
     }
@@ -91,9 +89,6 @@ fun PublicChatTab(
                 ChatInput(
                     inputText = inputText,
                     onTextChange = { inputText = it },
-                    pendingImage = pendingImage,
-                    onImageSelected = { pendingImage = it },
-                    onClearImage = { pendingImage = null },
                     pendingAudio = pendingAudio,
                     onClearAudio = { pendingAudio = null },
                     isRecording = isRecording,
@@ -109,13 +104,11 @@ fun PublicChatTab(
                         val message = when {
                             inputText.isNotBlank() -> inputText.trim()
                             pendingAudio != null -> voiceNoteText
-                            pendingImage != null -> photoText
                             else -> ""
                         }
-                        if (message.isNotBlank() || pendingImage != null || pendingAudio != null) {
-                            viewModel.sendPublicMessage(message, pendingImage, pendingAudio)
+                        if (message.isNotBlank() || pendingAudio != null) {
+                            viewModel.sendPublicMessage(message, null, pendingAudio)
                             inputText = ""
-                            pendingImage = null
                             pendingAudio = null
                         }
                     },
@@ -129,7 +122,6 @@ fun PublicChatTab(
                             )
                         }
                     },
-                    mediaHelper = mediaHelper
                 )
             }
         ) { innerPadding ->

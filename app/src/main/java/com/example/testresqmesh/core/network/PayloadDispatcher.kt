@@ -10,6 +10,7 @@ import com.example.testresqmesh.core.network.dispatch.ReceiptHandler
 import com.example.testresqmesh.core.network.dispatch.StandardMessageHandler
 import com.example.testresqmesh.core.network.dispatch.SystemPulseHandler
 import com.example.testresqmesh.core.network.dispatch.PingHandler
+import com.example.testresqmesh.core.network.dispatch.AttachmentPayloadHandler
 import com.example.testresqmesh.core.utils.AppLogger
 import com.example.testresqmesh.core.utils.TerminalLogCategory
 import com.example.testresqmesh.core.utils.TerminalLogLevel
@@ -29,6 +30,7 @@ class PayloadDispatcher(private val callback: PayloadDispatcherCallback) {
         BlockAckHandler(),
         LegacyBlockControlHandler(),
         LiveAudioHandler(),
+        AttachmentPayloadHandler(),
         StandardMessageHandler()
     )
 
@@ -41,11 +43,15 @@ class PayloadDispatcher(private val callback: PayloadDispatcherCallback) {
             val msgId = payload.id
             val seenMessageIds = callback.getSeenMessageIds()
 
-            if (seenMessageIds.contains(msgId)) return
-            seenMessageIds.add(msgId)
-            if (seenMessageIds.size > 500) {
-                seenMessageIds.firstOrNull()?.let { oldest ->
-                    seenMessageIds.remove(oldest)
+            // Attachment chunks are deliberately idempotent: if a checkpoint is lost, a repeated
+            // chunk must reach the recipient so it can repeat the durable checkpoint.
+            if (!payload.type.startsWith("ATTACHMENT_")) {
+                if (seenMessageIds.contains(msgId)) return
+                seenMessageIds.add(msgId)
+                if (seenMessageIds.size > 500) {
+                    seenMessageIds.firstOrNull()?.let { oldest ->
+                        seenMessageIds.remove(oldest)
+                    }
                 }
             }
 
