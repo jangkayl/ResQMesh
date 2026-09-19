@@ -43,7 +43,7 @@ class NativeBleManager(val context: Context) {
     var onLiveAudioChunk: ((String, String, ByteArray) -> Unit)? = null
     var onMessageDelivered: ((String, String, List<String>) -> Unit)? = null
     var onPublicKeyReceived: ((String, String, String) -> Unit)? = null
-    var onRoutingTableReceived: ((String, List<String>) -> Unit)? = null
+    var onRoutingTableReceived: ((String, String, List<String>, List<String>) -> Unit)? = null
     var onSosCancelled: (() -> Unit)? = null
     var onStatusChanged: ((String) -> Unit)? = null
     var onDeviceBlocked: ((String) -> Unit)? = null
@@ -97,13 +97,13 @@ class NativeBleManager(val context: Context) {
     val NAME_HANDSHAKE_TIMEOUT_MS = 10_000L
 
     /** How long to wait for the GATT link itself to come up. */
-    val CONNECT_TIMEOUT_MS = 15_000L
+    val CONNECT_TIMEOUT_MS = 5_000L
 
     /**
      * Absolute ceiling on the post-connect handshake (discovery and descriptor write). Always
      * fires, so a dropped OEM callback can never strand the connect lock.
      */
-    val HANDSHAKE_WATCHDOG_MS = 15_000L
+    val HANDSHAKE_WATCHDOG_MS = 5_000L
 
     /** Bounded retry for a synchronous `discoverServices()` rejection from a busy OEM stack. */
     val DISCOVERY_REQUEST_RETRY_MS = 300L
@@ -120,10 +120,15 @@ class NativeBleManager(val context: Context) {
 
     val payloadDispatcherCallback = object : PayloadDispatcherCallback {
         override fun getMyDeviceName() = myDeviceName
+        override fun getMyNodeId() = myNodeId
         override fun getSeenMessageIds() = store.seenMessageIds
         override fun getEndpointMedium(endpointId: String) = "Persistent BLE Mesh"
         override fun getConnectedEndpointIdByName(name: String) =
             store.connectedEndpointNames.entries.find { NodeIdentity.matches(it.value, name) }?.key
+        override fun getConnectedEndpointIdByNodeId(nodeId: String) =
+            (store.activeConnections.keys + store.activeServerConnections.keys).firstOrNull {
+                nodeIdForEndpoint(it)?.equals(nodeId, ignoreCase = true) == true && store.links.isReady(it)
+            }
         override fun getStpNeighbors(): Set<String> {
             return this@NativeBleManager.stpNeighborsProvider?.invoke() ?: emptySet()
         }
@@ -136,8 +141,10 @@ class NativeBleManager(val context: Context) {
         override fun broadcastPayload(payload: ByteArray, excludeEndpointId: String?) = this@NativeBleManager.broadcastPayload(payload, excludeEndpointId)
         override fun onMessageSeen(msgId: String, readerName: String) { onMessageSeen?.invoke(msgId, readerName) }
         override fun onMessageDelivered(msgId: String, readerName: String, returnRoute: List<String>) { onMessageDelivered?.invoke(msgId, readerName, returnRoute) }
-        override fun onPublicKeyReceived(endpointId: String, senderName: String, key: String) { onPublicKeyReceived?.invoke(endpointId, senderName, key) }
-        override fun onRoutingTableReceived(senderName: String, connectedNodes: List<String>) { onRoutingTableReceived?.invoke(senderName, connectedNodes) }
+        override fun onPublicKeyReceived(senderName: String, senderNodeId: String, key: String) { onPublicKeyReceived?.invoke(senderName, senderNodeId, key) }
+        override fun onRoutingTableReceived(senderName: String, senderNodeId: String, connectedNodes: List<String>, connectedNodeIds: List<String>) {
+            onRoutingTableReceived?.invoke(senderName, senderNodeId, connectedNodes, connectedNodeIds)
+        }
         override fun onMessageReceived(endpointId: String, msgId: String, senderName: String, text: String, isPrivate: Boolean, isSystem: Boolean, imageBase64: String?, audioBase64: String?, locationLat: Double?, locationLng: Double?, medium: String, routePath: List<String>, channelId: String) {
             this@NativeBleManager.onMessageReceived?.invoke(endpointId, msgId, senderName, text, isPrivate, isSystem, imageBase64, audioBase64, locationLat, locationLng, medium, routePath, channelId)
         }
@@ -217,7 +224,7 @@ class NativeBleManager(val context: Context) {
     )
     private val peerAdmissionController = BlePeerAdmissionController(
         store, handler, { myDeviceName }, ::isDeviceBlocked, ::hasLinkToIdentity,
-        { peerName -> checkRouteExists?.invoke(peerName) == true }, ::hasPayloadReadyDirectLink, ::distinctLinkCount,
+        { peerName -> checkRouteExists?.invoke(peerName) == true }, ::hasPayloadReadyDirectLink, ::hasReadyLinkToIdentity, ::distinctLinkCount,
         { MAX_TOTAL_CONNECTIONS }, ::getElectionScore, ::latestEndpointForIdentity,
         ::connectToPersistentGatt, { event -> onDeviceScanned?.invoke(event) },
         { endpoint -> onDeviceDisconnected?.invoke(endpoint) }, ::sendSystemPulse
@@ -249,6 +256,10 @@ class NativeBleManager(val context: Context) {
             val connectedNodesList = store.connectedEndpointNames.values
                 .filter { !NodeIdentity.isPlaceholder(it) }
                 .toList().sorted()
+            val connectedNodeIds = (store.activeConnections.keys + store.activeServerConnections.keys)
+                .mapNotNull { nodeIdForEndpoint(it) }
+                .distinct()
+                .sorted()
             val currentHash = connectedNodesList.hashCode()
             val now = System.currentTimeMillis()
             
@@ -275,6 +286,8 @@ class NativeBleManager(val context: Context) {
                 type = "SYSTEM",
                 senderName = myDeviceName,
                 connectedNodes = connectedNodesList,
+                senderNodeId = myNodeId,
+                connectedNodeIds = connectedNodeIds,
                 publicKey = com.example.testresqmesh.core.network.CryptoManager.getMyPublicKeyBase64()
             )
             val payloadBytes = kotlinx.serialization.protobuf.ProtoBuf.encodeToByteArray(com.example.testresqmesh.core.network.MeshPayload.serializer(), payload)
@@ -386,7 +399,8 @@ class NativeBleManager(val context: Context) {
         peerAdmissionController.handle(advertisement)
     }
 
-    fun connectToPersistentGatt(macAddress: String, peerName: String) { gattClientManager.connectToPersistentGatt(macAddress, peerName) }
+    fun connectToPersistentGatt(macAddress: String, peerName: String) =
+        gattClientManager.connectToPersistentGatt(macAddress, peerName)
 
     // ---------------------------------------------------------------------------------------------
     // Connect lock
@@ -561,7 +575,7 @@ class NativeBleManager(val context: Context) {
             // Only auto-rename the physical socket if this is a direct message (not relayed).
             // Relayed payloads carry a non-empty routePath; renaming from those would map a remote
             // node onto a local socket and corrupt the routing table.
-            if (payload.routePath.isEmpty() && payload.senderName.isNotEmpty()) {
+            if (isDirectIdentityPulse) {
                 val oldName = store.connectedEndpointNames[endpointId]
                 if (NodeIdentity.isPlaceholder(oldName) || !NodeIdentity.matches(oldName, payload.senderName)) {
                     AppLogger.d("BLE_MESH", "Auto-rename: $endpointId is now ${payload.senderName}")
@@ -609,6 +623,16 @@ class NativeBleManager(val context: Context) {
         targets.forEach { targetId ->
             sendDirectPayload(targetId, payloadBytes)
         }
+    }
+
+    /** SOS/control callers may overtake a queued low-priority attachment frame. */
+    fun broadcastPriorityPayload(payloadBytes: ByteArray, excludeEndpointId: String? = null) {
+        cacheOutgoingMessageId(payloadBytes)
+        val targets = mutableSetOf<String>()
+        targets.addAll(store.activeConnections.keys)
+        targets.addAll(store.activeServerConnections.keys)
+        targets.remove(excludeEndpointId)
+        targets.forEach { sendPriorityPayload(it, payloadBytes) }
     }
 
     /** Queue one complete framed payload, bypassing L2CAP for a GATT health check. */
@@ -956,7 +980,8 @@ class NativeBleManager(val context: Context) {
             reader = myDeviceName,
             isPrivate = isPrivate,
             returnRoute = listOf(myDeviceName),
-            directedRoute = directedReturnRoute
+            directedRoute = directedReturnRoute,
+            directedRouteNodeIds = directedReturnRoute.mapNotNull(NodeIdentity::idOf)
         )
         val bytes = ProtoBuf.encodeToByteArray(payload)
         

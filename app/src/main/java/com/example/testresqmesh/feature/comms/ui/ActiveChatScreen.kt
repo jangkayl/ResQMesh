@@ -110,9 +110,15 @@ fun ActiveChatScreen(
     var pendingAudio by remember { mutableStateOf<String?>(null) }
     var isRecording by remember { mutableStateOf(false) }
     var showDeleteDialog by remember { mutableStateOf(false) }
+    var showKeyChangeDialog by remember { mutableStateOf(false) }
 
     LaunchedEffect(viewModel) {
         viewModel.privateSendErrors.collect { snackbarHostState.showSnackbar(it) }
+    }
+    LaunchedEffect(viewModel, name) {
+        viewModel.pendingKeyVerification.collect { peer ->
+            if (NodeIdentity.matches(peer, name)) showKeyChangeDialog = true
+        }
     }
 
     LaunchedEffect(latestMessageId) {
@@ -127,6 +133,20 @@ fun ActiveChatScreen(
                 viewModel.deleteConversationWith(name)
                 onBack()
             }
+        )
+    }
+    if (showKeyChangeDialog) {
+        AlertDialog(
+            onDismissRequest = { showKeyChangeDialog = false },
+            title = { Text("Recipient key changed") },
+            text = { Text("This device advertised a different encryption key. Accept it only after verifying the recipient through a separate channel, then resend your message.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    viewModel.acceptPendingPublicKeyChange(name)
+                    showKeyChangeDialog = false
+                }) { Text("Accept new key") }
+            },
+            dismissButton = { TextButton(onClick = { showKeyChangeDialog = false }) { Text("Keep existing key") } }
         )
     }
 
@@ -211,10 +231,10 @@ fun ActiveChatScreen(
                         .fillMaxSize()
                         .padding(innerPadding),
                     contentPadding = PaddingValues(
-                        start = Spacing.Large,
+                        start = Spacing.Medium,
                         top = Spacing.Small,
-                        end = Spacing.Large,
-                        bottom = Spacing.Large
+                        end = Spacing.Medium,
+                        bottom = Spacing.Medium
                     ),
                     verticalArrangement = Arrangement.spacedBy(Spacing.Small, Alignment.Bottom),
                     reverseLayout = true
@@ -326,7 +346,7 @@ private fun PrivateMessageBubble(
             contentColor = contentColor,
             shadowElevation = if (mine) 4.dp else 8.dp
         ) {
-            Column(modifier = Modifier.padding(Spacing.Medium)) {
+            Column(modifier = Modifier.padding(horizontal = Spacing.Medium, vertical = 10.dp)) {
                 message.imageBase64?.let { image ->
                     val bitmap = remember(image) { mediaHelper.decodeBase64ToBitmap(image) }
                     if (bitmap != null) {

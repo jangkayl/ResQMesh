@@ -25,6 +25,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.AlertDialog
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -39,13 +40,20 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.example.testresqmesh.R
 import com.example.testresqmesh.core.ui.components.feedback.ResQEmptyState
+import com.example.testresqmesh.core.ui.components.feedback.ResQStatusChip
+import com.example.testresqmesh.core.ui.components.feedback.ResQStatusTone
+import com.example.testresqmesh.core.ui.components.layout.ResQContentSurface
 import com.example.testresqmesh.core.ui.components.layout.ResQGlassSurface
-import com.example.testresqmesh.core.ui.theme.ResQTheme
 import com.example.testresqmesh.core.ui.theme.Spacing
+import com.example.testresqmesh.core.ui.theme.TestResQMeshTheme
 import com.example.testresqmesh.feature.radar.viewmodel.RadarViewModel
+import androidx.compose.ui.tooling.preview.Preview
 
 @Composable
-fun NetworkScreen(viewModel: RadarViewModel) {
+fun NetworkScreen(
+    viewModel: RadarViewModel,
+    onMessagePeer: (String) -> Unit = {}
+) {
     val state by viewModel.uiState.collectAsState()
     val nodes = remember(state) { classifyRadarNodes(state) }
     var selectedNode by remember { mutableStateOf<NodeItemData?>(null) }
@@ -54,12 +62,13 @@ fun NetworkScreen(viewModel: RadarViewModel) {
     if (selectedNode != null) {
         NetworkPeerDetails(
             node = selectedNode!!,
-            routes = state.topology[selectedNode!!.name].orEmpty().toList(),
+            knownPath = knownMeshPath(selectedNode!!, nodes, state.topology),
             onBack = { selectedNode = null },
             onDisconnect = { viewModel.disconnectDevice(selectedNode!!.endpointId) },
             onConnect = { viewModel.forceConnect(selectedNode!!.endpointId, selectedNode!!.name) },
             onBlock = { viewModel.blockDevice(selectedNode!!.name) },
-            onUnblock = { viewModel.unblockDevice(selectedNode!!.name) }
+            onUnblock = { viewModel.unblockDevice(selectedNode!!.name) },
+            onMessage = { onMessagePeer(selectedNode!!.name) }
         )
         return
     }
@@ -87,16 +96,22 @@ internal fun NetworkList(
     onNodeClick: (NodeItemData) -> Unit,
     onTopologyClick: () -> Unit
 ) {
+    val groups = listOf(
+        "Direct now" to nodes.filter { it.kind == NodeKind.DIRECT || it.kind == NodeKind.UNRESPONSIVE },
+        "Reachable via mesh" to nodes.filter { it.kind == NodeKind.RELAY || it.kind == NodeKind.HOPPED },
+        "Nearby or unavailable" to nodes.filter { it.kind !in setOf(NodeKind.DIRECT, NodeKind.UNRESPONSIVE, NodeKind.RELAY, NodeKind.HOPPED) }
+    ).filter { it.second.isNotEmpty() }
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(start = Spacing.Large, top = Spacing.ExtraLarge, end = Spacing.Large, bottom = 156.dp),
-        verticalArrangement = Arrangement.spacedBy(Spacing.Medium)
+        contentPadding = PaddingValues(start = Spacing.Medium, top = Spacing.Large, end = Spacing.Medium, bottom = 120.dp),
+        verticalArrangement = Arrangement.spacedBy(Spacing.Small)
     ) {
         item {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(modifier = Modifier.weight(1f)) {
-                    Text("Network", style = MaterialTheme.typography.displayLarge, fontWeight = FontWeight.Black)
-                    Text("People around you.", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("MESH", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Black, color = MaterialTheme.colorScheme.primary)
+                    Text("People & paths", style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.Black)
+                    Text("Current local reachability.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 Surface(
                     modifier = Modifier.size(52.dp),
@@ -115,8 +130,8 @@ internal fun NetworkList(
                     }
                     Spacer(Modifier.width(Spacing.Medium))
                     Column(modifier = Modifier.weight(1f)) {
-                        Text("Nearby people", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                        Text(networkSummaryLabel(nodes), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("Mesh field", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                        Text(networkSummaryLabel(nodes) + " · status is live", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     TextButton(onClick = onTopologyClick) { Text("Details") }
                 }
@@ -127,8 +142,13 @@ internal fun NetworkList(
                 ResQEmptyState("No people nearby", "Keep ResQMesh open to find people.", icon = Icons.Outlined.Hub)
             }
         } else {
-            items(nodes, key = { "${it.endpointId}-${it.name}" }) { node ->
-                NetworkNodeRow(node, onClick = { onNodeClick(node) })
+            groups.forEach { (title, group) ->
+                item(key = "header_$title") {
+                    Text(title.uppercase(), style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Black, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = Spacing.Small, start = Spacing.Small))
+                }
+                items(group, key = { "${it.endpointId}-${it.name}" }) { node ->
+                    NetworkNodeRow(node, onClick = { onNodeClick(node) })
+                }
             }
         }
     }
@@ -137,11 +157,11 @@ internal fun NetworkList(
 @Composable
 private fun NetworkNodeRow(node: NodeItemData, onClick: () -> Unit) {
     val status = networkStatus(node.kind)
-    ResQGlassSurface(
-        modifier = Modifier.fillMaxWidth().then(Modifier),
-        shape = RoundedCornerShape(24.dp),
+    ResQContentSurface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(20.dp),
         contentPadding = PaddingValues(Spacing.Medium),
-        shadowElevation = 10.dp
+        shadowElevation = 2.dp
     ) {
         Surface(onClick = onClick, color = androidx.compose.ui.graphics.Color.Transparent) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -153,7 +173,7 @@ private fun NetworkNodeRow(node: NodeItemData, onClick: () -> Unit) {
                 Spacer(Modifier.width(Spacing.Medium))
                 Column(modifier = Modifier.weight(1f)) {
                     Text(node.label, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Text(status, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold, color = networkStatusColor(node.kind))
+                    ResQStatusChip(status, networkStatusTone(node.kind))
                 }
             }
         }
@@ -163,34 +183,80 @@ private fun NetworkNodeRow(node: NodeItemData, onClick: () -> Unit) {
 @Composable
 private fun NetworkPeerDetails(
     node: NodeItemData,
-    routes: List<String>,
+    knownPath: List<String>,
     onBack: () -> Unit,
     onDisconnect: () -> Unit,
     onConnect: () -> Unit,
     onBlock: () -> Unit,
-    onUnblock: () -> Unit
+    onUnblock: () -> Unit,
+    onMessage: () -> Unit
 ) {
-    Column(Modifier.fillMaxSize().padding(Spacing.Large), verticalArrangement = Arrangement.spacedBy(Spacing.Large)) {
+    var confirmBlock by remember { mutableStateOf(false) }
+    val canMessage = !node.isBlocked && node.kind in setOf(NodeKind.DIRECT, NodeKind.RELAY, NodeKind.HOPPED)
+    Column(Modifier.fillMaxSize().padding(Spacing.Medium), verticalArrangement = Arrangement.spacedBy(Spacing.Medium)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Outlined.ArrowBack, "Back") }
             Text(node.label, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Black, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
-        ResQGlassSurface(shape = RoundedCornerShape(28.dp), contentPadding = PaddingValues(Spacing.Large)) {
+        ResQGlassSurface(shape = RoundedCornerShape(28.dp), contentPadding = PaddingValues(Spacing.Medium)) {
             Column(verticalArrangement = Arrangement.spacedBy(Spacing.Small)) {
-                Text(networkStatus(node.kind), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = networkStatusColor(node.kind))
+                ResQStatusChip(networkStatus(node.kind), networkStatusTone(node.kind))
                 Text("Status follows current network evidence.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
-        if (routes.isNotEmpty()) {
-            Text("Routes", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-            routes.forEach { route -> Text(route, style = MaterialTheme.typography.bodyMedium) }
-        }
+        Text("Known mesh path", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+        Text(
+            if (knownPath.isEmpty()) "Path unavailable right now. This is not a delivery guarantee."
+            else knownPath.joinToString("  →  "),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
         Row(horizontalArrangement = Arrangement.spacedBy(Spacing.Small)) {
+            if (canMessage) TextButton(onClick = onMessage) { Text("Message") }
             if (node.kind == NodeKind.DIRECT || node.kind == NodeKind.UNRESPONSIVE) TextButton(onClick = onDisconnect) { Text("Disconnect") }
             if (node.endpointId.isNotEmpty() && (node.kind == NodeKind.DISCOVERED || node.kind == NodeKind.SYNCING)) TextButton(onClick = onConnect) { Text("Connect") }
-            if (node.isBlocked) TextButton(onClick = onUnblock) { Text("Unblock") } else TextButton(onClick = onBlock) { Text("Block") }
+            if (node.isBlocked) TextButton(onClick = onUnblock) { Text("Unblock") } else TextButton(onClick = { confirmBlock = true }) { Text("Block") }
         }
     }
+    if (confirmBlock) {
+        AlertDialog(
+            onDismissRequest = { confirmBlock = false },
+            title = { Text("Block ${node.label}?") },
+            text = { Text("This denies a direct link on both phones after acknowledgement. Each phone must unblock locally before direct contact can resume. Relayed messages may still be available.") },
+            confirmButton = { TextButton(onClick = { confirmBlock = false; onBlock() }) { Text("Block") } },
+            dismissButton = { TextButton(onClick = { confirmBlock = false }) { Text("Cancel") } }
+        )
+    }
+}
+
+/** A current topology hint, deliberately not a promise of the next delivery route. */
+internal fun knownMeshPath(
+    target: NodeItemData,
+    nodes: List<NodeItemData>,
+    topology: Map<String, Set<String>>
+): List<String> {
+    if (target.kind == NodeKind.DIRECT) return listOf("You", target.label)
+    val direct = nodes.filter { it.kind == NodeKind.DIRECT }.map { it.name }
+    if (direct.isEmpty()) return emptyList()
+    val adjacency = mutableMapOf<String, MutableSet<String>>()
+    topology.forEach { (from, to) ->
+        adjacency.getOrPut(from) { mutableSetOf() }.addAll(to)
+        to.forEach { neighbor -> adjacency.getOrPut(neighbor) { mutableSetOf() }.add(from) }
+    }
+    val queue = ArrayDeque<List<String>>()
+    direct.forEach { queue.add(listOf(it)) }
+    val visited = direct.toMutableSet()
+    while (queue.isNotEmpty()) {
+        val path = queue.removeFirst()
+        val current = path.last()
+        if (com.example.testresqmesh.core.model.NodeIdentity.matches(current, target.name)) {
+            return listOf("You") + path.map { name -> nodes.firstOrNull { com.example.testresqmesh.core.model.NodeIdentity.matches(it.name, name) }?.label ?: name }
+        }
+        adjacency[current].orEmpty().forEach { next ->
+            if (visited.add(next)) queue.add(path + next)
+        }
+    }
+    return emptyList()
 }
 
 @Composable
@@ -226,10 +292,27 @@ internal fun networkSummaryLabel(nodes: List<NodeItemData>): String = when {
 }
 
 @Composable
-private fun networkStatusColor(kind: NodeKind) = when (kind) {
-    NodeKind.DIRECT -> ResQTheme.colors.success
-    NodeKind.UNRESPONSIVE, NodeKind.HANDSHAKING, NodeKind.SYNCING -> ResQTheme.colors.warning
-    NodeKind.RELAY, NodeKind.HOPPED -> MaterialTheme.colorScheme.primary
-    NodeKind.DISCOVERED -> MaterialTheme.colorScheme.secondary
-    NodeKind.OFFLINE, NodeKind.BLOCKED_OFFLINE -> MaterialTheme.colorScheme.onSurfaceVariant
+private fun networkStatusTone(kind: NodeKind) = when (kind) {
+    NodeKind.DIRECT -> ResQStatusTone.Success
+    NodeKind.UNRESPONSIVE, NodeKind.HANDSHAKING, NodeKind.SYNCING -> ResQStatusTone.Warning
+    NodeKind.RELAY, NodeKind.HOPPED -> ResQStatusTone.Information
+    NodeKind.DISCOVERED -> ResQStatusTone.Neutral
+    NodeKind.OFFLINE, NodeKind.BLOCKED_OFFLINE -> ResQStatusTone.Neutral
+}
+
+@Preview(name = "Mesh — reachable states", showBackground = true, widthDp = 390, heightDp = 844)
+@Composable
+private fun NetworkListPreview() {
+    TestResQMeshTheme {
+        NetworkList(
+            nodes = listOf(
+                NodeItemData("AA:01", "alpha", "", NodeKind.DIRECT, label = "Alpha"),
+                NodeItemData("BB:02", "bravo", "", NodeKind.RELAY, label = "Bravo"),
+                NodeItemData("CC:03", "charlie", "", NodeKind.DISCOVERED, label = "Charlie")
+            ),
+            onRefresh = {},
+            onNodeClick = {},
+            onTopologyClick = {}
+        )
+    }
 }

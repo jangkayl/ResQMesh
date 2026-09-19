@@ -21,8 +21,8 @@ class ResQAppShellTest {
     val composeRule = createComposeRule()
 
     @Test
-    fun shell_exposesThreeDestinations_andDispatchesSelection() {
-        var selected = ResQDestination.Home
+    fun shell_exposesVoiceDestination_andDispatchesSelection() {
+        var selected = ResQDestination.Mission
 
         composeRule.setContent {
             TestResQMeshTheme(darkTheme = false) {
@@ -35,23 +35,23 @@ class ResQAppShellTest {
             }
         }
 
-        composeRule.onNodeWithText("Home").assertIsDisplayed()
-        composeRule.onNodeWithText("Messages").performClick()
-        composeRule.onNodeWithText("Network").assertIsDisplayed()
+        composeRule.onNodeWithText("Mission").assertIsDisplayed()
+        composeRule.onNodeWithText("Voice").performClick()
+        composeRule.onNodeWithText("Mesh").assertIsDisplayed()
 
         composeRule.runOnIdle {
-            assertEquals(ResQDestination.Messages, selected)
+            assertEquals(ResQDestination.Voice, selected)
         }
     }
 
     @Test
-    fun sos_exposesAccessibleLongClickAction() {
+    fun sos_exposesAccessibleAction() {
         var activated = false
 
         composeRule.setContent {
             TestResQMeshTheme(darkTheme = true) {
                 ResQAppShell(
-                    selectedDestination = ResQDestination.Home,
+                    selectedDestination = ResQDestination.Mission,
                     onDestinationSelected = {},
                     onSosActivated = { activated = true },
                     content = { Box {} }
@@ -59,12 +59,7 @@ class ResQAppShellTest {
             }
         }
 
-        composeRule.onNode(
-            SemanticsMatcher.expectValue(
-                SemanticsProperties.ContentDescription,
-                listOf("Press and hold for two seconds to activate SOS")
-            )
-        ).performSemanticsAction(SemanticsActions.OnLongClick)
+        composeRule.onNodeWithText("SOS").performClick()
 
         composeRule.runOnIdle {
             assertTrue(activated)

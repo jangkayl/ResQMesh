@@ -21,7 +21,7 @@ interface MeshNetworkGateway {
     var onLiveAudioChunk: ((String, String, ByteArray) -> Unit)?
     var onMessageDelivered: ((String, String, List<String>) -> Unit)?
     var onPublicKeyReceived: ((String, String, String) -> Unit)?
-    var onRoutingTableReceived: ((String, List<String>) -> Unit)?
+    var onRoutingTableReceived: ((String, String, List<String>, List<String>) -> Unit)?
     var onSosCancelled: (() -> Unit)?
     var onStatusChanged: ((String) -> Unit)?
     var onDeviceBlocked: ((String) -> Unit)?
@@ -45,6 +45,7 @@ interface MeshNetworkGateway {
     fun disconnectDirectIdentity(deviceName: String, reason: String)
     fun isDeviceBlocked(deviceName: String): Boolean
     fun broadcastPayload(payloadBytes: ByteArray, excludeEndpointId: String? = null)
+    fun broadcastPriorityPayload(payloadBytes: ByteArray, excludeEndpointId: String? = null)
     fun sendDirectPayload(targetEndpointId: String, payloadBytes: ByteArray)
     fun sendPriorityPayload(targetEndpointId: String, payloadBytes: ByteArray)
     fun broadcastSeenReceipt(messageId: String, isPrivate: Boolean, targetId: String? = null)
@@ -101,6 +102,8 @@ class NativeBleGateway(private val manager: NativeBleManager) : MeshNetworkGatew
     override fun isDeviceBlocked(deviceName: String) = manager.isDeviceBlocked(deviceName)
     override fun broadcastPayload(payloadBytes: ByteArray, excludeEndpointId: String?) =
         manager.broadcastPayload(payloadBytes, excludeEndpointId)
+    override fun broadcastPriorityPayload(payloadBytes: ByteArray, excludeEndpointId: String?) =
+        manager.broadcastPriorityPayload(payloadBytes, excludeEndpointId)
     override fun sendDirectPayload(targetEndpointId: String, payloadBytes: ByteArray) =
         manager.sendDirectPayload(targetEndpointId, payloadBytes)
     override fun sendPriorityPayload(targetEndpointId: String, payloadBytes: ByteArray) =

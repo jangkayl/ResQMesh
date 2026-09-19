@@ -8,10 +8,22 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Icon
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -24,8 +36,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
@@ -35,16 +49,140 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.disabled
 import androidx.compose.ui.semantics.onLongClick
+import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.ArrowForward
 import com.example.testresqmesh.R
 import com.example.testresqmesh.core.ui.theme.ResQSize
 import com.example.testresqmesh.core.ui.theme.ResQTheme
+import kotlin.math.roundToInt
 
 private const val SOS_HOLD_DURATION_MILLIS = 2_000
+
+/**
+ * The active SOS flow uses a horizontal slide instead of a timed hold. The old
+ * [SosHoldButton] remains available for legacy entry points while this control
+ * offers a clearer, deliberate one-motion confirmation.
+ */
+@Composable
+fun SosSlideToSend(
+    onSlideComplete: () -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true
+) {
+    val haptics = LocalHapticFeedback.current
+    val currentOnSlideComplete by rememberUpdatedState(onSlideComplete)
+    var progress by remember { mutableStateOf(0f) }
+    var completed by remember { mutableStateOf(false) }
+    val instruction = stringResource(R.string.sos_slide_instruction)
+    val progressDescription = stringResource(R.string.sos_slide_progress, (progress * 100).toInt())
+    val actionLabel = stringResource(R.string.sos_slide_action)
+
+    fun complete() {
+        if (!completed && enabled) {
+            completed = true
+            haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+            currentOnSlideComplete()
+        }
+    }
+
+    BoxWithConstraints(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(64.dp)
+            .clip(RoundedCornerShape(32.dp))
+            .background(if (enabled) ResQTheme.colors.sos else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
+            .semantics(mergeDescendants = true) {
+                role = Role.Button
+                contentDescription = instruction
+                stateDescription = progressDescription
+                if (enabled) {
+                    onClick(label = actionLabel) {
+                        complete()
+                        true
+                    }
+                } else disabled()
+            },
+        contentAlignment = Alignment.CenterStart
+    ) {
+        val density = LocalDensity.current
+        val thumbTravelPx = with(density) {
+            (maxWidth - 64.dp).coerceAtLeast(1.dp).toPx()
+        }
+
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .pointerInput(enabled, thumbTravelPx) {
+                    detectDragGestures(
+                        onDragStart = {
+                            completed = false
+                            progress = 0f
+                        },
+                        onDragCancel = { if (!completed) progress = 0f },
+                        onDragEnd = {
+                            if (progress >= 0.9f) complete()
+                            if (!completed) progress = 0f
+                        },
+                        onDrag = { change, dragAmount ->
+                            change.consume()
+                            if (enabled) {
+                                progress = (progress + dragAmount.x / thumbTravelPx).coerceIn(0f, 1f)
+                                if (progress >= 0.9f) complete()
+                            }
+                        }
+                    )
+                },
+            contentAlignment = Alignment.CenterStart
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(4.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .clip(RoundedCornerShape(28.dp))
+                        .background(Color.White.copy(alpha = 0.16f))
+                )
+                Box(
+                    modifier = Modifier
+                        .fillMaxHeight()
+                        .fillMaxWidth(progress)
+                        .clip(RoundedCornerShape(28.dp))
+                        .background(Color.White.copy(alpha = 0.22f))
+                )
+                Surface(
+                    modifier = Modifier
+                        .align(Alignment.CenterStart)
+                        .offset { IntOffset((progress * thumbTravelPx).roundToInt(), 0) }
+                        .size(56.dp),
+                    shape = CircleShape,
+                    color = Color.White,
+                    contentColor = ResQTheme.colors.sos
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(Icons.AutoMirrored.Outlined.ArrowForward, contentDescription = null)
+                    }
+                }
+                Text(
+                    text = instruction,
+                    modifier = Modifier.align(Alignment.Center),
+                    color = Color.White,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
+    }
+}
 
 @Composable
 fun SosHoldButton(

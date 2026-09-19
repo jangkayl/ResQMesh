@@ -22,6 +22,8 @@ class CommunicationViewModel(
     val uiState: StateFlow<ChatUiState> = _uiState.asStateFlow()
     private val _privateSendErrors = MutableSharedFlow<String>(extraBufferCapacity = 1)
     val privateSendErrors: SharedFlow<String> = _privateSendErrors
+    private val _pendingKeyVerification = MutableSharedFlow<String>(extraBufferCapacity = 1)
+    val pendingKeyVerification: SharedFlow<String> = _pendingKeyVerification
     private val _privateDrafts = MutableStateFlow<Map<String, String>>(emptyMap())
     val privateDrafts: StateFlow<Map<String, String>> = _privateDrafts.asStateFlow()
     
@@ -129,9 +131,14 @@ class CommunicationViewModel(
 
     fun sendPrivateMessage(targetName: String, text: String, imageBase64: String? = null, audioBase64: String? = null): Boolean {
         val sent = useCases.sendPrivateMessage(targetName, text, imageBase64, audioBase64)
-        if (!sent) reportPrivateSendFailure()
+        if (!sent) {
+            if (useCases.hasPendingPublicKeyChange(targetName)) _pendingKeyVerification.tryEmit(targetName)
+            else reportPrivateSendFailure()
+        }
         return sent
     }
+
+    fun acceptPendingPublicKeyChange(targetName: String): Boolean = useCases.acceptPendingPublicKeyChange(targetName)
 
     private fun reportPrivateSendFailure() {
         _privateSendErrors.tryEmit("Private message not sent. Waiting for a ready connection and current recipient key.")

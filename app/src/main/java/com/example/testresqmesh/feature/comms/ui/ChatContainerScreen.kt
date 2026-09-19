@@ -1,6 +1,7 @@
 package com.example.testresqmesh.feature.comms.ui
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -43,6 +44,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
@@ -51,6 +54,7 @@ import com.example.testresqmesh.R
 import com.example.testresqmesh.core.model.ChatMessage
 import com.example.testresqmesh.core.model.NodeIdentity
 import com.example.testresqmesh.core.ui.components.feedback.ResQEmptyState
+import com.example.testresqmesh.core.ui.components.layout.ResQContentSurface
 import com.example.testresqmesh.core.ui.components.layout.ResQGlassSurface
 import com.example.testresqmesh.core.ui.theme.ResQTheme
 import com.example.testresqmesh.core.ui.theme.Spacing
@@ -63,13 +67,10 @@ import com.example.testresqmesh.ui.state.ChatUiState
 @OptIn(ExperimentalMaterial3Api::class)
 fun ChatContainerScreen(
     viewModel: CommunicationViewModel,
-    walkieTalkieViewModel: com.example.testresqmesh.feature.comms.viewmodel.WalkieTalkieViewModel,
     mediaHelper: MediaHelper,
     onChatSelected: (String) -> Unit,
     onCommunityConversationChanged: (Boolean) -> Unit
 ) {
-    @Suppress("UNUSED_VARIABLE")
-    val retainedWalkieTalkieViewModel = walkieTalkieViewModel
     val uiState by viewModel.uiState.collectAsState()
     val currentChannel by viewModel.currentChannelId.collectAsState()
     val conversations = remember(uiState) { conversationPreviews(uiState) }
@@ -132,22 +133,22 @@ internal fun MessagesInboxContent(
     channelId: String,
     communityPreview: ChatMessage?,
     conversations: List<ConversationPreview>,
+    modifier: Modifier = Modifier,
     onNewMessageClick: () -> Unit,
     onCommunityClick: () -> Unit,
     onChannelSelected: (String) -> Unit,
     onConversationClick: (String) -> Unit,
-    onConversationSeen: (ChatMessage, String) -> Unit,
-    modifier: Modifier = Modifier
+    onConversationSeen: (ChatMessage, String) -> Unit
 ) {
     LazyColumn(
         modifier = modifier.fillMaxSize(),
         contentPadding = PaddingValues(
             start = Spacing.Large,
-            top = Spacing.ExtraLarge,
+            top = Spacing.Large,
             end = Spacing.Large,
-            bottom = 156.dp
+            bottom = 120.dp
         ),
-        verticalArrangement = Arrangement.spacedBy(Spacing.Medium)
+        verticalArrangement = Arrangement.spacedBy(Spacing.Small)
     ) {
         item {
             Row(
@@ -185,7 +186,7 @@ internal fun MessagesInboxContent(
         }
 
         item {
-            CommunityInboxCard(
+            CommunityHeroBanner(
                 channelId = channelId,
                 preview = communityPreview,
                 onClick = onCommunityClick,
@@ -230,81 +231,98 @@ internal fun MessagesInboxContent(
 }
 
 @Composable
-private fun CommunityInboxCard(
+private fun CommunityHeroBanner(
     channelId: String,
     preview: ChatMessage?,
     onClick: () -> Unit,
     onChannelSelected: (String) -> Unit
 ) {
     var channelPickerExpanded by remember { mutableStateOf(false) }
+    val openDescription = stringResource(R.string.messages_open_community)
+    
     ResQGlassSurface(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .semantics { contentDescription = openDescription }
+            .clickable(onClick = onClick),
         shape = RoundedCornerShape(28.dp),
-        contentPadding = PaddingValues(Spacing.Medium),
+        contentPadding = PaddingValues(Spacing.Large),
         shadowElevation = 14.dp
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
             Surface(
-                modifier = Modifier.size(52.dp),
-                shape = RoundedCornerShape(18.dp),
+                modifier = Modifier.size(64.dp),
+                shape = CircleShape,
                 color = MaterialTheme.colorScheme.primaryContainer
             ) {
                 Box(contentAlignment = Alignment.Center) {
                     Icon(
                         imageVector = Icons.Outlined.Campaign,
                         contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(32.dp)
                     )
                 }
             }
-            Spacer(Modifier.width(Spacing.Medium))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = stringResource(R.string.messages_community_title),
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold
-                )
-                Text(
-                    text = preview?.text?.ifBlank { stringResource(R.string.messages_attachment_preview) }
-                        ?: stringResource(R.string.messages_community_description, channelId),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Box {
-                    TextButton(
-                        onClick = { channelPickerExpanded = true },
-                        contentPadding = PaddingValues(0.dp)
+            Spacer(Modifier.height(Spacing.Medium))
+            Text(
+                text = stringResource(R.string.messages_community_title),
+                style = MaterialTheme.typography.headlineMedium,
+                fontWeight = FontWeight.Black,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+            )
+            Spacer(Modifier.height(Spacing.ExtraSmall))
+            Text(
+                text = preview?.text?.ifBlank { stringResource(R.string.messages_attachment_preview) }
+                    ?: stringResource(R.string.messages_community_description, channelId),
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                modifier = Modifier.padding(horizontal = Spacing.Medium)
+            )
+            Spacer(Modifier.height(Spacing.Medium))
+            Box {
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant,
+                    onClick = { channelPickerExpanded = true }
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = Spacing.Medium, vertical = Spacing.Small),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
                             text = stringResource(R.string.messages_channel_short, channelId),
-                            style = MaterialTheme.typography.labelMedium,
-                            fontWeight = FontWeight.SemiBold
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Icon(
+                            imageVector = Icons.Outlined.ChevronRight,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp).padding(start = 4.dp)
                         )
                     }
-                    DropdownMenu(
-                        expanded = channelPickerExpanded,
-                        onDismissRequest = { channelPickerExpanded = false }
-                    ) {
-                        (1..5).forEach { channel ->
-                            DropdownMenuItem(
-                                text = { Text(stringResource(R.string.messages_channel_option, channel)) },
-                                onClick = {
-                                    onChannelSelected(channel.toString())
-                                    channelPickerExpanded = false
-                                }
-                            )
-                        }
+                }
+                DropdownMenu(
+                    expanded = channelPickerExpanded,
+                    onDismissRequest = { channelPickerExpanded = false }
+                ) {
+                    (1..5).forEach { channel ->
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.messages_channel_option, channel)) },
+                            onClick = {
+                                onChannelSelected(channel.toString())
+                                channelPickerExpanded = false
+                            }
+                        )
                     }
                 }
-            }
-            IconButton(onClick = onClick) {
-                Icon(
-                    imageVector = Icons.Outlined.ChevronRight,
-                    contentDescription = stringResource(R.string.messages_open_community),
-                    tint = MaterialTheme.colorScheme.primary
-                )
             }
         }
     }
@@ -315,11 +333,12 @@ private fun ConversationInboxRow(
     conversation: ConversationPreview,
     onClick: () -> Unit
 ) {
-    ResQGlassSurface(
-        modifier = Modifier.fillMaxWidth(),
+    val openDescription = stringResource(R.string.messages_open_conversation, conversation.displayName)
+    ResQContentSurface(
+        modifier = Modifier.fillMaxWidth().semantics { contentDescription = openDescription }.clickable(onClick = onClick),
         shape = RoundedCornerShape(24.dp),
         contentPadding = PaddingValues(Spacing.Medium),
-        shadowElevation = 10.dp
+        shadowElevation = 2.dp
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Surface(
@@ -370,13 +389,11 @@ private fun ConversationInboxRow(
                     color = conversation.status.color()
                 )
             }
-            IconButton(onClick = onClick) {
-                Icon(
-                    imageVector = Icons.Outlined.ChevronRight,
-                    contentDescription = stringResource(R.string.messages_open_conversation, conversation.displayName),
-                    tint = MaterialTheme.colorScheme.primary
-                )
-            }
+            Icon(
+                imageVector = Icons.Outlined.ChevronRight,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary
+            )
         }
     }
 }

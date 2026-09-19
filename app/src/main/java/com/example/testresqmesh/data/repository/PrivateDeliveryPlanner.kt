@@ -7,7 +7,7 @@ import com.example.testresqmesh.core.model.NodeIdentity
 object PrivateDeliveryPlanner {
     sealed interface Target {
         data class Endpoint(val endpointId: String) : Target
-        data object Broadcast : Target
+        data object Unavailable : Target
     }
 
     fun select(
@@ -20,11 +20,11 @@ object PrivateDeliveryPlanner {
             ?.takeIf(String::isNotEmpty)
             ?.let { return Target.Endpoint(it) }
 
-        val nextHopName = directedRoute.getOrNull(1) ?: return Target.Broadcast
+        val nextHopName = directedRoute.getOrNull(1) ?: return Target.Unavailable
         return readyDevices.firstOrNull { NodeIdentity.matches(it.name, nextHopName) }
             ?.endpointId
             ?.takeIf(String::isNotEmpty)
             ?.let(Target::Endpoint)
-            ?: Target.Broadcast
+            ?: Target.Unavailable
     }
 }

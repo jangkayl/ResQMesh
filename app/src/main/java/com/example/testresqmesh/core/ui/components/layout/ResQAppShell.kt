@@ -14,16 +14,16 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.clickable
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.ChatBubbleOutline
-import androidx.compose.material.icons.outlined.Home
+import androidx.compose.material.icons.outlined.GraphicEq
+import androidx.compose.material.icons.outlined.MyLocation
 import androidx.compose.material.icons.outlined.Hub
-import androidx.compose.material.icons.outlined.Mic
-import androidx.compose.material.icons.outlined.SignalWifiStatusbarConnectedNoInternet4
+import androidx.compose.material.icons.outlined.WarningAmber
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -36,9 +36,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.example.testresqmesh.R
-import com.example.testresqmesh.core.ui.components.feedback.ResQStateCard
-import com.example.testresqmesh.core.ui.components.feedback.ResQStatusChip
-import com.example.testresqmesh.core.ui.components.feedback.ResQStatusTone
+import com.example.testresqmesh.core.ui.theme.ResQTheme
 import com.example.testresqmesh.core.ui.theme.Spacing
 import com.example.testresqmesh.core.ui.theme.TestResQMeshTheme
 import androidx.compose.ui.graphics.Color
@@ -47,10 +45,9 @@ enum class ResQDestination(
     @StringRes val labelRes: Int,
     val icon: ImageVector
 ) {
-    Home(R.string.nav_home, Icons.Outlined.Home),
+    Mission(R.string.nav_mission, Icons.Outlined.MyLocation),
     Messages(R.string.nav_messages, Icons.Outlined.ChatBubbleOutline),
-    WalkieTalkie(R.string.nav_walkie_talkie, Icons.Outlined.Mic),
-    Network(R.string.nav_network, Icons.Outlined.Hub)
+    Voice(R.string.nav_voice, Icons.Outlined.GraphicEq)
 }
 
 @Composable
@@ -92,7 +89,7 @@ private fun ResQBottomBar(
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(96.dp)
+            .height(92.dp)
             .padding(horizontal = Spacing.Large),
         contentAlignment = Alignment.Center
     ) {
@@ -113,29 +110,21 @@ private fun ResQBottomBar(
                 tonalElevation = 0.dp
             ) {
                 ResQNavigationItem(
-                    destination = ResQDestination.Home,
-                    selected = selectedDestination == ResQDestination.Home,
-                    onClick = { onDestinationSelected(ResQDestination.Home) }
+                    destination = ResQDestination.Mission,
+                    selected = selectedDestination == ResQDestination.Mission,
+                    onClick = { onDestinationSelected(ResQDestination.Mission) }
                 )
                 ResQNavigationItem(
                     destination = ResQDestination.Messages,
                     selected = selectedDestination == ResQDestination.Messages,
                     onClick = { onDestinationSelected(ResQDestination.Messages) }
                 )
-                SosNavigationItem(
-                    onClick = onSosActivated,
-                    enabled = sosEnabled
-                )
                 ResQNavigationItem(
-                    destination = ResQDestination.WalkieTalkie,
-                    selected = selectedDestination == ResQDestination.WalkieTalkie,
-                    onClick = { onDestinationSelected(ResQDestination.WalkieTalkie) }
+                    destination = ResQDestination.Voice,
+                    selected = selectedDestination == ResQDestination.Voice,
+                    onClick = { onDestinationSelected(ResQDestination.Voice) }
                 )
-                ResQNavigationItem(
-                    destination = ResQDestination.Network,
-                    selected = selectedDestination == ResQDestination.Network,
-                    onClick = { onDestinationSelected(ResQDestination.Network) }
-                )
+                SosNavigationItem(onClick = onSosActivated, enabled = sosEnabled)
             }
         }
     }
@@ -150,15 +139,19 @@ private fun androidx.compose.foundation.layout.RowScope.ResQNavigationItem(
     NavigationBarItem(
         selected = selected,
         onClick = onClick,
+        colors = NavigationBarItemDefaults.colors(
+            selectedIconColor = MaterialTheme.colorScheme.primary,
+            indicatorColor = MaterialTheme.colorScheme.primaryContainer,
+            unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant
+        ),
         icon = {
             Icon(
                 imageVector = destination.icon,
                 contentDescription = stringResource(destination.labelRes),
-                modifier = Modifier.size(24.dp)
+                modifier = Modifier.size(28.dp) // Slightly larger since there's no text
             )
         },
-        alwaysShowLabel = false,
-        label = null
+        alwaysShowLabel = false
     )
 }
 
@@ -169,17 +162,23 @@ private fun androidx.compose.foundation.layout.RowScope.SosNavigationItem(
 ) {
     Box(
         modifier = Modifier
-            .weight(1f)
-            .fillMaxSize()
-            .then(if (enabled) Modifier.clickable(onClick = onClick) else Modifier),
+            .width(68.dp)
+            .fillMaxSize(),
         contentAlignment = Alignment.Center
     ) {
-        Text(
-            text = "SOS",
-            color = if (enabled) Color(0xFFE5484D) else MaterialTheme.colorScheme.onSurfaceVariant,
-            style = MaterialTheme.typography.labelLarge,
-            fontWeight = FontWeight.Black
-        )
+        androidx.compose.material3.Surface(
+            modifier = Modifier.size(54.dp),
+            shape = RoundedCornerShape(18.dp),
+            color = if (enabled) ResQTheme.colors.sos else MaterialTheme.colorScheme.surfaceVariant,
+            contentColor = if (enabled) ResQTheme.colors.onSos else MaterialTheme.colorScheme.onSurfaceVariant,
+            onClick = onClick,
+            enabled = enabled
+        ) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+                Icon(Icons.Outlined.WarningAmber, contentDescription = stringResource(R.string.sos), modifier = Modifier.size(19.dp))
+                Text("SOS", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Black)
+            }
+        }
     }
 }
 
@@ -198,42 +197,31 @@ private fun ShellPreviewContent(innerPadding: PaddingValues) {
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = "Good morning",
+                    text = "Mission control",
                     style = MaterialTheme.typography.headlineMedium,
                     fontWeight = FontWeight.Bold
                 )
                 Text(
-                    text = "ResQMesh is ready nearby",
+                    text = "Your local mesh at a glance",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
-            ResQStatusChip(
-                label = "Online — Direct",
-                tone = ResQStatusTone.Success,
-                icon = Icons.Outlined.SignalWifiStatusbarConnectedNoInternet4
-            )
         }
-        ResQStateCard(
-            title = "Ready to communicate",
-            message = "Two nearby devices are available for emergency messages.",
-            tone = ResQStatusTone.Information
-        )
-        Spacer(Modifier.height(Spacing.Small))
         Text(
-            text = "The SOS control stays available in the main app. Hold it for two seconds to activate.",
+            text = "The SOS action opens a dedicated type-and-slide flow.",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
     }
 }
 
-@Preview(name = "App shell — light", showBackground = true, widthDp = 390, heightDp = 844)
+@Preview(name = "App shell — night operations", showBackground = true, widthDp = 390, heightDp = 844)
 @Composable
 private fun ResQAppShellLightPreview() {
     TestResQMeshTheme(darkTheme = false) {
         ResQAppShell(
-            selectedDestination = ResQDestination.Home,
+            selectedDestination = ResQDestination.Mission,
             onDestinationSelected = {},
             onSosActivated = {},
             content = { ShellPreviewContent(it) }
@@ -246,7 +234,7 @@ private fun ResQAppShellLightPreview() {
 private fun ResQAppShellLargeTextPreview() {
     TestResQMeshTheme {
         ResQAppShell(
-            selectedDestination = ResQDestination.Home,
+            selectedDestination = ResQDestination.Mission,
             onDestinationSelected = {},
             onSosActivated = {},
             content = { ShellPreviewContent(it) }

@@ -149,10 +149,10 @@ fun PublicChatTab(
                         .fillMaxSize()
                         .padding(innerPadding),
                     contentPadding = PaddingValues(
-                        start = Spacing.Large,
+                        start = Spacing.Medium,
                         top = Spacing.Small,
-                        end = Spacing.Large,
-                        bottom = Spacing.Large
+                        end = Spacing.Medium,
+                        bottom = Spacing.Medium
                     ),
                     verticalArrangement = Arrangement.spacedBy(Spacing.Small, Alignment.Bottom),
                     reverseLayout = true

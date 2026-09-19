@@ -32,6 +32,7 @@ class MeshRepository(
     private val networkManager: MeshNetworkGateway,
     private val messageStore: MessageStore,
     private val blockStore: BlockRelationshipStore,
+    private val publicKeys: PeerPublicKeyDirectory,
     private val repositoryScope: CoroutineScope
 ) {
 
@@ -78,7 +79,6 @@ class MeshRepository(
     val isOnline = _isOnline.asStateFlow()
 
     private var myNodeName: String = ""
-    private val publicKeys = PeerPublicKeyCache()
     val blockRelationships = blockStore.relationships
     private val blockRetryJobs = mutableMapOf<String, Job>()
 
@@ -109,7 +109,6 @@ class MeshRepository(
             val existingIsReady = existingByIdentity?.let { networkManager.hasReadyEndpoint(it.endpointId) } ?: false
             if (existingById == null && !NodeIdentity.isPlaceholder(device.name) &&
                 (existingByIdentity == null || !networkManager.hasLiveSocket(existingByIdentity.endpointId))) {
-                publicKeys.observeDirectLink(device.name, device.endpointId)
             }
 
             var updatedList = _connectedDevices.value
@@ -203,7 +202,6 @@ class MeshRepository(
             val peerStillReady = disconnectedDevice != null && !NodeIdentity.isPlaceholder(disconnectedDevice.name) &&
                 networkManager.hasReadyLinkToIdentity(disconnectedDevice.name)
             if (disconnectedDevice != null && !NodeIdentity.isPlaceholder(disconnectedDevice.name) && !peerStillReady) {
-                publicKeys.forgetDirectLink(disconnectedDevice.name, endpointId)
             }
             _connectedDevices.value = _connectedDevices.value.filter {
                 it.endpointId != endpointId || peerStillReady && networkManager.hasLiveSocket(endpointId)
@@ -223,13 +221,18 @@ class MeshRepository(
             }
         }
         
-        networkManager.onPublicKeyReceived = { endpointId, senderName, key ->
-            publicKeys.put(senderName, key, endpointId)
-            AppLogger.d("BLE_MESH", "Received recipient public key for $senderName via $endpointId")
+        networkManager.onPublicKeyReceived = { senderName, senderNodeId, key ->
+            when (publicKeys.observe(senderName, senderNodeId, key)) {
+                PeerPublicKeyDirectory.Observation.KEY_CHANGE_PENDING ->
+                    AppLogger.d("BLE_MESH", "Public-key change requires approval for $senderName")
+                PeerPublicKeyDirectory.Observation.INVALID_IDENTITY ->
+                    AppLogger.d("BLE_MESH", "Ignored public key with invalid stable identity")
+                else -> AppLogger.d("BLE_MESH", "Recorded public-key observation for $senderName")
+            }
         }
         
-        networkManager.onRoutingTableReceived = { senderName, connectedNodes ->
-            meshRouter.updateTopology(senderName, connectedNodes, myNodeName)
+        networkManager.onRoutingTableReceived = { senderName, senderNodeId, connectedNodes, connectedNodeIds ->
+            meshRouter.updateTopology(senderName, senderNodeId, connectedNodes, connectedNodeIds, myNodeName)
             meshRouter.recalculateKnownNodes(myNodeName, readyConnectedDevices())
             AppLogger.event(
                 category = com.example.testresqmesh.core.utils.TerminalLogCategory.ROUTING,
@@ -378,7 +381,6 @@ class MeshRepository(
                 }
             }
         }
-        
         networkManager.onMessageDelivered = { msgId, readerName, returnRoute ->
             val currentSos = _incomingSosAlert.value
             if (currentSos?.id == msgId && !currentSos.deliveredTo.contains(readerName)) {
@@ -411,7 +413,6 @@ class MeshRepository(
     }
 
     fun startNode(customName: String, nodeTag: String, teamKey: String, nodeId: String) {
-        publicKeys.clear()
         myNodeName = "$customName [$nodeTag]#$nodeId"
         networkManager.myDeviceName = myNodeName
         networkManager.myNodeId = nodeId
@@ -422,7 +423,6 @@ class MeshRepository(
     }
 
     fun stopNode() {
-        publicKeys.clear()
         networkManager.stopMeshNode()
         _isOnline.value = false
         _connectedDevices.value = emptyList()
@@ -492,7 +492,7 @@ class MeshRepository(
     private fun sendBlockRequest(relationship: BlockRelationship) {
         val route = meshRouter.findShortestPath(myNodeName, relationship.peerName, readyConnectedDevices())
         val bytes = sealedRetryPayload(relationship, route) ?: run {
-            val targetKey = publicKeys.get(relationship.peerName)
+            val targetKey = publicKeys.trustedKey(relationship.peerName)
             if (targetKey.isNullOrBlank()) {
                 AppLogger.d("MeshNetwork_E2EE", "Block request pending: no recipient key for ${relationship.peerName}")
                 return
@@ -606,7 +606,8 @@ class MeshRepository(
     private fun sendControl(targetName: String, route: List<String>, payloadBytes: ByteArray) {
         when (val target = PrivateDeliveryPlanner.select(targetName, route, readyConnectedDevices())) {
             is PrivateDeliveryPlanner.Target.Endpoint -> networkManager.sendPriorityPayload(target.endpointId, payloadBytes)
-            PrivateDeliveryPlanner.Target.Broadcast -> networkManager.broadcastPayload(payloadBytes)
+            PrivateDeliveryPlanner.Target.Unavailable ->
+                AppLogger.d("MeshNetwork_E2EE", "Control message route unavailable; not broadcasting")
         }
     }
 
@@ -618,10 +619,10 @@ class MeshRepository(
         const val BLOCK_RETRY_MS = 3_000L
     }
 
+    @Synchronized
     fun broadcastLiveAudioChunk(chunk: ByteArray) {
-        val messageId = java.util.UUID.randomUUID().toString()
         val payload = com.example.testresqmesh.core.network.MeshPayload(
-            id = messageId,
+            id = UUID.randomUUID().toString(),
             type = "LIVE_AUDIO",
             senderName = myNodeName,
             channelId = _currentChannelId.value,
@@ -670,7 +671,7 @@ class MeshRepository(
         repositoryScope.launch {
             messageStore.save(message, targetName = null)
         }
-        networkManager.broadcastPayload(payloadBytes)
+        if (isSOS) networkManager.broadcastPriorityPayload(payloadBytes) else networkManager.broadcastPayload(payloadBytes)
         return messageId
     }
 
@@ -679,6 +680,10 @@ class MeshRepository(
             messageStore.deleteConversation(peerName)
         }
     }
+
+    fun hasPendingPublicKeyChange(peerName: String): Boolean = publicKeys.hasPendingChange(peerName)
+
+    fun acceptPendingPublicKeyChange(peerName: String): Boolean = publicKeys.acceptPendingChange(peerName)
 
     fun sendPrivateMessage(targetName: String, text: String, imageBase64: String?, audioBase64: String?, locationLat: Double? = null, locationLng: Double? = null): Boolean {
         val msgId = UUID.randomUUID().toString()
@@ -690,9 +695,18 @@ class MeshRepository(
             return false
         }
         val directedRouteList = meshRouter.findShortestPath(myNodeName, targetName, readyDevices)
-        val targetPubKey = publicKeys.get(targetName)
+        if (publicKeys.hasPendingChange(targetName)) {
+            AppLogger.d("MeshNetwork_E2EE", "Private send blocked: recipient key change requires approval")
+            return false
+        }
+        val targetPubKey = publicKeys.trustedKey(targetName)
         if (targetPubKey == null) {
             AppLogger.d("MeshNetwork_E2EE", "Private send blocked: no recipient public key for $targetName")
+            return false
+        }
+        if (directedRouteList.isEmpty()) {
+            AppLogger.d("MeshNetwork_E2EE", "Private send blocked: no stable directed route to $targetName")
+            return false
         }
 
         val payloadBytes = runCatching { PayloadFactory.buildPrivatePayload(
@@ -713,6 +727,12 @@ class MeshRepository(
             return false
         }
 
+        val delivery = PrivateDeliveryPlanner.select(targetName, directedRouteList, readyDevices)
+        if (delivery == PrivateDeliveryPlanner.Target.Unavailable) {
+            AppLogger.d("MeshNetwork_E2EE", "Private send blocked: selected route has no payload-ready next hop")
+            return false
+        }
+
         val isDirect = readyDevices.any { NodeIdentity.matches(it.name, targetName) }
         val message = ChatMessage(msgId, myNodeName, text, imageBase64, audioBase64, locationLat, locationLng, true, true, timestamp, isHopped = !isDirect, outboundRoute = directedRouteList)
         
@@ -720,11 +740,12 @@ class MeshRepository(
             messageStore.save(message, targetName = targetName)
         }
 
-        when (val delivery = PrivateDeliveryPlanner.select(targetName, directedRouteList, readyDevices)) {
-            is PrivateDeliveryPlanner.Target.Endpoint ->
+        when (delivery) {
+            is PrivateDeliveryPlanner.Target.Endpoint -> {
+                AppLogger.d("MeshNetwork_E2EE", "Private route selected with ${directedRouteList.size - 1} hop(s)")
                 networkManager.sendDirectPayload(delivery.endpointId, payloadBytes)
-            PrivateDeliveryPlanner.Target.Broadcast ->
-                networkManager.broadcastPayload(payloadBytes)
+            }
+            PrivateDeliveryPlanner.Target.Unavailable -> error("Checked before saving the outbound message")
         }
         return true
     }

@@ -1,226 +1,130 @@
 package com.example.testresqmesh.feature.radar.ui
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.ChatBubbleOutline
-import androidx.compose.material3.*
+import androidx.compose.material.icons.outlined.Hub
+import androidx.compose.material.icons.outlined.LocationOn
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import com.example.testresqmesh.core.ui.components.buttons.ButtonVariant
 import com.example.testresqmesh.core.ui.components.buttons.ResQButton
-import com.example.testresqmesh.core.ui.components.layout.ResQTopBar
-import com.example.testresqmesh.core.ui.theme.InboxBackground
-import com.example.testresqmesh.core.ui.theme.InboxAccentBlue
+import com.example.testresqmesh.core.ui.components.buttons.ButtonVariant
+import com.example.testresqmesh.core.ui.components.feedback.ResQStatusChip
+import com.example.testresqmesh.core.ui.components.feedback.ResQStatusTone
+import com.example.testresqmesh.core.ui.components.layout.ResQGlassSurface
+import com.example.testresqmesh.core.ui.theme.ResQSize
 import com.example.testresqmesh.core.ui.theme.Spacing
 
+/**
+ * A presentation-only peer detail screen. It deliberately avoids making range, route, or
+ * encryption claims that are not supplied by its caller.
+ */
 @Composable
 fun ResponderTrackerScreen(nodeName: String, onBack: () -> Unit, onChat: () -> Unit) {
-    Scaffold(
-        topBar = {
-            ResQTopBar(
-                title = "Tracking Responder",
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.Default.ChevronLeft, contentDescription = "Back", tint = Color.White)
-                    }
-                },
-                actions = {
-                    Surface(
-                        color = Color.White.copy(alpha = 0.1f),
-                        shape = RoundedCornerShape(20.dp),
-                        modifier = Modifier.padding(end = 8.dp)
-                    ) {
-                        Text("LIVE MESH", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Black, color = Color.White, modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp))
-                    }
-                }
-            )
-        },
-        containerColor = InboxBackground
-    ) { innerPadding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-                .padding(Spacing.Large),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            // Radar Distance Visualization
-            Box(
-                modifier = Modifier
-                    .size(240.dp)
-                    .padding(Spacing.Medium),
-                contentAlignment = Alignment.Center
-            ) {
-                // Compass-like background
-                androidx.compose.foundation.Canvas(modifier = Modifier.fillMaxSize()) {
-                    val radius = size.minDimension / 2
-                    drawCircle(color = Color.White.copy(alpha = 0.05f), radius = radius)
-                    drawCircle(color = Color.White.copy(alpha = 0.05f), radius = radius * 0.7f, style = androidx.compose.ui.graphics.drawscope.Stroke(1.dp.toPx()))
-                    drawCircle(color = Color.White.copy(alpha = 0.05f), radius = radius * 0.4f, style = androidx.compose.ui.graphics.drawscope.Stroke(1.dp.toPx()))
-                }
-                
-                // Target dot
-                Surface(
-                    modifier = Modifier.size(12.dp).align(Alignment.Center),
-                    color = Color.White,
-                    shape = CircleShape
-                ) {}
-                
-                // North indicator
-                Icon(Icons.Default.North, contentDescription = null, tint = Color.White.copy(alpha = 0.6f), modifier = Modifier.align(Alignment.TopCenter).size(24.dp))
-                Text("N", modifier = Modifier.align(Alignment.TopCenter).padding(top = 28.dp), color = Color.White.copy(alpha = 0.6f), style = MaterialTheme.typography.labelSmall)
-                Text("S", modifier = Modifier.align(Alignment.BottomCenter), color = Color.White.copy(alpha = 0.6f), style = MaterialTheme.typography.labelSmall)
-                Text("E", modifier = Modifier.align(Alignment.CenterEnd), color = Color.White.copy(alpha = 0.6f), style = MaterialTheme.typography.labelSmall)
-                Text("W", modifier = Modifier.align(Alignment.CenterStart), color = Color.White.copy(alpha = 0.6f), style = MaterialTheme.typography.labelSmall)
-            }
-
-            Text(
-                text = "ESTIMATED DISTANCE",
-                style = MaterialTheme.typography.labelSmall,
-                fontWeight = FontWeight.Black,
-                color = Color.White.copy(alpha = 0.4f),
-                letterSpacing = 1.sp
-            )
-            
-            Text(
-                text = "~150m",
-                style = MaterialTheme.typography.displayMedium,
-                fontWeight = FontWeight.Black,
-                color = Color.White
-            )
-
-            Spacer(modifier = Modifier.height(32.dp))
-
-            // Node Details Card
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                color = Color.White.copy(alpha = 0.05f),
-                shape = RoundedCornerShape(16.dp),
-                border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.1f))
-            ) {
-                Column(modifier = Modifier.padding(Spacing.Medium)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column {
-                            Text("TARGET ID", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = Color.White.copy(alpha = 0.4f))
-                            Text(nodeName, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Black, color = Color.White)
-                        }
-                        Surface(color = Color.Black.copy(alpha = 0.4f), shape = RoundedCornerShape(12.dp)) {
-                            Text("Signal: Weak", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = Color.White, modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp))
-                        }
-                    }
-                    
-                    Divider(modifier = Modifier.padding(vertical = 12.dp), color = Color.White.copy(alpha = 0.1f))
-                    
-                    Text("ROUTING PATH METADATA", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Black, color = Color.White.copy(alpha = 0.4f))
-                    Spacer(modifier = Modifier.height(12.dp))
-                    
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        PathNodeIcon(true)
-                        PathDottedLine()
-                        PathNodeIcon(false)
-                        PathDottedLine()
-                        PathNodeIcon(false)
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Icon(Icons.Default.Bolt, contentDescription = null, tint = Color.White.copy(alpha = 0.6f), modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("3 HOPS", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, color = Color.White)
-                    }
-                    
-                    Spacer(modifier = Modifier.height(16.dp))
-                    
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text("Encryption Status", style = MaterialTheme.typography.labelMedium, color = Color.White.copy(alpha = 0.6f))
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.TrendingUp, contentDescription = null, tint = Color(0xFF10B981), modifier = Modifier.size(14.dp))
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text("E2EE Active", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, color = Color.White)
-                        }
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(24.dp))
-
-            // Action Buttons
-            Surface(
-                onClick = onChat,
-                modifier = Modifier.fillMaxWidth(),
-                color = Color.White.copy(alpha = 0.05f),
-                shape = RoundedCornerShape(12.dp),
-                border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.1f))
-            ) {
-                Row(modifier = Modifier.padding(Spacing.Medium), verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Outlined.ChatBubbleOutline, contentDescription = null, tint = InboxAccentBlue)
-                    Spacer(modifier = Modifier.width(16.dp))
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text("Send Mesh Message", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold, color = Color.White)
-                        Text("Direct relay via multi-hop", style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.4f))
-                    }
-                    Icon(Icons.Default.ChevronRight, contentDescription = null, tint = Color.White.copy(alpha = 0.2f))
-                }
-            }
-
-            Spacer(modifier = Modifier.height(24.dp))
-
-            ResQButton(
-                onClick = {},
-                modifier = Modifier.fillMaxWidth().height(56.dp)
-            ) {
-                Icon(Icons.Default.Share, contentDescription = null)
-                Spacer(modifier = Modifier.width(12.dp))
-                Text("Broadcast My Position", fontWeight = FontWeight.Black)
-            }
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            ResQButton(
-                onClick = {},
-                variant = ButtonVariant.Outline,
-                modifier = Modifier.fillMaxWidth().height(56.dp)
-            ) {
-                Icon(Icons.Default.Wifi, contentDescription = null)
-                Spacer(modifier = Modifier.width(12.dp))
-                Text("Attempt Direct Peer Link", fontWeight = FontWeight.Black)
-            }
-        }
-    }
-}
-
-@Composable
-fun PathNodeIcon(isMe: Boolean) {
-    Surface(
-        modifier = Modifier.size(24.dp),
-        shape = CircleShape,
-        color = if (isMe) InboxAccentBlue.copy(alpha = 0.2f) else Color.White.copy(alpha = 0.1f),
-        border = androidx.compose.foundation.BorderStroke(1.dp, if (isMe) InboxAccentBlue else Color.White.copy(alpha = 0.2f))
+    Column(
+        modifier = Modifier.fillMaxSize().padding(horizontal = Spacing.Medium, vertical = Spacing.Medium),
+        verticalArrangement = Arrangement.spacedBy(Spacing.Medium)
     ) {
-        Box(contentAlignment = Alignment.Center) {
-            Icon(
-                if (isMe) Icons.Default.LocationOn else Icons.Default.Wifi, 
-                contentDescription = null, 
-                modifier = Modifier.size(12.dp),
-                tint = if (isMe) InboxAccentBlue else Color.White.copy(alpha = 0.6f)
-            )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            IconButton(onClick = onBack, modifier = Modifier.size(ResQSize.MinimumTouchTarget)) {
+                Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "Back")
+            }
+            Column(modifier = Modifier.weight(1f)) {
+                Text("Peer details", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Black)
+                Text("Current mesh information", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+
+        ResQGlassSurface(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(24.dp),
+            contentPadding = androidx.compose.foundation.layout.PaddingValues(Spacing.Large),
+            shadowElevation = 8.dp
+        ) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(Spacing.Medium)) {
+                MeshSignalIllustration()
+                Text(nodeName, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Black, textAlign = TextAlign.Center)
+                ResQStatusChip("Reachability updates in Mesh", ResQStatusTone.Information, icon = Icons.Outlined.Hub)
+                Text(
+                    "Distance, direction, and next-hop delivery are not shown until the mesh provides verified evidence.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center
+                )
+            }
+        }
+
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(20.dp),
+            color = MaterialTheme.colorScheme.surface,
+            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+        ) {
+            Row(modifier = Modifier.padding(Spacing.Medium), verticalAlignment = Alignment.CenterVertically) {
+                Surface(modifier = Modifier.size(44.dp), shape = RoundedCornerShape(14.dp), color = MaterialTheme.colorScheme.secondaryContainer) {
+                    Box(contentAlignment = Alignment.Center) { Icon(Icons.Outlined.LocationOn, contentDescription = null, tint = MaterialTheme.colorScheme.secondary) }
+                }
+                Spacer(Modifier.width(Spacing.Medium))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("Location sharing", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    Text("Shown in an SOS map only when the sender included a location.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+        }
+
+        Spacer(Modifier.weight(1f))
+        ResQButton(onClick = onChat, modifier = Modifier.fillMaxWidth()) {
+            Icon(Icons.Outlined.ChatBubbleOutline, contentDescription = null)
+            Spacer(Modifier.width(Spacing.Small))
+            Text("Message peer", fontWeight = FontWeight.Bold)
+        }
+        ResQButton(onClick = onBack, modifier = Modifier.fillMaxWidth(), variant = ButtonVariant.Outline) {
+            Text("Back to Mesh", fontWeight = FontWeight.Bold)
         }
     }
 }
 
 @Composable
-fun PathDottedLine() {
-    Text(" •••• ", color = Color.White.copy(alpha = 0.2f), fontWeight = FontWeight.Black)
+private fun MeshSignalIllustration() {
+    val primary = MaterialTheme.colorScheme.primary
+    val secondary = MaterialTheme.colorScheme.secondary
+    Box(
+        modifier = Modifier
+            .size(164.dp)
+            .drawBehind {
+                val radius = size.minDimension / 2
+                drawCircle(primary.copy(alpha = 0.07f), radius)
+                drawCircle(primary.copy(alpha = 0.20f), radius * 0.68f, style = androidx.compose.ui.graphics.drawscope.Stroke(1.dp.toPx()))
+                drawCircle(secondary.copy(alpha = 0.30f), radius * 0.36f, style = androidx.compose.ui.graphics.drawscope.Stroke(1.dp.toPx()))
+            },
+        contentAlignment = Alignment.Center
+    ) {
+        Surface(modifier = Modifier.size(52.dp), shape = CircleShape, color = MaterialTheme.colorScheme.primaryContainer) {
+            Box(contentAlignment = Alignment.Center) { Icon(Icons.Outlined.Hub, contentDescription = null, tint = MaterialTheme.colorScheme.primary) }
+        }
+    }
 }

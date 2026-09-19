@@ -4,17 +4,16 @@ The UI uses Jetpack Compose and Material 3. Inspect the actual screen, ViewModel
 
 ## Component and state boundaries
 
-- Reuse shared components under `core/ui/components` and theme tokens before adding local styling.
-- The civilian-first system is light-only: a pale-white/lavender canvas, large near-black headings, purple emphasis, cyan identity accents, green truthful status banners, and raised white cards. Red is reserved for genuine emergency and destructive actions.
-- Use the reference-inspired mobile hierarchy: generous whitespace, strong left-aligned page titles, single-purpose circular or rounded-square actions, and a white capsule navigation dock with SOS floating above it. Do not preserve earlier screen layouts merely by recoloring them.
-- The visual system is stable across all supported Android versions and does not depend on system dark mode, blur, or other version-specific rendering effects.
-- New top-level screens use the reusable shell: Home, Messages, Walkie-talkie, and Network, with SOS as a persistent action rather than a navigation destination.
-- Shared controls use at least 48 dp touch targets, semantic shapes, and text or icon-independent status descriptions.
+- Reuse shared components and theme tokens before local styling.
+- Tactical & Utilitarian / High-Vis Safety Dark is dark-first with a Field Light Daylight preference; appearance affects presentation only.
+- Night uses Pitch Black (#000000) for OLED efficiency, Carbon/Dark Grey raised panels, restrained shadows, and 1dp borders. Daylight uses white and steel grey backgrounds with black text.
+- Both use Safety Orange (#FF5A00) for interactions/accents, green for positive states, amber for attention, and red for SOS. Use tokens, vector icons, 8dp rhythm, 16dp gutters, 18-24dp radii, and 48dp targets.
+- Use tactical mission-first hierarchy, left-aligned titles, compact bento groups, and a restrained icon-only navigation dock with persistent SOS. Ambient fields are decorative and use 150-220ms transitions.
+- New top-level screens use the reusable shell: Mission, Messages, Voice, and Mesh. SOS is a persistent action rather than a navigation destination.
+- Shared controls use semantic shapes, clear pressed/disabled states, and text or icon-independent status descriptions.
 - Keep business, routing, and transport decisions out of composables. ViewModels/use cases expose UI state and user actions.
 - Keep route-level composables responsible for state collection and side effects; move reusable stateless presentation into feature `ui/components` files.
-- Prefer immutable screen state and explicit loading, success, empty, warning, and error states.
-- Do not perform blocking storage/network work during composition.
-- Preserve previews or focused UI tests where they provide meaningful coverage.
+- Keep state immutable/nonblocking; retain tests.
 
 ## Connection language
 
@@ -36,6 +35,7 @@ Avoid showing “connected” from a BLE callback alone. Counters and selected p
 - A failed private send remains unsent/unstored and explains whether readiness or a usable key is missing without exposing cryptographic details.
 - Distinguish queued, sending, delivered, failed, and blocked outcomes; do not imply peer receipt from local enqueue or transport initiation.
 - SOS alerts and cancellation feedback must identify the relevant alert/sender once the model supports it.
+- SOS uses one accessible slide after type selection; early release resets it and no second confirmation is shown.
 - Never render debug plaintext, keys, ciphertext previews, or sensitive location content in the terminal/debug UI.
 
 ## Diagnostic terminal
@@ -46,11 +46,10 @@ Avoid showing “connected” from a BLE callback alone. Counters and selected p
 - Display newest events first. When the user scrolls into older events, pause live follow, show a new-event count, and provide controls to jump to Latest or the latest Sync event.
 - Keep heartbeat and relay chatter behind the Details control so connection state, setup failures, and topology changes remain readable by default. Last Sync is a one-time jump, not an instruction to resume live follow.
 
-## Hidden legacy UI restoration checklist
-
-- `OfflineMapPromptModal`, the legacy `RadarScreen`, and the debug terminal remain in source but are intentionally hidden from the current shell; do not delete their backing logic while the new design is evaluated.
-- Before restoring one, choose and document its user entry point, reconnect the existing callbacks without changing mesh policy, and retain its accessibility label.
-- Validate the restored flow's empty, permission-denied, and error states. For a transport-, SOS-, or location-driven screen, also run its corresponding focused phone test.
+## Hidden legacy UI
+- `OfflineMapPromptModal`, legacy `RadarScreen`, and debug terminal are hidden; do not delete logic during evaluation.
+- Before restoring, choose entry point, reconnect callbacks without changing mesh policy, and retain accessibility labels.
+- Validate empty, permission-denied, and error states. For transport/SOS/location screens, run focused phone tests.
 
 ## Accessibility and interaction
 
@@ -59,6 +58,8 @@ Avoid showing “connected” from a BLE callback alone. Counters and selected p
 - Preserve user drafts when a recoverable send fails.
 - Active public and private conversations anchor the latest messages above the composer, keep it above the IME, and follow the newest message when the conversation changes. Sent community bubbles show reader circles only from recorded `seenBy` receipts.
 - Avoid rapid status flicker; state transitions should follow repository/link evidence rather than raw scan churn.
+- Peer rows are fully clickable. Message requires an unblocked direct/relayed peer; “Known mesh path” is only a topology hint.
+- Review both appearances independently. Active screens use theme tokens, never fixed dark surfaces or white text.
 
 ## Validation
 
