@@ -65,6 +65,11 @@
     <string name="mission_message_title">Start a conversation</string>
     <string name="mission_message_description">Messages work over the local mesh.</string>
     <string name="mission_sos_note">The SOS action stays ready in the navigation dock.</string>
+    <string name="sos_broadcasting_beacon">BROADCASTING EMERGENCY BEACON</string>
+    <string name="sos_radar_scanning">SCANNING ACTIVE MESH NODES</string>
+    <string name="sos_slide_to_resolve">SLIDE TO RESOLVE SOS</string>
+    <string name="sos_acknowledged_responders">ACKNOWLEDGED RESPONDERS</string>
+    <string name="sos_listening_for_acks">Listening for peer acknowledgments across mesh hops...</string>
     <string name="mission_metric_direct">DIRECT</string>
     <string name="mission_metric_relay">RELAY</string>
     <string name="mission_metric_nearby">NEARBY</string>
@@ -110,6 +115,8 @@
     <string name="new_message_empty_description">Try again in a moment.</string>
     <string name="new_message_choose_recipient">Choose %1$s</string>
     <string name="community_message_user">Message %1$s</string>
+    <string name="chat_reply_action">Reply</string>
+    <string name="chat_replying_to">Replying to %1$s</string>
     <string name="recipient_status_direct">Direct</string>
     <string name="recipient_status_checking">Checking</string>
     <string name="recipient_status_relayed">Relayed</string>

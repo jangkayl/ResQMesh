@@ -1,6 +1,7 @@
 package com.example.testresqmesh.feature.comms.ui.components
 
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -49,6 +50,11 @@ import com.example.testresqmesh.feature.comms.ui.deliveryLabel
 import com.example.testresqmesh.feature.comms.ui.messageTime
 import kotlin.math.absoluteValue
 
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.material.icons.automirrored.outlined.Reply
+import androidx.compose.ui.text.font.FontFamily
+
 @Composable
 fun ChatBubble(
     message: ChatMessage,
@@ -56,7 +62,8 @@ fun ChatBubble(
     showAvatar: Boolean = true,
     showSenderName: Boolean = true,
     onUserClick: ((String) -> Unit)? = null,
-    onShowSeenBy: ((List<String>) -> Unit)? = null
+    onShowSeenBy: ((List<String>) -> Unit)? = null,
+    onReplyClick: ((ChatMessage) -> Unit)? = null
 ) {
     val mine = message.isMine
     val isSos = message.isSOS
@@ -121,6 +128,21 @@ fun ChatBubble(
                                 onUserClick?.invoke(message.senderName)
                             }
                         )
+                        if (onReplyClick != null) {
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.chat_reply_action)) },
+                                leadingIcon = {
+                                    Icon(
+                                        imageVector = Icons.AutoMirrored.Outlined.Reply,
+                                        contentDescription = null
+                                    )
+                                },
+                                onClick = {
+                                    showUserMenu = false
+                                    onReplyClick.invoke(message)
+                                }
+                            )
+                        }
                     }
                 }
             } else {
@@ -200,9 +222,61 @@ fun ChatBubble(
                         }
                         Spacer(Modifier.height(4.dp))
                     }
-                    if (message.text.isNotBlank()) {
+                    val (replyQuote, actualText) = remember(message.text) {
+                        if (message.text.startsWith("> ") && message.text.contains("\n")) {
+                            val firstNewline = message.text.indexOf("\n")
+                            val quote = message.text.substring(2, firstNewline).trim()
+                            val rest = message.text.substring(firstNewline + 1).trim()
+                            quote to rest
+                        } else {
+                            null to message.text
+                        }
+                    }
+
+                    if (replyQuote != null) {
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = contentColor.copy(alpha = 0.12f),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(bottom = 6.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .width(3.dp)
+                                        .height(20.dp)
+                                        .clip(RoundedCornerShape(1.5.dp))
+                                        .background(if (mine) Color.White.copy(alpha = 0.85f) else MaterialTheme.colorScheme.primary)
+                                )
+                                Spacer(Modifier.width(6.dp))
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Outlined.Reply,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(13.dp),
+                                    tint = if (mine) Color.White.copy(alpha = 0.85f) else MaterialTheme.colorScheme.primary
+                                )
+                                Spacer(Modifier.width(4.dp))
+                                Text(
+                                    text = replyQuote,
+                                    style = MaterialTheme.typography.labelSmall.copy(
+                                        fontSize = 11.sp,
+                                        fontFamily = FontFamily.Monospace
+                                    ),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    color = contentColor.copy(alpha = 0.9f)
+                                )
+                            }
+                        }
+                    }
+
+                    if (actualText.isNotBlank()) {
                         Text(
-                            text = message.text,
+                            text = actualText,
                             style = MaterialTheme.typography.bodyMedium,
                             fontWeight = if (isSos) FontWeight.Bold else FontWeight.Normal
                         )

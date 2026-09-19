@@ -484,7 +484,7 @@ private fun TacticalMetricPod(
 ) {
     Surface(
         shape = RoundedCornerShape(14.dp),
-        color = contentColor.copy(alpha = 0.08f),
+        color = Color.Transparent,
         modifier = Modifier.width(96.dp)
     ) {
         Column(

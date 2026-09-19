@@ -10,6 +10,8 @@ The UI uses Jetpack Compose and Material 3. Inspect the actual screen, ViewModel
 - Both use Safety Orange (#FF5A00) for interactions/accents, green for positive states, amber for attention, and red for SOS. Use tokens, vector icons, 8dp rhythm, 16dp gutters, 18-24dp radii, and 48dp targets.
 - Use tactical mission-first hierarchy, left-aligned titles, compact bento groups, and a restrained icon-only navigation dock with persistent SOS. Ambient fields are decorative and use 150-220ms transitions.
 - New top-level screens use the reusable shell: Mission, Messages, Voice, and Mesh. SOS is a persistent action rather than a navigation destination.
+- **Chat Composers** must be context-aware: hide inline media tools while typing to maximize horizontal space, providing access via a contextual floating action bubble above the input.
+- **Network & Topology** uses Tactical Operator Cards with clear glowing status borders, and interactive 2D Visual Holographic Maps for visualizing routes instead of raw text logs.
 - Shared controls use semantic shapes, clear pressed/disabled states, and text or icon-independent status descriptions.
 - Keep business, routing, and transport decisions out of composables. ViewModels/use cases expose UI state and user actions.
 - Keep route-level composables responsible for state collection and side effects; move reusable stateless presentation into feature `ui/components` files.
@@ -32,19 +34,19 @@ Avoid showing “connected” from a BLE callback alone. Counters and selected p
 
 ## Messaging and safety feedback
 
-- A failed private send remains unsent/unstored and explains whether readiness or a usable key is missing without exposing cryptographic details.
-- Distinguish queued, sending, delivered, failed, and blocked outcomes; do not imply peer receipt from local enqueue or transport initiation.
-- SOS alerts and cancellation feedback must identify the relevant alert/sender once the model supports it.
-- SOS uses one accessible slide after type selection; early release resets it and no second confirmation is shown.
-- Never render debug plaintext, keys, ciphertext previews, or sensitive location content in the terminal/debug UI.
+- Failed private sends remain unsent and explain missing readiness/keys without exposing crypto details.
+- Distinguish queued, sending, delivered, failed, and blocked outcomes; do not imply peer receipt from enqueue.
+- SOS alerts and cancellation feedback must identify the relevant alert/sender.
+- SOS uses one accessible slide ("Slide to Broadcast"); early release resets it.
+- Never render debug plaintext, keys, ciphertext previews, or sensitive location in the debug UI.
 
 ## Diagnostic terminal
 
-- The in-app terminal is a bounded, session-only diagnostic view; it is not a replacement for a focused Logcat capture.
-- Its categories are Connection, Sync, Transport, Routing, Security, System, and cross-category Alerts. Categories must be emitted explicitly for new diagnostics; the compatibility classifier exists only for older log sites.
-- Direct-link summary rows use client/server lifecycle evidence, never an advertisement or a routed peer. Show peer name, shortened endpoint, role/generation, readiness state, and transport only.
-- Display newest events first. When the user scrolls into older events, pause live follow, show a new-event count, and provide controls to jump to Latest or the latest Sync event.
-- Keep heartbeat and relay chatter behind the Details control so connection state, setup failures, and topology changes remain readable by default. Last Sync is a one-time jump, not an instruction to resume live follow.
+- The terminal is a bounded, session-only diagnostic view, not a Logcat replacement.
+- Categories: Connection, Sync, Transport, Routing, Security, System, Alerts. Must emit categories explicitly.
+- Direct-link summaries use client/server lifecycle evidence, not advertisements. Show peer name, endpoint, role, readiness, transport.
+- Display newest events first. If scrolling older, pause follow, show new-event count, provide jumps to Latest/Sync.
+- Keep heartbeat/relay chatter behind Details to preserve readability.
 
 ## Hidden legacy UI
 - `OfflineMapPromptModal`, legacy `RadarScreen`, and debug terminal are hidden; do not delete logic during evaluation.

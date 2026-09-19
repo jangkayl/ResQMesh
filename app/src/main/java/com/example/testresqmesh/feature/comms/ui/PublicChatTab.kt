@@ -2,6 +2,8 @@ package com.example.testresqmesh.feature.comms.ui
 
 import android.Manifest
 import android.content.pm.PackageManager
+import com.example.testresqmesh.core.model.ChatMessage
+import com.example.testresqmesh.core.model.NodeIdentity
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -75,6 +77,7 @@ fun PublicChatTab(
     var pendingImage by remember { mutableStateOf<String?>(null) }
     var pendingAudio by remember { mutableStateOf<String?>(null) }
     var isRecording by remember { mutableStateOf(false) }
+    var replyingToMessage by remember { mutableStateOf<ChatMessage?>(null) }
     val context = LocalContext.current
     val voiceNoteText = stringResource(R.string.private_chat_voice_note)
     val photoText = stringResource(R.string.private_chat_photo)
@@ -146,18 +149,33 @@ fun PublicChatTab(
                             isRecording = mediaHelper.startRecording()
                         }
                     },
+                    replyingTo = replyingToMessage,
+                    onCancelReply = { replyingToMessage = null },
                     onSend = {
-                        val message = when {
+                        val rawMessage = when {
                             inputText.isNotBlank() -> inputText.trim()
                             pendingAudio != null -> voiceNoteText
                             pendingImage != null -> photoText
                             else -> ""
                         }
-                        if (message.isNotBlank() || pendingImage != null || pendingAudio != null) {
-                            viewModel.sendPublicMessage(message, pendingImage, pendingAudio)
+                        val currentReply = replyingToMessage
+                        val finalMessage = if (currentReply != null && rawMessage.isNotBlank()) {
+                            val quoteSender = NodeIdentity.displayNameOf(currentReply.senderName).ifBlank { currentReply.senderName }
+                            val quoteSnippet = currentReply.text.take(60).ifBlank {
+                                if (currentReply.imageBase64 != null) photoText
+                                else if (currentReply.audioBase64 != null) voiceNoteText
+                                else "Attachment"
+                            }
+                            "> $quoteSender: $quoteSnippet\n$rawMessage"
+                        } else {
+                            rawMessage
+                        }
+                        if (finalMessage.isNotBlank() || pendingImage != null || pendingAudio != null) {
+                            viewModel.sendPublicMessage(finalMessage, pendingImage, pendingAudio)
                             inputText = ""
                             pendingImage = null
                             pendingAudio = null
+                            replyingToMessage = null
                         }
                     },
                     onSendLocation = {
@@ -211,7 +229,8 @@ fun PublicChatTab(
                             showAvatar = isLatestInBlock,
                             showSenderName = isLatestInBlock,
                             onUserClick = { onChatSelected(it) },
-                            onShowSeenBy = { readers -> activeSeenReaders = readers }
+                            onShowSeenBy = { readers -> activeSeenReaders = readers },
+                            onReplyClick = { replyingToMessage = it }
                         )
                     }
                 }
