@@ -12,9 +12,11 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -44,22 +46,31 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import com.example.testresqmesh.R
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.rememberModalBottomSheetState
 import com.example.testresqmesh.core.ui.components.feedback.ResQEmptyState
 import com.example.testresqmesh.core.ui.components.layout.ResQAuroraBackground
 import com.example.testresqmesh.core.ui.theme.Spacing
 import com.example.testresqmesh.core.utils.MediaHelper
 import com.example.testresqmesh.feature.comms.ui.components.ChatBubble
 import com.example.testresqmesh.feature.comms.ui.components.ChatInput
+import com.example.testresqmesh.feature.comms.ui.components.SeenByBottomSheet
 import com.example.testresqmesh.feature.comms.viewmodel.CommunicationViewModel
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PublicChatTab(
     viewModel: CommunicationViewModel,
     mediaHelper: MediaHelper,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    onChatSelected: (String) -> Unit = {}
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val channelId by viewModel.currentChannelId.collectAsState()
+
+    BackHandler {
+        onBack()
+    }
     var inputText by remember { mutableStateOf("") }
     var pendingImage by remember { mutableStateOf<String?>(null) }
     var pendingAudio by remember { mutableStateOf<String?>(null) }
@@ -75,6 +86,36 @@ fun PublicChatTab(
 
     LaunchedEffect(latestMessageId) {
         if (latestMessageId != null) listState.scrollToItem(0)
+    }
+
+    var displayLimit by remember { mutableStateOf(50) }
+    val displayedMessages = remember(sortedMessages, displayLimit) {
+        sortedMessages.take(displayLimit)
+    }
+
+    var activeSeenReaders by remember { mutableStateOf<List<String>?>(null) }
+    val seenSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+    if (activeSeenReaders != null) {
+        SeenByBottomSheet(
+            readers = activeSeenReaders!!,
+            sheetState = seenSheetState,
+            onDismissRequest = { activeSeenReaders = null },
+            onUserClick = { selectedUser ->
+                activeSeenReaders = null
+                onChatSelected(selectedUser)
+            }
+        )
+    }
+
+    // Infinite scrolling: load next 50 messages when scrolled near the top of the list
+    LaunchedEffect(listState.firstVisibleItemIndex, displayedMessages.size, sortedMessages.size) {
+        if (displayedMessages.size < sortedMessages.size) {
+            val lastVisibleIndex = listState.firstVisibleItemIndex + listState.layoutInfo.visibleItemsInfo.size
+            if (lastVisibleIndex >= displayedMessages.size - 5) {
+                displayLimit += 50
+            }
+        }
     }
 
     ResQAuroraBackground(Modifier.fillMaxSize()) {
@@ -157,13 +198,21 @@ fun PublicChatTab(
                     verticalArrangement = Arrangement.spacedBy(Spacing.Small, Alignment.Bottom),
                     reverseLayout = true
                 ) {
-                    items(sortedMessages, key = { it.id }) { message ->
+                    itemsIndexed(displayedMessages, key = { _, message -> message.id }) { index, message ->
                         if (!message.isMine && !message.seenBy.contains("Me")) {
                             LaunchedEffect(message.id) {
                                 viewModel.markMessageAsSeen(message.id, isPrivate = false)
                             }
                         }
-                        ChatBubble(message = message, mediaHelper = mediaHelper)
+                        val isLatestInBlock = (index == 0 || displayedMessages[index - 1].senderName != message.senderName)
+                        ChatBubble(
+                            message = message,
+                            mediaHelper = mediaHelper,
+                            showAvatar = isLatestInBlock,
+                            showSenderName = isLatestInBlock,
+                            onUserClick = { onChatSelected(it) },
+                            onShowSeenBy = { readers -> activeSeenReaders = readers }
+                        )
                     }
                 }
             }
