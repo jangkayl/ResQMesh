@@ -25,7 +25,7 @@ fun ResQButton(
     contentPadding: PaddingValues = ButtonDefaults.ContentPadding,
     content: @Composable RowScope.() -> Unit
 ) {
-    val shape = MaterialTheme.shapes.extraLarge
+    val shape = MaterialTheme.shapes.medium
     val containerColor = when (variant) {
         ButtonVariant.Primary -> MaterialTheme.colorScheme.primary
         ButtonVariant.Secondary -> MaterialTheme.colorScheme.surface
@@ -53,7 +53,7 @@ fun ResQButton(
         .then(
             if (variant == ButtonVariant.Primary && enabled) {
                 Modifier.shadow(
-                        elevation = 8.dp,
+                        elevation = 4.dp,
                         shape = shape,
                         ambientColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.18f),
                         spotColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.22f)

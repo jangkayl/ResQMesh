@@ -29,6 +29,7 @@ import com.example.testresqmesh.feature.setup.ui.IdentitySetupScreen
 import com.example.testresqmesh.feature.setup.ui.PermissionsScreen
 import com.example.testresqmesh.feature.setup.ui.SplashScreen
 import com.example.testresqmesh.core.ui.theme.TestResQMeshTheme
+import com.example.testresqmesh.core.ui.theme.AppAppearance
 import com.example.testresqmesh.feature.comms.viewmodel.CommunicationViewModel
 import com.example.testresqmesh.feature.radar.viewmodel.RadarViewModel
 import com.example.testresqmesh.feature.setup.viewmodel.SetupViewModel
@@ -90,9 +91,8 @@ class MainActivity : ComponentActivity() {
             val commsViewModel: CommunicationViewModel = org.koin.androidx.compose.koinViewModel()
             val walkieTalkieViewModel: com.example.testresqmesh.feature.comms.viewmodel.WalkieTalkieViewModel = org.koin.androidx.compose.koinViewModel()
 
-            // ResQMesh uses one deliberately light, high-clarity appearance throughout setup and
-            // the main experience so emergency actions do not change presentation by system theme.
-            TestResQMeshTheme {
+            var appearance by remember { mutableStateOf(AppAppearance.load(applicationContext)) }
+            TestResQMeshTheme(appearance = appearance) {
                 val setupState by setupViewModel.uiState.collectAsState()
                 
                 // Track navigation stage - initialize with Splash to avoid black screen
@@ -139,7 +139,12 @@ class MainActivity : ComponentActivity() {
                                 radarViewModel = radarViewModel,
                                 commsViewModel = commsViewModel,
                                 walkieTalkieViewModel = walkieTalkieViewModel,
-                                mediaHelper = mediaHelper
+                                mediaHelper = mediaHelper,
+                                appearance = appearance,
+                                onAppearanceSelected = { selected ->
+                                    appearance = selected
+                                    AppAppearance.save(applicationContext, selected)
+                                }
                             )
                         }
                         

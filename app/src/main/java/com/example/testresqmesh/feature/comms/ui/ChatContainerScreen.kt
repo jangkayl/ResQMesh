@@ -44,6 +44,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
@@ -52,6 +54,7 @@ import com.example.testresqmesh.R
 import com.example.testresqmesh.core.model.ChatMessage
 import com.example.testresqmesh.core.model.NodeIdentity
 import com.example.testresqmesh.core.ui.components.feedback.ResQEmptyState
+import com.example.testresqmesh.core.ui.components.layout.ResQContentSurface
 import com.example.testresqmesh.core.ui.components.layout.ResQGlassSurface
 import com.example.testresqmesh.core.ui.theme.ResQTheme
 import com.example.testresqmesh.core.ui.theme.Spacing
@@ -64,13 +67,10 @@ import com.example.testresqmesh.ui.state.ChatUiState
 @OptIn(ExperimentalMaterial3Api::class)
 fun ChatContainerScreen(
     viewModel: CommunicationViewModel,
-    walkieTalkieViewModel: com.example.testresqmesh.feature.comms.viewmodel.WalkieTalkieViewModel,
     mediaHelper: MediaHelper,
     onChatSelected: (String) -> Unit,
     onCommunityConversationChanged: (Boolean) -> Unit
 ) {
-    @Suppress("UNUSED_VARIABLE")
-    val retainedWalkieTalkieViewModel = walkieTalkieViewModel
     val uiState by viewModel.uiState.collectAsState()
     val currentChannel by viewModel.currentChannelId.collectAsState()
     val conversations = remember(uiState) { conversationPreviews(uiState) }
@@ -133,12 +133,12 @@ internal fun MessagesInboxContent(
     channelId: String,
     communityPreview: ChatMessage?,
     conversations: List<ConversationPreview>,
+    modifier: Modifier = Modifier,
     onNewMessageClick: () -> Unit,
     onCommunityClick: () -> Unit,
     onChannelSelected: (String) -> Unit,
     onConversationClick: (String) -> Unit,
-    onConversationSeen: (ChatMessage, String) -> Unit,
-    modifier: Modifier = Modifier
+    onConversationSeen: (ChatMessage, String) -> Unit
 ) {
     LazyColumn(
         modifier = modifier.fillMaxSize(),
@@ -238,8 +238,9 @@ private fun CommunityInboxCard(
     onChannelSelected: (String) -> Unit
 ) {
     var channelPickerExpanded by remember { mutableStateOf(false) }
+    val openDescription = stringResource(R.string.messages_open_community)
     ResQGlassSurface(
-        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
+        modifier = Modifier.fillMaxWidth().semantics { contentDescription = openDescription }.clickable(onClick = onClick),
         shape = RoundedCornerShape(28.dp),
         contentPadding = PaddingValues(Spacing.Medium),
         shadowElevation = 14.dp
@@ -314,11 +315,12 @@ private fun ConversationInboxRow(
     conversation: ConversationPreview,
     onClick: () -> Unit
 ) {
-    ResQGlassSurface(
-        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
+    val openDescription = stringResource(R.string.messages_open_conversation, conversation.displayName)
+    ResQContentSurface(
+        modifier = Modifier.fillMaxWidth().semantics { contentDescription = openDescription }.clickable(onClick = onClick),
         shape = RoundedCornerShape(24.dp),
         contentPadding = PaddingValues(Spacing.Medium),
-        shadowElevation = 10.dp
+        shadowElevation = 2.dp
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Surface(

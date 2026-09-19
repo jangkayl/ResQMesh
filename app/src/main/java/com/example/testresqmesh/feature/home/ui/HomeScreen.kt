@@ -22,9 +22,7 @@ import androidx.compose.material.icons.outlined.ChatBubbleOutline
 import androidx.compose.material.icons.outlined.ChevronRight
 import androidx.compose.material.icons.outlined.Hub
 import androidx.compose.material.icons.outlined.PersonOutline
-import androidx.compose.material.icons.outlined.WarningAmber
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -45,7 +43,6 @@ import androidx.compose.ui.unit.dp
 import com.example.testresqmesh.R
 import com.example.testresqmesh.core.model.ConnectedDevice
 import com.example.testresqmesh.core.model.NodeIdentity
-import com.example.testresqmesh.core.ui.components.buttons.ResQButton
 import com.example.testresqmesh.core.ui.components.layout.ResQGlassSurface
 import com.example.testresqmesh.core.ui.theme.ResQTheme
 import com.example.testresqmesh.core.ui.theme.Spacing
@@ -104,14 +101,14 @@ fun HomeScreenContent(
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = stringResource(R.string.app_name),
-                    style = MaterialTheme.typography.headlineMedium,
+                    text = stringResource(R.string.mission_label),
+                    style = MaterialTheme.typography.labelLarge,
                     fontWeight = FontWeight.Black
                 )
                 Text(
-                    text = stringResource(R.string.home_subtitle),
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    text = stringResource(R.string.mission_title),
+                    style = MaterialTheme.typography.headlineMedium,
+                    color = MaterialTheme.colorScheme.onSurface
                 )
             }
             Surface(
@@ -132,11 +129,7 @@ fun HomeScreenContent(
             }
         }
 
-        HomeReadinessBanner(
-            title = readinessTitle,
-            description = readinessDescription,
-            active = isNodeActive
-        )
+        MissionSignalPanel(isNodeActive = isNodeActive, summary = summary, title = readinessTitle, description = readinessDescription)
 
         ResQGlassSurface(
             modifier = Modifier
@@ -146,31 +139,14 @@ fun HomeScreenContent(
             contentPadding = androidx.compose.foundation.layout.PaddingValues(Spacing.Medium),
             shadowElevation = 10.dp
         ) {
-            Column {
-                HomeCardIcon(
-                    icon = Icons.Outlined.ChatBubbleOutline,
-                    color = MaterialTheme.colorScheme.primaryContainer,
-                    contentColor = MaterialTheme.colorScheme.primary
-                )
-                Spacer(Modifier.height(Spacing.Small))
-                Text(
-                    text = stringResource(R.string.home_message_title),
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold
-                )
-                Spacer(Modifier.height(Spacing.ExtraSmall))
-                Text(
-                    text = stringResource(R.string.home_message_description),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Spacer(Modifier.height(Spacing.Small))
-                Text(
-                    text = stringResource(R.string.home_message_action),
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.primary,
-                    fontWeight = FontWeight.Bold
-                )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                HomeCardIcon(Icons.Outlined.ChatBubbleOutline, MaterialTheme.colorScheme.primaryContainer, MaterialTheme.colorScheme.primary)
+                Spacer(Modifier.width(Spacing.Medium))
+                Column(Modifier.weight(1f)) {
+                    Text(stringResource(R.string.mission_message_title), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                    Text(stringResource(R.string.mission_message_description), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                Icon(Icons.Outlined.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
             }
         }
 
@@ -210,72 +186,60 @@ fun HomeScreenContent(
             }
         }
 
-        Surface(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(24.dp),
-            color = MaterialTheme.colorScheme.errorContainer
-        ) {
-            Row(
-                modifier = Modifier.padding(Spacing.Medium),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Icon(
-                    imageVector = Icons.Outlined.WarningAmber,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.error
-                )
+        Text(
+            text = stringResource(R.string.mission_sos_note),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(horizontal = Spacing.Small)
+        )
+    }
+}
+
+@Composable
+private fun MissionSignalPanel(
+    isNodeActive: Boolean,
+    summary: HomeNetworkSummary,
+    title: String,
+    description: String,
+) {
+    val container = if (isNodeActive) MaterialTheme.colorScheme.primaryContainer else ResQTheme.colors.warningContainer
+    val content = if (isNodeActive) MaterialTheme.colorScheme.onPrimaryContainer else ResQTheme.colors.onWarningContainer
+    val dot = if (isNodeActive) ResQTheme.colors.success else ResQTheme.colors.warning
+
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(30.dp),
+        color = container,
+        contentColor = content
+    ) {
+        Column(modifier = Modifier.padding(Spacing.Large), verticalArrangement = Arrangement.spacedBy(Spacing.Medium)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(modifier = Modifier.size(12.dp).clip(CircleShape).background(dot).semantics { contentDescription = title })
                 Spacer(Modifier.width(Spacing.Small))
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = stringResource(R.string.home_sos_title),
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onErrorContainer
-                    )
-                    Text(
-                        text = stringResource(R.string.home_sos_description),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onErrorContainer
-                    )
-                }
+                Text(
+                    stringResource(if (isNodeActive) R.string.mission_online else R.string.mission_check),
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.Black
+                )
+            }
+            Column {
+                Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                Text(description, style = MaterialTheme.typography.bodyMedium)
+            }
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                MissionMetric(stringResource(R.string.mission_metric_direct), summary.directPeers.toString())
+                MissionMetric(stringResource(R.string.mission_metric_relay), summary.relayedPeers.toString())
+                MissionMetric(stringResource(R.string.mission_metric_nearby), summary.nearbyPeers.toString())
             }
         }
     }
 }
 
 @Composable
-private fun HomeReadinessBanner(
-    title: String,
-    description: String,
-    active: Boolean
-) {
-    val container = if (active) ResQTheme.colors.successContainer else ResQTheme.colors.warningContainer
-    val content = if (active) ResQTheme.colors.onSuccessContainer else ResQTheme.colors.onWarningContainer
-    val dot = if (active) ResQTheme.colors.success else ResQTheme.colors.warning
-
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(22.dp),
-        color = container,
-        contentColor = content
-    ) {
-        Row(
-            modifier = Modifier.padding(Spacing.Medium),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(12.dp)
-                    .clip(CircleShape)
-                    .background(dot)
-                    .semantics { contentDescription = title }
-            )
-            Spacer(Modifier.width(Spacing.Small))
-            Column {
-                Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                Text(description, style = MaterialTheme.typography.bodyMedium)
-            }
-        }
+private fun MissionMetric(label: String, value: String) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(value, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Black)
+        Text(label, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
     }
 }
 

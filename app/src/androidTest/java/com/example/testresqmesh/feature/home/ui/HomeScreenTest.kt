@@ -36,7 +36,7 @@ class HomeScreenTest {
 
         composeRule.onNodeWithText("Nearby sharing is on").assertIsDisplayed()
         composeRule.onNodeWithText("1 direct").assertIsDisplayed()
-        composeRule.onNodeWithText("Hold SOS below.").assertIsDisplayed()
+        composeRule.onNodeWithText("The SOS action stays ready in the navigation dock.").assertIsDisplayed()
     }
 
     @Test
@@ -57,8 +57,8 @@ class HomeScreenTest {
             }
         }
 
-        composeRule.onNodeWithText("Messages").performClick()
-        composeRule.onNodeWithContentDescription("View network").performClick()
+        composeRule.onNodeWithText("Start a conversation").performClick()
+        composeRule.onNodeWithText("Your network").performClick()
         composeRule.onNodeWithContentDescription("Open profile").performClick()
 
         composeRule.runOnIdle {

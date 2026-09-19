@@ -81,13 +81,13 @@ fun ResQStatusChip(
     val colors = tone.colors()
     Surface(
         modifier = modifier,
-        shape = MaterialTheme.shapes.extraLarge,
+        shape = MaterialTheme.shapes.small,
         color = colors.container,
         contentColor = colors.foreground,
         border = BorderStroke(1.dp, colors.border)
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {

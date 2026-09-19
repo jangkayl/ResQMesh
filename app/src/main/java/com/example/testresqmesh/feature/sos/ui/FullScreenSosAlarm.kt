@@ -5,7 +5,6 @@ import android.os.Build
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -16,7 +15,6 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -24,6 +22,8 @@ import androidx.compose.ui.unit.dp
 import com.example.testresqmesh.core.model.ChatMessage
 import com.example.testresqmesh.core.ui.theme.Spacing
 import com.example.testresqmesh.core.utils.MediaHelper
+import com.example.testresqmesh.core.ui.theme.ResQTheme
+import com.example.testresqmesh.core.ui.components.layout.ResQSosBackground
 
 @Composable
 fun FullScreenSosAlarm(alertMessage: ChatMessage, onDismiss: () -> Unit, onViewMap: () -> Unit = {}) {
@@ -38,23 +38,25 @@ fun FullScreenSosAlarm(alertMessage: ChatMessage, onDismiss: () -> Unit, onViewM
         }
         onDispose { media.stopEmergencySiren(); vibrator.cancel() }
     }
-    val red = Color(0xFFE5484D)
+    val red = ResQTheme.colors.sos
     val hasLocation = alertMessage.locationLat != null && alertMessage.locationLng != null
-    Column(Modifier.fillMaxSize().background(Color(0xFFFBFAFF)).padding(Spacing.Large), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+    ResQSosBackground(modifier = Modifier.fillMaxSize()) {
+        Column(Modifier.fillMaxSize().padding(Spacing.Large), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
         Surface(Modifier.size(96.dp), CircleShape, color = red.copy(alpha = .12f)) { Box(contentAlignment = Alignment.Center) { Icon(Icons.Default.Warning, "Emergency alert", tint = red, modifier = Modifier.size(48.dp)) } }
         Spacer(Modifier.height(20.dp))
         Text("Emergency alert", style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.Black)
         Text("From ${alertMessage.senderName}", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Spacer(Modifier.height(24.dp))
-        Surface(Modifier.fillMaxWidth(), RoundedCornerShape(28.dp), color = Color.White, shadowElevation = 4.dp) {
+        Surface(Modifier.fillMaxWidth(), RoundedCornerShape(28.dp), color = MaterialTheme.colorScheme.surfaceVariant, shadowElevation = 4.dp) {
             Column(Modifier.padding(22.dp)) {
                 Text(alertMessage.text, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
                 Spacer(Modifier.height(16.dp))
-                Row(verticalAlignment = Alignment.CenterVertically) { Icon(Icons.Default.LocationOn, null, tint = if (hasLocation) Color(0xFF18A66A) else MaterialTheme.colorScheme.onSurfaceVariant); Spacer(Modifier.width(8.dp)); Text(if (hasLocation) "Location shared" else "No location shared", fontWeight = FontWeight.Bold) }
+                Row(verticalAlignment = Alignment.CenterVertically) { Icon(Icons.Default.LocationOn, null, tint = if (hasLocation) ResQTheme.colors.success else MaterialTheme.colorScheme.onSurfaceVariant); Spacer(Modifier.width(8.dp)); Text(if (hasLocation) "Location shared" else "No location shared", fontWeight = FontWeight.Bold) }
             }
         }
         Spacer(Modifier.height(28.dp))
         if (hasLocation) { Button(onClick = onViewMap, modifier = Modifier.fillMaxWidth().height(56.dp), shape = RoundedCornerShape(22.dp)) { Text("View map", fontWeight = FontWeight.Bold) }; Spacer(Modifier.height(10.dp)) }
         OutlinedButton(onClick = onDismiss, modifier = Modifier.fillMaxWidth().height(56.dp), shape = RoundedCornerShape(22.dp)) { Text("Dismiss", fontWeight = FontWeight.Bold) }
+        }
     }
 }

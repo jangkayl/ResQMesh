@@ -381,7 +381,6 @@ class MeshRepository(
                 }
             }
         }
-        
         networkManager.onMessageDelivered = { msgId, readerName, returnRoute ->
             val currentSos = _incomingSosAlert.value
             if (currentSos?.id == msgId && !currentSos.deliveredTo.contains(readerName)) {
@@ -620,10 +619,10 @@ class MeshRepository(
         const val BLOCK_RETRY_MS = 3_000L
     }
 
+    @Synchronized
     fun broadcastLiveAudioChunk(chunk: ByteArray) {
-        val messageId = java.util.UUID.randomUUID().toString()
         val payload = com.example.testresqmesh.core.network.MeshPayload(
-            id = messageId,
+            id = UUID.randomUUID().toString(),
             type = "LIVE_AUDIO",
             senderName = myNodeName,
             channelId = _currentChannelId.value,
@@ -672,7 +671,7 @@ class MeshRepository(
         repositoryScope.launch {
             messageStore.save(message, targetName = null)
         }
-        networkManager.broadcastPayload(payloadBytes)
+        if (isSOS) networkManager.broadcastPriorityPayload(payloadBytes) else networkManager.broadcastPayload(payloadBytes)
         return messageId
     }
 

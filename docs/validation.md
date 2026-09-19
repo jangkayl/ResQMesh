@@ -62,15 +62,15 @@ Restart each app separately, toggle Bluetooth on one phone, move out of range an
 
 Arrange A-B-C so A and C depend on B; send both directions, remove and restore B, verify route withdrawal/recovery, and check duplicates and direct-versus-indirect status.
 
-For the stable-route build, use four phones when available: arrange A-B-C-D with A and D indirect; wait for SYSTEM sync; send five private messages in each direction; then force one relay reconnect. Record each sender's selected next-hop marker, each receiver's delivery receipt, and any GATT retirement. A failed route must report route unavailable and must not produce a private broadcast/relay loop.
+For A-B-C-D, make A/D indirect, send five private messages each way, then reconnect one relay. Record next hop, receipt, and GATT retirement; failed routes must not private-broadcast or loop.
 
 ### Level 4: release/capstone matrix
 
-Across representative devices, measure delivery success, reconnect time, latency, range conditions, battery behavior, SOS correctness, private-message failure policy, and hardware-specific failures. Do not infer production guarantees from a single run.
+Across representative devices, measure delivery, recovery, range, battery, SOS, private-send failure, and hardware-specific failures. Do not infer production guarantees from one run.
 
 ## Required test card
 
-For every device-facing change, Codex provides: build identity and APK path; devices/setup; exact steps; expected results; failure indicators; relevant markers; and the observations the user should report. If the test fails, continue the same task with its capture and timestamp.
+Record APK, setup, steps, result, failures, markers, and report items. Continue failures with capture/timestamp.
 
 ## Latest verified results
 

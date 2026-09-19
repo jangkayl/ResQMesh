@@ -40,10 +40,14 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.example.testresqmesh.R
 import com.example.testresqmesh.core.ui.components.feedback.ResQEmptyState
+import com.example.testresqmesh.core.ui.components.feedback.ResQStatusChip
+import com.example.testresqmesh.core.ui.components.feedback.ResQStatusTone
+import com.example.testresqmesh.core.ui.components.layout.ResQContentSurface
 import com.example.testresqmesh.core.ui.components.layout.ResQGlassSurface
-import com.example.testresqmesh.core.ui.theme.ResQTheme
 import com.example.testresqmesh.core.ui.theme.Spacing
+import com.example.testresqmesh.core.ui.theme.TestResQMeshTheme
 import com.example.testresqmesh.feature.radar.viewmodel.RadarViewModel
+import androidx.compose.ui.tooling.preview.Preview
 
 @Composable
 fun NetworkScreen(
@@ -92,6 +96,11 @@ internal fun NetworkList(
     onNodeClick: (NodeItemData) -> Unit,
     onTopologyClick: () -> Unit
 ) {
+    val groups = listOf(
+        "Direct now" to nodes.filter { it.kind == NodeKind.DIRECT || it.kind == NodeKind.UNRESPONSIVE },
+        "Reachable via mesh" to nodes.filter { it.kind == NodeKind.RELAY || it.kind == NodeKind.HOPPED },
+        "Nearby or unavailable" to nodes.filter { it.kind !in setOf(NodeKind.DIRECT, NodeKind.UNRESPONSIVE, NodeKind.RELAY, NodeKind.HOPPED) }
+    ).filter { it.second.isNotEmpty() }
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(start = Spacing.Medium, top = Spacing.Large, end = Spacing.Medium, bottom = 120.dp),
@@ -100,8 +109,9 @@ internal fun NetworkList(
         item {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(modifier = Modifier.weight(1f)) {
-                    Text("Network", style = MaterialTheme.typography.displayLarge, fontWeight = FontWeight.Black)
-                    Text("People around you.", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("MESH", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Black, color = MaterialTheme.colorScheme.primary)
+                    Text("People & paths", style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.Black)
+                    Text("Current local reachability.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 Surface(
                     modifier = Modifier.size(52.dp),
@@ -120,8 +130,8 @@ internal fun NetworkList(
                     }
                     Spacer(Modifier.width(Spacing.Medium))
                     Column(modifier = Modifier.weight(1f)) {
-                        Text("Nearby people", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                        Text(networkSummaryLabel(nodes), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("Mesh field", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                        Text(networkSummaryLabel(nodes) + " · status is live", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     TextButton(onClick = onTopologyClick) { Text("Details") }
                 }
@@ -132,8 +142,13 @@ internal fun NetworkList(
                 ResQEmptyState("No people nearby", "Keep ResQMesh open to find people.", icon = Icons.Outlined.Hub)
             }
         } else {
-            items(nodes, key = { "${it.endpointId}-${it.name}" }) { node ->
-                NetworkNodeRow(node, onClick = { onNodeClick(node) })
+            groups.forEach { (title, group) ->
+                item(key = "header_$title") {
+                    Text(title.uppercase(), style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Black, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = Spacing.Small, start = Spacing.Small))
+                }
+                items(group, key = { "${it.endpointId}-${it.name}" }) { node ->
+                    NetworkNodeRow(node, onClick = { onNodeClick(node) })
+                }
             }
         }
     }
@@ -142,11 +157,11 @@ internal fun NetworkList(
 @Composable
 private fun NetworkNodeRow(node: NodeItemData, onClick: () -> Unit) {
     val status = networkStatus(node.kind)
-    ResQGlassSurface(
+    ResQContentSurface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(24.dp),
+        shape = RoundedCornerShape(20.dp),
         contentPadding = PaddingValues(Spacing.Medium),
-        shadowElevation = 10.dp
+        shadowElevation = 2.dp
     ) {
         Surface(onClick = onClick, color = androidx.compose.ui.graphics.Color.Transparent) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -158,7 +173,7 @@ private fun NetworkNodeRow(node: NodeItemData, onClick: () -> Unit) {
                 Spacer(Modifier.width(Spacing.Medium))
                 Column(modifier = Modifier.weight(1f)) {
                     Text(node.label, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Text(status, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold, color = networkStatusColor(node.kind))
+                    ResQStatusChip(status, networkStatusTone(node.kind))
                 }
             }
         }
@@ -185,7 +200,7 @@ private fun NetworkPeerDetails(
         }
         ResQGlassSurface(shape = RoundedCornerShape(28.dp), contentPadding = PaddingValues(Spacing.Medium)) {
             Column(verticalArrangement = Arrangement.spacedBy(Spacing.Small)) {
-                Text(networkStatus(node.kind), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = networkStatusColor(node.kind))
+                ResQStatusChip(networkStatus(node.kind), networkStatusTone(node.kind))
                 Text("Status follows current network evidence.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
@@ -277,10 +292,27 @@ internal fun networkSummaryLabel(nodes: List<NodeItemData>): String = when {
 }
 
 @Composable
-private fun networkStatusColor(kind: NodeKind) = when (kind) {
-    NodeKind.DIRECT -> ResQTheme.colors.success
-    NodeKind.UNRESPONSIVE, NodeKind.HANDSHAKING, NodeKind.SYNCING -> ResQTheme.colors.warning
-    NodeKind.RELAY, NodeKind.HOPPED -> MaterialTheme.colorScheme.primary
-    NodeKind.DISCOVERED -> MaterialTheme.colorScheme.secondary
-    NodeKind.OFFLINE, NodeKind.BLOCKED_OFFLINE -> MaterialTheme.colorScheme.onSurfaceVariant
+private fun networkStatusTone(kind: NodeKind) = when (kind) {
+    NodeKind.DIRECT -> ResQStatusTone.Success
+    NodeKind.UNRESPONSIVE, NodeKind.HANDSHAKING, NodeKind.SYNCING -> ResQStatusTone.Warning
+    NodeKind.RELAY, NodeKind.HOPPED -> ResQStatusTone.Information
+    NodeKind.DISCOVERED -> ResQStatusTone.Neutral
+    NodeKind.OFFLINE, NodeKind.BLOCKED_OFFLINE -> ResQStatusTone.Neutral
+}
+
+@Preview(name = "Mesh — reachable states", showBackground = true, widthDp = 390, heightDp = 844)
+@Composable
+private fun NetworkListPreview() {
+    TestResQMeshTheme {
+        NetworkList(
+            nodes = listOf(
+                NodeItemData("AA:01", "alpha", "", NodeKind.DIRECT, label = "Alpha"),
+                NodeItemData("BB:02", "bravo", "", NodeKind.RELAY, label = "Bravo"),
+                NodeItemData("CC:03", "charlie", "", NodeKind.DISCOVERED, label = "Charlie")
+            ),
+            onRefresh = {},
+            onNodeClick = {},
+            onTopologyClick = {}
+        )
+    }
 }

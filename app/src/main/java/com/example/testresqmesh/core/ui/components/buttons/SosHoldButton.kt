@@ -14,8 +14,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -34,6 +36,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.Color
@@ -58,6 +61,7 @@ import androidx.compose.material.icons.automirrored.outlined.ArrowForward
 import com.example.testresqmesh.R
 import com.example.testresqmesh.core.ui.theme.ResQSize
 import com.example.testresqmesh.core.ui.theme.ResQTheme
+import kotlin.math.roundToInt
 
 private const val SOS_HOLD_DURATION_MILLIS = 2_000
 
@@ -76,7 +80,6 @@ fun SosSlideToSend(
     val currentOnSlideComplete by rememberUpdatedState(onSlideComplete)
     var progress by remember { mutableStateOf(0f) }
     var completed by remember { mutableStateOf(false) }
-    val density = LocalDensity.current
     val instruction = stringResource(R.string.sos_slide_instruction)
     val progressDescription = stringResource(R.string.sos_slide_progress, (progress * 100).toInt())
     val actionLabel = stringResource(R.string.sos_slide_action)
@@ -89,7 +92,7 @@ fun SosSlideToSend(
         }
     }
 
-    Box(
+    BoxWithConstraints(
         modifier = modifier
             .fillMaxWidth()
             .height(64.dp)
@@ -105,64 +108,78 @@ fun SosSlideToSend(
                         true
                     }
                 } else disabled()
-            }
-            .pointerInput(enabled) {
-                detectDragGestures(
-                    onDragStart = { completed = false },
-                    onDragCancel = { if (!completed) progress = 0f },
-                    onDragEnd = {
-                        if (progress >= 0.9f) complete()
-                        if (!completed) progress = 0f
-                    },
-                    onDrag = { change, dragAmount ->
-                        change.consume()
-                        if (enabled) {
-                            val trackWidth = size.width.toFloat().coerceAtLeast(with(density) { 1.dp.toPx() })
-                            progress = (progress + dragAmount.x / trackWidth).coerceIn(0f, 1f)
-                            if (progress >= 0.9f) complete()
-                        }
-                    }
-                )
             },
         contentAlignment = Alignment.CenterStart
     ) {
+        val density = LocalDensity.current
+        val thumbTravelPx = with(density) {
+            (maxWidth - 64.dp).coerceAtLeast(1.dp).toPx()
+        }
+
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(4.dp)
+                .pointerInput(enabled, thumbTravelPx) {
+                    detectDragGestures(
+                        onDragStart = {
+                            completed = false
+                            progress = 0f
+                        },
+                        onDragCancel = { if (!completed) progress = 0f },
+                        onDragEnd = {
+                            if (progress >= 0.9f) complete()
+                            if (!completed) progress = 0f
+                        },
+                        onDrag = { change, dragAmount ->
+                            change.consume()
+                            if (enabled) {
+                                progress = (progress + dragAmount.x / thumbTravelPx).coerceIn(0f, 1f)
+                                if (progress >= 0.9f) complete()
+                            }
+                        }
+                    )
+                },
+            contentAlignment = Alignment.CenterStart
         ) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .clip(RoundedCornerShape(28.dp))
-                    .background(Color.White.copy(alpha = 0.16f))
-            )
-            Box(
-                modifier = Modifier
-                    .fillMaxHeight()
-                    .fillMaxWidth(progress)
-                    .clip(RoundedCornerShape(28.dp))
-                    .background(Color.White.copy(alpha = 0.22f))
-            )
-            Surface(
-                modifier = Modifier
-                    .align(Alignment.CenterStart)
-                    .size(56.dp),
-                shape = CircleShape,
-                color = Color.White,
-                contentColor = ResQTheme.colors.sos
+                    .padding(4.dp)
             ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Icon(Icons.AutoMirrored.Outlined.ArrowForward, contentDescription = null)
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .clip(RoundedCornerShape(28.dp))
+                        .background(Color.White.copy(alpha = 0.16f))
+                )
+                Box(
+                    modifier = Modifier
+                        .fillMaxHeight()
+                        .fillMaxWidth(progress)
+                        .clip(RoundedCornerShape(28.dp))
+                        .background(Color.White.copy(alpha = 0.22f))
+                )
+                Surface(
+                    modifier = Modifier
+                        .align(Alignment.CenterStart)
+                        .offset { IntOffset((progress * thumbTravelPx).roundToInt(), 0) }
+                        .size(56.dp),
+                    shape = CircleShape,
+                    color = Color.White,
+                    contentColor = ResQTheme.colors.sos
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(Icons.AutoMirrored.Outlined.ArrowForward, contentDescription = null)
+                    }
                 }
+                Text(
+                    text = instruction,
+                    modifier = Modifier.align(Alignment.Center),
+                    color = Color.White,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
             }
-            Text(
-                text = instruction,
-                modifier = Modifier.align(Alignment.Center),
-                color = Color.White,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold
-            )
         }
     }
 }

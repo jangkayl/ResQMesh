@@ -21,3 +21,9 @@ object ResQSize {
     val SosAction = 64.dp
     val ContentMaxWidth = 680.dp
 }
+
+/** Shared, short interaction timing. Compose respects the platform animation-duration setting. */
+object ResQMotion {
+    const val PressMillis = 150
+    const val ScreenMillis = 220
+}

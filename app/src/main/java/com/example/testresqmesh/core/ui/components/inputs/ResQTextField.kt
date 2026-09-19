@@ -31,7 +31,7 @@ fun ResQTextField(
         isError = isError,
         enabled = enabled,
         singleLine = singleLine,
-        shape = MaterialTheme.shapes.extraLarge,
+        shape = MaterialTheme.shapes.medium,
         colors = OutlinedTextFieldDefaults.colors(
             focusedBorderColor = MaterialTheme.colorScheme.primary,
             unfocusedBorderColor = ResQTheme.colors.glassBorder,

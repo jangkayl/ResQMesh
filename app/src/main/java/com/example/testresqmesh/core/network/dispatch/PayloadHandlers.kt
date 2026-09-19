@@ -223,8 +223,6 @@ class LiveAudioHandler : PayloadHandler {
         val chunk = payload.liveAudioChunk ?: return
         val channelId = payload.channelId
         callback.onLiveAudioChunk(payload.senderName, channelId, chunk)
-        
-        // STP Directed Routing
         val stpNeighbors = callback.getStpNeighbors()
         if (stpNeighbors.isEmpty()) return
 

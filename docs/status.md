@@ -14,20 +14,10 @@ Make blocking reliably mutual across relays: deny direct links after identity, s
 - Payload-ready routing/UI selection and endpoint-owned cleanup for stale GATT/L2CAP state.
 - Inbound-progress liveness, Radar online/checking/offline feedback, and heartbeat challenge ownership tests.
 - Callback-driven GATT client writes and server notification completion for the heartbeat/fallback path.
-- Server-to-client GATT fallback now uses acknowledged indications after the 2026-09-16 capture showed accepted notifications repeatedly missing completion callbacks after L2CAP loss.
-- L2CAP promotion disarms overlapping GATT work, preventing late callbacks from tearing down a healthy link; connect-lock contention retains its cooldown.
-- User reports the stabilized Samsung pairing now reaches `READY`, and a five-device mesh run shows all nodes available. Exact build, device/API matrix, repetitions, and capture are not yet recorded, so this is encouraging device evidence rather than a capacity or production-reliability claim.
-- Direct-link admission now consistently uses three distinct neighbors; meshes larger than four devices depend on routed hops rather than a full direct-link graph.
-- A nearby routed peer is normally kept on its existing mesh path, avoiding redundant direct ACL churn. If no payload-ready direct neighbor remains, admission may bootstrap one direct link; explicit Radar **Connect Directly** uses the same block, duplicate, and capacity guards.
-- Startup admission now retains elected peers by stable identity when the radio gate or connect lock is busy. One no-progress client setup is bounded to five seconds, then the queued bootstrap can continue and the failed peer retries with bounded backoff. Device timing evidence is still required.
-- L2CAP identity checks, retirement, and GATT retry/fallback.
-- Runtime `BLUETOOTH_CONNECT` revocation now fails the affected operation safely instead of crashing.
-- Persistent Android Keystore RSA identity, fail-closed private sending, endpoint-aware key cache rules, encrypted private locations, and removal of private plaintext logging in the reviewed handlers.
-- Focused unit tests for link lifecycle, liveness, heartbeat ownership, and private-message policy.
-- Coordinators own GATT-flight/heartbeat state; shared framing rejects malformed or oversized payloads; pending GATT work is capped at 128 transfers per endpoint. Repository gateway/store boundaries hide Bluetooth/Room, while Active Chat and Radar models are separated without public UI changes.
-- The diagnostic terminal uses structured events, a live direct-link summary, paused-follow scrolling, and Latest/Last Sync controls. Device validation must confirm that its lifecycle matches the phones.
-- Active public and private chats anchor the latest messages above the keyboard, automatically return to them, and show recorded community reader circles; phone interaction validation is pending.
-- Lean pull-request CI for the debug build, unit tests, error-free Android Lint, canonical-document checks, and diff hygiene; PR creation and merging remain explicit user actions.
+- GATT uses acknowledged server indications and protects healthy L2CAP from stale callbacks; permission revocation fails safely.
+- Three direct neighbors are allowed; queued stable-identity admission retries after a five-second setup watchdog. Samsung/five-device reports remain unrecorded device evidence.
+- Private sends fail closed; link/frame/queue policy and focused unit tests cover lifecycle and heartbeat ownership.
+- The terminal, UI shell, and lean CI are implemented; phone validation remains required.
 
 Local checks passed; physical BLE validation remains required.
 

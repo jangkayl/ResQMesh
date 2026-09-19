@@ -5,12 +5,12 @@ The UI uses Jetpack Compose and Material 3. Inspect the actual screen, ViewModel
 ## Component and state boundaries
 
 - Reuse shared components and theme tokens before local styling.
-- The civilian-first system is light-only: a pale-white/lavender canvas, large near-black headings, purple emphasis, cyan identity accents, green truthful status banners, and raised white cards. Red is reserved for genuine emergency and destructive actions.
-- Use the reference-inspired mobile hierarchy: generous whitespace, strong left-aligned page titles, single-purpose circular or rounded-square actions, and a white capsule navigation dock with SOS floating above it. Do not preserve earlier screen layouts merely by recoloring them.
-- The visual system is stable across all supported Android versions and does not depend on system dark mode, blur, or other version-specific rendering effects.
-- Use compact 16 dp gutters, 8–12 dp rhythm, smaller titles, and 48 dp touch targets. Reserve glass for navigation and summaries.
-- New top-level screens use the reusable shell: Home, Messages, Walkie-talkie, and Network, with SOS as a persistent action rather than a navigation destination.
-- Shared controls use at least 48 dp touch targets, semantic shapes, and text or icon-independent status descriptions.
+- Calm Emergency OS is dark-first with a separate high-contrast Daylight preference; appearance affects presentation only.
+- Night uses a neutral near-black canvas, opaque raised panels, restrained shadows, and visible 1 dp borders. Use tokens, vector icons, 8 dp rhythm, 16 dp gutters, 18–24 dp radii, and 48 dp touch targets.
+- Cyan marks interaction, green a verified positive state, amber attention, and red only SOS/destructive states. Effects establish hierarchy; text and status symbols establish system truth.
+- Use mission-first hierarchy, left-aligned page titles, compact bento groups, and a restrained navigation dock with persistent SOS. Ambient fields are decorative only and use 150–220 ms feedback transitions.
+- New top-level screens use the reusable shell: Mission, Messages, Voice, and Mesh. SOS is a persistent action rather than a navigation destination.
+- Shared controls use semantic shapes, clear pressed/disabled states, and text or icon-independent status descriptions.
 - Keep business, routing, and transport decisions out of composables. ViewModels/use cases expose UI state and user actions.
 - Keep route-level composables responsible for state collection and side effects; move reusable stateless presentation into feature `ui/components` files.
 - Keep state immutable/nonblocking; retain tests.
@@ -60,6 +60,7 @@ Avoid showing “connected” from a BLE callback alone. Counters and selected p
 - Active public and private conversations anchor the latest messages above the composer, keep it above the IME, and follow the newest message when the conversation changes. Sent community bubbles show reader circles only from recorded `seenBy` receipts.
 - Avoid rapid status flicker; state transitions should follow repository/link evidence rather than raw scan churn.
 - Peer rows are fully clickable. Message requires an unblocked direct/relayed peer; “Known mesh path” is only a topology hint.
+- Review both appearances independently. Active screens use theme tokens, never fixed dark surfaces or white text.
 
 ## Validation
 

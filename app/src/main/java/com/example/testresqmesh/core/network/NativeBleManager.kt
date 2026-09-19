@@ -625,6 +625,16 @@ class NativeBleManager(val context: Context) {
         }
     }
 
+    /** SOS/control callers may overtake a queued low-priority attachment frame. */
+    fun broadcastPriorityPayload(payloadBytes: ByteArray, excludeEndpointId: String? = null) {
+        cacheOutgoingMessageId(payloadBytes)
+        val targets = mutableSetOf<String>()
+        targets.addAll(store.activeConnections.keys)
+        targets.addAll(store.activeServerConnections.keys)
+        targets.remove(excludeEndpointId)
+        targets.forEach { sendPriorityPayload(it, payloadBytes) }
+    }
+
     /** Queue one complete framed payload, bypassing L2CAP for a GATT health check. */
     private fun enqueueGattPayload(
         endpoint: String,
