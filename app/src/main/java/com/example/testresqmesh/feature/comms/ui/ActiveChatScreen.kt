@@ -7,6 +7,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -37,6 +38,7 @@ import androidx.compose.material.icons.outlined.LocationOn
 import androidx.compose.material.icons.outlined.Mic
 import androidx.compose.material.icons.outlined.PlayArrow
 import androidx.compose.material.icons.outlined.Stop
+import com.example.testresqmesh.core.ui.components.dialogs.ResQConfirmationDialog
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -79,6 +81,8 @@ import com.example.testresqmesh.core.ui.theme.ResQTheme
 import com.example.testresqmesh.core.ui.theme.Spacing
 import com.example.testresqmesh.core.ui.theme.TestResQMeshTheme
 import com.example.testresqmesh.core.utils.MediaHelper
+import com.example.testresqmesh.feature.comms.ui.components.FullscreenImageViewer
+import com.example.testresqmesh.feature.comms.ui.components.ModernVoicePlayer
 import com.example.testresqmesh.feature.comms.viewmodel.CommunicationViewModel
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -330,9 +334,18 @@ private fun PrivateMessageBubble(
     val bubbleColor = if (mine) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface
     val contentColor = if (mine) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
     val shape = if (mine) {
-        RoundedCornerShape(22.dp, 22.dp, 6.dp, 22.dp)
+        RoundedCornerShape(10.dp, 10.dp, 3.dp, 10.dp)
     } else {
-        RoundedCornerShape(22.dp, 22.dp, 22.dp, 6.dp)
+        RoundedCornerShape(10.dp, 10.dp, 10.dp, 3.dp)
+    }
+
+    var fullScreenImage by remember { mutableStateOf<String?>(null) }
+    if (fullScreenImage != null) {
+        FullscreenImageViewer(
+            imageBase64 = fullScreenImage!!,
+            mediaHelper = mediaHelper,
+            onDismiss = { fullScreenImage = null }
+        )
     }
 
     Column(
@@ -340,13 +353,13 @@ private fun PrivateMessageBubble(
         horizontalAlignment = if (mine) Alignment.End else Alignment.Start
     ) {
         Surface(
-            modifier = Modifier.widthIn(max = 300.dp),
+            modifier = Modifier.widthIn(max = 260.dp),
             shape = shape,
             color = bubbleColor,
             contentColor = contentColor,
-            shadowElevation = if (mine) 4.dp else 8.dp
+            shadowElevation = if (mine) 3.dp else 4.dp
         ) {
-            Column(modifier = Modifier.padding(horizontal = Spacing.Medium, vertical = 10.dp)) {
+            Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)) {
                 message.imageBase64?.let { image ->
                     val bitmap = remember(image) { mediaHelper.decodeBase64ToBitmap(image) }
                     if (bitmap != null) {
@@ -356,18 +369,20 @@ private fun PrivateMessageBubble(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(180.dp)
-                                .clip(RoundedCornerShape(14.dp)),
+                                .clip(RoundedCornerShape(8.dp))
+                                .clickable { fullScreenImage = image },
                             contentScale = ContentScale.Crop
                         )
                         Spacer(Modifier.height(Spacing.Small))
                     }
                 }
                 message.audioBase64?.let { audio ->
-                    TextButton(onClick = { mediaHelper.playVoiceMail(audio) }) {
-                        Icon(Icons.Outlined.PlayArrow, contentDescription = null)
-                        Spacer(Modifier.width(Spacing.ExtraSmall))
-                        Text(stringResource(R.string.private_chat_voice_note))
-                    }
+                    ModernVoicePlayer(
+                        audioBase64 = audio,
+                        mediaHelper = mediaHelper,
+                        modifier = Modifier.padding(vertical = 4.dp)
+                    )
+                    Spacer(Modifier.height(Spacing.ExtraSmall))
                 }
                 if (message.locationLat != null && message.locationLng != null) {
                     Surface(
@@ -540,19 +555,15 @@ private fun DeleteConversationDialog(
     onDismiss: () -> Unit,
     onDelete: () -> Unit
 ) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.private_chat_delete_title)) },
-        text = { Text(stringResource(R.string.private_chat_delete_description, name)) },
-        confirmButton = {
-            Button(
-                onClick = onDelete,
-                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
-            ) { Text(stringResource(R.string.private_chat_delete_confirm)) }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) { Text(stringResource(R.string.private_chat_cancel_action)) }
-        }
+    ResQConfirmationDialog(
+        title = stringResource(R.string.private_chat_delete_title),
+        message = stringResource(R.string.private_chat_delete_description, name),
+        confirmText = stringResource(R.string.private_chat_delete_confirm),
+        cancelText = stringResource(R.string.private_chat_cancel_action),
+        icon = Icons.Outlined.DeleteOutline,
+        isDestructive = true,
+        onConfirm = onDelete,
+        onDismiss = onDismiss
     )
 }
 

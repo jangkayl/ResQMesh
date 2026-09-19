@@ -1,6 +1,8 @@
 package com.example.testresqmesh.feature.comms.ui.components
 
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -14,15 +16,19 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.ChatBubbleOutline
 import androidx.compose.material.icons.outlined.LocationOn
-import androidx.compose.material.icons.outlined.PlayArrow
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -33,6 +39,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.example.testresqmesh.R
 import com.example.testresqmesh.core.model.ChatMessage
 import com.example.testresqmesh.core.model.NodeIdentity
@@ -43,7 +50,14 @@ import com.example.testresqmesh.feature.comms.ui.messageTime
 import kotlin.math.absoluteValue
 
 @Composable
-fun ChatBubble(message: ChatMessage, mediaHelper: MediaHelper) {
+fun ChatBubble(
+    message: ChatMessage,
+    mediaHelper: MediaHelper,
+    showAvatar: Boolean = true,
+    showSenderName: Boolean = true,
+    onUserClick: ((String) -> Unit)? = null,
+    onShowSeenBy: ((List<String>) -> Unit)? = null
+) {
     val mine = message.isMine
     val isSos = message.isSOS
     val bubbleColor = when {
@@ -57,139 +71,256 @@ fun ChatBubble(message: ChatMessage, mediaHelper: MediaHelper) {
         else -> MaterialTheme.colorScheme.onSurface
     }
     val shape = if (mine) {
-        RoundedCornerShape(22.dp, 22.dp, 6.dp, 22.dp)
+        RoundedCornerShape(10.dp, 10.dp, 3.dp, 10.dp)
     } else {
-        RoundedCornerShape(22.dp, 22.dp, 22.dp, 6.dp)
+        RoundedCornerShape(10.dp, 10.dp, 10.dp, 3.dp)
     }
     val sender = remember(message.senderName) { NodeIdentity.displayNameOf(message.senderName).ifBlank { message.senderName } }
+    var showUserMenu by remember { mutableStateOf(false) }
 
-    Column(
+    var fullScreenImage by remember { mutableStateOf<String?>(null) }
+    if (fullScreenImage != null) {
+        FullscreenImageViewer(
+            imageBase64 = fullScreenImage!!,
+            mediaHelper = mediaHelper,
+            onDismiss = { fullScreenImage = null }
+        )
+    }
+
+    val distinctReaders = remember(message.seenBy) { message.seenBy.distinct() }
+
+    Row(
         modifier = Modifier.fillMaxWidth(),
-        horizontalAlignment = if (mine) Alignment.End else Alignment.Start
+        horizontalArrangement = if (mine) Arrangement.End else Arrangement.Start,
+        verticalAlignment = Alignment.Bottom
     ) {
+        // Left Profile Avatar for other users
         if (!mine) {
-            Text(
-                text = sender,
-                style = MaterialTheme.typography.labelMedium,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(start = Spacing.Small, bottom = 2.dp),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-        }
-        Surface(
-            modifier = Modifier.widthIn(max = 300.dp),
-            shape = shape,
-            color = bubbleColor,
-            contentColor = contentColor,
-            shadowElevation = if (mine) 4.dp else 8.dp
-        ) {
-            Column(modifier = Modifier.padding(Spacing.Medium)) {
-                if (isSos) {
-                    Text(
-                        text = stringResource(R.string.community_sos_label),
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = FontWeight.Bold
+            if (showAvatar) {
+                Box {
+                    UserAvatar(
+                        name = message.senderName,
+                        size = 32.dp,
+                        onClick = { showUserMenu = true },
+                        modifier = Modifier.padding(bottom = 4.dp, end = 8.dp)
                     )
-                    Spacer(Modifier.height(Spacing.ExtraSmall))
-                }
-                message.imageBase64?.let { image ->
-                    val bitmap = remember(image) { mediaHelper.decodeBase64ToBitmap(image) }
-                    if (bitmap != null) {
-                        Image(
-                            bitmap = bitmap.asImageBitmap(),
-                            contentDescription = stringResource(R.string.community_image_description),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(180.dp)
-                                .clip(RoundedCornerShape(14.dp)),
-                            contentScale = ContentScale.Crop
-                        )
-                        Spacer(Modifier.height(Spacing.Small))
-                    }
-                }
-                message.audioBase64?.let { audio ->
-                    TextButton(onClick = { mediaHelper.playVoiceMail(audio) }) {
-                        Icon(Icons.Outlined.PlayArrow, contentDescription = null)
-                        Spacer(Modifier.width(Spacing.ExtraSmall))
-                        Text(stringResource(R.string.private_chat_voice_note))
-                    }
-                }
-                if (message.locationLat != null && message.locationLng != null) {
-                    Surface(
-                        shape = RoundedCornerShape(14.dp),
-                        color = contentColor.copy(alpha = 0.12f)
+                    DropdownMenu(
+                        expanded = showUserMenu,
+                        onDismissRequest = { showUserMenu = false }
                     ) {
-                        androidx.compose.foundation.layout.Row(
-                            modifier = Modifier.padding(Spacing.Small),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(Icons.Outlined.LocationOn, contentDescription = null)
-                            Spacer(Modifier.width(Spacing.ExtraSmall))
-                            Text(stringResource(R.string.community_location_shared))
-                        }
-                    }
-                    Spacer(Modifier.height(Spacing.Small))
-                }
-                if (message.text.isNotBlank()) {
-                    Text(
-                        text = message.text,
-                        style = MaterialTheme.typography.bodyLarge,
-                        fontWeight = if (isSos) FontWeight.Bold else FontWeight.Normal
-                    )
-                }
-                Spacer(Modifier.height(Spacing.ExtraSmall))
-                androidx.compose.foundation.layout.Row(
-                    modifier = Modifier.align(Alignment.End),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    if (mine) {
-                        Text(
-                            text = deliveryLabel(message),
-                            style = MaterialTheme.typography.labelMedium,
-                            color = contentColor.copy(alpha = 0.72f)
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.community_message_user, sender)) },
+                            leadingIcon = {
+                                Icon(
+                                    imageVector = Icons.Outlined.ChatBubbleOutline,
+                                    contentDescription = null
+                                )
+                            },
+                            onClick = {
+                                showUserMenu = false
+                                onUserClick?.invoke(message.senderName)
+                            }
                         )
-                        Spacer(Modifier.width(Spacing.Small))
                     }
-                    Text(
-                        text = messageTime(message.timestamp),
-                        style = MaterialTheme.typography.labelMedium,
-                        color = contentColor.copy(alpha = 0.72f)
-                    )
                 }
+            } else {
+                Spacer(modifier = Modifier.width(40.dp))
             }
         }
-        if (mine && message.seenBy.isNotEmpty()) {
-            Row(
-                modifier = Modifier.padding(top = Spacing.ExtraSmall, end = Spacing.ExtraSmall),
-                verticalAlignment = Alignment.CenterVertically
+
+        Column(
+            horizontalAlignment = if (mine) Alignment.End else Alignment.Start
+        ) {
+            if (!mine && showSenderName) {
+                Text(
+                    text = sender,
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier
+                        .padding(start = Spacing.Small, bottom = 2.dp)
+                        .clickable { showUserMenu = true },
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+            Surface(
+                modifier = Modifier.widthIn(max = 260.dp),
+                shape = shape,
+                color = bubbleColor,
+                contentColor = contentColor,
+                shadowElevation = if (mine) 3.dp else 4.dp
             ) {
-                message.seenBy.distinct().take(3).forEachIndexed { index, reader ->
-                    if (index > 0) Spacer(Modifier.width(2.dp))
-                    Surface(
-                        modifier = Modifier.size(18.dp),
-                        shape = CircleShape,
-                        color = communityReaderColor(reader)
-                    ) {
-                        Box(contentAlignment = Alignment.Center) {
+                Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp)) {
+                    if (isSos) {
+                        Text(
+                            text = stringResource(R.string.community_sos_label),
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Spacer(Modifier.height(2.dp))
+                    }
+                    message.imageBase64?.let { image ->
+                        val bitmap = remember(image) { mediaHelper.decodeBase64ToBitmap(image) }
+                        if (bitmap != null) {
+                            Image(
+                                bitmap = bitmap.asImageBitmap(),
+                                contentDescription = stringResource(R.string.community_image_description),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(180.dp)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .clickable { fullScreenImage = image },
+                                contentScale = ContentScale.Crop
+                            )
+                            Spacer(Modifier.height(4.dp))
+                        }
+                    }
+                    message.audioBase64?.let { audio ->
+                        ModernVoicePlayer(
+                            audioBase64 = audio,
+                            mediaHelper = mediaHelper,
+                            modifier = Modifier.padding(vertical = 2.dp)
+                        )
+                        Spacer(Modifier.height(2.dp))
+                    }
+                    if (message.locationLat != null && message.locationLng != null) {
+                        Surface(
+                            shape = RoundedCornerShape(10.dp),
+                            color = contentColor.copy(alpha = 0.12f)
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(Icons.Outlined.LocationOn, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(Modifier.width(4.dp))
+                                Text(stringResource(R.string.community_location_shared), style = MaterialTheme.typography.labelMedium)
+                            }
+                        }
+                        Spacer(Modifier.height(4.dp))
+                    }
+                    if (message.text.isNotBlank()) {
+                        Text(
+                            text = message.text,
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = if (isSos) FontWeight.Bold else FontWeight.Normal
+                        )
+                    }
+
+                    // Compact Metadata Row: Timestamp, Delivery Status, and Seen Receipts
+                    if (mine) {
+                        Row(
+                            modifier = Modifier
+                                .align(Alignment.End)
+                                .padding(top = 2.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
                             Text(
-                                text = reader.take(1).uppercase(),
+                                text = deliveryLabel(message),
                                 style = MaterialTheme.typography.labelSmall,
-                                fontWeight = FontWeight.Bold,
-                                color = Color.White
+                                color = contentColor.copy(alpha = 0.72f)
+                            )
+                            Spacer(Modifier.width(4.dp))
+                            Text(
+                                text = messageTime(message.timestamp),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = contentColor.copy(alpha = 0.72f)
+                            )
+                            if (distinctReaders.isNotEmpty()) {
+                                Spacer(Modifier.width(6.dp))
+                                Row(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .clickable { onShowSeenBy?.invoke(distinctReaders) },
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    distinctReaders.take(3).forEachIndexed { index, reader ->
+                                        if (index > 0) Spacer(Modifier.width(1.dp))
+                                        Surface(
+                                            modifier = Modifier.size(14.dp),
+                                            shape = CircleShape,
+                                            color = communityReaderColor(reader)
+                                        ) {
+                                            Box(contentAlignment = Alignment.Center) {
+                                                Text(
+                                                    text = reader.take(1).uppercase(),
+                                                    style = MaterialTheme.typography.labelSmall.copy(
+                                                        fontSize = 8.sp,
+                                                        lineHeight = 8.sp
+                                                    ),
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = Color.White
+                                                )
+                                            }
+                                        }
+                                    }
+                                    val additionalReaders = distinctReaders.size - 3
+                                    if (additionalReaders > 0) {
+                                        Text(
+                                            text = "+$additionalReaders",
+                                            style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp),
+                                            color = contentColor.copy(alpha = 0.85f),
+                                            modifier = Modifier.padding(start = 2.dp)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    } else {
+                        // Other user's message: Seen badges and timestamp aligned neatly
+                        Row(
+                            modifier = Modifier
+                                .align(Alignment.End)
+                                .padding(top = 2.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            if (distinctReaders.isNotEmpty()) {
+                                Row(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(6.dp))
+                                        .clickable { onShowSeenBy?.invoke(distinctReaders) },
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    distinctReaders.take(3).forEachIndexed { index, reader ->
+                                        if (index > 0) Spacer(Modifier.width(1.dp))
+                                        Surface(
+                                            modifier = Modifier.size(13.dp),
+                                            shape = CircleShape,
+                                            color = communityReaderColor(reader)
+                                        ) {
+                                            Box(contentAlignment = Alignment.Center) {
+                                                Text(
+                                                    text = reader.take(1).uppercase(),
+                                                    style = MaterialTheme.typography.labelSmall.copy(
+                                                        fontSize = 8.sp,
+                                                        lineHeight = 8.sp
+                                                    ),
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = Color.White
+                                                )
+                                            }
+                                        }
+                                    }
+                                    val additionalReaders = distinctReaders.size - 3
+                                    if (additionalReaders > 0) {
+                                        Text(
+                                            text = "+$additionalReaders",
+                                            style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp),
+                                            color = contentColor.copy(alpha = 0.85f),
+                                            modifier = Modifier.padding(start = 2.dp)
+                                        )
+                                    }
+                                }
+                                Spacer(Modifier.width(4.dp))
+                            }
+                            Text(
+                                text = messageTime(message.timestamp),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = contentColor.copy(alpha = 0.72f)
                             )
                         }
                     }
-                }
-                val additionalReaders = message.seenBy.distinct().size - 3
-                if (additionalReaders > 0) {
-                    Text(
-                        text = "+$additionalReaders",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(start = Spacing.ExtraSmall)
-                    )
                 }
             }
         }

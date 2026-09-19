@@ -8,6 +8,8 @@ import android.media.MediaRecorder
 import android.os.Build
 import android.util.Base64
 import android.util.Log
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import java.io.ByteArrayOutputStream
 import java.io.File
 
@@ -54,17 +56,47 @@ class MediaHelper(private val context: Context) {
     private val playbackQueue = java.util.concurrent.ConcurrentLinkedQueue<String>()
     private var isPlaying = false
 
+    private val _currentlyPlayingAudio = MutableStateFlow<String?>(null)
+    val currentlyPlayingAudio: StateFlow<String?> = _currentlyPlayingAudio
+
     fun playVoiceMail(base64Audio: String) {
+        togglePlayVoiceMail(base64Audio)
+    }
+
+    fun togglePlayVoiceMail(base64Audio: String) {
+        if (_currentlyPlayingAudio.value == base64Audio) {
+            stopVoiceMail()
+            return
+        }
+        stopVoiceMail()
         playbackQueue.offer(base64Audio)
         playNextInQueue()
     }
 
+    fun stopVoiceMail() {
+        try {
+            playbackQueue.clear()
+            mediaPlayer?.stop()
+            mediaPlayer?.release()
+            mediaPlayer = null
+        } catch (e: Exception) {
+            Log.e("MediaHelper", "Error stopping playback", e)
+        } finally {
+            isPlaying = false
+            _currentlyPlayingAudio.value = null
+        }
+    }
+
     private fun playNextInQueue() {
         if (isPlaying) return
-        val nextAudio = playbackQueue.poll() ?: return
+        val nextAudio = playbackQueue.poll() ?: run {
+            _currentlyPlayingAudio.value = null
+            return
+        }
 
         try {
             this.isPlaying = true
+            _currentlyPlayingAudio.value = nextAudio
             val decodedBytes = Base64.decode(nextAudio, Base64.NO_WRAP)
             val tempPlayFile = File(context.cacheDir, "temp_audio_play_${System.currentTimeMillis()}.amr")
             tempPlayFile.writeBytes(decodedBytes)
@@ -77,12 +109,14 @@ class MediaHelper(private val context: Context) {
                     it.release()
                     tempPlayFile.delete()
                     this@MediaHelper.isPlaying = false
+                    this@MediaHelper._currentlyPlayingAudio.value = null
                     playNextInQueue() 
                 }
             }
         } catch (e: Exception) {
             Log.e("MediaHelper", "Playback failed", e)
             this.isPlaying = false
+            this._currentlyPlayingAudio.value = null
             playNextInQueue()
         }
     }

@@ -212,7 +212,8 @@ fun MainContainerScreen(
                     radarViewModel = radarViewModel,
                     onMessagesClick = { currentDestination = ResQDestination.Messages },
                     onNetworkClick = { showNetworkDetails = true },
-                    onProfileClick = { showProfile = true }
+                    onProfileClick = { showProfile = true },
+                    onVoiceClick = { currentDestination = ResQDestination.Voice }
                 )
                 ResQDestination.Messages -> ChatContainerScreen(
                     viewModel = commsViewModel, 

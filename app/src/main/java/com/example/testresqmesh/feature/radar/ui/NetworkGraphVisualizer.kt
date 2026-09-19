@@ -31,7 +31,8 @@ fun NetworkGraphVisualizer(
     topology: Map<String, Set<String>>,
     myDeviceName: String,
     connectedNodes: List<String> = emptyList(),
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    showEmptyScanPrompt: Boolean = true
 ) {
     val infiniteTransition = rememberInfiniteTransition(label = "radar")
     val radarAngle by infiniteTransition.animateFloat(
@@ -59,7 +60,7 @@ fun NetworkGraphVisualizer(
             .background(Color.Transparent)
             .padding(8.dp)
     ) {
-        if (topology.isEmpty() && topology.values.flatten().isEmpty() && connectedNodes.isEmpty()) {
+        if (showEmptyScanPrompt && topology.isEmpty() && topology.values.flatten().isEmpty() && connectedNodes.isEmpty()) {
             Text(
                 "Scanning tactical mesh...",
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
