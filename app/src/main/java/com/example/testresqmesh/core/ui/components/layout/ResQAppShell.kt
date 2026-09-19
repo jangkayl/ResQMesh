@@ -47,8 +47,7 @@ enum class ResQDestination(
 ) {
     Mission(R.string.nav_mission, Icons.Outlined.MyLocation),
     Messages(R.string.nav_messages, Icons.Outlined.ChatBubbleOutline),
-    Voice(R.string.nav_voice, Icons.Outlined.GraphicEq),
-    Mesh(R.string.nav_mesh, Icons.Outlined.Hub)
+    Voice(R.string.nav_voice, Icons.Outlined.GraphicEq)
 }
 
 @Composable
@@ -125,11 +124,6 @@ private fun ResQBottomBar(
                     selected = selectedDestination == ResQDestination.Voice,
                     onClick = { onDestinationSelected(ResQDestination.Voice) }
                 )
-                ResQNavigationItem(
-                    destination = ResQDestination.Mesh,
-                    selected = selectedDestination == ResQDestination.Mesh,
-                    onClick = { onDestinationSelected(ResQDestination.Mesh) }
-                )
                 SosNavigationItem(onClick = onSosActivated, enabled = sosEnabled)
             }
         }
@@ -147,20 +141,17 @@ private fun androidx.compose.foundation.layout.RowScope.ResQNavigationItem(
         onClick = onClick,
         colors = NavigationBarItemDefaults.colors(
             selectedIconColor = MaterialTheme.colorScheme.primary,
-            selectedTextColor = MaterialTheme.colorScheme.primary,
             indicatorColor = MaterialTheme.colorScheme.primaryContainer,
-            unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
-            unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant
+            unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant
         ),
         icon = {
             Icon(
                 imageVector = destination.icon,
                 contentDescription = stringResource(destination.labelRes),
-                modifier = Modifier.size(24.dp)
+                modifier = Modifier.size(28.dp) // Slightly larger since there's no text
             )
         },
-        alwaysShowLabel = true,
-        label = { Text(stringResource(destination.labelRes), style = MaterialTheme.typography.labelMedium) }
+        alwaysShowLabel = false
     )
 }
 

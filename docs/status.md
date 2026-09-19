@@ -18,6 +18,7 @@ Make blocking reliably mutual across relays: deny direct links after identity, s
 - Three direct neighbors are allowed; queued stable-identity admission retries after a five-second setup watchdog. Samsung/five-device reports remain unrecorded device evidence.
 - Private sends fail closed; link/frame/queue policy and focused unit tests cover lifecycle and heartbeat ownership.
 - The terminal, UI shell, and lean CI are implemented; phone validation remains required.
+- Modern Tactical & Utilitarian UI redesign (Phase 1 & 2) implemented, including High-Vis Safety Dark and Field Light themes, tactical dashboard with animations, massive Walkie-Talkie radar PTT, and centered Hero Banner for Public Broadcast.
 
 Local checks passed; physical BLE validation remains required.
 

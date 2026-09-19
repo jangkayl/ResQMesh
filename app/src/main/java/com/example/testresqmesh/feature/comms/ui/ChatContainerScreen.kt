@@ -143,9 +143,9 @@ internal fun MessagesInboxContent(
     LazyColumn(
         modifier = modifier.fillMaxSize(),
         contentPadding = PaddingValues(
-            start = Spacing.Medium,
+            start = Spacing.Large,
             top = Spacing.Large,
-            end = Spacing.Medium,
+            end = Spacing.Large,
             bottom = 120.dp
         ),
         verticalArrangement = Arrangement.spacedBy(Spacing.Small)
@@ -186,7 +186,7 @@ internal fun MessagesInboxContent(
         }
 
         item {
-            CommunityInboxCard(
+            CommunityHeroBanner(
                 channelId = channelId,
                 preview = communityPreview,
                 onClick = onCommunityClick,
@@ -231,7 +231,7 @@ internal fun MessagesInboxContent(
 }
 
 @Composable
-private fun CommunityInboxCard(
+private fun CommunityHeroBanner(
     channelId: String,
     preview: ChatMessage?,
     onClick: () -> Unit,
@@ -239,73 +239,91 @@ private fun CommunityInboxCard(
 ) {
     var channelPickerExpanded by remember { mutableStateOf(false) }
     val openDescription = stringResource(R.string.messages_open_community)
+    
     ResQGlassSurface(
-        modifier = Modifier.fillMaxWidth().semantics { contentDescription = openDescription }.clickable(onClick = onClick),
+        modifier = Modifier
+            .fillMaxWidth()
+            .semantics { contentDescription = openDescription }
+            .clickable(onClick = onClick),
         shape = RoundedCornerShape(28.dp),
-        contentPadding = PaddingValues(Spacing.Medium),
+        contentPadding = PaddingValues(Spacing.Large),
         shadowElevation = 14.dp
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
             Surface(
-                modifier = Modifier.size(52.dp),
-                shape = RoundedCornerShape(18.dp),
+                modifier = Modifier.size(64.dp),
+                shape = CircleShape,
                 color = MaterialTheme.colorScheme.primaryContainer
             ) {
                 Box(contentAlignment = Alignment.Center) {
                     Icon(
                         imageVector = Icons.Outlined.Campaign,
                         contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(32.dp)
                     )
                 }
             }
-            Spacer(Modifier.width(Spacing.Medium))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = stringResource(R.string.messages_community_title),
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold
-                )
-                Text(
-                    text = preview?.text?.ifBlank { stringResource(R.string.messages_attachment_preview) }
-                        ?: stringResource(R.string.messages_community_description, channelId),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Box {
-                    TextButton(
-                        onClick = { channelPickerExpanded = true },
-                        contentPadding = PaddingValues(0.dp)
+            Spacer(Modifier.height(Spacing.Medium))
+            Text(
+                text = stringResource(R.string.messages_community_title),
+                style = MaterialTheme.typography.headlineMedium,
+                fontWeight = FontWeight.Black,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+            )
+            Spacer(Modifier.height(Spacing.ExtraSmall))
+            Text(
+                text = preview?.text?.ifBlank { stringResource(R.string.messages_attachment_preview) }
+                    ?: stringResource(R.string.messages_community_description, channelId),
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                modifier = Modifier.padding(horizontal = Spacing.Medium)
+            )
+            Spacer(Modifier.height(Spacing.Medium))
+            Box {
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant,
+                    onClick = { channelPickerExpanded = true }
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = Spacing.Medium, vertical = Spacing.Small),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
                             text = stringResource(R.string.messages_channel_short, channelId),
-                            style = MaterialTheme.typography.labelMedium,
-                            fontWeight = FontWeight.SemiBold
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Icon(
+                            imageVector = Icons.Outlined.ChevronRight,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp).padding(start = 4.dp)
                         )
                     }
-                    DropdownMenu(
-                        expanded = channelPickerExpanded,
-                        onDismissRequest = { channelPickerExpanded = false }
-                    ) {
-                        (1..5).forEach { channel ->
-                            DropdownMenuItem(
-                                text = { Text(stringResource(R.string.messages_channel_option, channel)) },
-                                onClick = {
-                                    onChannelSelected(channel.toString())
-                                    channelPickerExpanded = false
-                                }
-                            )
-                        }
+                }
+                DropdownMenu(
+                    expanded = channelPickerExpanded,
+                    onDismissRequest = { channelPickerExpanded = false }
+                ) {
+                    (1..5).forEach { channel ->
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.messages_channel_option, channel)) },
+                            onClick = {
+                                onChannelSelected(channel.toString())
+                                channelPickerExpanded = false
+                            }
+                        )
                     }
                 }
             }
-            Icon(
-                imageVector = Icons.Outlined.ChevronRight,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary
-            )
         }
     }
 }

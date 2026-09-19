@@ -1,6 +1,6 @@
 <resources>
     <string name="app_name">ResQMesh</string>
-    <string name="nav_mission">Mission</string>
+    <string name="nav_mission">Mission &amp; Mesh</string>
     <string name="nav_messages">Messages</string>
     <string name="nav_voice">Voice</string>
     <string name="nav_mesh">Mesh</string>
@@ -71,7 +71,7 @@
     <string name="messages_title">Messages</string>
     <string name="messages_subtitle">Local conversations, even when the internet is gone.</string>
     <string name="messages_new_action">New message</string>
-    <string name="messages_community_title">Community</string>
+    <string name="messages_community_title">Public Broadcast</string>
     <string name="messages_community_description">Channel %1$s</string>
     <string name="messages_channel_short">Ch %1$s</string>
     <string name="messages_channel_option">Channel %1$d</string>

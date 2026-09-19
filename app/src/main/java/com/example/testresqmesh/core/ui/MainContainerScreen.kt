@@ -51,6 +51,7 @@ fun MainContainerScreen(
     var mapSosAlert by remember { mutableStateOf<com.example.testresqmesh.core.model.ChatMessage?>(null) }
     var showProfile by remember { mutableStateOf(false) }
     var showAdvanced by remember { mutableStateOf(false) }
+    var showNetworkDetails by remember { mutableStateOf(false) }
     var isCommunityConversationOpen by remember { mutableStateOf(false) }
 
     // OfflineMapPromptModal and the legacy Radar screen remain in source intentionally. Their
@@ -173,6 +174,20 @@ fun MainContainerScreen(
         return
     }
 
+    if (showNetworkDetails) {
+        ResQAuroraBackground(modifier = Modifier.fillMaxSize()) {
+            NetworkScreen(
+                viewModel = radarViewModel,
+                onMessagePeer = { peer ->
+                    showNetworkDetails = false
+                    activeChatNode = peer
+                }
+            )
+        }
+        BackHandler { showNetworkDetails = false }
+        return
+    }
+
     ResQAppShell(
         selectedDestination = currentDestination,
         onDestinationSelected = { currentDestination = it },
@@ -196,7 +211,7 @@ fun MainContainerScreen(
                     setupViewModel = setupViewModel,
                     radarViewModel = radarViewModel,
                     onMessagesClick = { currentDestination = ResQDestination.Messages },
-                    onNetworkClick = { currentDestination = ResQDestination.Mesh },
+                    onNetworkClick = { showNetworkDetails = true },
                     onProfileClick = { showProfile = true }
                 )
                 ResQDestination.Messages -> ChatContainerScreen(
@@ -209,10 +224,6 @@ fun MainContainerScreen(
                     commsViewModel = commsViewModel,
                     walkieTalkieViewModel = walkieTalkieViewModel,
                     mediaHelper = mediaHelper
-                )
-                ResQDestination.Mesh -> NetworkScreen(
-                    viewModel = radarViewModel,
-                    onMessagePeer = { peer -> activeChatNode = peer }
                 )
             }
         }

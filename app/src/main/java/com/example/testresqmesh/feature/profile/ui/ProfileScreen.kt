@@ -1,48 +1,20 @@
 package com.example.testresqmesh.feature.profile.ui
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ColumnScope
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Brightness4
-import androidx.compose.material.icons.filled.ChevronRight
-import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.Key
-import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.Map
-import androidx.compose.material.icons.filled.PowerSettingsNew
-import androidx.compose.material.icons.filled.Tune
-import androidx.compose.material.icons.filled.WbSunny
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.example.testresqmesh.core.ui.components.layout.ResQGlassSurface
 import com.example.testresqmesh.core.ui.theme.AppAppearance
@@ -51,6 +23,7 @@ import com.example.testresqmesh.core.ui.theme.ResQTheme
 import com.example.testresqmesh.core.ui.theme.Spacing
 import com.example.testresqmesh.feature.setup.viewmodel.SetupViewModel
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProfileScreen(
     viewModel: SetupViewModel,
@@ -60,14 +33,77 @@ fun ProfileScreen(
     onBack: () -> Unit
 ) {
     val state by viewModel.uiState.collectAsState()
+    var showConnectionConfirm by remember { mutableStateOf(false) }
+
+    if (showConnectionConfirm) {
+        ModalBottomSheet(
+            onDismissRequest = { showConnectionConfirm = false },
+            containerColor = MaterialTheme.colorScheme.surface,
+            dragHandle = { BottomSheetDefaults.DragHandle() }
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = Spacing.Large, vertical = Spacing.Medium)
+                    .padding(bottom = 32.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Warning,
+                    contentDescription = null,
+                    tint = if (state.isOnline) ResQTheme.colors.sos else ResQTheme.colors.success,
+                    modifier = Modifier.size(48.dp)
+                )
+                Spacer(Modifier.height(Spacing.Medium))
+                Text(
+                    text = if (state.isOnline) "Disconnect from mesh?" else "Connect to mesh?",
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Black,
+                    textAlign = TextAlign.Center
+                )
+                Spacer(Modifier.height(Spacing.Small))
+                Text(
+                    text = if (state.isOnline) "Going offline will isolate your device from the tactical network. You will stop sending and receiving all data." 
+                           else "Going online will connect your device to nearby peers and resume network activity.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center
+                )
+                Spacer(Modifier.height(Spacing.Large))
+                Button(
+                    onClick = {
+                        if (state.isOnline) viewModel.goOffline()
+                        showConnectionConfirm = false
+                    },
+                    modifier = Modifier.fillMaxWidth().height(56.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (state.isOnline) ResQTheme.colors.sos else ResQTheme.colors.success,
+                        contentColor = if (state.isOnline) ResQTheme.colors.onSos else ResQTheme.colors.onSuccess
+                    ),
+                    shape = RoundedCornerShape(16.dp)
+                ) {
+                    Text(if (state.isOnline) "Confirm Disconnect" else "Confirm Connect", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
+                }
+                Spacer(Modifier.height(Spacing.Medium))
+                OutlinedButton(
+                    onClick = { showConnectionConfirm = false },
+                    modifier = Modifier.fillMaxWidth().height(56.dp),
+                    shape = RoundedCornerShape(16.dp)
+                ) {
+                    Text("Cancel", fontWeight = FontWeight.Bold)
+                }
+            }
+        }
+    }
+
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(horizontal = Spacing.Medium, vertical = Spacing.Medium),
+        contentPadding = PaddingValues(horizontal = Spacing.Large, vertical = Spacing.Large),
         verticalArrangement = Arrangement.spacedBy(Spacing.Medium)
     ) {
         item {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = onBack, modifier = Modifier.size(ResQSize.MinimumTouchTarget)) {
+                IconButton(onClick = onBack, modifier = Modifier.size(ResQSize.MinimumTouchTarget).offset(x = (-12).dp)) {
                     Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                 }
                 Column(modifier = Modifier.weight(1f)) {
@@ -136,14 +172,15 @@ fun ProfileScreen(
             }
         }
         item {
+            Spacer(Modifier.height(Spacing.Medium))
             OutlinedButton(
-                onClick = viewModel::goOffline,
-                modifier = Modifier.fillMaxWidth().height(ResQSize.MinimumTouchTarget),
+                onClick = { showConnectionConfirm = true },
+                modifier = Modifier.fillMaxWidth().height(56.dp),
                 shape = RoundedCornerShape(18.dp)
             ) {
-                Icon(Icons.Default.PowerSettingsNew, contentDescription = null)
+                Icon(Icons.Default.PowerSettingsNew, contentDescription = null, tint = if (state.isOnline) MaterialTheme.colorScheme.onSurface else ResQTheme.colors.success)
                 Spacer(Modifier.width(Spacing.Small))
-                Text("Go offline", fontWeight = FontWeight.Bold)
+                Text(if (state.isOnline) "Go offline" else "Go online", fontWeight = FontWeight.Bold, color = if (state.isOnline) MaterialTheme.colorScheme.onSurface else ResQTheme.colors.success)
             }
         }
     }
@@ -199,7 +236,7 @@ private fun SettingsCard(content: @Composable ColumnScope.() -> Unit) {
         border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
     ) {
         Column(
-            modifier = Modifier.padding(vertical = Spacing.Small),
+            // Removed internal vertical padding, now handled entirely by SettingRow heights
             content = content
         )
     }
@@ -212,7 +249,7 @@ private fun DividerLine() {
 
 @Composable
 private fun SettingRow(icon: ImageVector, title: String, subtitle: String, onClick: (() -> Unit)? = null) {
-    val rowModifier = Modifier.fillMaxWidth().heightIn(min = 68.dp)
+    val rowModifier = Modifier.fillMaxWidth().heightIn(min = 72.dp)
     val content: @Composable () -> Unit = {
         Row(modifier = Modifier.padding(horizontal = Spacing.Medium), verticalAlignment = Alignment.CenterVertically) {
             Surface(modifier = Modifier.size(36.dp), shape = RoundedCornerShape(12.dp), color = MaterialTheme.colorScheme.secondaryContainer) {
@@ -227,8 +264,8 @@ private fun SettingRow(icon: ImageVector, title: String, subtitle: String, onCli
         }
     }
     if (onClick == null) {
-        Box(modifier = rowModifier, content = { content() })
+        Box(modifier = rowModifier, contentAlignment = Alignment.CenterStart, content = { content() })
     } else {
-        Surface(modifier = rowModifier, color = Color.Transparent, onClick = onClick, content = { content() })
+        Surface(modifier = rowModifier, color = Color.Transparent, onClick = onClick, content = { Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.CenterStart) { content() } })
     }
 }

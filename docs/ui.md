@@ -5,10 +5,10 @@ The UI uses Jetpack Compose and Material 3. Inspect the actual screen, ViewModel
 ## Component and state boundaries
 
 - Reuse shared components and theme tokens before local styling.
-- Calm Emergency OS is dark-first with a separate high-contrast Daylight preference; appearance affects presentation only.
-- Night uses a neutral near-black canvas, opaque raised panels, restrained shadows, and visible 1 dp borders. Use tokens, vector icons, 8 dp rhythm, 16 dp gutters, 18–24 dp radii, and 48 dp touch targets.
-- Cyan marks interaction, green a verified positive state, amber attention, and red only SOS/destructive states. Effects establish hierarchy; text and status symbols establish system truth.
-- Use mission-first hierarchy, left-aligned page titles, compact bento groups, and a restrained navigation dock with persistent SOS. Ambient fields are decorative only and use 150–220 ms feedback transitions.
+- Tactical & Utilitarian / High-Vis Safety Dark is dark-first with a Field Light Daylight preference; appearance affects presentation only.
+- Night uses Pitch Black (#000000) for OLED efficiency, Carbon/Dark Grey raised panels, restrained shadows, and 1dp borders. Daylight uses white and steel grey backgrounds with black text.
+- Both use Safety Orange (#FF5A00) for interactions/accents, green for positive states, amber for attention, and red for SOS. Use tokens, vector icons, 8dp rhythm, 16dp gutters, 18-24dp radii, and 48dp targets.
+- Use tactical mission-first hierarchy, left-aligned titles, compact bento groups, and a restrained icon-only navigation dock with persistent SOS. Ambient fields are decorative and use 150-220ms transitions.
 - New top-level screens use the reusable shell: Mission, Messages, Voice, and Mesh. SOS is a persistent action rather than a navigation destination.
 - Shared controls use semantic shapes, clear pressed/disabled states, and text or icon-independent status descriptions.
 - Keep business, routing, and transport decisions out of composables. ViewModels/use cases expose UI state and user actions.
@@ -46,11 +46,10 @@ Avoid showing “connected” from a BLE callback alone. Counters and selected p
 - Display newest events first. When the user scrolls into older events, pause live follow, show a new-event count, and provide controls to jump to Latest or the latest Sync event.
 - Keep heartbeat and relay chatter behind the Details control so connection state, setup failures, and topology changes remain readable by default. Last Sync is a one-time jump, not an instruction to resume live follow.
 
-## Hidden legacy UI restoration checklist
-
-- `OfflineMapPromptModal`, the legacy `RadarScreen`, and the debug terminal remain in source but are intentionally hidden from the current shell; do not delete their backing logic while the new design is evaluated.
-- Before restoring one, choose and document its user entry point, reconnect the existing callbacks without changing mesh policy, and retain its accessibility label.
-- Validate the restored flow's empty, permission-denied, and error states. For a transport-, SOS-, or location-driven screen, also run its corresponding focused phone test.
+## Hidden legacy UI
+- `OfflineMapPromptModal`, legacy `RadarScreen`, and debug terminal are hidden; do not delete logic during evaluation.
+- Before restoring, choose entry point, reconnect callbacks without changing mesh policy, and retain accessibility labels.
+- Validate empty, permission-denied, and error states. For transport/SOS/location screens, run focused phone tests.
 
 ## Accessibility and interaction
 
