@@ -29,6 +29,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.text.font.FontFamily
@@ -108,6 +109,7 @@ internal fun NetworkList(
     ).filter { it.second.isNotEmpty() }
 
     val haptics = LocalHapticFeedback.current
+    val isLight = MaterialTheme.colorScheme.background.luminance() > 0.5f
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -142,21 +144,21 @@ internal fun NetworkList(
                         text = "People & Paths",
                         style = MaterialTheme.typography.headlineMedium,
                         fontWeight = FontWeight.ExtraBold,
-                        color = Color.White
+                        color = MaterialTheme.colorScheme.onBackground
                     )
                     Text(
                         text = "Live decentralized peer topology & multi-hop reachability.",
                         style = MaterialTheme.typography.bodySmall,
-                        color = Color(0xFF8B98AD)
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
 
                 Surface(
                     modifier = Modifier.size(48.dp),
                     shape = CircleShape,
-                    color = Color(0xFF141824),
-                    border = BorderStroke(1.dp, Color(0xFF263045)),
-                    shadowElevation = 8.dp,
+                    color = if (isLight) MaterialTheme.colorScheme.surfaceVariant else Color(0xFF141824),
+                    border = BorderStroke(1.dp, if (isLight) MaterialTheme.colorScheme.outlineVariant else Color(0xFF263045)),
+                    shadowElevation = if (isLight) 2.dp else 8.dp,
                     onClick = {
                         haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                         onRefresh()
@@ -228,13 +230,13 @@ internal fun NetworkList(
                             text = networkSummaryLabel(nodes),
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
-                            color = Color.White
+                            color = MaterialTheme.colorScheme.onSurface
                         )
                         Text(
                             text = "Dynamic ad-hoc Bluetooth & Wi-Fi routing",
                             style = MaterialTheme.typography.bodySmall,
                             fontSize = 11.sp,
-                            color = Color(0xFF7A889D)
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
 
@@ -281,7 +283,7 @@ internal fun NetworkList(
                             fontFamily = FontFamily.Monospace,
                             style = MaterialTheme.typography.labelMedium,
                             fontWeight = FontWeight.ExtraBold,
-                            color = Color(0xFF7C8BA1),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                             letterSpacing = 1.2.sp
                         )
                         Spacer(Modifier.width(8.dp))
@@ -308,13 +310,17 @@ internal fun NetworkList(
 @Composable
 private fun TacticalOperatorCard(node: NodeItemData, onClick: () -> Unit) {
     val status = networkStatus(node.kind)
+    val isLight = MaterialTheme.colorScheme.background.luminance() > 0.5f
     val accentColor = when (node.kind) {
         NodeKind.DIRECT -> Color(0xFF00E676)
         NodeKind.RELAY, NodeKind.HOPPED -> Color(0xFF00E5FF)
         NodeKind.HANDSHAKING, NodeKind.SYNCING, NodeKind.UNRESPONSIVE -> Color(0xFFFFB300)
-        NodeKind.DISCOVERED -> Color(0xFF8A99AD)
-        NodeKind.OFFLINE, NodeKind.BLOCKED_OFFLINE -> Color(0xFF536074)
+        NodeKind.DISCOVERED -> if (isLight) Color(0xFF64748B) else Color(0xFF8A99AD)
+        NodeKind.OFFLINE, NodeKind.BLOCKED_OFFLINE -> if (isLight) Color(0xFF94A3B8) else Color(0xFF536074)
     }
+
+    val cardBg = if (isLight) MaterialTheme.colorScheme.surface else Color(0xFF10141E)
+    val cardBorder = if (isLight) MaterialTheme.colorScheme.outlineVariant else Color(0xFF1E2638)
 
     Surface(
         modifier = Modifier
@@ -322,9 +328,9 @@ private fun TacticalOperatorCard(node: NodeItemData, onClick: () -> Unit) {
             .clip(RoundedCornerShape(18.dp))
             .clickable(onClick = onClick),
         shape = RoundedCornerShape(18.dp),
-        color = Color(0xFF10141E),
-        border = BorderStroke(1.dp, Color(0xFF1E2638)),
-        shadowElevation = 4.dp
+        color = cardBg,
+        border = BorderStroke(1.dp, cardBorder),
+        shadowElevation = if (isLight) 2.dp else 4.dp
     ) {
         Row(
             modifier = Modifier
@@ -348,7 +354,7 @@ private fun TacticalOperatorCard(node: NodeItemData, onClick: () -> Unit) {
                 Surface(
                     modifier = Modifier.size(44.dp),
                     shape = RoundedCornerShape(12.dp),
-                    color = accentColor.copy(alpha = 0.12f),
+                    color = accentColor.copy(alpha = if (isLight) 0.16f else 0.12f),
                     border = BorderStroke(1.dp, accentColor.copy(alpha = 0.35f))
                 ) {
                     Box(contentAlignment = Alignment.Center) {
@@ -366,7 +372,7 @@ private fun TacticalOperatorCard(node: NodeItemData, onClick: () -> Unit) {
                     modifier = Modifier
                         .size(10.dp)
                         .clip(CircleShape)
-                        .background(Color(0xFF10141E))
+                        .background(cardBg)
                         .padding(1.5.dp)
                 ) {
                     Box(
@@ -390,7 +396,7 @@ private fun TacticalOperatorCard(node: NodeItemData, onClick: () -> Unit) {
                         text = node.label,
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
-                        color = Color.White,
+                        color = MaterialTheme.colorScheme.onSurface,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
@@ -421,7 +427,7 @@ private fun TacticalOperatorCard(node: NodeItemData, onClick: () -> Unit) {
                             text = "EP: ${node.endpointId.take(4).uppercase()}",
                             fontFamily = FontFamily.Monospace,
                             fontSize = 10.sp,
-                            color = Color(0xFF67778C),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                             fontWeight = FontWeight.Bold
                         )
                     }
@@ -432,7 +438,7 @@ private fun TacticalOperatorCard(node: NodeItemData, onClick: () -> Unit) {
             Icon(
                 imageVector = Icons.Default.ChevronRight,
                 contentDescription = "Details",
-                tint = Color(0xFF4C5B70),
+                tint = MaterialTheme.colorScheme.outline,
                 modifier = Modifier.size(18.dp)
             )
         }
@@ -463,6 +469,8 @@ private fun NetworkPeerDetails(
         else -> Color(0xFFFFB300)
     }
 
+    val isLight = MaterialTheme.colorScheme.background.luminance() > 0.5f
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -479,15 +487,15 @@ private fun NetworkPeerDetails(
             Surface(
                 modifier = Modifier.size(40.dp),
                 shape = CircleShape,
-                color = Color(0xFF141926),
-                border = BorderStroke(1.dp, Color(0xFF242E44)),
+                color = if (isLight) MaterialTheme.colorScheme.surfaceVariant else Color(0xFF141926),
+                border = BorderStroke(1.dp, if (isLight) MaterialTheme.colorScheme.outlineVariant else Color(0xFF242E44)),
                 onClick = onBack
             ) {
                 Box(contentAlignment = Alignment.Center) {
                     Icon(
                         imageVector = Icons.AutoMirrored.Outlined.ArrowBack,
                         contentDescription = "Back",
-                        tint = Color.White,
+                        tint = MaterialTheme.colorScheme.onSurface,
                         modifier = Modifier.size(18.dp)
                     )
                 }
@@ -498,7 +506,7 @@ private fun NetworkPeerDetails(
                     text = node.label,
                     style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.ExtraBold,
-                    color = Color.White,
+                    color = MaterialTheme.colorScheme.onSurface,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -506,7 +514,7 @@ private fun NetworkPeerDetails(
                     text = if (node.endpointId.isNotBlank()) "ENDPOINT: ${node.endpointId.uppercase()}" else "OFFLINE RELAY IDENTITY",
                     fontFamily = FontFamily.Monospace,
                     fontSize = 10.sp,
-                    color = Color(0xFF7A8B9E),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     fontWeight = FontWeight.Bold
                 )
             }
@@ -516,8 +524,9 @@ private fun NetworkPeerDetails(
         // 1. Visual Holographic Known Mesh Path Card
         Surface(
             shape = RoundedCornerShape(22.dp),
-            color = Color(0xFF0E121C),
-            border = BorderStroke(1.2.dp, Color(0xFF202A3E)),
+            color = if (isLight) MaterialTheme.colorScheme.surface else Color(0xFF0E121C),
+            border = BorderStroke(1.2.dp, if (isLight) MaterialTheme.colorScheme.outlineVariant else Color(0xFF202A3E)),
+            shadowElevation = if (isLight) 2.dp else 0.dp,
             modifier = Modifier.fillMaxWidth()
         ) {
             Column(
@@ -550,14 +559,14 @@ private fun NetworkPeerDetails(
 
                     Surface(
                         shape = RoundedCornerShape(6.dp),
-                        color = Color.White.copy(alpha = 0.06f)
+                        color = if (isLight) MaterialTheme.colorScheme.surfaceVariant else Color.White.copy(alpha = 0.06f)
                     ) {
                         Text(
                             text = if (knownPath.size <= 2) "DIRECT (0 HOPS)" else "${knownPath.size - 2} RELAY HOP(S)",
                             fontFamily = FontFamily.Monospace,
                             fontSize = 9.sp,
                             fontWeight = FontWeight.Bold,
-                            color = Color.White.copy(alpha = 0.8f),
+                            color = if (isLight) MaterialTheme.colorScheme.onSurfaceVariant else Color.White.copy(alpha = 0.8f),
                             modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                         )
                     }
@@ -581,7 +590,7 @@ private fun NetworkPeerDetails(
                         "Packets relay peer-to-peer across hardware radios without requiring internet or cellular connectivity."
                     },
                     fontSize = 11.sp,
-                    color = Color(0xFF718296),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     lineHeight = 15.sp
                 )
             }
@@ -590,8 +599,9 @@ private fun NetworkPeerDetails(
         // 2. Hardware Diagnostics Strip
         Surface(
             shape = RoundedCornerShape(18.dp),
-            color = Color(0xFF111520),
-            border = BorderStroke(1.dp, Color(0xFF1D2536)),
+            color = if (isLight) MaterialTheme.colorScheme.surface else Color(0xFF111520),
+            border = BorderStroke(1.dp, if (isLight) MaterialTheme.colorScheme.outlineVariant else Color(0xFF1D2536)),
+            shadowElevation = if (isLight) 2.dp else 0.dp,
             modifier = Modifier.fillMaxWidth()
         ) {
             Row(
@@ -607,7 +617,7 @@ private fun NetworkPeerDetails(
                         fontFamily = FontFamily.Monospace,
                         fontSize = 9.sp,
                         fontWeight = FontWeight.Bold,
-                        color = Color(0xFF6C7C90)
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Text(
                         text = "AES-GCM VERIFIED",
@@ -624,7 +634,7 @@ private fun NetworkPeerDetails(
                         fontFamily = FontFamily.Monospace,
                         fontSize = 9.sp,
                         fontWeight = FontWeight.Bold,
-                        color = Color(0xFF6C7C90)
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Text(
                         text = if (node.kind == NodeKind.DIRECT) "PEER-TO-PEER" else "MULTI-HOP FLOOD",
@@ -691,8 +701,8 @@ private fun NetworkPeerDetails(
                             .weight(1f)
                             .height(44.dp),
                         shape = RoundedCornerShape(14.dp),
-                        color = Color(0xFF1D1418),
-                        border = BorderStroke(1.dp, Color(0xFF4D222A)),
+                        color = if (isLight) Color(0xFFFFEBEE) else Color(0xFF1D1418),
+                        border = BorderStroke(1.dp, if (isLight) Color(0xFFFFCDD2) else Color(0xFF4D222A)),
                         onClick = onDisconnect
                     ) {
                         Box(contentAlignment = Alignment.Center) {
@@ -701,7 +711,7 @@ private fun NetworkPeerDetails(
                                 fontFamily = FontFamily.Monospace,
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 11.sp,
-                                color = Color(0xFFFF5252)
+                                color = if (isLight) Color(0xFFD32F2F) else Color(0xFFFF5252)
                             )
                         }
                     }
@@ -713,8 +723,8 @@ private fun NetworkPeerDetails(
                             .weight(1f)
                             .height(44.dp),
                         shape = RoundedCornerShape(14.dp),
-                        color = Color(0xFF121E19),
-                        border = BorderStroke(1.dp, Color(0xFF1C4533)),
+                        color = if (isLight) Color(0xFFE8F5E9) else Color(0xFF121E19),
+                        border = BorderStroke(1.dp, if (isLight) Color(0xFFA5D6A7) else Color(0xFF1C4533)),
                         onClick = onConnect
                     ) {
                         Box(contentAlignment = Alignment.Center) {
@@ -723,7 +733,7 @@ private fun NetworkPeerDetails(
                                 fontFamily = FontFamily.Monospace,
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 11.sp,
-                                color = Color(0xFF00E676)
+                                color = if (isLight) Color(0xFF2E7D32) else Color(0xFF00E676)
                             )
                         }
                     }
@@ -734,8 +744,19 @@ private fun NetworkPeerDetails(
                         .weight(1f)
                         .height(44.dp),
                     shape = RoundedCornerShape(14.dp),
-                    color = if (node.isBlocked) Color(0xFF1A1F2C) else Color(0xFF1A1417),
-                    border = BorderStroke(1.dp, if (node.isBlocked) Color(0xFF2C354C) else Color(0xFF402428)),
+                    color = if (node.isBlocked) {
+                        if (isLight) MaterialTheme.colorScheme.surfaceVariant else Color(0xFF1A1F2C)
+                    } else {
+                        if (isLight) Color(0xFFFFEBEE) else Color(0xFF1A1417)
+                    },
+                    border = BorderStroke(
+                        1.dp,
+                        if (node.isBlocked) {
+                            if (isLight) MaterialTheme.colorScheme.outlineVariant else Color(0xFF2C354C)
+                        } else {
+                            if (isLight) Color(0xFFFFCDD2) else Color(0xFF402428)
+                        }
+                    ),
                     onClick = {
                         if (node.isBlocked) onUnblock() else confirmBlock = true
                     }
@@ -746,7 +767,11 @@ private fun NetworkPeerDetails(
                             fontFamily = FontFamily.Monospace,
                             fontWeight = FontWeight.Bold,
                             fontSize = 11.sp,
-                            color = if (node.isBlocked) Color.White.copy(alpha = 0.8f) else Color(0xFFFF5252)
+                            color = if (node.isBlocked) {
+                                if (isLight) MaterialTheme.colorScheme.onSurfaceVariant else Color.White.copy(alpha = 0.8f)
+                            } else {
+                                if (isLight) Color(0xFFD32F2F) else Color(0xFFFF5252)
+                            }
                         )
                     }
                 }
@@ -778,6 +803,9 @@ private fun VisualHolographicPathMap(
         if (path.isEmpty()) listOf("You", targetLabel) else path
     }
 
+    val isLight = MaterialTheme.colorScheme.background.luminance() > 0.5f
+    val pulseColor = if (isLight) MaterialTheme.colorScheme.primary else Color.White
+
     // Animated data pulse traveling from 0 to 1 across the route
     val infiniteTransition = rememberInfiniteTransition(label = "pulseTrack")
     val pulseProgress by infiniteTransition.animateFloat(
@@ -795,8 +823,8 @@ private fun VisualHolographicPathMap(
             .fillMaxWidth()
             .height(90.dp)
             .clip(RoundedCornerShape(16.dp))
-            .background(Color(0xFF090C12))
-            .border(BorderStroke(1.dp, Color(0xFF182030)), RoundedCornerShape(16.dp))
+            .background(if (isLight) MaterialTheme.colorScheme.surfaceVariant else Color(0xFF090C12))
+            .border(BorderStroke(1.dp, if (isLight) MaterialTheme.colorScheme.outlineVariant else Color(0xFF182030)), RoundedCornerShape(16.dp))
     ) {
         // Canvas Laser Track & Traveling Data Pulse
         Canvas(modifier = Modifier.fillMaxSize()) {
@@ -810,7 +838,7 @@ private fun VisualHolographicPathMap(
 
             // Background Dashed Circuit Line
             drawLine(
-                color = Color(0xFF1F2B40),
+                color = if (isLight) Color(0xFFCBD5E1) else Color(0xFF1F2B40),
                 start = Offset(startX, cy),
                 end = Offset(endX, cy),
                 strokeWidth = 3.dp.toPx(),
@@ -821,7 +849,7 @@ private fun VisualHolographicPathMap(
             // Active Glowing Circuit Line
             drawLine(
                 brush = Brush.horizontalGradient(
-                    listOf(Color(0xFF00E676), accentColor)
+                    listOf(if (isLight) Color(0xFF2E7D32) else Color(0xFF00E676), accentColor)
                 ),
                 start = Offset(startX, cy),
                 end = Offset(endX, cy),
@@ -832,12 +860,12 @@ private fun VisualHolographicPathMap(
             // Traveling Glowing Data Pulse Packet
             val pulseX = startX + (endX - startX) * pulseProgress
             drawCircle(
-                color = Color.White,
+                color = pulseColor,
                 radius = 4.dp.toPx(),
                 center = Offset(pulseX, cy)
             )
             drawCircle(
-                color = accentColor.copy(alpha = 0.5f),
+                color = accentColor.copy(alpha = if (isLight) 0.3f else 0.5f),
                 radius = 10.dp.toPx(),
                 center = Offset(pulseX, cy)
             )
@@ -855,9 +883,9 @@ private fun VisualHolographicPathMap(
                 val isStart = index == 0
                 val isEnd = index == displayPath.lastIndex
                 val nodeTint = when {
-                    isStart -> Color(0xFF00E676)
+                    isStart -> if (isLight) Color(0xFF2E7D32) else Color(0xFF00E676)
                     isEnd -> accentColor
-                    else -> Color(0xFFFFB300)
+                    else -> if (isLight) Color(0xFFD97706) else Color(0xFFFFB300)
                 }
 
                 Column(
@@ -867,9 +895,9 @@ private fun VisualHolographicPathMap(
                     Surface(
                         modifier = Modifier.size(36.dp),
                         shape = CircleShape,
-                        color = Color(0xFF0B1019),
+                        color = if (isLight) MaterialTheme.colorScheme.surface else Color(0xFF0B1019),
                         border = BorderStroke(2.dp, nodeTint),
-                        shadowElevation = 6.dp
+                        shadowElevation = if (isLight) 2.dp else 6.dp
                     ) {
                         Box(contentAlignment = Alignment.Center) {
                             Icon(
@@ -892,7 +920,7 @@ private fun VisualHolographicPathMap(
                         fontFamily = FontFamily.Monospace,
                         fontSize = 10.sp,
                         fontWeight = FontWeight.Bold,
-                        color = if (isStart || isEnd) Color.White else Color(0xFF90A1B5),
+                        color = if (isStart || isEnd) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1
                     )
                 }
@@ -906,6 +934,8 @@ private fun VisualHolographicPathMap(
  */
 @Composable
 private fun NetworkTopology(topology: Map<String, Set<String>>, onBack: () -> Unit) {
+    val isLight = MaterialTheme.colorScheme.background.luminance() > 0.5f
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -921,15 +951,15 @@ private fun NetworkTopology(topology: Map<String, Set<String>>, onBack: () -> Un
             Surface(
                 modifier = Modifier.size(40.dp),
                 shape = CircleShape,
-                color = Color(0xFF141926),
-                border = BorderStroke(1.dp, Color(0xFF242E44)),
+                color = if (isLight) MaterialTheme.colorScheme.surfaceVariant else Color(0xFF141926),
+                border = BorderStroke(1.dp, if (isLight) MaterialTheme.colorScheme.outlineVariant else Color(0xFF242E44)),
                 onClick = onBack
             ) {
                 Box(contentAlignment = Alignment.Center) {
                     Icon(
                         imageVector = Icons.AutoMirrored.Outlined.ArrowBack,
                         contentDescription = "Back",
-                        tint = Color.White,
+                        tint = MaterialTheme.colorScheme.onSurface,
                         modifier = Modifier.size(18.dp)
                     )
                 }
@@ -940,12 +970,12 @@ private fun NetworkTopology(topology: Map<String, Set<String>>, onBack: () -> Un
                     text = "Network Topology",
                     style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.ExtraBold,
-                    color = Color.White
+                    color = MaterialTheme.colorScheme.onBackground
                 )
                 Text(
                     text = "Active multi-hop routes discovered across the mesh.",
                     style = MaterialTheme.typography.bodySmall,
-                    color = Color(0xFF7A8B9E)
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
         }
@@ -966,8 +996,8 @@ private fun NetworkTopology(topology: Map<String, Set<String>>, onBack: () -> Un
                         Surface(
                             modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(18.dp),
-                            color = Color(0xFF111520),
-                            border = BorderStroke(1.dp, Color(0xFF1F283C))
+                            color = if (isLight) MaterialTheme.colorScheme.surface else Color(0xFF111520),
+                            border = BorderStroke(1.dp, if (isLight) MaterialTheme.colorScheme.outlineVariant else Color(0xFF1F283C))
                         ) {
                             Column(modifier = Modifier.padding(14.dp)) {
                                 Row(
@@ -985,7 +1015,7 @@ private fun NetworkTopology(topology: Map<String, Set<String>>, onBack: () -> Un
                                         fontFamily = FontFamily.Monospace,
                                         fontWeight = FontWeight.Bold,
                                         fontSize = 13.sp,
-                                        color = Color.White
+                                        color = MaterialTheme.colorScheme.onSurface
                                     )
                                 }
 
@@ -996,7 +1026,7 @@ private fun NetworkTopology(topology: Map<String, Set<String>>, onBack: () -> Un
                                         text = "No outward peer connections",
                                         fontFamily = FontFamily.Monospace,
                                         fontSize = 11.sp,
-                                        color = Color(0xFF6C7C90)
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
                                 } else {
                                     to.forEach { destination ->
@@ -1007,7 +1037,7 @@ private fun NetworkTopology(topology: Map<String, Set<String>>, onBack: () -> Un
                                             Icon(
                                                 imageVector = Icons.AutoMirrored.Outlined.ArrowForward,
                                                 contentDescription = null,
-                                                tint = Color(0xFF00E5FF),
+                                                tint = if (isLight) Color(0xFF00838F) else Color(0xFF00E5FF),
                                                 modifier = Modifier.size(13.dp)
                                             )
                                             Spacer(Modifier.width(6.dp))
@@ -1015,7 +1045,7 @@ private fun NetworkTopology(topology: Map<String, Set<String>>, onBack: () -> Un
                                                 text = destination,
                                                 fontFamily = FontFamily.Monospace,
                                                 fontSize = 12.sp,
-                                                color = Color(0xFF00E5FF),
+                                                color = if (isLight) Color(0xFF00838F) else Color(0xFF00E5FF),
                                                 fontWeight = FontWeight.SemiBold
                                             )
                                         }

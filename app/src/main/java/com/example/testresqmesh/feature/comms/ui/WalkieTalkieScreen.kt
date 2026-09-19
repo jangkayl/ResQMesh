@@ -43,12 +43,15 @@ import com.example.testresqmesh.feature.comms.viewmodel.WalkieTalkieViewModel
 import kotlin.math.cos
 import kotlin.math.sin
 
+import androidx.compose.ui.graphics.luminance
+
 @Composable
 fun WalkieTalkieScreen(
     commsViewModel: CommunicationViewModel,
     walkieTalkieViewModel: WalkieTalkieViewModel,
     mediaHelper: MediaHelper
 ) {
+    val isLight = MaterialTheme.colorScheme.background.luminance() > 0.5f
     val receiverOn by walkieTalkieViewModel.isWalkieTalkieMode.collectAsState()
     val channel by walkieTalkieViewModel.currentChannelId.collectAsState()
     val speaker by walkieTalkieViewModel.currentSpeaker.collectAsState()
@@ -353,11 +356,11 @@ fun WalkieTalkieScreen(
                         spotColor = if (recording) ResQTheme.colors.sos else MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
                     ),
                 shape = CircleShape,
-                color = Color(0xFF161A20),
+                color = if (isLight) Color(0xFFE2E8F0) else Color(0xFF161A20),
                 border = BorderStroke(
                     width = 2.dp,
                     color = if (recording) ResQTheme.colors.sos
-                    else MaterialTheme.colorScheme.primary.copy(alpha = idlePulse * 0.65f)
+                    else MaterialTheme.colorScheme.primary.copy(alpha = if (isLight) idlePulse * 0.85f else idlePulse * 0.65f)
                 )
             ) {
                 Canvas(Modifier.fillMaxSize()) {
@@ -371,12 +374,12 @@ fun WalkieTalkieScreen(
                         val bx = center.x + boltDist * cos(angle).toFloat()
                         val by = center.y + boltDist * sin(angle).toFloat()
                         drawCircle(
-                            color = Color(0xFF2C323B),
+                            color = if (isLight) Color(0xFFCBD5E1) else Color(0xFF2C323B),
                             radius = 3.5.dp.toPx(),
                             center = Offset(bx, by)
                         )
                         drawCircle(
-                            color = Color(0xFF0F1215),
+                            color = if (isLight) Color(0xFF94A3B8) else Color(0xFF0F1215),
                             radius = 2.dp.toPx(),
                             center = Offset(bx, by)
                         )
@@ -419,8 +422,9 @@ fun WalkieTalkieScreen(
                         )
                     },
                 shape = CircleShape,
-                color = if (recording) Color(0xFF900C3F) else Color(0xFF1E242C),
-                shadowElevation = if (recording) 2.dp else 8.dp
+                color = if (recording) (if (isLight) Color(0xFFFFD9DE) else Color(0xFF900C3F))
+                        else (if (isLight) Color(0xFFFFFFFF) else Color(0xFF1E242C)),
+                shadowElevation = if (recording) 2.dp else (if (isLight) 4.dp else 8.dp)
             ) {
                 Box(
                     contentAlignment = Alignment.Center,
@@ -434,7 +438,7 @@ fun WalkieTalkieScreen(
                         for (i in -lineCount..lineCount) {
                             val y = center.y + (i * lineSpacing)
                             drawLine(
-                                color = Color.White.copy(alpha = 0.04f),
+                                color = if (isLight) Color.Black.copy(alpha = 0.05f) else Color.White.copy(alpha = 0.04f),
                                 start = Offset(center.x - 45.dp.toPx(), y),
                                 end = Offset(center.x + 45.dp.toPx(), y),
                                 strokeWidth = 2.dp.toPx()
@@ -451,7 +455,7 @@ fun WalkieTalkieScreen(
                             text = "PTT",
                             style = MaterialTheme.typography.labelSmall.copy(letterSpacing = 2.sp),
                             fontWeight = FontWeight.Black,
-                            color = if (recording) Color.White else MaterialTheme.colorScheme.primary.copy(alpha = 0.8f)
+                            color = if (recording) (if (isLight) ResQTheme.colors.sos else Color.White) else MaterialTheme.colorScheme.primary.copy(alpha = 0.9f)
                         )
                         Spacer(Modifier.height(6.dp))
                         Surface(
@@ -474,7 +478,7 @@ fun WalkieTalkieScreen(
                             text = if (recording) "ON AIR" else "TRANSMIT",
                             style = MaterialTheme.typography.labelSmall.copy(letterSpacing = 1.5.sp),
                             fontWeight = FontWeight.ExtraBold,
-                            color = if (recording) Color(0xFFFFD166) else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                            color = if (recording) (if (isLight) Color(0xFFB71C1C) else Color(0xFFFFD166)) else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
                         )
                     }
                 }

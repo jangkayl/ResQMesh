@@ -28,6 +28,9 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -40,6 +43,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.testresqmesh.core.ui.theme.ResQTheme
 import com.example.testresqmesh.core.ui.theme.Spacing
 import com.example.testresqmesh.core.ui.theme.TestResQMeshTheme
 import kotlinx.coroutines.launch
@@ -54,19 +58,22 @@ data class EmergencyProfile(
 )
 
 /**
- * Minimalist & Secure SOS Broadcast Screen.
+ * Minimalist & Secure SOS Broadcast Screen with full Dark and Light Mode support.
  *
  * Professional, calm, high-contrast emergency dispatch interface.
  * Replaces gamified elements with deliberate safety interactions:
  * - Clean 2x2 Minimalist Grid for fast emergency categorization
  * - Smooth "Slide to Broadcast" slider requiring intentional physical drag to send
  * - Minimalist hardware & mesh status indicators
+ * - Seamless adaptation between Night Operations and Field Daylight themes
  */
 @Composable
 fun SOSBroadcastScreen(
     onCancel: () -> Unit,
     onSosTriggered: (String) -> Unit = {}
 ) {
+    val isLight = MaterialTheme.colorScheme.background.luminance() > 0.5f
+
     val emergencyTypes = remember {
         listOf(
             EmergencyProfile(
@@ -109,11 +116,11 @@ fun SOSBroadcastScreen(
         label = "themeAccent"
     )
 
-    // Subtle, slow ambient glow pulse
+    // Ambient emergency glow and radiant light wave pulse
     val infiniteTransition = rememberInfiniteTransition(label = "ambientPulse")
     val pulseGlow by infiniteTransition.animateFloat(
-        initialValue = 0.05f,
-        targetValue = 0.12f,
+        initialValue = if (isLight) 0.28f else 0.18f,
+        targetValue = if (isLight) 0.46f else 0.32f,
         animationSpec = infiniteRepeatable(
             animation = tween(2400, easing = FastOutSlowInEasing),
             repeatMode = RepeatMode.Reverse
@@ -121,26 +128,124 @@ fun SOSBroadcastScreen(
         label = "pulseGlow"
     )
 
+    val lightHaloScale by infiniteTransition.animateFloat(
+        initialValue = 0.90f,
+        targetValue = 1.15f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(2800, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "lightHaloScale"
+    )
+
     val haptics = LocalHapticFeedback.current
+    val backgroundColor = if (isLight) Color(0xFFF8FAFC) else Color(0xFF0A0C10)
 
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFF0A0C10))
+            .background(backgroundColor)
     ) {
-        // Minimalist Ambient Radial Vignette
+        // Multi-Layered Emergency Light Illumination & Tactical Radar System (Light & Dark)
         Canvas(modifier = Modifier.fillMaxSize()) {
             val w = size.width
             val h = size.height
+
+            // 1. Base Gradient Layer
+            drawRect(
+                brush = Brush.verticalGradient(
+                    colors = if (isLight) {
+                        listOf(
+                            Color(0xFFFFFFFF),
+                            Color(0xFFF8FAFC),
+                            Color(0xFFF1F5F9)
+                        )
+                    } else {
+                        listOf(
+                            Color(0xFF0F131C),
+                            Color(0xFF0A0C10),
+                            Color(0xFF06080C)
+                        )
+                    }
+                )
+            )
+
+            // 2. Primary High-Luminance Top-Centered Emergency Sunburst / Light Flare
+            val topGlowAlpha = if (isLight) pulseGlow else pulseGlow * 0.85f
+            drawCircle(
+                brush = Brush.radialGradient(
+                    colors = listOf(
+                        animatedAccentColor.copy(alpha = topGlowAlpha),
+                        animatedAccentColor.copy(alpha = topGlowAlpha * 0.45f),
+                        Color.Transparent
+                    ),
+                    center = Offset(w / 2f, h * 0.20f),
+                    radius = w * 1.05f * lightHaloScale
+                )
+            )
+
+            // 3. Wide Ambient Emergency Wash illuminating mid and lower screen
+            val ambientAlpha = if (isLight) pulseGlow * 0.35f else pulseGlow * 0.40f
             drawRect(
                 brush = Brush.radialGradient(
                     colors = listOf(
-                        animatedAccentColor.copy(alpha = pulseGlow),
-                        Color(0xFF0A0C10)
+                        animatedAccentColor.copy(alpha = ambientAlpha),
+                        animatedAccentColor.copy(alpha = ambientAlpha * 0.35f),
+                        Color.Transparent
                     ),
-                    center = Offset(w / 2f, h * 0.45f),
-                    radius = w * 1.1f
+                    center = Offset(w / 2f, h * 0.55f),
+                    radius = w * 1.35f
                 )
+            )
+
+            // 4. Subtle Radial Light Anchor behind Slide to Broadcast area
+            val anchorAlpha = if (isLight) pulseGlow * 0.25f else pulseGlow * 0.35f
+            drawCircle(
+                brush = Brush.radialGradient(
+                    colors = listOf(
+                        animatedAccentColor.copy(alpha = anchorAlpha),
+                        Color.Transparent
+                    ),
+                    center = Offset(w / 2f, h * 0.88f),
+                    radius = w * 0.75f
+                )
+            )
+
+            // 5. Distinct Luminous Beacon Rings (expanding emergency waves)
+            val centerOffset = Offset(w / 2f, h * 0.38f)
+            val ringRadii = listOf(w * 0.32f, w * 0.60f, w * 0.90f)
+            ringRadii.forEachIndexed { index, radius ->
+                val ringAlpha = if (isLight) {
+                    (0.18f - index * 0.04f).coerceAtLeast(0.08f)
+                } else {
+                    (0.24f - index * 0.05f).coerceAtLeast(0.10f)
+                }
+                drawCircle(
+                    color = animatedAccentColor.copy(alpha = ringAlpha),
+                    radius = radius,
+                    center = centerOffset,
+                    style = Stroke(
+                        width = 1.5.dp.toPx(),
+                        pathEffect = PathEffect.dashPathEffect(floatArrayOf(12f, 10f), 0f)
+                    )
+                )
+            }
+
+            // 6. Tactical Reticle Crosshairs with glowing focal tick marks
+            val reticleAlpha = if (isLight) 0.14f else 0.18f
+            drawLine(
+                color = animatedAccentColor.copy(alpha = reticleAlpha),
+                start = Offset(w * 0.08f, centerOffset.y),
+                end = Offset(w * 0.92f, centerOffset.y),
+                strokeWidth = 1.dp.toPx(),
+                pathEffect = PathEffect.dashPathEffect(floatArrayOf(6f, 14f), 0f)
+            )
+            drawLine(
+                color = animatedAccentColor.copy(alpha = reticleAlpha),
+                start = Offset(centerOffset.x, h * 0.10f),
+                end = Offset(centerOffset.x, h * 0.70f),
+                strokeWidth = 1.dp.toPx(),
+                pathEffect = PathEffect.dashPathEffect(floatArrayOf(6f, 14f), 0f)
             )
         }
 
@@ -168,8 +273,9 @@ fun SOSBroadcastScreen(
                     // System Mode Pill
                     Surface(
                         shape = RoundedCornerShape(20.dp),
-                        color = Color(0xFF141722),
-                        border = BorderStroke(1.dp, Color(0xFF22283A))
+                        color = if (isLight) Color.White else Color(0xFF141722),
+                        border = BorderStroke(1.dp, if (isLight) animatedAccentColor.copy(alpha = 0.4f) else Color(0xFF22283A)),
+                        shadowElevation = if (isLight) 3.dp else 0.dp
                     ) {
                         Row(
                             modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
@@ -187,7 +293,7 @@ fun SOSBroadcastScreen(
                                 fontFamily = FontFamily.Monospace,
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 10.sp,
-                                color = Color.White.copy(alpha = 0.85f),
+                                color = if (isLight) MaterialTheme.colorScheme.onSurfaceVariant else Color.White.copy(alpha = 0.85f),
                                 letterSpacing = 1.sp
                             )
                         }
@@ -196,8 +302,9 @@ fun SOSBroadcastScreen(
                     // Cancel Action
                     Surface(
                         shape = RoundedCornerShape(20.dp),
-                        color = Color(0xFF191D28),
-                        border = BorderStroke(1.dp, Color(0xFF2E3547)),
+                        color = if (isLight) Color.White else Color(0xFF191D28),
+                        border = BorderStroke(1.dp, if (isLight) MaterialTheme.colorScheme.outlineVariant else Color(0xFF2E3547)),
+                        shadowElevation = if (isLight) 3.dp else 0.dp,
                         onClick = onCancel
                     ) {
                         Row(
@@ -207,7 +314,7 @@ fun SOSBroadcastScreen(
                             Icon(
                                 imageVector = Icons.Default.Close,
                                 contentDescription = "Cancel Emergency",
-                                tint = Color.White.copy(alpha = 0.8f),
+                                tint = if (isLight) MaterialTheme.colorScheme.onSurface else Color.White.copy(alpha = 0.8f),
                                 modifier = Modifier.size(14.dp)
                             )
                             Spacer(Modifier.width(6.dp))
@@ -215,7 +322,7 @@ fun SOSBroadcastScreen(
                                 text = "Cancel",
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.SemiBold,
-                                color = Color.White
+                                color = if (isLight) MaterialTheme.colorScheme.onSurface else Color.White
                             )
                         }
                     }
@@ -228,7 +335,7 @@ fun SOSBroadcastScreen(
                     text = "Emergency SOS",
                     style = MaterialTheme.typography.headlineMedium,
                     fontWeight = FontWeight.ExtraBold,
-                    color = Color.White,
+                    color = MaterialTheme.colorScheme.onBackground,
                     letterSpacing = (-0.5).sp,
                     textAlign = TextAlign.Center
                 )
@@ -236,7 +343,7 @@ fun SOSBroadcastScreen(
                 Text(
                     text = "Select emergency type, then slide below to broadcast high-priority distress alerts to all mesh nodes within range.",
                     style = MaterialTheme.typography.bodyMedium,
-                    color = Color(0xFF8E9BAE),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.Center,
                     lineHeight = 19.sp,
                     modifier = Modifier.padding(horizontal = 8.dp)
@@ -256,6 +363,7 @@ fun SOSBroadcastScreen(
                         MinimalistEmergencyCard(
                             profile = emergencyTypes[0],
                             isSelected = selectedIndex == 0,
+                            isLight = isLight,
                             modifier = Modifier.weight(1f),
                             onClick = {
                                 selectedIndex = 0
@@ -265,6 +373,7 @@ fun SOSBroadcastScreen(
                         MinimalistEmergencyCard(
                             profile = emergencyTypes[1],
                             isSelected = selectedIndex == 1,
+                            isLight = isLight,
                             modifier = Modifier.weight(1f),
                             onClick = {
                                 selectedIndex = 1
@@ -280,6 +389,7 @@ fun SOSBroadcastScreen(
                         MinimalistEmergencyCard(
                             profile = emergencyTypes[2],
                             isSelected = selectedIndex == 2,
+                            isLight = isLight,
                             modifier = Modifier.weight(1f),
                             onClick = {
                                 selectedIndex = 2
@@ -289,6 +399,7 @@ fun SOSBroadcastScreen(
                         MinimalistEmergencyCard(
                             profile = emergencyTypes[3],
                             isSelected = selectedIndex == 3,
+                            isLight = isLight,
                             modifier = Modifier.weight(1f),
                             onClick = {
                                 selectedIndex = 3
@@ -303,8 +414,9 @@ fun SOSBroadcastScreen(
                 // 4. Hardware & Telemetry Diagnostic Strip
                 Surface(
                     shape = RoundedCornerShape(16.dp),
-                    color = Color(0xFF11141D),
-                    border = BorderStroke(1.dp, Color(0xFF1E2433)),
+                    color = if (isLight) Color.White else Color(0xFF11141D),
+                    border = BorderStroke(1.dp, if (isLight) MaterialTheme.colorScheme.outlineVariant else Color(0xFF1E2433)),
+                    shadowElevation = if (isLight) 4.dp else 0.dp,
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Row(
@@ -318,7 +430,7 @@ fun SOSBroadcastScreen(
                             Icon(
                                 imageVector = Icons.Default.GpsFixed,
                                 contentDescription = null,
-                                tint = Color(0xFF00E676),
+                                tint = ResQTheme.colors.success,
                                 modifier = Modifier.size(15.dp)
                             )
                             Spacer(Modifier.width(6.dp))
@@ -327,7 +439,7 @@ fun SOSBroadcastScreen(
                                 fontFamily = FontFamily.Monospace,
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = Color(0xFF00E676)
+                                color = ResQTheme.colors.success
                             )
                         }
 
@@ -335,7 +447,7 @@ fun SOSBroadcastScreen(
                             modifier = Modifier
                                 .height(16.dp)
                                 .width(1.dp)
-                                .background(Color(0xFF263045))
+                                .background(if (isLight) MaterialTheme.colorScheme.outlineVariant else Color(0xFF263045))
                         )
 
                         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -351,7 +463,7 @@ fun SOSBroadcastScreen(
                                 fontFamily = FontFamily.Monospace,
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = Color.White.copy(alpha = 0.85f)
+                                color = if (isLight) MaterialTheme.colorScheme.onSurface else Color.White.copy(alpha = 0.85f)
                             )
                         }
                     }
@@ -368,6 +480,7 @@ fun SOSBroadcastScreen(
                 SlideToBroadcastSlider(
                     accentColor = animatedAccentColor,
                     emergencyTitle = currentProfile.title,
+                    isLight = isLight,
                     onConfirm = {
                         onSosTriggered(currentProfile.title)
                     }
@@ -378,7 +491,7 @@ fun SOSBroadcastScreen(
                 Text(
                     text = "Broadcasts will relay offline across all nearby civilian & rescuer devices.",
                     fontSize = 11.sp,
-                    color = Color(0xFF6B7686),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.Center,
                     lineHeight = 15.sp,
                     modifier = Modifier.padding(horizontal = 16.dp)
@@ -390,27 +503,40 @@ fun SOSBroadcastScreen(
 
 /**
  * Minimalist emergency category selection card.
- * High contrast, legible, non-gamified.
+ * High contrast, legible, non-gamified, theme-adaptive.
  */
 @Composable
 private fun MinimalistEmergencyCard(
     profile: EmergencyProfile,
     isSelected: Boolean,
+    isLight: Boolean,
     modifier: Modifier = Modifier,
     onClick: () -> Unit
 ) {
+    val cardColor = if (isSelected) {
+        if (isLight) Color.White else Color(0xFF1C1318)
+    } else {
+        if (isLight) Color.White.copy(alpha = 0.90f) else Color(0xFF12151E)
+    }
+
+    val borderColor = if (isSelected) {
+        profile.color
+    } else {
+        if (isLight) MaterialTheme.colorScheme.outlineVariant else Color(0xFF202636)
+    }
+
     Surface(
         modifier = modifier
             .height(115.dp)
             .clip(RoundedCornerShape(18.dp))
             .clickable(onClick = onClick),
         shape = RoundedCornerShape(18.dp),
-        color = if (isSelected) Color(0xFF1C1318) else Color(0xFF12151E),
+        color = cardColor,
         border = BorderStroke(
-            width = if (isSelected) 2.dp else 1.dp,
-            color = if (isSelected) profile.color else Color(0xFF202636)
+            width = if (isSelected) 2.5.dp else 1.dp,
+            color = borderColor
         ),
-        shadowElevation = if (isSelected) 8.dp else 0.dp
+        shadowElevation = if (isSelected) 8.dp else (if (isLight) 3.dp else 0.dp)
     ) {
         Column(
             modifier = Modifier
@@ -425,14 +551,14 @@ private fun MinimalistEmergencyCard(
             ) {
                 Surface(
                     shape = RoundedCornerShape(6.dp),
-                    color = if (isSelected) profile.color else Color(0xFF1D2332)
+                    color = if (isSelected) profile.color else (if (isLight) MaterialTheme.colorScheme.surfaceVariant else Color(0xFF1D2332))
                 ) {
                     Text(
                         text = profile.code,
                         fontFamily = FontFamily.Monospace,
                         fontSize = 10.sp,
                         fontWeight = FontWeight.Black,
-                        color = if (isSelected) Color.White else Color(0xFF8895A7),
+                        color = if (isSelected) Color.White else (if (isLight) MaterialTheme.colorScheme.onSurfaceVariant else Color(0xFF8895A7)),
                         modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp)
                     )
                 }
@@ -440,7 +566,7 @@ private fun MinimalistEmergencyCard(
                 Icon(
                     imageVector = profile.icon,
                     contentDescription = null,
-                    tint = if (isSelected) profile.color else Color(0xFF707D91),
+                    tint = if (isSelected) profile.color else (if (isLight) MaterialTheme.colorScheme.outline else Color(0xFF707D91)),
                     modifier = Modifier.size(24.dp)
                 )
             }
@@ -450,14 +576,14 @@ private fun MinimalistEmergencyCard(
                     text = profile.title,
                     fontWeight = FontWeight.Bold,
                     fontSize = 14.sp,
-                    color = if (isSelected) Color.White else Color(0xFFD6DBE5),
+                    color = if (isSelected) (if (isLight) profile.color else Color.White) else MaterialTheme.colorScheme.onSurface,
                     letterSpacing = 0.5.sp
                 )
                 Spacer(Modifier.height(2.dp))
                 Text(
                     text = profile.subtitle,
                     fontSize = 10.5.sp,
-                    color = if (isSelected) Color.White.copy(alpha = 0.75f) else Color(0xFF677488),
+                    color = if (isSelected) (if (isLight) MaterialTheme.colorScheme.onSurface else Color.White.copy(alpha = 0.75f)) else MaterialTheme.colorScheme.onSurfaceVariant,
                     lineHeight = 13.sp,
                     maxLines = 2
                 )
@@ -469,12 +595,13 @@ private fun MinimalistEmergencyCard(
 /**
  * Slide to Broadcast Track.
  * Requires an intentional full horizontal swipe to trigger the SOS,
- * preventing accidental touch activations.
+ * preventing accidental touch activations. Adapts smoothly to Light/Dark modes.
  */
 @Composable
 private fun SlideToBroadcastSlider(
     accentColor: Color,
     emergencyTitle: String,
+    isLight: Boolean,
     onConfirm: () -> Unit
 ) {
     val haptics = LocalHapticFeedback.current
@@ -507,13 +634,18 @@ private fun SlideToBroadcastSlider(
         label = "chevronAlpha"
     )
 
+    val trackBgColor = if (isLight) Color.White else Color(0xFF141722)
+    val trackBorderColor = if (isLight) (if (dragProgress > 0.1f) accentColor.copy(alpha = 0.6f) else Color(0xFFCBD5E1)) else Color(0xFF262D3D)
+    val trackLabelColor = if (isLight) Color(0xFF1E293B) else Color.White
+
     Box(
         modifier = Modifier
             .fillMaxWidth()
             .height(68.dp)
+            .shadow(elevation = if (isLight) 6.dp else 0.dp, shape = CircleShape)
             .clip(CircleShape)
-            .background(Color(0xFF141722))
-            .border(BorderStroke(1.5.dp, Color(0xFF262D3D)), CircleShape)
+            .background(trackBgColor)
+            .border(BorderStroke(1.5.dp, trackBorderColor), CircleShape)
             .onGloballyPositioned { coordinates ->
                 trackWidthPx = coordinates.size.width.toFloat()
             },
@@ -554,7 +686,7 @@ private fun SlideToBroadcastSlider(
                     fontWeight = FontWeight.ExtraBold,
                     fontSize = 12.sp,
                     letterSpacing = 1.5.sp,
-                    color = Color.White.copy(alpha = chevronAlpha)
+                    color = trackLabelColor.copy(alpha = chevronAlpha)
                 )
                 Spacer(Modifier.width(8.dp))
                 Icon(
@@ -576,6 +708,11 @@ private fun SlideToBroadcastSlider(
                 .clip(CircleShape)
                 .background(
                     if (dragProgress > 0.8f) accentColor else Color.White
+                )
+                .then(
+                    if (isLight && dragProgress <= 0.8f) {
+                        Modifier.border(BorderStroke(2.dp, accentColor.copy(alpha = 0.4f)), CircleShape)
+                    } else Modifier
                 )
                 .draggable(
                     orientation = Orientation.Horizontal,
@@ -631,17 +768,25 @@ private fun SlideToBroadcastSlider(
             Icon(
                 imageVector = Icons.AutoMirrored.Filled.ArrowForward,
                 contentDescription = "Slide Arrow",
-                tint = if (dragProgress > 0.8f) Color.White else Color(0xFFD32F2F),
+                tint = if (dragProgress > 0.8f) Color.White else accentColor,
                 modifier = Modifier.size(24.dp)
             )
         }
     }
 }
 
-@Preview(name = "SOS — Minimalist & Secure", widthDp = 390, heightDp = 844)
+@Preview(name = "SOS — Minimalist & Secure Dark", widthDp = 390, heightDp = 844)
 @Composable
-private fun SOSBroadcastPreview() {
-    TestResQMeshTheme {
+private fun SOSBroadcastDarkPreview() {
+    TestResQMeshTheme(darkTheme = true) {
+        SOSBroadcastScreen(onCancel = {})
+    }
+}
+
+@Preview(name = "SOS — Minimalist & Secure Light", widthDp = 390, heightDp = 844)
+@Composable
+private fun SOSBroadcastLightPreview() {
+    TestResQMeshTheme(darkTheme = false) {
         SOSBroadcastScreen(onCancel = {})
     }
 }

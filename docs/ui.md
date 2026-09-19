@@ -12,6 +12,7 @@ The UI uses Jetpack Compose and Material 3. Inspect the actual screen, ViewModel
 - New top-level screens use the reusable shell: Mission, Messages, Voice, and Mesh. SOS is a persistent action rather than a navigation destination.
 - **Chat Composers** must be context-aware: hide inline media tools while typing to maximize horizontal space, providing access via a contextual floating action bubble above the input.
 - **Network & Topology** uses Tactical Operator Cards with clear glowing status borders, and interactive 2D Visual Holographic Maps for visualizing routes instead of raw text logs.
+- **Onboarding & Setup** uses a Tactical Radar Sweep splash and a civilian Secure Digital Passport card that updates in real-time, avoiding gamified/combat aesthetics.
 - Shared controls use semantic shapes, clear pressed/disabled states, and text or icon-independent status descriptions.
 - Keep business, routing, and transport decisions out of composables. ViewModels/use cases expose UI state and user actions.
 - Keep route-level composables responsible for state collection and side effects; move reusable stateless presentation into feature `ui/components` files.
@@ -38,6 +39,7 @@ Avoid showing “connected” from a BLE callback alone. Counters and selected p
 - Distinguish queued, sending, delivered, failed, and blocked outcomes; do not imply peer receipt from enqueue.
 - SOS alerts and cancellation feedback must identify the relevant alert/sender.
 - SOS uses one accessible slide ("Slide to Broadcast"); early release resets it.
+- SOS background uses unified multi-layered emergency illumination (sunburst halo, ambient wash, beacon rings, reticle) across both Daylight and Night operations.
 - Never render debug plaintext, keys, ciphertext previews, or sensitive location in the debug UI.
 
 ## Diagnostic terminal

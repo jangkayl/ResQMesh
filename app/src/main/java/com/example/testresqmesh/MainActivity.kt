@@ -98,6 +98,22 @@ class MainActivity : ComponentActivity() {
                 // Track navigation stage - initialize with Splash to avoid black screen
                 var currentStage by remember { mutableStateOf(AppState.Splash) }
 
+                // Reactive permissions and hardware states
+                var permissionsState by remember { mutableStateOf(hasRequiredPermissions()) }
+                var hardwareState by remember { mutableStateOf(isHardwareEnabledSafe()) }
+
+                val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+                DisposableEffect(lifecycleOwner) {
+                    val observer = LifecycleEventObserver { _, event ->
+                        if (event == Lifecycle.Event.ON_RESUME) {
+                            permissionsState = hasRequiredPermissions()
+                            hardwareState = isHardwareEnabledSafe()
+                        }
+                    }
+                    lifecycleOwner.lifecycle.addObserver(observer)
+                    onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+                }
+
                 // Initial stage determination - if already online, skip to Main
                 LaunchedEffect(setupState.isOnline, sosDeepLinkTriggered.value) {
                     if (sosDeepLinkTriggered.value || (setupState.isOnline && currentStage != AppState.Main)) {
@@ -114,7 +130,7 @@ class MainActivity : ComponentActivity() {
                         when (currentStage) {
                             AppState.Splash -> SplashScreen {
                                 // If fully set up, go to Identity Setup, else go to Permissions
-                                currentStage = if (hasRequiredPermissions() && isHardwareEnabledSafe()) {
+                                currentStage = if (permissionsState && hardwareState) {
                                     AppState.IdentitySetup
                                 } else {
                                     AppState.Permissions
@@ -122,8 +138,14 @@ class MainActivity : ComponentActivity() {
                             }
                             AppState.Permissions -> PermissionsScreen(
                                 onAllSet = { currentStage = AppState.IdentitySetup },
-                                hasPermissions = hasRequiredPermissions(),
-                                requestPermissions = { requestPermissionLauncher.launch(getRequiredPermissions()) },
+                                hasPermissions = permissionsState,
+                                requestPermissions = {
+                                    onPermissionsResult = {
+                                        permissionsState = hasRequiredPermissions()
+                                        hardwareState = isHardwareEnabledSafe()
+                                    }
+                                    requestPermissionLauncher.launch(getRequiredPermissions())
+                                },
                                 checkHardware = { isHardwareEnabledSafe() }
                             )
                             AppState.IdentitySetup -> IdentitySetupScreen(setupViewModel) {
@@ -171,9 +193,20 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun hasRequiredPermissions(): Boolean {
-        return getRequiredPermissions().all { 
-            ContextCompat.checkSelfPermission(this, it) == PackageManager.PERMISSION_GRANTED 
+        val fineLocation = ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
+        val coarseLocation = ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
+        val hasLocation = fineLocation || coarseLocation
+
+        val hasBluetooth = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_SCAN) == PackageManager.PERMISSION_GRANTED &&
+            ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED &&
+            ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_ADVERTISE) == PackageManager.PERMISSION_GRANTED
+        } else {
+            ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH) == PackageManager.PERMISSION_GRANTED &&
+            ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_ADMIN) == PackageManager.PERMISSION_GRANTED
         }
+
+        return hasLocation && hasBluetooth
     }
 
     private fun getRequiredPermissions(): Array<String> {

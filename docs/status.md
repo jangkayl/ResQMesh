@@ -18,10 +18,12 @@ Make blocking reliably mutual across relays: deny direct links after identity, s
 - Three direct neighbors are allowed; queued stable-identity admission retries after a five-second setup watchdog. Samsung/five-device reports remain unrecorded device evidence.
 - Private sends fail closed; link/frame/queue policy and focused unit tests cover lifecycle and heartbeat ownership.
 - The terminal, UI shell, and lean CI are implemented; phone validation remains required.
-- Modern Tactical & Utilitarian UI redesign (Phases 1-9) implemented, including:
+- Modern Tactical & Utilitarian UI redesign (Phases 1-11) implemented, including:
   - High-Vis Safety Dark and Field Light themes, tactical dashboard with animations, massive Walkie-Talkie radar PTT.
   - Phase 8: SOS Minimalist & Secure 2x2 grid with "Slide to Broadcast".
   - Phase 9: Context-Aware Chat Composer (auto-expanding multi-line text input with seamless floating media actions) and Tactical People & Paths operator cards with a 2D Visual Holographic mesh map.
+  - Phase 10: Tactical Radar Sweep Splash screen, Secure Digital Passport Identity onboarding, and high-trust Permissions & Hardware screen.
+  - Phase 11: Field Light ("Daylight") mode support across SOS broadcast, Walkie-Talkie tactical PTT, People & Paths direct/relay operator cards, 2D holographic path visualizer, and Network Topology.
 
 Local checks passed; physical BLE validation remains required.
 
