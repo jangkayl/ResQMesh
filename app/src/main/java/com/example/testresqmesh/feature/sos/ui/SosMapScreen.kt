@@ -6,12 +6,15 @@ import android.content.Context
 import android.location.Location
 import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.*
-import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.Paint
+import android.graphics.Color as AndroidColor
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -57,6 +60,7 @@ import com.example.testresqmesh.core.ui.theme.SignalRed
 import com.example.testresqmesh.core.ui.theme.Spacing
 import com.example.testresqmesh.data.location.DefaultLocationClient
 import org.maplibre.android.MapLibre
+import org.maplibre.android.annotations.IconFactory
 import org.maplibre.android.annotations.Marker
 import org.maplibre.android.annotations.MarkerOptions
 import org.maplibre.android.annotations.Polyline
@@ -389,19 +393,23 @@ private fun MapLibreLocalMapContainer(
         userMarker?.let { map.removeMarker(it) }
         rangePolyline?.let { map.removePolyline(it) }
 
+        val iconFactory = IconFactory.getInstance(context)
+        val myLocationIcon = iconFactory.fromBitmap(createMyLocationMarkerBitmap(context))
+
         userMarker = map.addMarker(
             MarkerOptions()
                 .position(LatLng(userLoc.latitude, userLoc.longitude))
                 .title("YOU")
                 .snippet("My Current Location")
+                .icon(myLocationIcon)
         )
 
-        // Draw tactical connecting range vector line
+        // Draw tactical connecting range vector line in high-vis Safety Orange
         rangePolyline = map.addPolyline(
             PolylineOptions()
                 .add(LatLng(userLoc.latitude, userLoc.longitude))
                 .add(LatLng(state.lat, state.lng))
-                .color(android.graphics.Color.parseColor("#E53935"))
+                .color(android.graphics.Color.parseColor("#FF9100"))
                 .width(3.5f)
         )
     }
@@ -418,6 +426,9 @@ private fun MapLibreLocalMapContainer(
                         // Enable free two-finger rotation gestures & track bearing
                         mapLibreMap.uiSettings.isRotateGesturesEnabled = true
                         mapLibreMap.uiSettings.isCompassEnabled = false // using custom HUD compass
+                        mapLibreMap.uiSettings.isLogoEnabled = false
+                        mapLibreMap.uiSettings.isAttributionEnabled = false
+
                         mapLibreMap.addOnCameraMoveListener {
                             mapBearing = mapLibreMap.cameraPosition.bearing.toFloat()
                         }
@@ -433,12 +444,14 @@ private fun MapLibreLocalMapContainer(
                         }
 
                         mapLibreMap.setStyle(styleBuilder) {
-                            // SOS Beacon Target Marker
+                            // SOS Beacon Target Marker with distinct Signal Red custom icon
+                            val sosIcon = IconFactory.getInstance(context).fromBitmap(createSosMarkerBitmap(context, "SOS"))
                             mapLibreMap.addMarker(
                                 MarkerOptions()
                                     .position(LatLng(state.lat, state.lng))
                                     .title("SOS: ${alertMessage.senderName}")
                                     .snippet(alertMessage.text.ifBlank { "Emergency beacon" })
+                                    .icon(sosIcon)
                             )
 
                             // Initial camera framing
@@ -515,25 +528,25 @@ private fun MapLibreLocalMapContainer(
 
                 // Air-Gapped Offline Verified Pill
                 Surface(
-                    shape = RoundedCornerShape(8.dp),
-                    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.90f),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, ResQTheme.colors.success.copy(alpha = 0.5f))
+                    shape = RoundedCornerShape(6.dp),
+                    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, ResQTheme.colors.success.copy(alpha = 0.4f))
                 ) {
                     Row(
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp),
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
                         Box(
                             modifier = Modifier
-                                .size(6.dp)
+                                .size(4.dp)
                                 .background(ResQTheme.colors.success, CircleShape)
                         )
                         Text(
                             text = "OFFLINE v${state.manifest.version}",
-                            style = MaterialTheme.typography.labelSmall,
+                            style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp),
                             fontFamily = FontFamily.Monospace,
-                            fontWeight = FontWeight.ExtraBold,
+                            fontWeight = FontWeight.Bold,
                             color = ResQTheme.colors.success
                         )
                     }
@@ -550,11 +563,11 @@ private fun MapLibreLocalMapContainer(
                 // Interactive Compass Dial (Tracks True North, click to animate back to North)
                 Surface(
                     shape = CircleShape,
-                    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f),
-                    border = androidx.compose.foundation.BorderStroke(1.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.35f)),
-                    shadowElevation = 6.dp,
+                    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.35f)),
+                    shadowElevation = 4.dp,
                     modifier = Modifier
-                        .size(44.dp)
+                        .size(36.dp)
                         .clickable {
                             mapLibreInstance?.animateCamera(CameraUpdateFactory.bearingTo(0.0))
                             Toast.makeText(context, "Aligned to True North", Toast.LENGTH_SHORT).show()
@@ -569,13 +582,13 @@ private fun MapLibreLocalMapContainer(
                         ) {
                             Text(
                                 text = "▲",
-                                fontSize = 13.sp,
+                                fontSize = 11.sp,
                                 color = SignalRed,
                                 fontWeight = FontWeight.Black
                             )
                             Text(
                                 text = "N",
-                                fontSize = 9.sp,
+                                fontSize = 8.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.onSurface,
                                 modifier = Modifier.offset(y = (-2).dp)
@@ -586,6 +599,12 @@ private fun MapLibreLocalMapContainer(
             }
         }
 
+        val fabBottomPadding by animateDpAsState(
+            targetValue = if (isSheetExpanded) 250.dp else 90.dp,
+            animationSpec = tween(durationMillis = 280, easing = FastOutSlowInEasing),
+            label = "fabBottomPadding"
+        )
+
         // Floating Target Re-Center Action Button (Frames tactical corridor between you & beacon)
         FloatingActionButton(
             onClick = {
@@ -595,9 +614,9 @@ private fun MapLibreLocalMapContainer(
             },
             modifier = Modifier
                 .align(Alignment.BottomEnd)
-                .padding(end = Spacing.Medium, bottom = if (isSheetExpanded) 250.dp else 90.dp)
-                .size(48.dp),
-            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f),
+                .padding(end = Spacing.Medium, bottom = fabBottomPadding)
+                .size(42.dp),
+            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f),
             contentColor = SignalRed,
             shape = CircleShape
         ) {
@@ -614,7 +633,6 @@ private fun MapLibreLocalMapContainer(
                 .align(Alignment.BottomCenter)
                 .fillMaxWidth()
                 .navigationBarsPadding()
-                .animateContentSize()
                 .draggable(
                     state = rememberDraggableState { delta ->
                         if (delta > 20) {
@@ -720,8 +738,14 @@ private fun MapLibreLocalMapContainer(
                 // Expanded Section: Coordinates Tabs, 1-Tap Copy, Telemetry & Action Buttons
                 AnimatedVisibility(
                     visible = isSheetExpanded,
-                    enter = expandVertically() + fadeIn(),
-                    exit = shrinkVertically() + fadeOut()
+                    enter = slideInVertically(
+                        initialOffsetY = { it },
+                        animationSpec = tween(durationMillis = 280, easing = FastOutSlowInEasing)
+                    ) + fadeIn(animationSpec = tween(durationMillis = 180)),
+                    exit = slideOutVertically(
+                        targetOffsetY = { it },
+                        animationSpec = tween(durationMillis = 280, easing = FastOutSlowInEasing)
+                    ) + fadeOut(animationSpec = tween(durationMillis = 180))
                 ) {
                     Column(
                         modifier = Modifier.fillMaxWidth(),
@@ -1162,4 +1186,94 @@ internal fun bearingToCardinal(bearing: Double): String {
     val directions = arrayOf("N", "NE", "E", "SE", "S", "SW", "W", "NW")
     val index = (((bearing + 22.5) % 360) / 45).toInt()
     return directions[index.coerceIn(0, 7)]
+}
+
+/**
+ * Generates a distinctive tactical Cyan/Electric Blue GPS Beacon marker for the local user ("YOU").
+ * Easily distinguishable from the Red SOS emergency beacon.
+ */
+internal fun createMyLocationMarkerBitmap(context: Context): Bitmap {
+    val density = context.resources.displayMetrics.density
+    val sizePx = (36 * density).toInt()
+    val bitmap = Bitmap.createBitmap(sizePx, sizePx, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(bitmap)
+    val center = sizePx / 2f
+
+    val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+
+    // Outer soft pulsing halo (Cyan #00E5FF, 25% alpha)
+    paint.color = AndroidColor.parseColor("#4000E5FF")
+    paint.style = Paint.Style.FILL
+    canvas.drawCircle(center, center, center - (2 * density), paint)
+
+    // Crisp white outer ring
+    paint.color = AndroidColor.WHITE
+    paint.style = Paint.Style.FILL
+    canvas.drawCircle(center, center, 12 * density, paint)
+
+    // Tactical Electric Marine Blue core disc
+    paint.color = AndroidColor.parseColor("#0091EA")
+    canvas.drawCircle(center, center, 9 * density, paint)
+
+    // Pinpoint white center dot
+    paint.color = AndroidColor.WHITE
+    canvas.drawCircle(center, center, 3.5f * density, paint)
+
+    return bitmap
+}
+
+/**
+ * Generates a high-contrast Crimson Red emergency beacon teardrop pin with a bold "SOS" insignia.
+ */
+internal fun createSosMarkerBitmap(context: Context, label: String = "SOS"): Bitmap {
+    val density = context.resources.displayMetrics.density
+    val widthPx = (44 * density).toInt()
+    val heightPx = (52 * density).toInt()
+    val bitmap = Bitmap.createBitmap(widthPx, heightPx, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(bitmap)
+
+    val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+
+    val centerX = widthPx / 2f
+    val pinRadius = 18 * density
+    val centerY = pinRadius + (2 * density)
+
+    // Outer Warning Halo (Red, 30% alpha)
+    paint.color = AndroidColor.parseColor("#4DFF1744")
+    paint.style = Paint.Style.FILL
+    canvas.drawCircle(centerX, centerY, pinRadius + (3 * density), paint)
+
+    // Teardrop pin pointer tip path
+    val path = android.graphics.Path().apply {
+        moveTo(centerX, heightPx - (2 * density))
+        lineTo(centerX - (11 * density), centerY + (6 * density))
+        quadTo(centerX, heightPx.toFloat(), centerX + (11 * density), centerY + (6 * density))
+        close()
+    }
+    // White outer border
+    paint.color = AndroidColor.WHITE
+    canvas.drawPath(path, paint)
+    canvas.drawCircle(centerX, centerY, pinRadius, paint)
+
+    // Deep Signal Red inner pin body
+    paint.color = AndroidColor.parseColor("#D50000")
+    canvas.drawCircle(centerX, centerY, pinRadius - (2.5f * density), paint)
+
+    val innerPath = android.graphics.Path().apply {
+        moveTo(centerX, heightPx - (4 * density))
+        lineTo(centerX - (9 * density), centerY + (5 * density))
+        quadTo(centerX, heightPx - (2 * density), centerX + (9 * density), centerY + (5 * density))
+        close()
+    }
+    canvas.drawPath(innerPath, paint)
+
+    // Bold white "SOS" text
+    paint.color = AndroidColor.WHITE
+    paint.textSize = 10 * density
+    paint.typeface = android.graphics.Typeface.DEFAULT_BOLD
+    paint.textAlign = Paint.Align.CENTER
+    val textY = centerY - ((paint.descent() + paint.ascent()) / 2)
+    canvas.drawText(label, centerX, textY, paint)
+
+    return bitmap
 }

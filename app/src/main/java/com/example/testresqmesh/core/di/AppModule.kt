@@ -34,6 +34,7 @@ val appModule = module {
     single(createdAtStart = true) { AppCoroutineScope(Dispatchers.IO) }
     single { MeshRepository(get(), get(), get(), get(), get<AppCoroutineScope>().scope) }
     single { MediaHelper(androidContext()) }
+    single { com.example.testresqmesh.core.utils.NotificationHelper(androidContext()) }
     single<LocationClient> { DefaultLocationClient(androidContext()) }
     
     // Offline map package management

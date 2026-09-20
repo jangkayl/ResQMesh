@@ -32,6 +32,9 @@ import com.example.testresqmesh.core.ui.components.layout.ResQDestination
 import com.example.testresqmesh.core.ui.theme.AppAppearance
 import com.example.testresqmesh.core.ui.theme.ResQMotion
 
+import androidx.compose.ui.platform.LocalContext
+import com.example.testresqmesh.core.utils.NotificationHelper
+
 @Composable
 fun MainContainerScreen(
     setupViewModel: SetupViewModel,
@@ -40,8 +43,16 @@ fun MainContainerScreen(
     walkieTalkieViewModel: com.example.testresqmesh.feature.comms.viewmodel.WalkieTalkieViewModel,
     mediaHelper: MediaHelper,
     appearance: AppAppearance,
-    onAppearanceSelected: (AppAppearance) -> Unit
+    onAppearanceSelected: (AppAppearance) -> Unit,
+    initialChatNode: String? = null,
+    onClearInitialChatNode: (() -> Unit)? = null,
+    initialViewMap: Boolean = false,
+    initialSosSender: String? = null,
+    initialSosText: String? = null,
+    onClearInitialViewMap: (() -> Unit)? = null
 ) {
+    val context = LocalContext.current
+    val notificationHelper = remember(context) { NotificationHelper(context) }
     var currentDestination by remember { mutableStateOf(ResQDestination.Mission) }
     
     // Sub-navigation state for prototype
@@ -59,6 +70,42 @@ fun MainContainerScreen(
     
     val incomingSosAlert by commsViewModel.incomingSosAlert.collectAsState()
     val activeSosMessageId by commsViewModel.activeSosMessageId.collectAsState()
+    val locationStatus by commsViewModel.locationStatus.collectAsState()
+
+    // Deep link handling: direct navigation to active chat
+    LaunchedEffect(initialChatNode) {
+        if (!initialChatNode.isNullOrBlank()) {
+            activeChatNode = initialChatNode
+            currentDestination = ResQDestination.Messages
+            notificationHelper.clearPrivateMessagesFor(initialChatNode)
+            onClearInitialChatNode?.invoke()
+        }
+    }
+
+    // Deep link handling: direct navigation to tactical SOS map
+    LaunchedEffect(initialViewMap) {
+        if (initialViewMap) {
+            mapSosAlert = com.example.testresqmesh.core.model.ChatMessage(
+                id = "deep_link_sos_${System.currentTimeMillis()}",
+                senderName = initialSosSender ?: "EMERGENCY BEACON",
+                text = initialSosText ?: "🚨 CRITICAL SOS ALERT",
+                imageBase64 = null,
+                audioBase64 = null,
+                locationLat = null,
+                locationLng = null,
+                isMine = false,
+                isPrivate = false
+            )
+            onClearInitialViewMap?.invoke()
+        }
+    }
+
+    // Clear notifications when entering a private conversation
+    LaunchedEffect(activeChatNode) {
+        activeChatNode?.let { node ->
+            notificationHelper.clearPrivateMessagesFor(node)
+        }
+    }
 
     DisposableEffect(Unit) {
         // Start passive location tracking when the node is active
@@ -223,6 +270,7 @@ fun MainContainerScreen(
                 ResQDestination.Mission -> HomeScreen(
                     setupViewModel = setupViewModel,
                     radarViewModel = radarViewModel,
+                    locationStatus = locationStatus,
                     onMessagesClick = { currentDestination = ResQDestination.Messages },
                     onNetworkClick = { showNetworkDetails = true },
                     onProfileClick = { showProfile = true },

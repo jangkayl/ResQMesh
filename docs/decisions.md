@@ -59,3 +59,15 @@ Before selecting a difficult fix or feature, compare the smallest viable change,
 ## D13: Offline maps use MapLibre and local PMTiles
 
 Replaced osmdroid and dynamic public raster tile downloading with MapLibre Native and downloaded local PMTiles packages. This ensures true offline reliability, avoids violating OSM tile scraping policies, and provides high-performance vector rendering.
+
+## D14: Offline map manifest verification uses Universal ECDSA (NIST P-256)
+
+Replaced Ed25519 with Universal ECDSA (NIST P-256 / secp256r1, SHA256withECDSA) as the default map package signature algorithm, with Ed25519 composite fallback. Ed25519 is natively supported only on Android 11+ (API 30+), throwing runtime security provider exceptions on older Android versions (API 24–29). ECDSA provides universal hardware-accelerated verification across all supported Android versions with zero third-party cryptography library overhead.
+
+## D15: Notification deep link routing preserves node setup flow
+
+Cold-launch from private message or SOS alert notifications routes to `IdentitySetupScreen` (or `PermissionsScreen` if permissions are ungranted) rather than jumping directly to the homepage (`MainContainerScreen`). Node identity, hardware readiness, and mesh startup must complete before the user enters the active mesh. Target chat nodes and SOS map views are preserved and automatically opened once setup is completed. Active in-session notifications continue direct navigation without re-prompting setup.
+
+## D16: Tactical map overlays and emergency cartography filtering
+
+MapLibre default engine watermarks and attribution widgets are suppressed in favor of unified in-sheet OpenStreetMap legal attribution to maximize screen real estate during disaster response. Emergency POI cartography strictly filters medical infrastructure (`hospital`, `clinic`, `doctors`) from general commercial amenities to prevent false alarms or clutter, while non-emergency POIs render as subtle labels at zoom 15+. Map overlays use compact 36dp true-north compass dials, distinct high-vis custom markers (cyan GPS puck vs. crimson SOS teardrop), and vertical slide sheets.

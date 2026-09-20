@@ -54,6 +54,15 @@ if (-not (Test-Path $stylePath)) {
     throw "Missing required asset: $stylePath"
 }
 if (-not $ValidateOnly) {
+    if ([string]::IsNullOrWhiteSpace($PrivateKeyPath)) {
+        $ecDefault = "$HOME\.resqmesh\keys\map_signing_private_ec.pem"
+        $edDefault = "$HOME\.resqmesh\keys\map_signing_private_ed25519.pem"
+        if (Test-Path $ecDefault) {
+            $PrivateKeyPath = $ecDefault
+        } elseif (Test-Path $edDefault) {
+            $PrivateKeyPath = $edDefault
+        }
+    }
     if ([string]::IsNullOrWhiteSpace($PrivateKeyPath) -or -not (Test-Path $PrivateKeyPath)) {
         throw "Private key not found at: '$PrivateKeyPath'. Please provide a valid -PrivateKeyPath, or pass -ValidateOnly to validate and package without signing."
     }
@@ -243,13 +252,31 @@ if ($ValidateOnly) {
 $sigName = "cebu-v$Version.manifest.sig"
 $sigPath = Join-Path $OutputDir $sigName
 
-Write-Host "[5/5] Signing manifest with Ed25519..." -ForegroundColor Green
+# Resolve default private key if not specified
+if ([string]::IsNullOrWhiteSpace($PrivateKeyPath)) {
+    $ecDefault = "$HOME\.resqmesh\keys\map_signing_private_ec.pem"
+    $edDefault = "$HOME\.resqmesh\keys\map_signing_private_ed25519.pem"
+    if (Test-Path $ecDefault) {
+        $PrivateKeyPath = $ecDefault
+    } elseif (Test-Path $edDefault) {
+        $PrivateKeyPath = $edDefault
+    } else {
+        throw "Private key not found at default location ($ecDefault or $edDefault). Please specify -PrivateKeyPath."
+    }
+}
+
+Write-Host "[5/5] Signing manifest with maintainer private key ($PrivateKeyPath)..." -ForegroundColor Green
 $hasOpenssl = (Get-Command openssl -ErrorAction SilentlyContinue) -ne $null
 
 if ($hasOpenssl) {
-    openssl pkeyutl -sign -rawin -inkey $PrivateKeyPath -in $manifestPath -out $sigPath
+    # Try ECDSA dgst first, fallback to Ed25519 pkeyutl
+    try {
+        openssl dgst -sha256 -sign $PrivateKeyPath -out $sigPath $manifestPath 2>$null
+    } catch {
+        openssl pkeyutl -sign -rawin -inkey $PrivateKeyPath -in $manifestPath -out $sigPath
+    }
 } else {
-    # Java Ed25519 fallback
+    # Java Signer supporting universal ECDSA and Ed25519
     $javaSigner = @"
 import java.nio.file.Files;
 import java.nio.file.Paths;
@@ -262,12 +289,24 @@ public class Signer {
     public static void main(String[] args) throws Exception {
         byte[] keyBytes = Files.readAllBytes(Paths.get(args[0]));
         byte[] dataBytes = Files.readAllBytes(Paths.get(args[1]));
-        KeyFactory kf = KeyFactory.getInstance("Ed25519");
-        PrivateKey priv = kf.generatePrivate(new PKCS8EncodedKeySpec(keyBytes));
-        Signature sig = Signature.getInstance("Ed25519");
-        sig.initSign(priv);
-        sig.update(dataBytes);
-        byte[] signature = sig.sign();
+        byte[] signature;
+        try {
+            // Try ECDSA first (SHA256withECDSA)
+            KeyFactory kf = KeyFactory.getInstance("EC");
+            PrivateKey priv = kf.generatePrivate(new PKCS8EncodedKeySpec(keyBytes));
+            Signature sig = Signature.getInstance("SHA256withECDSA");
+            sig.initSign(priv);
+            sig.update(dataBytes);
+            signature = sig.sign();
+        } catch (Exception ecEx) {
+            // Fallback to Ed25519
+            KeyFactory kf = KeyFactory.getInstance("Ed25519");
+            PrivateKey priv = kf.generatePrivate(new PKCS8EncodedKeySpec(keyBytes));
+            Signature sig = Signature.getInstance("Ed25519");
+            sig.initSign(priv);
+            sig.update(dataBytes);
+            signature = sig.sign();
+        }
         Files.write(Paths.get(args[2]), signature);
     }
 }
@@ -281,7 +320,7 @@ public class Signer {
         $classDir = [System.IO.Path]::GetDirectoryName($tempJava)
         & java -cp $classDir Signer $PrivateKeyPath $manifestPath $sigPath
     } else {
-        throw "Could not find openssl or javac/java to compute Ed25519 signature."
+        throw "Could not find openssl or javac/java to compute manifest signature."
     }
 }
 

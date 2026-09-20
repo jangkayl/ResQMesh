@@ -120,8 +120,8 @@ $styleContent = @"
       "source-layer": "buildings",
       "minzoom": 13,
       "paint": {
-        "fill-color": "#1f293d",
-        "fill-outline-color": "#293852"
+        "fill-color": "#212d45",
+        "fill-outline-color": "#3c5178"
       }
     },
     {
@@ -234,6 +234,7 @@ $styleContent = @"
       "type": "symbol",
       "source": "cebu",
       "source-layer": "pois",
+      "filter": ["any", ["==", "kind", "hospital"], ["==", "kind", "clinic"], ["==", "kind", "doctors"], ["==", "amenity", "hospital"]],
       "minzoom": 12,
       "layout": {
         "icon-image": "hospital",
@@ -250,6 +251,26 @@ $styleContent = @"
         "text-color": "#ff6b6b",
         "text-halo-color": "#10141e",
         "text-halo-width": 1.5
+      }
+    },
+    {
+      "id": "pois-generic",
+      "type": "symbol",
+      "source": "cebu",
+      "source-layer": "pois",
+      "filter": ["!", ["any", ["==", "kind", "hospital"], ["==", "kind", "clinic"], ["==", "kind", "doctors"], ["==", "amenity", "hospital"]]],
+      "minzoom": 15,
+      "layout": {
+        "text-field": "{name}",
+        "text-font": [
+          "Noto Sans Regular"
+        ],
+        "text-size": 9
+      },
+      "paint": {
+        "text-color": "#8b9db8",
+        "text-halo-color": "#10141e",
+        "text-halo-width": 1.0
       }
     }
   ]
@@ -364,6 +385,7 @@ if ($PmtilesSource -and (Test-Path $PmtilesSource)) {
         $tempBinDir = Join-Path $env:TEMP "go-pmtiles-bin"
         Write-Host "      Downloading standalone pmtiles CLI binary..." -ForegroundColor Yellow
         Invoke-WebRequest -Uri $pmtilesZipUrl -OutFile $tempZip
+        Add-Type -AssemblyName System.IO.Compression.FileSystem
         [System.IO.Compression.ZipFile]::ExtractToDirectory($tempZip, $tempBinDir)
         $pmtilesCmd = (Get-ChildItem -Path $tempBinDir -Filter "pmtiles.exe" -Recurse)[0].FullName
     }

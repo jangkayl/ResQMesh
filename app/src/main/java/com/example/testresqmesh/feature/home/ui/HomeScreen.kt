@@ -36,6 +36,7 @@ import androidx.compose.material.icons.outlined.ChevronRight
 import androidx.compose.material.icons.outlined.GraphicEq
 import androidx.compose.material.icons.outlined.Hub
 import androidx.compose.material.icons.outlined.Lock
+import androidx.compose.material.icons.outlined.NearMe
 import androidx.compose.material.icons.outlined.PersonOutline
 import androidx.compose.material.icons.outlined.Shield
 import androidx.compose.material.icons.outlined.WifiTethering
@@ -57,6 +58,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -69,6 +71,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.testresqmesh.R
+import com.example.testresqmesh.core.location.LocationStatus
 import com.example.testresqmesh.core.model.ConnectedDevice
 import com.example.testresqmesh.core.model.NodeIdentity
 import com.example.testresqmesh.core.ui.components.layout.ResQGlassSurface
@@ -87,6 +90,7 @@ import kotlinx.coroutines.delay
 fun HomeScreen(
     setupViewModel: SetupViewModel,
     radarViewModel: RadarViewModel,
+    locationStatus: LocationStatus = LocationStatus.READY,
     onMessagesClick: () -> Unit,
     onNetworkClick: () -> Unit,
     onProfileClick: () -> Unit,
@@ -112,6 +116,7 @@ fun HomeScreen(
         radarState = radarState,
         myDeviceName = myDeviceName,
         directNodeNames = directNodeNames,
+        locationStatus = locationStatus,
         onMessagesClick = onMessagesClick,
         onNetworkClick = onNetworkClick,
         onProfileClick = onProfileClick,
@@ -126,6 +131,7 @@ fun HomeScreenContent(
     radarState: RadarUiState,
     myDeviceName: String,
     directNodeNames: List<String>,
+    locationStatus: LocationStatus = LocationStatus.READY,
     onMessagesClick: () -> Unit,
     onNetworkClick: () -> Unit,
     onProfileClick: () -> Unit,
@@ -171,6 +177,11 @@ fun HomeScreenContent(
         TacticalTelemetryTicker(
             isOnline = isNodeActive,
             tickerText = tickerMessages[tickerIndex]
+        )
+
+        // 2.5 Tactical Satellite & GNSS Positioning Telemetry
+        TacticalSatelliteTelemetryCard(
+            locationStatus = locationStatus
         )
 
         // 3. Central Mission Readiness Command Panel
@@ -753,6 +764,184 @@ private fun TacticalTopologyPanel(
                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
                     )
                 }
+            }
+        }
+    }
+}
+
+private data class GpsCardVisuals(
+    val cardColor: Color,
+    val borderColor: Color,
+    val statusColor: Color,
+    val titleText: String,
+    val descText: String,
+    val badgeText: String
+)
+
+@Composable
+private fun TacticalSatelliteTelemetryCard(
+    locationStatus: LocationStatus,
+    modifier: Modifier = Modifier
+) {
+    val infiniteTransition = rememberInfiniteTransition(label = "GpsPulse")
+    val pulseAlpha by infiniteTransition.animateFloat(
+        initialValue = 0.35f,
+        targetValue = 1.0f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(900, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "pulseAlpha"
+    )
+    val pulseScale by infiniteTransition.animateFloat(
+        initialValue = 0.95f,
+        targetValue = 1.08f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(900, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "pulseScale"
+    )
+
+    val visuals = when (locationStatus) {
+        LocationStatus.ACQUIRING -> GpsCardVisuals(
+            cardColor = ResQTheme.colors.warning.copy(alpha = 0.08f),
+            borderColor = ResQTheme.colors.warning.copy(alpha = 0.45f),
+            statusColor = ResQTheme.colors.warning,
+            titleText = "ACQUIRING SATELLITE FIX",
+            descText = "SEARCHING GNSS CONSTELLATION • CACHING FOR FAST SOS",
+            badgeText = "SEARCHING"
+        )
+        LocationStatus.READY -> GpsCardVisuals(
+            cardColor = ResQTheme.colors.success.copy(alpha = 0.08f),
+            borderColor = ResQTheme.colors.success.copy(alpha = 0.45f),
+            statusColor = ResQTheme.colors.success,
+            titleText = "TACTICAL POSITION SECURED",
+            descText = "EMERGENCY GNSS CACHED • ARMED FOR RAPID BROADCAST",
+            badgeText = "LOCKED"
+        )
+        LocationStatus.ERROR_DENIED -> GpsCardVisuals(
+            cardColor = MaterialTheme.colorScheme.error.copy(alpha = 0.08f),
+            borderColor = MaterialTheme.colorScheme.error.copy(alpha = 0.4f),
+            statusColor = MaterialTheme.colorScheme.error,
+            titleText = "LOCATION ACCESS RESTRICTED",
+            descText = "LOCATION PERMISSION DENIED • EMERGENCY ACCURACY DEGRADED",
+            badgeText = "RESTRICTED"
+        )
+        LocationStatus.ERROR_DISABLED -> GpsCardVisuals(
+            cardColor = ResQTheme.colors.warning.copy(alpha = 0.08f),
+            borderColor = ResQTheme.colors.warning.copy(alpha = 0.4f),
+            statusColor = ResQTheme.colors.warning,
+            titleText = "DEVICE GNSS INACTIVE",
+            descText = "SYSTEM LOCATION SERVICE DISABLED • ENABLE IN SETTINGS",
+            badgeText = "DISABLED"
+        )
+        LocationStatus.IDLE -> GpsCardVisuals(
+            cardColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+            borderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f),
+            statusColor = MaterialTheme.colorScheme.onSurfaceVariant,
+            titleText = "GNSS TELEMETRY STANDBY",
+            descText = "BACKGROUND GNSS ENGINE INITIALIZING",
+            badgeText = "STANDBY"
+        )
+    }
+
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(14.dp),
+        color = visuals.cardColor,
+        border = BorderStroke(1.dp, visuals.borderColor)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = Spacing.Medium, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Animated Radar Beacon / Satellite Status Icon
+            Box(
+                modifier = Modifier
+                    .size(34.dp)
+                    .clip(CircleShape)
+                    .background(visuals.statusColor.copy(alpha = 0.15f)),
+                contentAlignment = Alignment.Center
+            ) {
+                if (locationStatus == LocationStatus.ACQUIRING) {
+                    Box(
+                        modifier = Modifier
+                            .size(26.dp)
+                            .graphicsLayer {
+                                scaleX = pulseScale
+                                scaleY = pulseScale
+                                alpha = pulseAlpha
+                            }
+                            .clip(CircleShape)
+                            .background(visuals.statusColor.copy(alpha = 0.25f))
+                    )
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(18.dp),
+                        strokeWidth = 2.dp,
+                        color = visuals.statusColor
+                    )
+                } else if (locationStatus == LocationStatus.READY) {
+                    Box(
+                        modifier = Modifier
+                            .size(10.dp)
+                            .clip(CircleShape)
+                            .background(visuals.statusColor)
+                    )
+                } else {
+                    Icon(
+                        imageVector = Icons.Outlined.NearMe,
+                        contentDescription = null,
+                        tint = visuals.statusColor,
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
+            }
+
+            Spacer(Modifier.width(10.dp))
+
+            Column(modifier = Modifier.weight(1f)) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        text = visuals.titleText,
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 0.6.sp,
+                            fontFamily = FontFamily.Monospace
+                        ),
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Surface(
+                        shape = RoundedCornerShape(4.dp),
+                        color = visuals.statusColor.copy(alpha = 0.18f)
+                    ) {
+                        Text(
+                            text = visuals.badgeText,
+                            style = MaterialTheme.typography.labelSmall.copy(
+                                fontSize = 8.5.sp,
+                                fontWeight = FontWeight.Bold,
+                                letterSpacing = 0.5.sp,
+                                fontFamily = FontFamily.Monospace
+                            ),
+                            color = visuals.statusColor,
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                        )
+                    }
+                }
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    text = visuals.descText,
+                    style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.5.sp),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
             }
         }
     }

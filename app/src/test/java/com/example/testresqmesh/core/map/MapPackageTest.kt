@@ -97,6 +97,26 @@ class MapPackageTest {
     }
 
     @Test
+    fun ecdsaRealSignatureVerification_succeeds() {
+        val keyPairGen = java.security.KeyPairGenerator.getInstance("EC")
+        keyPairGen.initialize(java.security.spec.ECGenParameterSpec("secp256r1"))
+        val keyPair = keyPairGen.generateKeyPair()
+
+        val manifestData = "{\"packageId\":\"cebu-offline\",\"version\":1}".toByteArray()
+        val signer = java.security.Signature.getInstance("SHA256withECDSA")
+        signer.initSign(keyPair.private)
+        signer.update(manifestData)
+        val signature = signer.sign()
+
+        val realVerifier = ManifestVerifier() // Uses CompositeSignatureVerifier
+        assertTrue(realVerifier.verifyManifestSignature(manifestData, signature, keyPair.public.encoded))
+
+        // Tampered data should fail
+        val tamperedData = "{\"packageId\":\"cebu-offline\",\"version\":2}".toByteArray()
+        assertFalse(realVerifier.verifyManifestSignature(tamperedData, signature, keyPair.public.encoded))
+    }
+
+    @Test
     fun insufficientStorage_abortsBeforeDownload() = runBlocking {
         // Storage guard reporting only 10 MB free
         val lowStorageGuard = MapStorageGuard(

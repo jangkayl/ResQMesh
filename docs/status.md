@@ -1,6 +1,6 @@
 # Current status
 
-Last reviewed: 2026-09-19
+Last reviewed: 2026-09-20
 Baseline: uncommitted `fix/startup-bootstrap-admission` working tree; the 2026-09-18 focused five-phone capture confirms block acknowledgement, direct teardown, and public/private relay, while direct-upgrade behavior is awaiting a fresh APK run.
 
 ## Current objective
@@ -24,7 +24,9 @@ Make blocking reliably mutual across relays: deny direct links after identity, s
   - Phase 9: Context-Aware Chat Composer (auto-expanding multi-line text input with seamless floating media actions) and Tactical People & Paths operator cards with a 2D Visual Holographic mesh map.
   - Phase 10: Tactical Radar Sweep Splash screen, Secure Digital Passport Identity onboarding, and high-trust Permissions & Hardware screen.
   - Phase 11: Field Light ("Daylight") mode support across SOS broadcast, Walkie-Talkie tactical PTT, People & Paths direct/relay operator cards, 2D holographic path visualizer, and Network Topology.
-- Cebu offline map pilot (Phases 1-3): MapPackageManifest domain model, Ed25519/SHA-256 ManifestVerifier, MapStorageGuard atomic staging/rollback preservation/deletion, Wi-Fi MapPackageDownloader, MapLibre Native Android integration in SosMapScreen, legacy osmdroid/raster download removal, high-vis mapless SOS coordinate fallback, Profile Offline Maps settings UI with downloading/verifying/extracting/update/storage/corrupt states, versioned GitHub Release catalog configuration, and unit tests implemented.
+  - Tactical GNSS/GPS acquisition telemetry card with live pulsing status on the main dashboard.
+- Cebu offline map pilot: MapPackageManifest model, Universal ECDSA (NIST P-256) and Ed25519 Composite ManifestVerifier, MapStorageGuard atomic staging/rollback preservation/deletion, Wi-Fi MapPackageDownloader with 302 cross-domain redirect following and stream truncation verification, MapLibre Native Android integration in SosMapScreen with custom high-vis markers, streamlined 36dp HUD compass, suppressed engine watermarks, sliding telemetry bottom sheet, filtered emergency POI cartography, high-vis mapless SOS coordinate fallback, Profile Offline Maps settings UI, versioned GitHub Release catalog configuration, and unit tests implemented.
+- Android Notification & Deep Link System: NotificationCompat.MessagingStyle with 7-message conversation history deduplication, ResQMesh logo branding, and cold-launch deep-link routing that preserves the identity setup flow before entering active chat or tactical SOS map.
 
 Local checks passed; physical BLE validation remains required.
 
@@ -47,9 +49,9 @@ Local checks passed; physical BLE validation remains required.
 2. Record unilateral/bilateral unblock, restart persistence, and 70-second relay stability for `BLOCK-01`.
 3. Record APK/build identity, device matrix, and repetitions for the Samsung and five-device runs.
 4. Run the stable-ID relay card after installing this working tree; capture selected next hop, private relay route-unavailable, key-change, and GATT-retirement markers.
+5. Diagnose below-capacity auto-connect reports using [`ble-autoconnect-admission-diagnosis.md`](plans/ble-autoconnect-admission-diagnosis.md) before changing admission policy.
 
 ## Scope guard
 
 Reliable text/SOS, honest status, recovery, and private fail-closed behavior remain ahead of speculative features.
-
 

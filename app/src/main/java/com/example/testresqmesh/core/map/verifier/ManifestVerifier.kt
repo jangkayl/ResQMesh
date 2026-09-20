@@ -17,6 +17,7 @@ interface SignatureVerifier {
 
 /**
  * Standard Ed25519 signature verifier using standard Java / Android Security providers.
+ * Supported on Android 11+ (API 30+).
  */
 class Ed25519SignatureVerifier : SignatureVerifier {
     companion object {
@@ -51,10 +52,44 @@ class Ed25519SignatureVerifier : SignatureVerifier {
 }
 
 /**
+ * Universal ECDSA (SHA256withECDSA, NIST P-256) verifier supported across ALL Android versions (API 14+).
+ */
+class EcdsaSignatureVerifier : SignatureVerifier {
+    override fun verify(data: ByteArray, signature: ByteArray, publicKey: ByteArray): Boolean {
+        return try {
+            val keySpec = X509EncodedKeySpec(publicKey)
+            val keyFactory = KeyFactory.getInstance("EC")
+            val pubKey = keyFactory.generatePublic(keySpec)
+
+            val sig = Signature.getInstance("SHA256withECDSA")
+            sig.initVerify(pubKey)
+            sig.update(data)
+            sig.verify(signature)
+        } catch (e: Exception) {
+            AppLogger.d("ManifestVerifier", "ECDSA signature verification failed: ${e.message}")
+            false
+        }
+    }
+}
+
+/**
+ * Composite verifier that seamlessly checks ECDSA (universal) first, followed by Ed25519.
+ */
+class CompositeSignatureVerifier(
+    private val ecdsaVerifier: SignatureVerifier = EcdsaSignatureVerifier(),
+    private val ed25519Verifier: SignatureVerifier = Ed25519SignatureVerifier()
+) : SignatureVerifier {
+    override fun verify(data: ByteArray, signature: ByteArray, publicKey: ByteArray): Boolean {
+        if (ecdsaVerifier.verify(data, signature, publicKey)) return true
+        return ed25519Verifier.verify(data, signature, publicKey)
+    }
+}
+
+/**
  * Verifies package manifest signatures and package file integrity.
  */
 class ManifestVerifier(
-    private val signatureVerifier: SignatureVerifier = Ed25519SignatureVerifier()
+    private val signatureVerifier: SignatureVerifier = CompositeSignatureVerifier()
 ) {
 
     /**

@@ -81,6 +81,10 @@ This is not yet a basis for claiming authenticated end-to-end encryption or forw
 
 `MeshRepository` joins network callbacks, `MeshRouter`, persistence, and UI-facing state through two boundaries: `MeshNetworkGateway` hides Android Bluetooth types, and `MessageStore` hides Room/DAO operations. `PrivateDeliveryPlanner` makes the pure direct/next-hop/broadcast selection before the gateway performs transport I/O. Production adapters are supplied by Koin. Room collection and background writes run in the process-owned `AppCoroutineScope`. Compose features cover setup, chat, Radar, SOS, profile, responder tracking, and audio; Active Chat header presentation and Radar row models are separated from their route-level screens. UI rules live in `docs/ui.md`; physical behavior must be checked against `docs/validation.md`.
 
+## Offline maps and notifications
+
+Offline vector map packages (PMTiles) are distributed via versioned GitHub Releases with metadata manifests and cryptographic digital signatures. Manifest integrity is validated offline by `ManifestVerifier` using Universal ECDSA (NIST P-256 / SHA256withECDSA) with an Ed25519 composite fallback, guaranteeing native verification down to Android 7.0 (API 24) without external library bloat. `MapPackageDownloader` enforces Wi-Fi policies, follows 302 cross-domain release redirects, validates stream completion before SHA-256 hash checks, and relies on `MapStorageGuard` for atomic versioned activation. `NotificationHelper` formats incoming private messages via `NotificationCompat.MessagingStyle` (7-message history ring buffer) and SOS distress alarms via `CATEGORY_ALARM`. On cold launch from notifications, `MainActivity` routes through `IdentitySetupScreen` / `PermissionsScreen` to initialize node identity and radio hardware before entering the active mesh.
+
 ## Source map
 
 | Area | Primary paths |

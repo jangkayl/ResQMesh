@@ -74,19 +74,13 @@ data class MapPackageCatalogEntry(
             "https://github.com/jangkayl/ResQMesh/releases/download/map-cebu-v1/cebu-v1.manifest.sig"
 
         /**
-         * Embedded Ed25519 public key of the map release signer (32 bytes).
-         * This key is used by [com.example.testresqmesh.core.map.verifier.ManifestVerifier]
-         * to verify manifest integrity offline before proceeding with binary download.
+         * Embedded maintainer public key for offline map manifest verification.
+         * Universal ECDSA (NIST P-256 / secp256r1) X.509 DER encoded key.
+         * Verified offline by [com.example.testresqmesh.core.map.verifier.ManifestVerifier]
+         * across all Android versions (API 14+).
          */
         val DEFAULT_MAINTAINER_PUBLIC_KEY: ByteArray = byteArrayOf(
-            0x8d.toByte(), 0xef.toByte(), 0x6d.toByte(), 0xc8.toByte(),
-            0x64.toByte(), 0xe6.toByte(), 0xe4.toByte(), 0x88.toByte(),
-            0x0f.toByte(), 0x79.toByte(), 0x1c.toByte(), 0xbd.toByte(),
-            0x2c.toByte(), 0x72.toByte(), 0xdd.toByte(), 0x59.toByte(),
-            0xd0.toByte(), 0x34.toByte(), 0x6e.toByte(), 0x69.toByte(),
-            0xbe.toByte(), 0x71.toByte(), 0x83.toByte(), 0x51.toByte(),
-            0x69.toByte(), 0x88.toByte(), 0x83.toByte(), 0x0d.toByte(),
-            0x5c.toByte(), 0x9f.toByte(), 0xa6.toByte(), 0x2f.toByte()
+            0x30.toByte(), 0x59.toByte(), 0x30.toByte(), 0x13.toByte(), 0x06.toByte(), 0x07.toByte(), 0x2a.toByte(), 0x86.toByte(), 0x48.toByte(), 0xce.toByte(), 0x3d.toByte(), 0x02.toByte(), 0x01.toByte(), 0x06.toByte(), 0x08.toByte(), 0x2a.toByte(), 0x86.toByte(), 0x48.toByte(), 0xce.toByte(), 0x3d.toByte(), 0x03.toByte(), 0x01.toByte(), 0x07.toByte(), 0x03.toByte(), 0x42.toByte(), 0x00.toByte(), 0x04.toByte(), 0x16.toByte(), 0x53.toByte(), 0xce.toByte(), 0xaa.toByte(), 0x47.toByte(), 0xf2.toByte(), 0x98.toByte(), 0x2f.toByte(), 0x57.toByte(), 0x20.toByte(), 0xc2.toByte(), 0x88.toByte(), 0x71.toByte(), 0x43.toByte(), 0x94.toByte(), 0xfe.toByte(), 0x30.toByte(), 0x66.toByte(), 0x6d.toByte(), 0x04.toByte(), 0x7a.toByte(), 0x85.toByte(), 0x08.toByte(), 0x89.toByte(), 0xf9.toByte(), 0x40.toByte(), 0xf2.toByte(), 0x09.toByte(), 0x8a.toByte(), 0x92.toByte(), 0xd7.toByte(), 0xf9.toByte(), 0x49.toByte(), 0x19.toByte(), 0x6a.toByte(), 0xc9.toByte(), 0xce.toByte(), 0x57.toByte(), 0xc4.toByte(), 0xc0.toByte(), 0x38.toByte(), 0x56.toByte(), 0x52.toByte(), 0x49.toByte(), 0xa9.toByte(), 0xc8.toByte(), 0xb7.toByte(), 0xa2.toByte(), 0x15.toByte(), 0x4d.toByte(), 0x67.toByte(), 0x72.toByte(), 0x43.toByte(), 0x47.toByte(), 0xe2.toByte(), 0xd0.toByte(), 0xd4.toByte(), 0xfb.toByte(), 0x3d.toByte(), 0x85.toByte(), 0x4a.toByte(), 0x83.toByte(), 0x9e.toByte(), 0x80.toByte()
         )
     }
 }

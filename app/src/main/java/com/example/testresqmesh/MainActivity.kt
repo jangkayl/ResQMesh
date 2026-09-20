@@ -57,6 +57,30 @@ class MainActivity : ComponentActivity() {
 
     private var onPermissionsResult: ((Boolean) -> Unit)? = null
     private val sosDeepLinkTriggered = mutableStateOf(false)
+    private val pendingChatNode = mutableStateOf<String?>(null)
+    private val pendingViewMap = mutableStateOf(false)
+    private val pendingSosSender = mutableStateOf<String?>(null)
+    private val pendingSosText = mutableStateOf<String?>(null)
+
+    private fun handleIntentExtras(intent: android.content.Intent?) {
+        if (intent == null) return
+        if (intent.getBooleanExtra("EXTRA_TRIGGER_SOS", false)) {
+            sosDeepLinkTriggered.value = true
+            pendingSosSender.value = intent.getStringExtra("EXTRA_SOS_SENDER")
+            pendingSosText.value = intent.getStringExtra("EXTRA_SOS_TEXT")
+            pendingViewMap.value = true
+        }
+        if (intent.getBooleanExtra("EXTRA_VIEW_SOS_MAP", false)) {
+            pendingViewMap.value = true
+            pendingSosSender.value = intent.getStringExtra("EXTRA_SOS_SENDER")
+            pendingSosText.value = intent.getStringExtra("EXTRA_SOS_TEXT")
+            sosDeepLinkTriggered.value = true
+        }
+        val chatNode = intent.getStringExtra("EXTRA_OPEN_CHAT_NODE")
+        if (!chatNode.isNullOrBlank()) {
+            pendingChatNode.value = chatNode
+        }
+    }
 
     private val requestPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -67,6 +91,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        handleIntentExtras(intent)
         
         // Let Compose handle window insets (stops bottom nav bar from being pushed up by keyboard)
         androidx.core.view.WindowCompat.setDecorFitsSystemWindows(window, false)
@@ -90,12 +115,26 @@ class MainActivity : ComponentActivity() {
             TestResQMeshTheme(appearance = appearance) {
                 val setupState by setupViewModel.uiState.collectAsState()
                 
-                // Track navigation stage - initialize with Splash to avoid black screen
-                var currentStage by remember { mutableStateOf(AppState.Splash) }
-
                 // Reactive permissions and hardware states
                 var permissionsState by remember { mutableStateOf(hasRequiredPermissions()) }
                 var hardwareState by remember { mutableStateOf(isHardwareEnabledSafe()) }
+
+                val hasDeepLink = remember {
+                    sosDeepLinkTriggered.value || pendingChatNode.value != null || pendingViewMap.value
+                }
+
+                // Track navigation stage:
+                // If opened via notification intent from closed/recent state, go directly to setup (or permissions if required).
+                // If opened normally, start with Splash.
+                var currentStage by remember {
+                    mutableStateOf(
+                        if (hasDeepLink) {
+                            if (permissionsState && hardwareState) AppState.IdentitySetup else AppState.Permissions
+                        } else {
+                            AppState.Splash
+                        }
+                    )
+                }
 
                 val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
                 DisposableEffect(lifecycleOwner) {
@@ -109,11 +148,10 @@ class MainActivity : ComponentActivity() {
                     onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
                 }
 
-                // Initial stage determination - if already online, skip to Main
-                LaunchedEffect(setupState.isOnline, sosDeepLinkTriggered.value) {
-                    if (sosDeepLinkTriggered.value || (setupState.isOnline && currentStage != AppState.Main)) {
+                // If already online (e.g. background mesh service active), allow direct progression to Main
+                LaunchedEffect(setupState.isOnline) {
+                    if (setupState.isOnline && currentStage != AppState.Main) {
                         currentStage = AppState.Main
-                        sosDeepLinkTriggered.value = false
                     }
                 }
 
@@ -161,6 +199,16 @@ class MainActivity : ComponentActivity() {
                                 onAppearanceSelected = { selected ->
                                     appearance = selected
                                     AppAppearance.save(applicationContext, selected)
+                                },
+                                initialChatNode = pendingChatNode.value,
+                                onClearInitialChatNode = { pendingChatNode.value = null },
+                                initialViewMap = pendingViewMap.value,
+                                initialSosSender = pendingSosSender.value,
+                                initialSosText = pendingSosText.value,
+                                onClearInitialViewMap = {
+                                    pendingViewMap.value = false
+                                    pendingSosSender.value = null
+                                    pendingSosText.value = null
                                 }
                             )
                         }
@@ -223,8 +271,6 @@ class MainActivity : ComponentActivity() {
 
     override fun onNewIntent(intent: android.content.Intent?) {
         super.onNewIntent(intent)
-        if (intent?.getBooleanExtra("EXTRA_TRIGGER_SOS", false) == true) {
-            sosDeepLinkTriggered.value = true
-        }
+        handleIntentExtras(intent)
     }
 }

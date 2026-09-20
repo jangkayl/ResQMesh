@@ -32,6 +32,8 @@ class CommunicationViewModel(
 
     private val _isAcquiringLocation = MutableStateFlow(false)
     val isAcquiringLocation: StateFlow<Boolean> = _isAcquiringLocation.asStateFlow()
+
+    val locationStatus: StateFlow<com.example.testresqmesh.core.location.LocationStatus> = locationClient.locationStatus
     
     val incomingSosAlert = useCases.observeIncomingSosAlert()
     

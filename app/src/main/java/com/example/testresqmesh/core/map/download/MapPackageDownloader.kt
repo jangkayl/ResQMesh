@@ -59,14 +59,54 @@ class DefaultHttpTransport : HttpTransport {
     companion object {
         private const val CONNECT_TIMEOUT_MS = 15_000
         private const val READ_TIMEOUT_MS = 30_000
+        private const val MAX_REDIRECTS = 5
+    }
+
+    private fun openConnectionWithRedirects(urlString: String, resumeOffset: Long = 0L): HttpURLConnection {
+        var currentUrl = urlString
+        var redirectCount = 0
+
+        while (redirectCount < MAX_REDIRECTS) {
+            val connection = (URL(currentUrl).openConnection() as HttpURLConnection).apply {
+                connectTimeout = CONNECT_TIMEOUT_MS
+                readTimeout = READ_TIMEOUT_MS
+                requestMethod = "GET"
+                instanceFollowRedirects = true
+                if (resumeOffset > 0) {
+                    setRequestProperty("Range", "bytes=$resumeOffset-")
+                }
+            }
+            val code = connection.responseCode
+            if (code == HttpURLConnection.HTTP_MOVED_PERM ||
+                code == HttpURLConnection.HTTP_MOVED_TEMP ||
+                code == HttpURLConnection.HTTP_SEE_OTHER ||
+                code == 307 || code == 308
+            ) {
+                val newLocation = connection.getHeaderField("Location")
+                connection.disconnect()
+                if (!newLocation.isNullOrBlank()) {
+                    currentUrl = if (newLocation.startsWith("http://") || newLocation.startsWith("https://")) {
+                        newLocation
+                    } else {
+                        URL(URL(currentUrl), newLocation).toString()
+                    }
+                    redirectCount++
+                    continue
+                }
+            }
+            return connection
+        }
+        throw java.io.IOException("Too many redirects connecting to: $urlString")
     }
 
     override suspend fun fetchBytes(urlString: String): ByteArray? {
         return try {
-            val connection = (URL(urlString).openConnection() as HttpURLConnection).apply {
-                connectTimeout = CONNECT_TIMEOUT_MS
-                readTimeout = READ_TIMEOUT_MS
-                requestMethod = "GET"
+            val connection = openConnectionWithRedirects(urlString)
+            val responseCode = connection.responseCode
+            if (responseCode != HttpURLConnection.HTTP_OK) {
+                AppLogger.d("DefaultHttpTransport", "Fetch bytes failed with HTTP $responseCode for $urlString")
+                connection.disconnect()
+                return null
             }
             connection.inputStream.use { it.readBytes() }
         } catch (e: Exception) {
@@ -82,14 +122,7 @@ class DefaultHttpTransport : HttpTransport {
         onProgress: (bytesDownloaded: Long, totalBytes: Long) -> Unit
     ): Boolean {
         return try {
-            val connection = (URL(urlString).openConnection() as HttpURLConnection).apply {
-                connectTimeout = CONNECT_TIMEOUT_MS
-                readTimeout = READ_TIMEOUT_MS
-                requestMethod = "GET"
-                if (resumeOffset > 0) {
-                    setRequestProperty("Range", "bytes=$resumeOffset-")
-                }
-            }
+            val connection = openConnectionWithRedirects(urlString, resumeOffset)
 
             val responseCode = connection.responseCode
             val isPartial = responseCode == HttpURLConnection.HTTP_PARTIAL
@@ -97,6 +130,7 @@ class DefaultHttpTransport : HttpTransport {
 
             if (!isOk && !isPartial) {
                 AppLogger.d("DefaultHttpTransport", "Download failed with HTTP $responseCode")
+                connection.disconnect()
                 return false
             }
 
@@ -118,6 +152,16 @@ class DefaultHttpTransport : HttpTransport {
                     }
                 }
             }
+
+            // Guard against premature stream termination
+            if (totalBytes > 0 && bytesReadTotal < totalBytes) {
+                AppLogger.d(
+                    "DefaultHttpTransport",
+                    "Download truncated prematurely: read $bytesReadTotal of $totalBytes bytes"
+                )
+                return false
+            }
+
             true
         } catch (e: Exception) {
             AppLogger.d("DefaultHttpTransport", "Error downloading to file: ${e.message}")
