@@ -685,6 +685,8 @@ class MeshRepository(
 
     fun acceptPendingPublicKeyChange(peerName: String): Boolean = publicKeys.acceptPendingChange(peerName)
 
+    fun rejectPendingPublicKeyChange(peerName: String): Boolean = publicKeys.rejectPendingChange(peerName)
+
     fun sendPrivateMessage(targetName: String, text: String, imageBase64: String?, audioBase64: String?, locationLat: Double? = null, locationLng: Double? = null): Boolean {
         val msgId = UUID.randomUUID().toString()
         val timestamp = System.currentTimeMillis()

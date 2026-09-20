@@ -27,6 +27,7 @@ Make blocking reliably mutual across relays: deny direct links after identity, s
   - Tactical GNSS/GPS acquisition telemetry card with live pulsing status on the main dashboard.
 - Cebu offline map pilot: MapPackageManifest model, Universal ECDSA (NIST P-256) and Ed25519 Composite ManifestVerifier, MapStorageGuard atomic staging/rollback preservation/deletion, Wi-Fi MapPackageDownloader with 302 cross-domain redirect following and stream truncation verification, MapLibre Native Android integration in SosMapScreen with custom high-vis markers, streamlined 36dp HUD compass, suppressed engine watermarks, sliding telemetry bottom sheet, filtered emergency POI cartography, high-vis mapless SOS coordinate fallback, Profile Offline Maps settings UI, versioned GitHub Release catalog configuration, and unit tests implemented.
 - Android Notification & Deep Link System: NotificationCompat.MessagingStyle with 7-message conversation history deduplication, ResQMesh logo branding, and cold-launch deep-link routing that preserves the identity setup flow before entering active chat or tactical SOS map.
+- Permanent cryptographic node identity: deterministic Node ID from SHA-256 hash of Keystore public key, Google Cloud Backup exclusions for key/ID prefs, explicit dismissal of pending key change alerts, and People & Paths multi-hop messaging for blocked devices (D17).
 
 Local checks passed; physical BLE validation remains required.
 
@@ -40,7 +41,7 @@ Local checks passed; physical BLE validation remains required.
 | ADMIT-01 | P1 | Automatic direct admission previously deferred every peer already reachable through a hop; queued startup recovery and the working-tree exception need device evidence without redundant-link churn | A routed peer bootstraps only after the last ready direct link disappears; busy startup candidates are retained; blocked/capacity-full peers remain denied |
 | LIMIT-01 | P2 | User reports five-device availability, but direct-limit/admission and routed-capacity conditions lack a recorded matrix | Record devices/build/conditions; repeat controlled five-device admission and route tests |
 | ROUTE-01 | P0 | Relay capture delivered private traffic both ways, but some return receipts lost a directed hop and one relay repeatedly retired a GATT callback link | Stable route/reconnect run with delivery receipts and no repeated callback retirement |
-| SEC-01 | P1 | Public keys persist by stable ID with TOFU change detection, but first-contact authentication, fingerprint display, and backup policy remain unresolved | Defined threat model, approval flow, fail-closed tests, and documented claim boundary |
+| SEC-01 | P1 | Deterministic node ID bound to Keystore public key, backup exclusions, and key rejection flow implemented (D17); fingerprint display and interactive trust verification UI remain | Defined threat model, approval flow, fail-closed tests, and documented claim boundary |
 | SOS-01 | P1 | SOS cancellation/follow-up ownership needs sender/alert binding review | Concurrent-alert and cancel-before-location tests |
 
 ## Next actions

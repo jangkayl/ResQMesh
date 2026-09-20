@@ -1,6 +1,7 @@
 package com.example.testresqmesh.data.repository
 
 import android.content.Context
+import android.content.SharedPreferences
 import com.example.testresqmesh.core.model.NodeIdentity
 import java.security.MessageDigest
 import org.json.JSONArray
@@ -10,7 +11,9 @@ import org.json.JSONObject
  * Persistent trust-on-first-use directory for keys learned from direct or relayed SYSTEM pulses.
  * Public keys are not secret, but a changed key is never silently substituted for a pinned key.
  */
-class PeerPublicKeyDirectory(context: Context) {
+class PeerPublicKeyDirectory(private val preferences: SharedPreferences) {
+    constructor(context: Context) : this(context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE))
+
     enum class Observation { TRUSTED, UNCHANGED, KEY_CHANGE_PENDING, INVALID_IDENTITY }
 
     private data class Entry(
@@ -23,7 +26,6 @@ class PeerPublicKeyDirectory(context: Context) {
         val pendingKey: String? = null
     )
 
-    private val preferences = context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE)
     private val entries = load().toMutableMap()
 
     @Synchronized fun observe(peerName: String, advertisedNodeId: String, publicKey: String): Observation {
@@ -46,20 +48,57 @@ class PeerPublicKeyDirectory(context: Context) {
         return Observation.KEY_CHANGE_PENDING
     }
 
-    @Synchronized fun trustedKey(peerName: String): String? =
-        NodeIdentity.idOf(peerName)?.let(entries::get)?.publicKey
+    @Synchronized fun trustedKey(peerName: String): String? {
+        val nodeId = NodeIdentity.idOf(peerName)
+        if (nodeId != null) return entries[nodeId]?.publicKey
+        return entries.values.firstOrNull { matchesPeer(it, peerName) }?.publicKey
+    }
 
-    @Synchronized fun hasPendingChange(peerName: String): Boolean =
-        NodeIdentity.idOf(peerName)?.let(entries::get)?.pendingKey != null
+    @Synchronized fun hasPendingChange(peerName: String): Boolean {
+        val nodeId = NodeIdentity.idOf(peerName)
+        if (nodeId != null) return entries[nodeId]?.pendingKey != null
+        return entries.values.any { matchesPeer(it, peerName) && it.pendingKey != null }
+    }
 
     /** UI may call this only after presenting the old/new fingerprint to the user. */
     @Synchronized fun acceptPendingChange(peerName: String): Boolean {
-        val nodeId = NodeIdentity.idOf(peerName) ?: return false
-        val current = entries[nodeId] ?: return false
+        val nodeId = NodeIdentity.idOf(peerName)
+        val current = (if (nodeId != null) entries[nodeId] else null)
+            ?: entries.values.firstOrNull { matchesPeer(it, peerName) && it.pendingKey != null }
+            ?: return false
         val replacement = current.pendingKey ?: return false
-        entries[nodeId] = current.copy(publicKey = replacement, fingerprint = fingerprint(replacement), pendingKey = null, lastSeenAt = System.currentTimeMillis())
+        entries[current.nodeId] = current.copy(
+            publicKey = replacement,
+            fingerprint = fingerprint(replacement),
+            pendingKey = null,
+            lastSeenAt = System.currentTimeMillis()
+        )
         persist()
         return true
+    }
+
+    /** Dismisses a pending key change by clearing pendingKey and keeping the pinned key. */
+    @Synchronized fun rejectPendingChange(peerName: String): Boolean {
+        val nodeId = NodeIdentity.idOf(peerName)
+        val current = (if (nodeId != null) entries[nodeId] else null)
+            ?: entries.values.firstOrNull { matchesPeer(it, peerName) && it.pendingKey != null }
+            ?: return false
+        if (current.pendingKey == null) return false
+        entries[current.nodeId] = current.copy(pendingKey = null)
+        persist()
+        return true
+    }
+
+    private fun matchesPeer(entry: Entry, peerName: String): Boolean {
+        val queryId = NodeIdentity.idOf(peerName)
+        if (queryId != null && entry.nodeId.equals(queryId, ignoreCase = true)) return true
+        val cleanQuery = NodeIdentity.displayNameOf(peerName).trim()
+        val cleanEntry = NodeIdentity.displayNameOf(entry.displayName).trim()
+        if (cleanQuery.isNotEmpty() && cleanQuery.equals(cleanEntry, ignoreCase = true)) return true
+        val queryBase = cleanQuery.substringBefore('[').trim()
+        val entryBase = cleanEntry.substringBefore('[').trim()
+        if (queryBase.isNotEmpty() && queryBase.equals(entryBase, ignoreCase = true)) return true
+        return NodeIdentity.matches(entry.displayName, peerName)
     }
 
     private fun stableId(peerName: String, advertisedNodeId: String): String? {

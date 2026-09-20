@@ -151,7 +151,10 @@ fun ActiveChatScreen(
     }
     if (showKeyChangeDialog) {
         AlertDialog(
-            onDismissRequest = { showKeyChangeDialog = false },
+            onDismissRequest = {
+                viewModel.rejectPendingPublicKeyChange(name)
+                showKeyChangeDialog = false
+            },
             title = { Text("Recipient key changed") },
             text = { Text("This device advertised a different encryption key. Accept it only after verifying the recipient through a separate channel, then resend your message.") },
             confirmButton = {
@@ -160,7 +163,12 @@ fun ActiveChatScreen(
                     showKeyChangeDialog = false
                 }) { Text("Accept new key") }
             },
-            dismissButton = { TextButton(onClick = { showKeyChangeDialog = false }) { Text("Keep existing key") } }
+            dismissButton = {
+                TextButton(onClick = {
+                    viewModel.rejectPendingPublicKeyChange(name)
+                    showKeyChangeDialog = false
+                }) { Text("Keep existing key") }
+            }
         )
     }
 

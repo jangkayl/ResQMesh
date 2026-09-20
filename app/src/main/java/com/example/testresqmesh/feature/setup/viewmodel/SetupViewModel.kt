@@ -52,12 +52,11 @@ class SetupViewModel(private val useCases: com.example.testresqmesh.core.domain.
 
     fun getSavedNodeId(context: Context): String {
         val prefs = context.getSharedPreferences("resqmesh_prefs", Context.MODE_PRIVATE)
-        var nodeId = prefs.getString("node_id", null)
-        if (nodeId == null) {
-            nodeId = java.util.UUID.randomUUID().toString().substring(0, 4).uppercase()
-            prefs.edit().putString("node_id", nodeId).apply()
+        val permanentNodeId = com.example.testresqmesh.core.network.CryptoManager.getMyNodeId()
+        if (prefs.getString("node_id", null) != permanentNodeId) {
+            prefs.edit().putString("node_id", permanentNodeId).apply()
         }
-        return nodeId
+        return permanentNodeId
     }
 
     fun checkHardwareAndGoOnline(context: Context, customName: String, nodeTag: String, teamKey: String) {

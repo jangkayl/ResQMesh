@@ -72,6 +72,7 @@ val appModule = module {
             sendPrivateMessage = SendPrivateMessageUseCase(get()),
             hasPendingPublicKeyChange = HasPendingPublicKeyChangeUseCase(get()),
             acceptPendingPublicKeyChange = AcceptPendingPublicKeyChangeUseCase(get()),
+            rejectPendingPublicKeyChange = RejectPendingPublicKeyChangeUseCase(get()),
             deleteConversationWith = DeleteConversationWithUseCase(get()),
             broadcastLiveAudioChunk = BroadcastLiveAudioChunkUseCase(get()),
             broadcastSeenReceipt = BroadcastSeenReceiptUseCase(get()),

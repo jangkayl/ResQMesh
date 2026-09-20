@@ -62,7 +62,7 @@ Avoid showing “connected” from a BLE callback alone. Counters and selected p
 - Preserve user drafts when a recoverable send fails.
 - Active public and private conversations anchor the latest messages above the composer, keep it above the IME, and follow the newest message when the conversation changes. Sent community bubbles show reader circles only from recorded `seenBy` receipts.
 - Avoid rapid status flicker; state transitions should follow repository/link evidence rather than raw scan churn.
-- Peer rows are fully clickable. Message requires an unblocked direct/relayed peer; “Known mesh path” is only a topology hint.
+- Peer rows are clickable. Blocked devices are grouped under "Blocked Devices (Direct Link Denied)" and can be messaged via mesh hops ("MESSAGE VIA MESH HOP") to test multi-hop relay routing while direct links remain denied.
 - Review both appearances independently. Active screens use theme tokens, never fixed dark surfaces or white text.
 
 ## Validation

@@ -5,15 +5,13 @@
 -->
 <data-extraction-rules>
     <cloud-backup>
-        <!-- TODO: Use <include> and <exclude> to control what is backed up.
-        <include .../>
-        <exclude .../>
-        -->
+        <include domain="sharedpref" path="."/>
+        <exclude domain="sharedpref" path="resqmesh_prefs.xml"/>
+        <exclude domain="sharedpref" path="resqmesh_peer_public_keys.xml"/>
     </cloud-backup>
-    <!--
     <device-transfer>
-        <include .../>
-        <exclude .../>
+        <include domain="sharedpref" path="."/>
+        <exclude domain="sharedpref" path="resqmesh_prefs.xml"/>
+        <exclude domain="sharedpref" path="resqmesh_peer_public_keys.xml"/>
     </device-transfer>
-    -->
 </data-extraction-rules>

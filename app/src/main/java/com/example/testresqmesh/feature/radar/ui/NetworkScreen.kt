@@ -103,9 +103,10 @@ internal fun NetworkList(
     onTopologyClick: () -> Unit
 ) {
     val groups = listOf(
-        "Direct Links" to nodes.filter { it.kind == NodeKind.DIRECT || it.kind == NodeKind.UNRESPONSIVE },
-        "Multi-Hop Mesh Relays" to nodes.filter { it.kind == NodeKind.RELAY || it.kind == NodeKind.HOPPED },
-        "Nearby & Discovered" to nodes.filter { it.kind !in setOf(NodeKind.DIRECT, NodeKind.UNRESPONSIVE, NodeKind.RELAY, NodeKind.HOPPED) }
+        "Direct Links" to nodes.filter { !it.isBlocked && (it.kind == NodeKind.DIRECT || it.kind == NodeKind.UNRESPONSIVE) },
+        "Multi-Hop Mesh Relays" to nodes.filter { !it.isBlocked && (it.kind == NodeKind.RELAY || it.kind == NodeKind.HOPPED) },
+        "Nearby & Discovered" to nodes.filter { !it.isBlocked && it.kind !in setOf(NodeKind.DIRECT, NodeKind.UNRESPONSIVE, NodeKind.RELAY, NodeKind.HOPPED) },
+        "Blocked Devices (Direct Link Denied)" to nodes.filter { it.isBlocked }
     ).filter { it.second.isNotEmpty() }
 
     val haptics = LocalHapticFeedback.current
@@ -311,12 +312,13 @@ internal fun NetworkList(
 private fun TacticalOperatorCard(node: NodeItemData, onClick: () -> Unit) {
     val status = networkStatus(node.kind)
     val isLight = MaterialTheme.colorScheme.background.luminance() > 0.5f
-    val accentColor = when (node.kind) {
-        NodeKind.DIRECT -> Color(0xFF00E676)
-        NodeKind.RELAY, NodeKind.HOPPED -> Color(0xFF00E5FF)
-        NodeKind.HANDSHAKING, NodeKind.SYNCING, NodeKind.UNRESPONSIVE -> Color(0xFFFFB300)
-        NodeKind.DISCOVERED -> if (isLight) Color(0xFF64748B) else Color(0xFF8A99AD)
-        NodeKind.OFFLINE, NodeKind.BLOCKED_OFFLINE -> if (isLight) Color(0xFF94A3B8) else Color(0xFF536074)
+    val accentColor = when {
+        node.isBlocked -> Color(0xFFFF334B)
+        node.kind == NodeKind.DIRECT -> Color(0xFF00E676)
+        node.kind in setOf(NodeKind.RELAY, NodeKind.HOPPED) -> Color(0xFF00E5FF)
+        node.kind in setOf(NodeKind.HANDSHAKING, NodeKind.SYNCING, NodeKind.UNRESPONSIVE) -> Color(0xFFFFB300)
+        node.kind == NodeKind.DISCOVERED -> if (isLight) Color(0xFF64748B) else Color(0xFF8A99AD)
+        else -> if (isLight) Color(0xFF94A3B8) else Color(0xFF536074)
     }
 
     val cardBg = if (isLight) MaterialTheme.colorScheme.surface else Color(0xFF10141E)
@@ -460,12 +462,13 @@ private fun NetworkPeerDetails(
     onMessage: () -> Unit
 ) {
     var confirmBlock by remember { mutableStateOf(false) }
-    val canMessage = !node.isBlocked && node.kind in setOf(NodeKind.DIRECT, NodeKind.RELAY, NodeKind.HOPPED)
+    val canMessage = !com.example.testresqmesh.core.model.NodeIdentity.isPlaceholder(node.name)
     val haptics = LocalHapticFeedback.current
 
-    val accentColor = when (node.kind) {
-        NodeKind.DIRECT -> Color(0xFF00E676)
-        NodeKind.RELAY, NodeKind.HOPPED -> Color(0xFF00E5FF)
+    val accentColor = when {
+        node.isBlocked -> Color(0xFFFF334B)
+        node.kind == NodeKind.DIRECT -> Color(0xFF00E676)
+        node.kind in setOf(NodeKind.RELAY, NodeKind.HOPPED) -> Color(0xFF00E5FF)
         else -> Color(0xFFFFB300)
     }
 
@@ -680,7 +683,7 @@ private fun NetworkPeerDetails(
                         )
                         Spacer(Modifier.width(8.dp))
                         Text(
-                            text = "SEND MESSAGE",
+                            text = if (node.isBlocked) "MESSAGE VIA MESH HOP" else "SEND MESSAGE",
                             fontFamily = FontFamily.Monospace,
                             fontWeight = FontWeight.Black,
                             fontSize = 12.sp,

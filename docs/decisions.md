@@ -71,3 +71,7 @@ Cold-launch from private message or SOS alert notifications routes to `IdentityS
 ## D16: Tactical map overlays and emergency cartography filtering
 
 MapLibre default engine watermarks and attribution widgets are suppressed in favor of unified in-sheet OpenStreetMap legal attribution to maximize screen real estate during disaster response. Emergency POI cartography strictly filters medical infrastructure (`hospital`, `clinic`, `doctors`) from general commercial amenities to prevent false alarms or clutter, while non-emergency POIs render as subtle labels at zoom 15+. Map overlays use compact 36dp true-north compass dials, distinct high-vis custom markers (cyan GPS puck vs. crimson SOS teardrop), and vertical slide sheets.
+
+## D17: Hardware-bound permanent node identity and cloud backup exclusions
+
+Node IDs are derived deterministically from the SHA-256 hash of the device's hardware-backed public key (`CryptoManager.getMyNodeId()`) rather than ephemeral random UUIDs. This prevents key-versus-ID desynchronization across app restarts and re-installations. `resqmesh_prefs` (`node_id`) and `resqmesh_peer_public_keys` are excluded from Google Cloud Backup (`backup_rules.xml` and `data_extraction_rules.xml`), ensuring restored preferences cannot conflict with newly generated Keystore key pairs. Peer public key resolution supports display-name fallbacks and explicit rejection of pending key change alerts.

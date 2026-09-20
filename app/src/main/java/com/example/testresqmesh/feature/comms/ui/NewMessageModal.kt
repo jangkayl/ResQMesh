@@ -228,7 +228,13 @@ internal data class RecipientCandidate(
     val availability: RecipientAvailability
 ) {
     val isSelectable: Boolean
-        get() = availability == RecipientAvailability.Direct || availability == RecipientAvailability.Relayed
+        get() = availability in setOf(
+            RecipientAvailability.Direct,
+            RecipientAvailability.Relayed,
+            RecipientAvailability.Blocked,
+            RecipientAvailability.Nearby,
+            RecipientAvailability.Offline
+        )
 }
 
 internal enum class RecipientAvailability {

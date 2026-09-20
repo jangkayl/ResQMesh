@@ -145,6 +145,8 @@ class CommunicationViewModel(
 
     fun acceptPendingPublicKeyChange(targetName: String): Boolean = useCases.acceptPendingPublicKeyChange(targetName)
 
+    fun rejectPendingPublicKeyChange(targetName: String): Boolean = useCases.rejectPendingPublicKeyChange(targetName)
+
     private fun reportPrivateSendFailure() {
         _privateSendErrors.tryEmit("Private message not sent. Waiting for a ready connection and current recipient key.")
     }

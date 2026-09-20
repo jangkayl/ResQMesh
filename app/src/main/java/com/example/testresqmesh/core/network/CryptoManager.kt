@@ -10,6 +10,7 @@ import java.security.KeyFactory
 import java.security.KeyStore
 import java.security.PrivateKey
 import java.security.PublicKey
+import java.security.MessageDigest
 import java.security.spec.X509EncodedKeySpec
 import javax.crypto.Cipher
 import javax.crypto.KeyGenerator
@@ -49,6 +50,17 @@ object CryptoManager {
     fun getMyPublicKeyBase64(): String {
         return Base64.encodeToString(keyPair.public.encoded, Base64.NO_WRAP)
     }
+
+    /** Deterministic 4-char hex node ID derived from the SHA-256 hash of the hardware public key. */
+    fun getMyNodeId(): String = MessageDigest.getInstance("SHA-256")
+        .digest(keyPair.public.encoded)
+        .take(2)
+        .joinToString("") { "%02X".format(it) }
+
+    fun getMyPublicKeyFingerprint(): String = MessageDigest.getInstance("SHA-256")
+        .digest(keyPair.public.encoded)
+        .joinToString("") { "%02X".format(it) }
+        .take(16)
 
     private fun getPublicKeyFromString(base64PublicKey: String): PublicKey {
         val byteKey = Base64.decode(base64PublicKey.toByteArray(), Base64.DEFAULT)
