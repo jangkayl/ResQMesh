@@ -30,9 +30,6 @@ fun AdvancedScreen(walkieTalkieViewModel: WalkieTalkieViewModel, onBack: () -> U
         item { AdvancedCard(Icons.Default.GraphicEq, "Walkie-talkie", "Play incoming voice messages", trailing = { Switch(checked = enabled, onCheckedChange = { walkieTalkieViewModel.toggleWalkieTalkieMode() }) }) }
         item { Spacer(Modifier.height(14.dp)); AdvancedCard(Icons.Default.Science, "Topology", "View routes from Network") }
     }
-    // Intentionally hidden during the shell transition. Keep the debug-only terminal mounted so
-    // its implementation can be restored through a future, deliberate entry point.
-    if (BuildConfig.DEBUG) DebugTerminal()
 }
 
 @Composable private fun AdvancedCard(icon: androidx.compose.ui.graphics.vector.ImageVector, title: String, subtitle: String, trailing: @Composable (() -> Unit)? = null) { Surface(Modifier.fillMaxWidth(), RoundedCornerShape(28.dp), color = MaterialTheme.colorScheme.surfaceVariant, shadowElevation = 3.dp) { Row(Modifier.padding(20.dp), verticalAlignment = Alignment.CenterVertically) { Icon(icon, null, tint = MaterialTheme.colorScheme.primary); Spacer(Modifier.width(14.dp)); Column(Modifier.weight(1f)) { Text(title, fontWeight = FontWeight.Black); Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }; trailing?.invoke() } } }

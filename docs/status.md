@@ -18,16 +18,12 @@ Make blocking reliably mutual across relays: deny direct links after identity, s
 - Three direct neighbors are allowed; queued stable-identity admission retries after a five-second setup watchdog. Samsung/five-device reports remain unrecorded device evidence.
 - Private sends fail closed; link/frame/queue policy and focused unit tests cover lifecycle and heartbeat ownership.
 - The terminal, UI shell, and lean CI are implemented; phone validation remains required.
-- Modern Tactical & Utilitarian UI redesign (Phases 1-11) implemented, including:
-  - High-Vis Safety Dark and Field Light themes, tactical dashboard with animations, massive Walkie-Talkie radar PTT.
-  - Phase 8: SOS Minimalist & Secure 2x2 grid with "Slide to Broadcast".
-  - Phase 9: Context-Aware Chat Composer (auto-expanding multi-line text input with seamless floating media actions) and Tactical People & Paths operator cards with a 2D Visual Holographic mesh map.
-  - Phase 10: Tactical Radar Sweep Splash screen, Secure Digital Passport Identity onboarding, and high-trust Permissions & Hardware screen.
-  - Phase 11: Field Light ("Daylight") mode support across SOS broadcast, Walkie-Talkie tactical PTT, People & Paths direct/relay operator cards, 2D holographic path visualizer, and Network Topology.
-  - Tactical GNSS/GPS acquisition telemetry card with live pulsing status on the main dashboard.
-- Cebu offline map pilot: MapPackageManifest model, Universal ECDSA (NIST P-256) and Ed25519 Composite ManifestVerifier, MapStorageGuard atomic staging/rollback preservation/deletion, Wi-Fi MapPackageDownloader with 302 cross-domain redirect following and stream truncation verification, MapLibre Native Android integration in SosMapScreen with custom high-vis markers, streamlined 36dp HUD compass, suppressed engine watermarks, sliding telemetry bottom sheet, filtered emergency POI cartography, high-vis mapless SOS coordinate fallback, Profile Offline Maps settings UI, versioned GitHub Release catalog configuration, and unit tests implemented.
-- Android Notification & Deep Link System: NotificationCompat.MessagingStyle with 7-message conversation history deduplication, ResQMesh logo branding, and cold-launch deep-link routing that preserves the identity setup flow before entering active chat or tactical SOS map.
+- Modern Tactical & Utilitarian UI redesign (Phases 1-11): Safety Dark and Field Light themes, tactical dashboard, Walkie-Talkie radar PTT, SOS 2x2 grid with "Slide to Broadcast", context-aware chat composer, 2D mesh path visualizer, radar sweep splash, and GNSS telemetry.
+- Cebu offline map pilot: MapPackageManifest model, dual ECDSA/Ed25519 ManifestVerifier, atomic MapStorageGuard, 302-redirect downloader with truncation checks, MapLibre SosMapScreen markers, 36dp compass, telemetry bottom sheet, mapless fallback, and settings UI.
+- Android Notification & Deep Link System: NotificationCompat.MessagingStyle with 7-message deduplication, ResQMesh branding, and cold-launch deep-link routing.
 - Permanent cryptographic node identity: deterministic Node ID from SHA-256 hash of Keystore public key, Google Cloud Backup exclusions for key/ID prefs, explicit dismissal of pending key change alerts, and People & Paths multi-hop messaging for blocked devices (D17).
+- Auto-connect zero-peer deadlock recovery: isolated node election yield schedules fallback initiator watchdog (2.5s) if elected master fails to connect; stale zombie/ghost sockets evicted on rebooted advertisement (`directConnections == 0`).
+- Developer Debugging Mode: PIN `0000` gated Settings toggle persisting in prefs; displays floating top-right HUD badge across main app shell to open live Diagnostic Terminal and legacy Radar overlay.
 
 Local checks passed; physical BLE validation remains required.
 

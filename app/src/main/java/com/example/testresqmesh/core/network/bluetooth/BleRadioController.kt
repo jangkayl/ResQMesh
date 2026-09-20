@@ -148,6 +148,9 @@ class BleRadioController(
 
     fun isHandshakeActive(): Boolean = handshakeGate.isActive()
 
+    fun activeHandshakeInfo(now: Long = System.currentTimeMillis()): Pair<String?, Long> =
+        handshakeGate.activeOwnerInfo(now)
+
     fun rescan() {
         stopScanning()
         startScanning()

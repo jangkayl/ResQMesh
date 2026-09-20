@@ -74,6 +74,7 @@ object TerminalLogClassifier {
             "MeshNetwork_E2EE" -> TerminalLogCategory.SECURITY
             "PayloadDispatcher" -> TerminalLogCategory.ROUTING
             "PAYLOAD_DISPATCHER" -> TerminalLogCategory.SYSTEM
+            "BLE_ADMISSION" -> TerminalLogCategory.CONNECTION
             "BLE_MESH" -> when {
                 text.containsAny("system pulse", "heartbeat", "ping", "pong", "identity", "public key", "topology") -> TerminalLogCategory.SYNC
                 text.containsAny("l2cap", "mtu", "chunk", "payload queue", "payload sent", "payload received") -> TerminalLogCategory.TRANSPORT

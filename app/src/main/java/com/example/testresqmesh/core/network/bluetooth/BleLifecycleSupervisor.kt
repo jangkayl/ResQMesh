@@ -33,7 +33,8 @@ class BleLifecycleSupervisor(
 
             val activeEndpoints = (store.activeConnections.keys + store.activeServerConnections.keys).toSet()
             activeEndpoints.forEach { endpoint ->
-                val lastInbound = store.connectionInteractionTimes[endpoint] ?: store.connectionEstablishTime[endpoint] ?: now
+                val lastInbound = store.connectionInteractionTimes[endpoint]
+                    ?: store.connectionEstablishTime.computeIfAbsent(endpoint) { now }
                 onLivenessChanged(endpoint, !BleLivenessPolicy.isUnresponsive(lastInbound, now))
                 if (!store.activeL2capSockets.containsKey(endpoint) &&
                     now - lastInbound >= BleLivenessPolicy.UNRESPONSIVE_AFTER_MS && !heartbeats.contains(endpoint)) {

@@ -51,9 +51,8 @@ Avoid showing “connected” from a BLE callback alone. Counters and selected p
 - Keep heartbeat/relay chatter behind Details to preserve readability.
 
 ## Hidden legacy UI
-- Legacy `RadarScreen` and debug terminal are hidden; do not delete logic during evaluation. Offline maps are managed via Profile/Settings.
-- Before restoring, choose entry point, reconnect callbacks without changing mesh policy, and retain accessibility labels.
-- Validate empty, permission-denied, and error states. For transport/SOS/location screens, run focused phone tests.
+- Legacy `RadarScreen` and `DebugTerminal` are hidden from civilian flows. Developer Debugging Mode (PIN 0000 in Settings) surfaces a top-right floating badge to open `DebugTerminal` (click) and legacy Radar overlay (long-press or header action) for field diagnostics. Offline maps are managed via Settings.
+- Restored callbacks preserve accessibility labels without altering underlying mesh policies. Validate empty, permission-denied, and error states.
 
 ## Accessibility and interaction
 

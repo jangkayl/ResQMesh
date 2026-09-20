@@ -227,7 +227,10 @@ class NativeBleManager(val context: Context) {
         { peerName -> checkRouteExists?.invoke(peerName) == true }, ::hasPayloadReadyDirectLink, ::hasReadyLinkToIdentity, ::distinctLinkCount,
         { MAX_TOTAL_CONNECTIONS }, ::getElectionScore, ::latestEndpointForIdentity,
         ::connectToPersistentGatt, { event -> onDeviceScanned?.invoke(event) },
-        { endpoint -> onDeviceDisconnected?.invoke(endpoint) }, ::sendSystemPulse
+        { endpoint -> onDeviceDisconnected?.invoke(endpoint) }, ::sendSystemPulse,
+        { radioController.activeHandshakeInfo() },
+        distinctReadyPeerCount = ::distinctReadyLinkCount,
+        disconnectEndpoint = ::disconnectFromEndpoint
     )
 
     fun startMeshNode(teamKey: String) {
@@ -526,6 +529,18 @@ class NativeBleManager(val context: Context) {
      */
     fun distinctLinkCount(): Int {
         val endpoints = store.activeConnections.keys + store.activeServerConnections.keys
+        return endpoints
+            .map { endpoint ->
+                nodeIdForEndpoint(endpoint)
+                    ?: NodeIdentity.key(store.connectedEndpointNames[endpoint]).ifEmpty { endpoint }
+            }
+            .toSet()
+            .size
+    }
+
+    fun distinctReadyLinkCount(): Int {
+        val endpoints = (store.activeConnections.keys + store.activeServerConnections.keys)
+            .filter { store.links.isReady(it) }
         return endpoints
             .map { endpoint ->
                 nodeIdForEndpoint(endpoint)

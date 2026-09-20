@@ -19,6 +19,9 @@ class SetupViewModel(private val useCases: com.example.testresqmesh.core.domain.
     private val _uiState = MutableStateFlow(ConnectionUiState())
     val uiState: StateFlow<ConnectionUiState> = _uiState.asStateFlow()
 
+    private val _isDeveloperModeEnabled = MutableStateFlow(false)
+    val isDeveloperModeEnabled: StateFlow<Boolean> = _isDeveloperModeEnabled.asStateFlow()
+
     init {
         viewModelScope.launch {
             useCases.observeIsOnline().collect { isOnline ->
@@ -29,6 +32,30 @@ class SetupViewModel(private val useCases: com.example.testresqmesh.core.domain.
             useCases.observeConnectionStatus().collect { status ->
                 _uiState.update { it.copy(connectionStatus = status) }
             }
+        }
+    }
+
+    fun initDeveloperMode(context: Context) {
+        val prefs = context.getSharedPreferences("resqmesh_prefs", Context.MODE_PRIVATE)
+        _isDeveloperModeEnabled.value = prefs.getBoolean("developer_mode_enabled", false)
+    }
+
+    fun setDeveloperMode(context: Context, enabled: Boolean, pin: String? = null): Boolean {
+        if (enabled) {
+            if (pin != "0000") return false
+            context.getSharedPreferences("resqmesh_prefs", Context.MODE_PRIVATE)
+                .edit()
+                .putBoolean("developer_mode_enabled", true)
+                .apply()
+            _isDeveloperModeEnabled.value = true
+            return true
+        } else {
+            context.getSharedPreferences("resqmesh_prefs", Context.MODE_PRIVATE)
+                .edit()
+                .putBoolean("developer_mode_enabled", false)
+                .apply()
+            _isDeveloperModeEnabled.value = false
+            return true
         }
     }
 

@@ -16,6 +16,10 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import com.example.testresqmesh.core.ui.components.layout.ResQGlassSurface
 import com.example.testresqmesh.core.ui.theme.AppAppearance
 import com.example.testresqmesh.core.ui.theme.ResQSize
@@ -33,8 +37,17 @@ fun ProfileScreen(
     onOfflineMaps: () -> Unit = {},
     onBack: () -> Unit
 ) {
+    val context = LocalContext.current
     val state by viewModel.uiState.collectAsState()
+    val isDeveloperMode by viewModel.isDeveloperModeEnabled.collectAsState()
     var showConnectionConfirm by remember { mutableStateOf(false) }
+    var showPinDialog by remember { mutableStateOf(false) }
+    var pinInput by remember { mutableStateOf("") }
+    var pinError by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(Unit) {
+        viewModel.initDeveloperMode(context)
+    }
 
     if (showConnectionConfirm) {
         ModalBottomSheet(
@@ -170,6 +183,35 @@ fun ProfileScreen(
                 SettingRow(Icons.Default.Info, "About", "ResQMesh")
                 DividerLine()
                 SettingRow(Icons.Default.Tune, "Advanced", "Voice and diagnostic utilities", onClick = onAdvanced)
+                DividerLine()
+                SettingRow(
+                    icon = Icons.Default.Terminal,
+                    title = "Developer Debugging Mode",
+                    subtitle = if (isDeveloperMode) "Active (PIN 0000 verified)" else "Locked (Requires PIN 0000)",
+                    onClick = {
+                        if (isDeveloperMode) {
+                            viewModel.setDeveloperMode(context, false)
+                        } else {
+                            pinInput = ""
+                            pinError = null
+                            showPinDialog = true
+                        }
+                    },
+                    trailing = {
+                        Switch(
+                            checked = isDeveloperMode,
+                            onCheckedChange = { checked ->
+                                if (checked) {
+                                    pinInput = ""
+                                    pinError = null
+                                    showPinDialog = true
+                                } else {
+                                    viewModel.setDeveloperMode(context, false)
+                                }
+                            }
+                        )
+                    }
+                )
             }
         }
         item {
@@ -184,6 +226,60 @@ fun ProfileScreen(
                 Text(if (state.isOnline) "Go offline" else "Go online", fontWeight = FontWeight.Bold, color = if (state.isOnline) MaterialTheme.colorScheme.onSurface else ResQTheme.colors.success)
             }
         }
+    }
+
+    if (showPinDialog) {
+        AlertDialog(
+            onDismissRequest = { showPinDialog = false },
+            title = { Text("Developer Authentication", fontWeight = FontWeight.Bold) },
+            text = {
+                Column {
+                    Text(
+                        "Enter the 4-digit PIN to enable developer debugging tools and the floating diagnostic overlay.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(Modifier.height(16.dp))
+                    OutlinedTextField(
+                        value = pinInput,
+                        onValueChange = { input ->
+                            if (input.length <= 4 && input.all { it.isDigit() }) {
+                                pinInput = input
+                                pinError = null
+                            }
+                        },
+                        label = { Text("PIN (0000)") },
+                        singleLine = true,
+                        isError = pinError != null,
+                        supportingText = pinError?.let { { Text(it, color = MaterialTheme.colorScheme.error) } },
+                        visualTransformation = PasswordVisualTransformation(),
+                        keyboardOptions = KeyboardOptions(
+                            keyboardType = KeyboardType.NumberPassword
+                        ),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        val success = viewModel.setDeveloperMode(context, true, pinInput)
+                        if (success) {
+                            showPinDialog = false
+                        } else {
+                            pinError = "Incorrect PIN. Access denied."
+                        }
+                    }
+                ) {
+                    Text("Unlock")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showPinDialog = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
     }
 }
 
@@ -249,7 +345,13 @@ private fun DividerLine() {
 }
 
 @Composable
-private fun SettingRow(icon: ImageVector, title: String, subtitle: String, onClick: (() -> Unit)? = null) {
+private fun SettingRow(
+    icon: ImageVector,
+    title: String,
+    subtitle: String,
+    onClick: (() -> Unit)? = null,
+    trailing: @Composable (() -> Unit)? = null
+) {
     val rowModifier = Modifier.fillMaxWidth().heightIn(min = 72.dp)
     val content: @Composable () -> Unit = {
         Row(modifier = Modifier.padding(horizontal = Spacing.Medium), verticalAlignment = Alignment.CenterVertically) {
@@ -261,7 +363,11 @@ private fun SettingRow(icon: ImageVector, title: String, subtitle: String, onCli
                 Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                 Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            if (onClick != null) Icon(Icons.Default.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            if (trailing != null) {
+                trailing()
+            } else if (onClick != null) {
+                Icon(Icons.Default.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
         }
     }
     if (onClick == null) {
