@@ -731,8 +731,8 @@ class MeshRepository(
         }
 
         val delivery = PrivateDeliveryPlanner.select(targetName, directedRouteList, readyDevices)
-        if (delivery == PrivateDeliveryPlanner.Target.Unavailable) {
-            AppLogger.d("MeshNetwork_E2EE", "Private send blocked: selected route has no payload-ready next hop")
+        if (delivery == PrivateDeliveryPlanner.Target.Unavailable && readyDevices.isEmpty()) {
+            AppLogger.d("MeshNetwork_E2EE", "Private send blocked: no payload-ready connections available")
             return false
         }
 
@@ -750,7 +750,10 @@ class MeshRepository(
                 AppLogger.d("MeshNetwork_E2EE", "Private route selected with ${directedRouteList.size - 1} hop(s)")
                 networkManager.sendDirectPayload(delivery.endpointId, payloadBytes)
             }
-            PrivateDeliveryPlanner.Target.Unavailable -> error("Checked before saving the outbound message")
+            PrivateDeliveryPlanner.Target.Unavailable -> {
+                AppLogger.d("MeshNetwork_E2EE", "Selected route next hop unavailable; broadcasting private message via hybrid fallback")
+                networkManager.broadcastPayload(payloadBytes)
+            }
         }
         return true
     }

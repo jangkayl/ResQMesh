@@ -539,27 +539,42 @@ class BlePeerAdmissionController(
         NodeIdentity.idOf(peerName)?.let { "node:$it" } ?: "endpoint:${NodeIdentity.key(peerName).ifEmpty { endpoint }}"
 
     private fun rescueOrphan(endpoint: String, peerName: String, peerConnections: Int, directLinks: Int, now: Long) {
-        if (peerConnections != 0 || directLinks < maxDirectLinks()) {
+        if (hasIndirectRoute(peerName) || directLinks < maxDirectLinks()) {
             store.orphanDetectionTime.remove(endpoint)
             return
         }
-        val firstDetected = store.orphanDetectionTime.putIfAbsent(endpoint, now) ?: return
-        if (now - firstDetected <= ORPHAN_RESCUE_DELAY_MS) {
+        val wasAbsent = !store.orphanDetectionTime.containsKey(endpoint)
+        val targetRescueTime = store.orphanDetectionTime.computeIfAbsent(endpoint) {
+            now + ORPHAN_RESCUE_DELAY_MS + jitterMs(1_000L, 4_000L)
+        }
+        if (wasAbsent) {
+            val delay = (targetRescueTime - now).coerceAtLeast(0L)
+            scheduler.postDelayed(delay) {
+                rescueOrphan(endpoint, peerName, peerConnections, directLinkCount(), clock())
+            }
+        }
+        if (now < targetRescueTime) {
             recordDecision(
                 peerName = peerName,
                 endpoint = endpoint,
                 peerConnections = peerConnections,
                 peerScore = store.endpointLastScore[endpoint].orEmpty(),
-                hasIndirectRoute = hasIndirectRoute(peerName),
+                hasIndirectRoute = false,
                 reason = BleAdmissionReason.ORPHAN_EVALUATING,
                 result = BleConnectStartResult.DEFERRED,
                 attempts = 0,
-                candidateAgeMs = (now - firstDetected).coerceAtLeast(0L),
+                candidateAgeMs = (now - (store.endpointFirstSeen[endpoint] ?: now)).coerceAtLeast(0L),
                 now = now
             )
             return
         }
-        AppLogger.d("BLE_MESH", "Orphan Preemption: Found orphan $peerName. Dropping weakest link to rescue.")
+        // Thundering Herd Guard: Did the peer become reachable via mesh routing during the jitter window?
+        if (hasIndirectRoute(peerName) || hasLinkToIdentity(peerName)) {
+            AppLogger.d("BLE_MESH", "Partition/Orphan resolution: $peerName is now reachable via mesh. Aborting preemption.")
+            store.orphanDetectionTime.remove(endpoint)
+            return
+        }
+        AppLogger.d("BLE_MESH", "Partition/Orphan Preemption: Found unrouted peer $peerName (peerConnections=$peerConnections). Dropping weakest link to bridge.")
         val lruEndpoint = store.connectionInteractionTimes
             .filterKeys { store.activeConnections.containsKey(it) }
             .filterKeys { store.pendingQueues[it]?.isEmpty() != false }
@@ -568,7 +583,7 @@ class BlePeerAdmissionController(
             store.activeConnections[lruEndpoint]?.disconnect()
             store.activeConnections[lruEndpoint]?.close()
         } catch (e: SecurityException) {
-            AppLogger.d("BLE_MESH", "Orphan preemption could not close $lruEndpoint: BLUETOOTH_CONNECT was revoked")
+            AppLogger.d("BLE_MESH", "Preemption could not close $lruEndpoint: BLUETOOTH_CONNECT was revoked")
         }
         store.activeConnections.remove(lruEndpoint)
         store.pendingQueues.remove(lruEndpoint)
@@ -576,6 +591,7 @@ class BlePeerAdmissionController(
         store.chunkBuffers.remove(lruEndpoint)
         store.connectionInteractionTimes.remove(lruEndpoint)
         scheduler.post { onDisconnected(lruEndpoint) }
+        store.orphanDetectionTime.remove(endpoint)
         connect(endpoint, peerName)
     }
 

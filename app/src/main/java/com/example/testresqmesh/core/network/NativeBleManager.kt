@@ -653,6 +653,7 @@ class NativeBleManager(val context: Context) {
         val targets = mutableSetOf<String>()
         targets.addAll(store.activeConnections.keys)
         targets.addAll(store.activeServerConnections.keys)
+        store.connectingMacAddress?.let { targets.add(it) }
         targets.remove(excludeEndpointId)
         
         targets.forEach { targetId ->
@@ -765,43 +766,19 @@ class NativeBleManager(val context: Context) {
         
         val isServerConnected = store.activeServerConnections.containsKey(targetMacAddress)
         val isClientConnected = store.activeConnections.containsKey(targetMacAddress)
+        val isConnecting = store.connectingMacAddress == targetMacAddress
+
+        if (!isServerConnected && !isClientConnected && !isConnecting) {
+            AppLogger.d("BLE_MESH", "sendDirectPayload skipped: $targetMacAddress is not directly connected; relying on mesh routing")
+            return
+        }
 
         if (!transferCoordinator.enqueue(targetMacAddress, GattTransfer(fullData), priority = false)) {
             AppLogger.d("BLE_MESH", "GATT queue full for $targetMacAddress; rejected payload")
             return
         }
 
-        if (isServerConnected || isClientConnected) {
-            processNextPayload(targetMacAddress)
-        } else {
-            if (distinctLinkCount() >= MAX_TOTAL_CONNECTIONS) {
-                // VIP BOUNCER (LRU EVICTION)
-                val lruMac = store.connectionInteractionTimes
-                    .filterKeys { store.activeConnections.containsKey(it) }
-                    .filterKeys { store.pendingQueues[it]?.isEmpty() != false } // QA FIX
-                    .minByOrNull { it.value }?.key
-                    
-                val macToEvict = lruMac ?: store.activeConnections.keys.firstOrNull { store.pendingQueues[it]?.isEmpty() != false }
-                
-                if (macToEvict != null) {
-                    AppLogger.d("BLE_MESH", "Evicting $macToEvict to make room for VIP connection to $targetMacAddress")
-                    store.activeConnections[macToEvict]?.disconnect()
-                    store.activeConnections[macToEvict]?.close()
-                    store.activeConnections.remove(macToEvict)
-                    store.pendingQueues.remove(macToEvict)
-                    store.isWriting.remove(macToEvict)
-                    store.chunkBuffers.remove(macToEvict)
-                    store.connectionInteractionTimes.remove(macToEvict)
-                    handler.post {
-                        onDeviceDisconnected?.invoke(macToEvict)
-                    }
-                } else {
-                    AppLogger.d("BLE_MESH", "VIP Bouncer failed: Cannot evict any connections because all are actively transmitting.")
-                    return // Abort connecting to the new node to protect current data streams
-                }
-            }
-            connectToPersistentGatt(targetMacAddress, store.connectedEndpointNames[targetMacAddress] ?: "Unknown")
-        }
+        processNextPayload(targetMacAddress)
     }
 
     fun cacheOutgoingMessageId(payloadBytes: ByteArray) {

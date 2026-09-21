@@ -24,6 +24,7 @@ Make blocking reliably mutual across relays: deny direct links after identity, s
 - Permanent cryptographic node identity: deterministic Node ID from SHA-256 hash of Keystore public key, Google Cloud Backup exclusions for key/ID prefs, explicit dismissal of pending key change alerts, and People & Paths multi-hop messaging for blocked devices (D17).
 - Auto-connect zero-peer deadlock recovery: isolated node election yield schedules fallback initiator watchdog (2.5s) if elected master fails to connect; stale zombie/ghost sockets evicted on rebooted advertisement (`directConnections == 0` with >8s silence/age check) and debounced advertising updates protect active links from false teardown.
 - Developer Debugging Mode: PIN `0000` gated Settings toggle persisting in prefs; displays floating top-right HUD badge across main app shell to open live Diagnostic Terminal and legacy Radar overlay.
+- Stable Core Topology & Partition Healing: Abolished connect-to-send and VIP bouncer churn during message transmission; private sends fallback to hybrid mesh broadcast if next hop is unrouted; partition bridging operates with randomized jitter and thundering herd abort.
 
 Local checks passed; physical BLE validation remains required.
 
