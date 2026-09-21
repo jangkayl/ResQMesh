@@ -1,5 +1,6 @@
 package com.example.testresqmesh.core.network.bluetooth
 
+import android.bluetooth.BluetoothDevice
 import com.example.testresqmesh.core.network.bluetooth.state.BleStateStore
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -451,5 +452,180 @@ class BlePeerAdmissionControllerTest {
         assertTrue(disconnected.contains(oldMac))
         assertFalse(f.store.connectedEndpointNames.containsKey(oldMac))
         assertFalse(f.store.connectedEndpointIds.contains(oldMac))
+    }
+
+    private fun createDummyDevice(): BluetoothDevice {
+        val unsafeField = sun.misc.Unsafe::class.java.getDeclaredField("theUnsafe")
+        unsafeField.isAccessible = true
+        val unsafe = unsafeField.get(null) as sun.misc.Unsafe
+        return unsafe.allocateInstance(BluetoothDevice::class.java) as BluetoothDevice
+    }
+
+    @Test
+    fun evictRotatedGhostDoesNotPurgeLiveActiveSocket() {
+        val disconnected = mutableListOf<String>()
+        val f = TestFixture(directLinks = 1, readyPeers = 0, localScoreStr = "900AA")
+        val oldCentralMac = "AA:BB:CC:DD:EE:FF"
+        f.store.connectedEndpointNames[oldCentralMac] = "Bob#B2"
+        f.store.connectedEndpointIds.add(oldCentralMac)
+        f.store.activeServerConnections[oldCentralMac] = createDummyDevice()
+        f.store.connectionEstablishTime[oldCentralMac] = f.clockTime
+
+        val controllerWithDisconnect = BlePeerAdmissionController(
+            store = f.store,
+            scheduler = f.scheduler,
+            localName = { f.localNameStr },
+            isBlocked = { false },
+            hasLinkToIdentity = { false },
+            hasIndirectRoute = { false },
+            hasPayloadReadyDirectLink = { false },
+            hasReadyLinkToIdentity = { false },
+            directLinkCount = { f.directLinks },
+            maxDirectLinks = { f.maxLinks },
+            electionScore = { f.localScoreStr },
+            latestEndpointForIdentity = { _, fallback -> fallback },
+            disconnectEndpoint = { disconnected.add(it) },
+            connect = { endpoint, peer ->
+                f.connectCalls.add(endpoint to peer)
+                f.connectResult
+            },
+            onScanned = {},
+            onDisconnected = {},
+            onPulse = {},
+            handshakeInfo = { f.handshakeInfoSupplier() },
+            distinctReadyPeerCount = { f.readyPeers },
+            clock = { f.clockTime },
+            jitterMs = { min, _ -> min },
+            onDecision = { f.decisions.add(it) }
+        )
+
+        val newAdvMac = "11:22:33:44:55:66"
+        val adv = BleAdvertisement(
+            endpointId = newAdvMac,
+            peerName = "Bob#B2",
+            nodeId = "B2",
+            electionScore = "700BB",
+            directConnections = 0
+        )
+
+        controllerWithDisconnect.handle(adv)
+
+        // Live connection must NOT be disconnected by evictRotatedGhost or zombie check
+        assertFalse(disconnected.contains(oldCentralMac))
+        assertTrue(f.store.connectedEndpointNames.containsKey(oldCentralMac))
+        assertTrue(f.store.activeServerConnections.containsKey(oldCentralMac))
+    }
+
+    @Test
+    fun healthyActiveSocketNotPurgedAsZombieWhenDirectConnectionsZero() {
+        val disconnected = mutableListOf<String>()
+        val f = TestFixture(directLinks = 1, readyPeers = 1, localScoreStr = "900AA")
+        val oldCentralMac = "AA:BB:CC:DD:EE:FF"
+        f.store.connectedEndpointNames[oldCentralMac] = "Bob#B2"
+        f.store.connectedEndpointIds.add(oldCentralMac)
+        f.store.activeServerConnections[oldCentralMac] = createDummyDevice()
+        // Connection established and had interaction recently (only 1 second ago)
+        f.store.connectionEstablishTime[oldCentralMac] = f.clockTime - 1_000L
+        f.store.connectionInteractionTimes[oldCentralMac] = f.clockTime - 1_000L
+
+        val controllerWithDisconnect = BlePeerAdmissionController(
+            store = f.store,
+            scheduler = f.scheduler,
+            localName = { f.localNameStr },
+            isBlocked = { false },
+            hasLinkToIdentity = { false },
+            hasIndirectRoute = { false },
+            hasPayloadReadyDirectLink = { false },
+            hasReadyLinkToIdentity = { false },
+            directLinkCount = { f.directLinks },
+            maxDirectLinks = { f.maxLinks },
+            electionScore = { f.localScoreStr },
+            latestEndpointForIdentity = { _, fallback -> fallback },
+            disconnectEndpoint = { disconnected.add(it) },
+            connect = { endpoint, peer ->
+                f.connectCalls.add(endpoint to peer)
+                f.connectResult
+            },
+            onScanned = {},
+            onDisconnected = {},
+            onPulse = {},
+            handshakeInfo = { f.handshakeInfoSupplier() },
+            distinctReadyPeerCount = { f.readyPeers },
+            clock = { f.clockTime },
+            jitterMs = { min, _ -> min },
+            onDecision = { f.decisions.add(it) }
+        )
+
+        val newAdvMac = "11:22:33:44:55:66"
+        val adv = BleAdvertisement(
+            endpointId = newAdvMac,
+            peerName = "Bob#B2",
+            nodeId = "B2",
+            electionScore = "700BB",
+            directConnections = 0
+        )
+
+        controllerWithDisconnect.handle(adv)
+
+        // Fresh, actively communicating socket must not be purged
+        assertFalse(disconnected.contains(oldCentralMac))
+        assertTrue(f.store.connectedEndpointNames.containsKey(oldCentralMac))
+    }
+
+    @Test
+    fun agedSilentSocketPurgedAsZombieWhenDirectConnectionsZero() {
+        val disconnected = mutableListOf<String>()
+        val f = TestFixture(directLinks = 1, readyPeers = 0, localScoreStr = "900AA")
+        val oldCentralMac = "AA:BB:CC:DD:EE:FF"
+        f.store.connectedEndpointNames[oldCentralMac] = "Bob#B2"
+        f.store.connectedEndpointIds.add(oldCentralMac)
+        f.store.activeServerConnections[oldCentralMac] = createDummyDevice()
+        // Connection established 15s ago, no inbound progress for 15s (silent)
+        f.store.connectionEstablishTime[oldCentralMac] = f.clockTime - 15_000L
+        f.store.connectionInteractionTimes[oldCentralMac] = f.clockTime - 15_000L
+
+        val controllerWithDisconnect = BlePeerAdmissionController(
+            store = f.store,
+            scheduler = f.scheduler,
+            localName = { f.localNameStr },
+            isBlocked = { false },
+            hasLinkToIdentity = { false },
+            hasIndirectRoute = { false },
+            hasPayloadReadyDirectLink = { false },
+            hasReadyLinkToIdentity = { false },
+            directLinkCount = { f.directLinks },
+            maxDirectLinks = { f.maxLinks },
+            electionScore = { f.localScoreStr },
+            latestEndpointForIdentity = { _, fallback -> fallback },
+            disconnectEndpoint = { disconnected.add(it) },
+            connect = { endpoint, peer ->
+                f.connectCalls.add(endpoint to peer)
+                f.connectResult
+            },
+            onScanned = {},
+            onDisconnected = {},
+            onPulse = {},
+            handshakeInfo = { f.handshakeInfoSupplier() },
+            distinctReadyPeerCount = { f.readyPeers },
+            clock = { f.clockTime },
+            jitterMs = { min, _ -> min },
+            onDecision = { f.decisions.add(it) }
+        )
+
+        val newAdvMac = "11:22:33:44:55:66"
+        val rebootAd = BleAdvertisement(
+            endpointId = newAdvMac,
+            peerName = "Bob#B2",
+            nodeId = "B2",
+            electionScore = "700BB",
+            directConnections = 0
+        )
+
+        controllerWithDisconnect.handle(rebootAd)
+
+        // Stale, silent socket from a peer advertising 0 connections must be purged
+        assertTrue(disconnected.contains(oldCentralMac))
+        assertFalse(f.store.connectedEndpointNames.containsKey(oldCentralMac))
+        assertFalse(f.store.connectedEndpointIds.contains(oldCentralMac))
     }
 }

@@ -342,6 +342,8 @@ class NativeBleManager(val context: Context) {
         heartbeatCoordinator.clear()
         store.isWriting.clear()
         lifecycleSupervisor.stop()
+        handler.removeCallbacks(updateAdvertisingRunnable)
+        lastAdvertisedConnections = -1
         store.connectedEndpointIds.clear()
         store.connectedEndpointNames.clear()
         store.endpointLastSeen.clear()
@@ -367,10 +369,27 @@ class NativeBleManager(val context: Context) {
         return String.format("%03d%s", specScore, myHex.take(2)) // e.g. "0889F", sorts by Specs, breaks ties with Hex
     }
 
+    private var lastAdvertisedConnections: Int = -1
+    private val updateAdvertisingRunnable = Runnable {
+        if (!store.isNodeActive.get()) return@Runnable
+        val currentConnections = distinctLinkCount()
+        if (currentConnections != lastAdvertisedConnections) {
+            lastAdvertisedConnections = currentConnections
+            AppLogger.d("BLE_MESH", "Updating BLE advertisement: directConnections=$currentConnections")
+            startAdvertising(currentTeamKey)
+        }
+    }
+
+    fun scheduleAdvertisingUpdate(delayMs: Long = 1000L) {
+        handler.removeCallbacks(updateAdvertisingRunnable)
+        handler.postDelayed(updateAdvertisingRunnable, delayMs)
+    }
+
     fun startAdvertising(teamKey: String) {
+        lastAdvertisedConnections = distinctLinkCount()
         radioController.startAdvertising(
             electionScore = getElectionScore(),
-            directConnections = distinctLinkCount(),
+            directConnections = lastAdvertisedConnections,
             deviceName = myDeviceName,
             fallbackNodeId = myNodeId.ifEmpty { myHex }
         )
@@ -469,6 +488,7 @@ class NativeBleManager(val context: Context) {
         store.writeFailureCount.remove(endpointId)
         store.connectionInteractionTimes.remove(endpointId)
         AppLogger.d("BLE_MESH", "Retired unowned endpoint transport $endpointId")
+        scheduleAdvertisingUpdate()
     }
 
     fun hasReadyLinkToIdentity(peerName: String): Boolean {
@@ -898,6 +918,7 @@ class NativeBleManager(val context: Context) {
                 sendSystemPulse()
             }
         }
+        scheduleAdvertisingUpdate()
     }
     
     /** Installs direct-link denial by stable identity without tearing down a live control path. */

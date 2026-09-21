@@ -22,7 +22,7 @@ Make blocking reliably mutual across relays: deny direct links after identity, s
 - Cebu offline map pilot: MapPackageManifest model, dual ECDSA/Ed25519 ManifestVerifier, atomic MapStorageGuard, 302-redirect downloader with truncation checks, MapLibre SosMapScreen markers, 36dp compass, telemetry bottom sheet, mapless fallback, and settings UI.
 - Android Notification & Deep Link System: NotificationCompat.MessagingStyle with 7-message deduplication, ResQMesh branding, and cold-launch deep-link routing.
 - Permanent cryptographic node identity: deterministic Node ID from SHA-256 hash of Keystore public key, Google Cloud Backup exclusions for key/ID prefs, explicit dismissal of pending key change alerts, and People & Paths multi-hop messaging for blocked devices (D17).
-- Auto-connect zero-peer deadlock recovery: isolated node election yield schedules fallback initiator watchdog (2.5s) if elected master fails to connect; stale zombie/ghost sockets evicted on rebooted advertisement (`directConnections == 0`).
+- Auto-connect zero-peer deadlock recovery: isolated node election yield schedules fallback initiator watchdog (2.5s) if elected master fails to connect; stale zombie/ghost sockets evicted on rebooted advertisement (`directConnections == 0` with >8s silence/age check) and debounced advertising updates protect active links from false teardown.
 - Developer Debugging Mode: PIN `0000` gated Settings toggle persisting in prefs; displays floating top-right HUD badge across main app shell to open live Diagnostic Terminal and legacy Radar overlay.
 
 Local checks passed; physical BLE validation remains required.

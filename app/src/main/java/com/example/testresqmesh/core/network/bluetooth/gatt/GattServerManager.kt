@@ -156,6 +156,7 @@ class GattServerManager(
                     }
                     handler.postDelayed(setupDeadline, serverSetupTimeoutMs)
                     store.activeServerConnections[macAddress] = device
+                    manager.scheduleAdvertisingUpdate()
                     store.pendingQueues.putIfAbsent(macAddress, ConcurrentLinkedDeque())
                     store.isWriting.putIfAbsent(macAddress, AtomicBoolean(false))
                     store.chunkBuffers.putIfAbsent(macAddress, ByteArray(0))

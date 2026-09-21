@@ -173,6 +173,7 @@ class GattClientManager(
                         AppLogger.updateLink(macAddress, peerName, "CLIENT", link.generation, "DISCOVERING")
                         AppLogger.d("BLE_MESH", "GATT Socket locked with ${peerName}. Starting service discovery with default MTU.")
                         store.activeConnections[macAddress] = gatt
+                        manager.scheduleAdvertisingUpdate()
                         store.connectedEndpointNames[macAddress] = peerName
                         NodeIdentity.idOf(peerName)?.let { store.endpointNodeIds[macAddress] = it }
                         store.pendingQueues.putIfAbsent(macAddress, ConcurrentLinkedDeque())

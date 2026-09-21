@@ -166,17 +166,25 @@ class BlePeerAdmissionController(
         // If our existing socket to this peer identity is not ready, silent, or peer advertises 0,
         // it is a dead zombie that must be purged to unblock new connection setup.
         val existingEndpoint = store.connectedEndpointNames.entries
-            .find { NodeIdentity.matches(it.value, peerName) }?.key
+            .find { it.key != endpoint && NodeIdentity.matches(it.value, peerName) }?.key
             ?: (advertisement.nodeId.takeIf { it.isNotEmpty() }?.let { id ->
-                store.endpointNodeIds.entries.find { it.value == id }?.key
+                store.endpointNodeIds.entries.find { it.key != endpoint && it.value == id }?.key
             })
 
         if (existingEndpoint != null && existingEndpoint != endpoint) {
-            val isOldLinkReady = store.links.isReady(existingEndpoint)
-            val lastInbound = store.connectionInteractionTimes[existingEndpoint] ?: store.connectionEstablishTime[existingEndpoint] ?: 0L
+            val hasLiveRole = store.activeConnections.containsKey(existingEndpoint) || store.activeServerConnections.containsKey(existingEndpoint)
+            val establishTime = store.connectionEstablishTime[existingEndpoint] ?: 0L
+            val lastInbound = store.connectionInteractionTimes[existingEndpoint] ?: establishTime
             val isOldLinkSilent = (now - lastInbound) > 8_000L
+            val isOldLinkAged = (now - establishTime) > 8_000L
 
-            if (!isOldLinkReady || isOldLinkSilent || advertisement.directConnections == 0) {
+            // Only evict as a rebooted zombie if the existing socket is genuinely silent/aged
+            // and the peer advertises directConnections == 0. A newly connecting or actively
+            // communicating socket must not be torn down simply because the peer's peripheral
+            // advertising MAC differs from its central connection MAC.
+            val isZombie = hasLiveRole && isOldLinkSilent && isOldLinkAged && advertisement.directConnections == 0
+
+            if (isZombie) {
                 AppLogger.d("BLE_MESH", "Purging zombie link $existingEndpoint for rebooted peer $peerName (new endpoint $endpoint)")
                 disconnectEndpoint(existingEndpoint)
                 store.connectedEndpointIds.remove(existingEndpoint)
@@ -237,7 +245,7 @@ class BlePeerAdmissionController(
         val oldEndpoint = store.connectedEndpointNames.entries
             .find { it.key != endpoint && NodeIdentity.matches(it.value, peerName) }?.key ?: return
         val hasLiveRole = store.activeConnections.containsKey(oldEndpoint) || store.activeServerConnections.containsKey(oldEndpoint)
-        if (hasLiveRole && store.links.isReady(oldEndpoint)) return
+        if (hasLiveRole) return
         AppLogger.d("BLE_MESH", "GHOST EVICTION: $peerName rotated MAC from $oldEndpoint to $endpoint. Purging ghost.")
         disconnectEndpoint(oldEndpoint)
         store.connectedEndpointIds.remove(oldEndpoint)
