@@ -565,11 +565,13 @@ private fun DeleteConversationDialog(
 internal enum class DeliveryFeedback {
     Sent,
     Delivered,
-    Read
+    Read,
+    Failed
 }
 
 internal fun deliveryFeedback(message: ChatMessage): DeliveryFeedback = when {
     message.seenBy.isNotEmpty() -> DeliveryFeedback.Read
+    message.deliveredTo.contains("FAILED") -> DeliveryFeedback.Failed
     message.deliveredTo.isNotEmpty() -> DeliveryFeedback.Delivered
     else -> DeliveryFeedback.Sent
 }
@@ -580,6 +582,7 @@ internal fun deliveryLabel(message: ChatMessage): String = stringResource(
         DeliveryFeedback.Sent -> R.string.private_chat_status_sent
         DeliveryFeedback.Delivered -> R.string.private_chat_status_delivered
         DeliveryFeedback.Read -> R.string.private_chat_status_read
+        DeliveryFeedback.Failed -> R.string.private_chat_status_failed
     }
 )
 

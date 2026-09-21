@@ -11,6 +11,7 @@ class DeliveryFeedbackTest {
         assertEquals(DeliveryFeedback.Sent, deliveryFeedback(message()))
         assertEquals(DeliveryFeedback.Delivered, deliveryFeedback(message(deliveredTo = listOf("Ari"))))
         assertEquals(DeliveryFeedback.Read, deliveryFeedback(message(seenBy = listOf("Ari"))))
+        assertEquals(DeliveryFeedback.Failed, deliveryFeedback(message(deliveredTo = listOf("FAILED"))))
     }
 
     private fun message(

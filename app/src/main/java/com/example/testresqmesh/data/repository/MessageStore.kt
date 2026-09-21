@@ -12,6 +12,7 @@ interface MessageStore {
     suspend fun save(message: ChatMessage, targetName: String?)
     suspend fun markDelivered(messageId: String, readerName: String)
     suspend fun markSeen(messageId: String, readerName: String)
+    suspend fun markFailed(messageId: String)
     suspend fun deleteConversation(peerName: String)
 }
 
@@ -33,16 +34,22 @@ class RoomMessageStore(private val dao: MessageDao) : MessageStore {
 
     override suspend fun markDelivered(messageId: String, readerName: String) {
         val message = dao.getMessageById(messageId) ?: return
-        val readers = message.deliveredTo.split(',').filter(String::isNotEmpty)
+        val readers = message.deliveredTo.split(',').filter { it.isNotEmpty() && it != "FAILED" }
         if (readerName in readers) return
         dao.updateDeliveredTo(messageId, (readers + readerName).joinToString(","))
     }
 
     override suspend fun markSeen(messageId: String, readerName: String) {
         val message = dao.getMessageById(messageId) ?: return
-        val readers = message.seenBy.split(',').filter(String::isNotEmpty)
+        val readers = message.seenBy.split(',').filter { it.isNotEmpty() && it != "FAILED" }
         if (readerName in readers) return
         dao.updateSeenBy(messageId, (readers + readerName).joinToString(","))
+    }
+
+    override suspend fun markFailed(messageId: String) {
+        val message = dao.getMessageById(messageId) ?: return
+        if (message.deliveredTo.isNotEmpty() || message.seenBy.isNotEmpty()) return
+        dao.updateDeliveredTo(messageId, "FAILED")
     }
 
     override suspend fun deleteConversation(peerName: String) {

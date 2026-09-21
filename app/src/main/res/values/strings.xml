@@ -147,6 +147,7 @@
     <string name="private_chat_status_sent">Sent</string>
     <string name="private_chat_status_delivered">Delivered</string>
     <string name="private_chat_status_read">Read</string>
+    <string name="private_chat_status_failed">Failed</string>
     <string name="community_title">Community</string>
     <string name="community_description">Public messages</string>
     <string name="community_back_action">Back to messages</string>

@@ -14,6 +14,8 @@ import android.util.Base64
 import com.example.testresqmesh.core.utils.BinaryCompressor
 import kotlinx.serialization.ExperimentalSerializationApi
 
+internal const val MAX_PRIVATE_RELAY_HOPS = 3
+
 interface PayloadHandler {
     fun canHandle(payloadType: String): Boolean
     fun handle(endpointId: String, payload: MeshPayload, payloadBytes: ByteArray, callback: PayloadDispatcherCallback)
@@ -127,12 +129,20 @@ class ReceiptHandler : PayloadHandler {
         val routeIds = payload.directedRouteNodeIds
         if (payload.isPrivate) {
             val myIndex = routeIds.indexOf(callback.getMyNodeId())
-            val nextEndpoint = routeIds.getOrNull(myIndex + 1)?.let(callback::getConnectedEndpointIdByNodeId)
-            if (nextEndpoint != null) {
-                AppLogger.d("PayloadDispatcher", "Private receipt forwarding to selected next hop")
-                callback.sendDirectPayload(nextEndpoint, ProtoBuf.encodeToByteArray(updatedPayload))
+            if (myIndex >= 0) {
+                val nextEndpoint = routeIds.getOrNull(myIndex + 1)?.let(callback::getConnectedEndpointIdByNodeId)
+                if (nextEndpoint != null) {
+                    AppLogger.d("PayloadDispatcher", "Private receipt forwarding to selected next hop")
+                    callback.sendDirectPayload(nextEndpoint, ProtoBuf.encodeToByteArray(updatedPayload))
+                    return
+                }
+            }
+            AppLogger.d("PayloadDispatcher", "Private receipt route unavailable; evaluating controlled flood fallback")
+            if (payload.relayHopCount < MAX_PRIVATE_RELAY_HOPS) {
+                val floodPayload = updatedPayload.copy(relayHopCount = payload.relayHopCount + 1)
+                callback.broadcastPayload(ProtoBuf.encodeToByteArray(floodPayload), endpointId)
             } else {
-                AppLogger.d("PayloadDispatcher", "Private receipt route unavailable; not broadcasting")
+                AppLogger.d("PayloadDispatcher", "Private receipt route unavailable and max flood hops ($MAX_PRIVATE_RELAY_HOPS) exceeded; dropping receipt")
             }
             return
         }
@@ -317,14 +327,23 @@ class StandardMessageHandler : PayloadHandler {
                 val routeIds = payload.directedRouteNodeIds
                 if (routeIds.isNotEmpty()) {
                     val myIndex = routeIds.indexOf(callback.getMyNodeId())
-                    val nextEndpoint = routeIds.getOrNull(myIndex + 1)?.let(callback::getConnectedEndpointIdByNodeId)
-                    if (nextEndpoint != null) {
-                        AppLogger.d("PayloadDispatcher", "Private relay forwarding to selected next hop")
-                        callback.sendDirectPayload(nextEndpoint, updatedBytes)
-                        return
+                    if (myIndex >= 0) {
+                        val nextEndpoint = routeIds.getOrNull(myIndex + 1)?.let(callback::getConnectedEndpointIdByNodeId)
+                        if (nextEndpoint != null) {
+                            AppLogger.d("PayloadDispatcher", "Private relay forwarding to selected next hop")
+                            callback.sendDirectPayload(nextEndpoint, updatedBytes)
+                            return
+                        }
                     }
                 }
-                AppLogger.d("PayloadDispatcher", "Private relay route unavailable; not broadcasting")
+                AppLogger.d("PayloadDispatcher", "Private relay route unavailable; evaluating controlled flood fallback")
+                if (payload.relayHopCount < MAX_PRIVATE_RELAY_HOPS) {
+                    val floodPayload = updatedPayload.copy(relayHopCount = payload.relayHopCount + 1)
+                    val floodBytes = ProtoBuf.encodeToByteArray(floodPayload)
+                    callback.broadcastPayload(floodBytes, endpointId)
+                } else {
+                    AppLogger.d("PayloadDispatcher", "Private relay route unavailable and max flood hops ($MAX_PRIVATE_RELAY_HOPS) exceeded; dropping payload")
+                }
             }
         } else {
             if (payload.isSOSCancel) {

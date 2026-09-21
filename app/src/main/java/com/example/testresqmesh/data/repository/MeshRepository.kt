@@ -617,6 +617,7 @@ class MeshRepository(
         const val BLOCK_DIRECT_GRACE_MS = 2_000L
         const val BLOCK_ACK_GRACE_MS = 1_000L
         const val BLOCK_RETRY_MS = 3_000L
+        const val PRIVATE_DELIVERY_TIMEOUT_MS = 15_000L
     }
 
     @Synchronized
@@ -740,6 +741,8 @@ class MeshRepository(
         
         repositoryScope.launch {
             messageStore.save(message, targetName = targetName)
+            delay(PRIVATE_DELIVERY_TIMEOUT_MS)
+            messageStore.markFailed(msgId)
         }
 
         when (delivery) {
