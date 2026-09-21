@@ -88,7 +88,13 @@ object NodeIdentity {
 
         val idLeft = idOf(left)
         val idRight = idOf(right)
-        if (idLeft != null && idRight != null) return idLeft == idRight
+        if (idLeft != null && idRight != null) {
+            if (idLeft == idRight) return true
+            if (idLeft.startsWith(idRight) || idRight.startsWith(idLeft)) {
+                return sharesPrefix(displayNameOf(left), displayNameOf(right))
+            }
+            return false
+        }
 
         return sharesPrefix(displayNameOf(left), displayNameOf(right))
     }

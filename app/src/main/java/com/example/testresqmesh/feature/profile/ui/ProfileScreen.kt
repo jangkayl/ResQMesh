@@ -40,6 +40,7 @@ fun ProfileScreen(
     val context = LocalContext.current
     val state by viewModel.uiState.collectAsState()
     val isDeveloperMode by viewModel.isDeveloperModeEnabled.collectAsState()
+    val isLongRangeProfile by viewModel.isLongRangeProfile.collectAsState()
     var showConnectionConfirm by remember { mutableStateOf(false) }
     var showPinDialog by remember { mutableStateOf(false) }
     var pinInput by remember { mutableStateOf("") }
@@ -173,6 +174,23 @@ fun ProfileScreen(
                 SettingRow(Icons.Default.Key, "Permissions", "Bluetooth, location, and microphone")
                 DividerLine()
                 SettingRow(Icons.Default.Map, "Offline maps", "Manage Cebu tactical vector packages", onClick = onOfflineMaps)
+                DividerLine()
+                SettingRow(
+                    icon = Icons.Default.AltRoute,
+                    title = "Mesh Profile",
+                    subtitle = if (isLongRangeProfile) "Long Range / Trail (TTL 10)" else "Dense Room (TTL 4)",
+                    onClick = {
+                        viewModel.setMeshProfile(context, !isLongRangeProfile)
+                    },
+                    trailing = {
+                        Switch(
+                            checked = isLongRangeProfile,
+                            onCheckedChange = { checked ->
+                                viewModel.setMeshProfile(context, checked)
+                            }
+                        )
+                    }
+                )
             }
         }
         item { SettingsLabel("MORE") }

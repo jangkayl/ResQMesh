@@ -23,7 +23,8 @@ object PayloadFactory {
         locationLng: Double?,
         isSOS: Boolean,
         isSOSCancel: Boolean,
-        channelId: String
+        channelId: String,
+        ttl: Int = 0
     ): ByteArray {
         val payload = MeshPayload(
             id = msgId,
@@ -39,7 +40,8 @@ object PayloadFactory {
             isSOS = isSOS,
             isSOSCancel = isSOSCancel,
             routePath = listOf(senderName),
-            channelId = channelId
+            channelId = channelId,
+            ttl = ttl
         )
         return ProtoBuf.encodeToByteArray(payload)
     }
@@ -56,7 +58,8 @@ object PayloadFactory {
         locationLng: Double?,
         directedRoute: List<String>,
         targetPubKey: String?,
-        channelId: String
+        channelId: String,
+        ttl: Int = 0
     ): ByteArray {
         require(!targetPubKey.isNullOrBlank()) { "Recipient public key is unavailable" }
         val innerPayloadJson = org.json.JSONObject().apply {
@@ -84,7 +87,8 @@ object PayloadFactory {
             routePath = listOf(senderName),
             directedRoute = directedRoute,
             directedRouteNodeIds = directedRoute.mapNotNull(NodeIdentity::idOf),
-            channelId = channelId
+            channelId = channelId,
+            ttl = ttl
         )
         return ProtoBuf.encodeToByteArray(payload)
     }

@@ -47,10 +47,19 @@ class SystemPulseHandler : PayloadHandler {
         
         callback.onMessageReceived(endpointId, msgId, sender, "", false, true, null, null, null, null, "LOCAL", emptyList(), payload.channelId)
         
-        if (payload.relayHopCount >= MAX_SYSTEM_RELAY_HOPS) return
+        val canRelay = if (payload.ttl > 0) {
+            payload.ttl > 1
+        } else {
+            payload.relayHopCount < MAX_SYSTEM_RELAY_HOPS
+        }
+        if (!canRelay) return
         val routePath = payload.routePath.toMutableList()
         routePath.add(callback.getMyDeviceName())
-        val updatedPayload = payload.copy(routePath = routePath, relayHopCount = payload.relayHopCount + 1)
+        val updatedPayload = payload.copy(
+            routePath = routePath,
+            relayHopCount = payload.relayHopCount + 1,
+            ttl = if (payload.ttl > 0) payload.ttl - 1 else 0
+        )
         val updatedBytes = ProtoBuf.encodeToByteArray(updatedPayload)
         callback.broadcastPayload(updatedBytes, endpointId)
         AppLogger.event(
@@ -130,6 +139,10 @@ class ReceiptHandler : PayloadHandler {
         if (payload.isPrivate) {
             val myIndex = routeIds.indexOf(callback.getMyNodeId())
             if (myIndex >= 0) {
+                // If this node is the end destination of the receipt return route, do not forward or flood
+                if (myIndex == routeIds.lastIndex) {
+                    return
+                }
                 val nextEndpoint = routeIds.getOrNull(myIndex + 1)?.let(callback::getConnectedEndpointIdByNodeId)
                 if (nextEndpoint != null) {
                     AppLogger.d("PayloadDispatcher", "Private receipt forwarding to selected next hop")
@@ -137,12 +150,19 @@ class ReceiptHandler : PayloadHandler {
                     return
                 }
             }
-            AppLogger.d("PayloadDispatcher", "Private receipt route unavailable; evaluating controlled flood fallback")
-            if (payload.relayHopCount < MAX_PRIVATE_RELAY_HOPS) {
-                val floodPayload = updatedPayload.copy(relayHopCount = payload.relayHopCount + 1)
+            val canRelay = if (payload.ttl > 0) {
+                payload.ttl > 1
+            } else {
+                payload.relayHopCount < MAX_PRIVATE_RELAY_HOPS
+            }
+            if (canRelay) {
+                val floodPayload = updatedPayload.copy(
+                    relayHopCount = payload.relayHopCount + 1,
+                    ttl = if (payload.ttl > 0) payload.ttl - 1 else 0
+                )
                 callback.broadcastPayload(ProtoBuf.encodeToByteArray(floodPayload), endpointId)
             } else {
-                AppLogger.d("PayloadDispatcher", "Private receipt route unavailable and max flood hops ($MAX_PRIVATE_RELAY_HOPS) exceeded; dropping receipt")
+                AppLogger.d("PayloadDispatcher", "Private receipt route unavailable and max flood hops exceeded; dropping receipt")
             }
             return
         }
@@ -337,12 +357,20 @@ class StandardMessageHandler : PayloadHandler {
                     }
                 }
                 AppLogger.d("PayloadDispatcher", "Private relay route unavailable; evaluating controlled flood fallback")
-                if (payload.relayHopCount < MAX_PRIVATE_RELAY_HOPS) {
-                    val floodPayload = updatedPayload.copy(relayHopCount = payload.relayHopCount + 1)
+                val canRelay = if (payload.ttl > 0) {
+                    payload.ttl > 1
+                } else {
+                    payload.relayHopCount < MAX_PRIVATE_RELAY_HOPS
+                }
+                if (canRelay) {
+                    val floodPayload = updatedPayload.copy(
+                        relayHopCount = payload.relayHopCount + 1,
+                        ttl = if (payload.ttl > 0) payload.ttl - 1 else 0
+                    )
                     val floodBytes = ProtoBuf.encodeToByteArray(floodPayload)
                     callback.broadcastPayload(floodBytes, endpointId)
                 } else {
-                    AppLogger.d("PayloadDispatcher", "Private relay route unavailable and max flood hops ($MAX_PRIVATE_RELAY_HOPS) exceeded; dropping payload")
+                    AppLogger.d("PayloadDispatcher", "Private relay route unavailable and max flood hops exceeded; dropping payload")
                 }
             }
         } else {

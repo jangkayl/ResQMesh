@@ -60,6 +60,11 @@ class NativeBleManager(val context: Context) {
      * Advertised as its own field so peer identity survives display-name truncation.
      */
     var myNodeId: String = ""
+    fun getMeshProfileTtl(): Int {
+        val isLongRange = context.getSharedPreferences("resqmesh_prefs", Context.MODE_PRIVATE)
+            .getBoolean("mesh_profile_long_range", false)
+        return if (isLongRange) 10 else 4
+    }
 
     /** Shared platform handles retained for the GATT client/server managers. */
     val bluetoothManager = context.getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
@@ -127,7 +132,11 @@ class NativeBleManager(val context: Context) {
             store.connectedEndpointNames.entries.find { NodeIdentity.matches(it.value, name) }?.key
         override fun getConnectedEndpointIdByNodeId(nodeId: String) =
             (store.activeConnections.keys + store.activeServerConnections.keys).firstOrNull {
-                nodeIdForEndpoint(it)?.equals(nodeId, ignoreCase = true) == true && store.links.isReady(it)
+                val epNodeId = nodeIdForEndpoint(it) ?: return@firstOrNull false
+                val idMatches = epNodeId.equals(nodeId, ignoreCase = true) ||
+                    epNodeId.startsWith(nodeId, ignoreCase = true) ||
+                    nodeId.startsWith(epNodeId, ignoreCase = true)
+                idMatches && store.links.isReady(it)
             }
         override fun getStpNeighbors(): Set<String> {
             return this@NativeBleManager.stpNeighborsProvider?.invoke() ?: emptySet()
@@ -291,7 +300,8 @@ class NativeBleManager(val context: Context) {
                 connectedNodes = connectedNodesList,
                 senderNodeId = myNodeId,
                 connectedNodeIds = connectedNodeIds,
-                publicKey = com.example.testresqmesh.core.network.CryptoManager.getMyPublicKeyBase64()
+                publicKey = com.example.testresqmesh.core.network.CryptoManager.getMyPublicKeyBase64(),
+                ttl = getMeshProfileTtl()
             )
             val payloadBytes = kotlinx.serialization.protobuf.ProtoBuf.encodeToByteArray(com.example.testresqmesh.core.network.MeshPayload.serializer(), payload)
             AppLogger.event(

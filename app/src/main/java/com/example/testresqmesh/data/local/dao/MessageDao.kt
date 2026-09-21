@@ -39,6 +39,9 @@ interface MessageDao {
     @Query("DELETE FROM messages")
     suspend fun deleteAllMessages(): Int
 
+    @Query("SELECT * FROM messages WHERE isMine = 1 AND deliveredTo = 'PENDING' AND timestamp >= :minTimestamp ORDER BY timestamp ASC")
+    suspend fun getPendingOutboxMessages(minTimestamp: Long): List<MessageEntity>
+
     @Query("DELETE FROM messages WHERE targetName = :peerName OR (senderName = :peerName AND targetName IS NOT NULL)")
     suspend fun deleteConversationWith(peerName: String): Int
 }

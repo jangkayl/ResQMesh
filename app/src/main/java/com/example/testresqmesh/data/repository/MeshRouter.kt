@@ -195,7 +195,16 @@ class MeshRouter {
             val path = queue.removeFirst()
             val currentNode = path.last()
             
-            if (currentNode == targetNodeId) {
+            val isTarget = if (currentNode == targetNodeId) {
+                true
+            } else if (currentNode.startsWith(targetNodeId) || targetNodeId.startsWith(currentNode)) {
+                val currentName = stableNames[currentNode]
+                currentName != null && NodeIdentity.matches(currentName, targetName)
+            } else {
+                false
+            }
+
+            if (isTarget) {
                 return path.map { stableNames[it] ?: "#$it" }
             }
             

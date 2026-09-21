@@ -580,9 +580,9 @@ class BlePeerAdmissionControllerTest {
         f.store.connectedEndpointNames[oldCentralMac] = "Bob#B2"
         f.store.connectedEndpointIds.add(oldCentralMac)
         f.store.activeServerConnections[oldCentralMac] = createDummyDevice()
-        // Connection established 15s ago, no inbound progress for 15s (silent)
-        f.store.connectionEstablishTime[oldCentralMac] = f.clockTime - 15_000L
-        f.store.connectionInteractionTimes[oldCentralMac] = f.clockTime - 15_000L
+        // Connection established 20s ago, no inbound progress for 20s (silent)
+        f.store.connectionEstablishTime[oldCentralMac] = f.clockTime - 20_000L
+        f.store.connectionInteractionTimes[oldCentralMac] = f.clockTime - 20_000L
 
         val controllerWithDisconnect = BlePeerAdmissionController(
             store = f.store,

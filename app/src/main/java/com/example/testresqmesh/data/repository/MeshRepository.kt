@@ -195,6 +195,9 @@ class MeshRepository(
 
             _connectedDevices.value = updatedList
             meshRouter.recalculateKnownNodes(myNodeName, updatedList.filter { it.isPayloadReady })
+            if (device.isPayloadReady) {
+                scheduleOutboxFlush()
+            }
         }
 
         networkManager.onDeviceDisconnected = { endpointId ->
@@ -227,13 +230,17 @@ class MeshRepository(
                     AppLogger.d("BLE_MESH", "Public-key change requires approval for $senderName")
                 PeerPublicKeyDirectory.Observation.INVALID_IDENTITY ->
                     AppLogger.d("BLE_MESH", "Ignored public key with invalid stable identity")
-                else -> AppLogger.d("BLE_MESH", "Recorded public-key observation for $senderName")
+                else -> {
+                    AppLogger.d("BLE_MESH", "Recorded public-key observation for $senderName")
+                    scheduleOutboxFlush()
+                }
             }
         }
         
         networkManager.onRoutingTableReceived = { senderName, senderNodeId, connectedNodes, connectedNodeIds ->
             meshRouter.updateTopology(senderName, senderNodeId, connectedNodes, connectedNodeIds, myNodeName)
             meshRouter.recalculateKnownNodes(myNodeName, readyConnectedDevices())
+            scheduleOutboxFlush()
             AppLogger.event(
                 category = com.example.testresqmesh.core.utils.TerminalLogCategory.ROUTING,
                 event = "TOPOLOGY_UPDATED",
@@ -611,6 +618,87 @@ class MeshRepository(
         }
     }
 
+    private var outboxFlushJob: Job? = null
+
+    private fun scheduleOutboxFlush() {
+        outboxFlushJob?.cancel()
+        outboxFlushJob = repositoryScope.launch {
+            // Jitter delay of 1-2.5 seconds to prevent thundering herd collisions
+            delay(1000L + (0..1500).random())
+            flushOutbox()
+        }
+    }
+
+    private suspend fun flushOutbox() {
+        val minTimestamp = System.currentTimeMillis() - OUTBOX_MAX_PENDING_AGE_MS
+        val pendingMessages = messageStore.getPendingOutbox(minTimestamp)
+        if (pendingMessages.isEmpty()) return
+
+        val readyDevices = readyConnectedDevices()
+        if (readyDevices.isEmpty()) return
+
+        for ((message, targetName) in pendingMessages) {
+            if (targetName != null) {
+                // Private message retry
+                val targetPubKey = publicKeys.trustedKey(targetName) ?: continue
+                val directedRouteList = meshRouter.findShortestPath(myNodeName, targetName, readyDevices)
+                val payloadBytes = runCatching {
+                    PayloadFactory.buildPrivatePayload(
+                        msgId = message.id,
+                        timestamp = message.timestamp,
+                        senderName = myNodeName,
+                        targetName = targetName,
+                        text = message.text,
+                        imageBase64 = message.imageBase64,
+                        audioBase64 = message.audioBase64,
+                        locationLat = message.locationLat,
+                        locationLng = message.locationLng,
+                        directedRoute = directedRouteList,
+                        targetPubKey = targetPubKey,
+                        channelId = _currentChannelId.value
+                    )
+                }.getOrNull() ?: continue
+
+                val delivery = PrivateDeliveryPlanner.select(targetName, directedRouteList, readyDevices)
+                messageStore.markSent(message.id)
+                repositoryScope.launch {
+                    delay(PRIVATE_DELIVERY_TIMEOUT_MS)
+                    messageStore.markFailed(message.id)
+                }
+
+                when (delivery) {
+                    is PrivateDeliveryPlanner.Target.Endpoint -> {
+                        networkManager.sendDirectPayload(delivery.endpointId, payloadBytes)
+                    }
+                    PrivateDeliveryPlanner.Target.Unavailable -> {
+                        networkManager.broadcastPayload(payloadBytes)
+                    }
+                }
+            } else {
+                // Public message retry
+                val payloadBytes = PayloadFactory.buildPublicPayload(
+                    msgId = message.id,
+                    timestamp = message.timestamp,
+                    senderName = myNodeName,
+                    text = message.text,
+                    imageBase64 = message.imageBase64,
+                    audioBase64 = message.audioBase64,
+                    locationLat = message.locationLat,
+                    locationLng = message.locationLng,
+                    isSOS = message.isSOS,
+                    isSOSCancel = false,
+                    channelId = _currentChannelId.value
+                )
+                messageStore.markSent(message.id)
+                if (message.isSOS) {
+                    networkManager.broadcastPriorityPayload(payloadBytes)
+                } else {
+                    networkManager.broadcastPayload(payloadBytes)
+                }
+            }
+        }
+    }
+
     private companion object {
         const val BLOCK_REQUEST_TYPE = "BLOCK_REQUEST"
         const val BLOCK_ACK_TYPE = "BLOCK_ACK"
@@ -618,6 +706,7 @@ class MeshRepository(
         const val BLOCK_ACK_GRACE_MS = 1_000L
         const val BLOCK_RETRY_MS = 3_000L
         const val PRIVATE_DELIVERY_TIMEOUT_MS = 15_000L
+        const val OUTBOX_MAX_PENDING_AGE_MS = 30_000L
     }
 
     @Synchronized
@@ -668,11 +757,17 @@ class MeshRepository(
             channelId = _currentChannelId.value
         )
 
+        val readyDevices = readyConnectedDevices()
         val message = ChatMessage(messageId, myNodeName, text, imageBase64, audioBase64, locationLat, locationLng, true, false, timestamp, isSOS = isSOS)
         repositoryScope.launch {
             messageStore.save(message, targetName = null)
+            if (readyDevices.isEmpty()) {
+                messageStore.markPending(messageId)
+            }
         }
-        if (isSOS) networkManager.broadcastPriorityPayload(payloadBytes) else networkManager.broadcastPayload(payloadBytes)
+        if (readyDevices.isNotEmpty()) {
+            if (isSOS) networkManager.broadcastPriorityPayload(payloadBytes) else networkManager.broadcastPayload(payloadBytes)
+        }
         return messageId
     }
 
@@ -693,22 +788,35 @@ class MeshRepository(
         val timestamp = System.currentTimeMillis()
         
         val readyDevices = readyConnectedDevices()
-        if (readyDevices.isEmpty()) {
-            AppLogger.d("MeshNetwork_E2EE", "Private send blocked: no payload-ready peer link")
-            return false
+        val directedRouteList = if (readyDevices.isNotEmpty()) meshRouter.findShortestPath(myNodeName, targetName, readyDevices) else emptyList()
+        val targetPubKey = publicKeys.trustedKey(targetName)
+        
+        // If we are completely offline or route is unavailable, save as Pending outbox message
+        if (readyDevices.isEmpty() || targetPubKey == null || directedRouteList.isEmpty()) {
+            val message = ChatMessage(
+                id = msgId,
+                senderName = myNodeName,
+                text = text,
+                imageBase64 = imageBase64,
+                audioBase64 = audioBase64,
+                locationLat = locationLat,
+                locationLng = locationLng,
+                isMine = true,
+                isPrivate = true,
+                timestamp = timestamp,
+                isHopped = false,
+                outboundRoute = emptyList()
+            )
+            repositoryScope.launch {
+                messageStore.save(message, targetName = targetName)
+                messageStore.markPending(msgId)
+            }
+            AppLogger.d("MeshNetwork_E2EE", "Private send queued as Pending for $targetName (no immediate route)")
+            return true
         }
-        val directedRouteList = meshRouter.findShortestPath(myNodeName, targetName, readyDevices)
+
         if (publicKeys.hasPendingChange(targetName)) {
             AppLogger.d("MeshNetwork_E2EE", "Private send blocked: recipient key change requires approval")
-            return false
-        }
-        val targetPubKey = publicKeys.trustedKey(targetName)
-        if (targetPubKey == null) {
-            AppLogger.d("MeshNetwork_E2EE", "Private send blocked: no recipient public key for $targetName")
-            return false
-        }
-        if (directedRouteList.isEmpty()) {
-            AppLogger.d("MeshNetwork_E2EE", "Private send blocked: no stable directed route to $targetName")
             return false
         }
 
@@ -731,11 +839,6 @@ class MeshRepository(
         }
 
         val delivery = PrivateDeliveryPlanner.select(targetName, directedRouteList, readyDevices)
-        if (delivery == PrivateDeliveryPlanner.Target.Unavailable && readyDevices.isEmpty()) {
-            AppLogger.d("MeshNetwork_E2EE", "Private send blocked: no payload-ready connections available")
-            return false
-        }
-
         val isDirect = readyDevices.any { NodeIdentity.matches(it.name, targetName) }
         val message = ChatMessage(msgId, myNodeName, text, imageBase64, audioBase64, locationLat, locationLng, true, true, timestamp, isHopped = !isDirect, outboundRoute = directedRouteList)
         

@@ -175,8 +175,8 @@ class BlePeerAdmissionController(
             val hasLiveRole = store.activeConnections.containsKey(existingEndpoint) || store.activeServerConnections.containsKey(existingEndpoint)
             val establishTime = store.connectionEstablishTime[existingEndpoint] ?: 0L
             val lastInbound = store.connectionInteractionTimes[existingEndpoint] ?: establishTime
-            val isOldLinkSilent = (now - lastInbound) > 8_000L
-            val isOldLinkAged = (now - establishTime) > 8_000L
+            val isOldLinkSilent = (now - lastInbound) > 15_000L
+            val isOldLinkAged = (now - establishTime) > 15_000L
 
             // Only evict as a rebooted zombie if the existing socket is genuinely silent/aged
             // and the peer advertises directConnections == 0. A newly connecting or actively

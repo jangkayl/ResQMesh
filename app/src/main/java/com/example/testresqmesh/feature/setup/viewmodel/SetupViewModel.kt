@@ -22,6 +22,9 @@ class SetupViewModel(private val useCases: com.example.testresqmesh.core.domain.
     private val _isDeveloperModeEnabled = MutableStateFlow(false)
     val isDeveloperModeEnabled: StateFlow<Boolean> = _isDeveloperModeEnabled.asStateFlow()
 
+    private val _isLongRangeProfile = MutableStateFlow(false)
+    val isLongRangeProfile: StateFlow<Boolean> = _isLongRangeProfile.asStateFlow()
+
     init {
         viewModelScope.launch {
             useCases.observeIsOnline().collect { isOnline ->
@@ -38,6 +41,15 @@ class SetupViewModel(private val useCases: com.example.testresqmesh.core.domain.
     fun initDeveloperMode(context: Context) {
         val prefs = context.getSharedPreferences("resqmesh_prefs", Context.MODE_PRIVATE)
         _isDeveloperModeEnabled.value = prefs.getBoolean("developer_mode_enabled", false)
+        _isLongRangeProfile.value = prefs.getBoolean("mesh_profile_long_range", false)
+    }
+
+    fun setMeshProfile(context: Context, longRange: Boolean) {
+        context.getSharedPreferences("resqmesh_prefs", Context.MODE_PRIVATE)
+            .edit()
+            .putBoolean("mesh_profile_long_range", longRange)
+            .apply()
+        _isLongRangeProfile.value = longRange
     }
 
     fun setDeveloperMode(context: Context, enabled: Boolean, pin: String? = null): Boolean {

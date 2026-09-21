@@ -563,6 +563,7 @@ private fun DeleteConversationDialog(
 }
 
 internal enum class DeliveryFeedback {
+    Pending,
     Sent,
     Delivered,
     Read,
@@ -572,6 +573,7 @@ internal enum class DeliveryFeedback {
 internal fun deliveryFeedback(message: ChatMessage): DeliveryFeedback = when {
     message.seenBy.isNotEmpty() -> DeliveryFeedback.Read
     message.deliveredTo.contains("FAILED") -> DeliveryFeedback.Failed
+    message.deliveredTo.contains("PENDING") -> DeliveryFeedback.Pending
     message.deliveredTo.isNotEmpty() -> DeliveryFeedback.Delivered
     else -> DeliveryFeedback.Sent
 }
@@ -579,6 +581,7 @@ internal fun deliveryFeedback(message: ChatMessage): DeliveryFeedback = when {
 @Composable
 internal fun deliveryLabel(message: ChatMessage): String = stringResource(
     when (deliveryFeedback(message)) {
+        DeliveryFeedback.Pending -> R.string.private_chat_status_pending
         DeliveryFeedback.Sent -> R.string.private_chat_status_sent
         DeliveryFeedback.Delivered -> R.string.private_chat_status_delivered
         DeliveryFeedback.Read -> R.string.private_chat_status_read

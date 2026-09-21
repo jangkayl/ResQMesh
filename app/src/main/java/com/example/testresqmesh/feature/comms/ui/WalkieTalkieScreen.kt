@@ -252,19 +252,20 @@ fun WalkieTalkieScreen(
                 Text(
                     text = "Burst Note",
                     style = MaterialTheme.typography.labelMedium,
-                    fontWeight = if (!liveAudio) FontWeight.Black else FontWeight.Normal,
-                    color = if (!liveAudio) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                    fontWeight = FontWeight.Black,
+                    color = MaterialTheme.colorScheme.primary
                 )
                 Switch(
-                    checked = liveAudio,
-                    onCheckedChange = { liveAudio = it },
+                    checked = false,
+                    onCheckedChange = { /* Disabled: Planned feature */ },
+                    enabled = false,
                     modifier = Modifier.padding(horizontal = 8.dp).scale(0.85f)
                 )
                 Text(
-                    text = "Live Stream",
+                    text = "Live Stream (Planned)",
                     style = MaterialTheme.typography.labelMedium,
-                    fontWeight = if (liveAudio) FontWeight.Black else FontWeight.Normal,
-                    color = if (liveAudio) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                    fontWeight = FontWeight.Normal,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
                 )
             }
         }
