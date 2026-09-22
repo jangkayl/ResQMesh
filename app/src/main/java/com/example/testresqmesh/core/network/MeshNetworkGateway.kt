@@ -21,7 +21,7 @@ interface MeshNetworkGateway {
     var onLiveAudioChunk: ((String, String, ByteArray) -> Unit)?
     var onMessageDelivered: ((String, String, List<String>) -> Unit)?
     var onPublicKeyReceived: ((String, String, String) -> Unit)?
-    var onRoutingTableReceived: ((String, String, List<String>, List<String>) -> Unit)?
+    var onRoutingTableReceived: ((String, String, List<String>, List<String>, Long) -> Unit)?
     var onSosCancelled: (() -> Unit)?
     var onStatusChanged: ((String) -> Unit)?
     var onDeviceBlocked: ((String) -> Unit)?
@@ -46,9 +46,14 @@ interface MeshNetworkGateway {
     fun isDeviceBlocked(deviceName: String): Boolean
     fun broadcastPayload(payloadBytes: ByteArray, excludeEndpointId: String? = null)
     fun broadcastPriorityPayload(payloadBytes: ByteArray, excludeEndpointId: String? = null)
-    fun sendDirectPayload(targetEndpointId: String, payloadBytes: ByteArray)
-    fun sendPriorityPayload(targetEndpointId: String, payloadBytes: ByteArray)
-    fun broadcastSeenReceipt(messageId: String, isPrivate: Boolean, targetId: String? = null)
+    fun sendDirectPayload(targetEndpointId: String, payloadBytes: ByteArray): TransportDispatchResult
+    fun sendPriorityPayload(targetEndpointId: String, payloadBytes: ByteArray): TransportDispatchResult
+    fun broadcastSeenReceipt(
+        messageId: String,
+        isPrivate: Boolean,
+        targetId: String? = null,
+        directedReturnRoute: List<String> = emptyList()
+    )
     fun broadcastDeliveredReceipt(
         messageId: String,
         isPrivate: Boolean,
@@ -108,8 +113,8 @@ class NativeBleGateway(private val manager: NativeBleManager) : MeshNetworkGatew
         manager.sendDirectPayload(targetEndpointId, payloadBytes)
     override fun sendPriorityPayload(targetEndpointId: String, payloadBytes: ByteArray) =
         manager.sendPriorityPayload(targetEndpointId, payloadBytes)
-    override fun broadcastSeenReceipt(messageId: String, isPrivate: Boolean, targetId: String?) =
-        manager.broadcastSeenReceipt(messageId, isPrivate, targetId)
+    override fun broadcastSeenReceipt(messageId: String, isPrivate: Boolean, targetId: String?, directedReturnRoute: List<String>) =
+        manager.broadcastSeenReceipt(messageId, isPrivate, targetId, directedReturnRoute)
     override fun broadcastDeliveredReceipt(
         messageId: String,
         isPrivate: Boolean,

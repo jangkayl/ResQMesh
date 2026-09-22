@@ -237,16 +237,18 @@ class MeshRepository(
             }
         }
         
-        networkManager.onRoutingTableReceived = { senderName, senderNodeId, connectedNodes, connectedNodeIds ->
-            meshRouter.updateTopology(senderName, senderNodeId, connectedNodes, connectedNodeIds, myNodeName)
-            meshRouter.recalculateKnownNodes(myNodeName, readyConnectedDevices())
-            scheduleOutboxFlush()
-            AppLogger.event(
-                category = com.example.testresqmesh.core.utils.TerminalLogCategory.ROUTING,
-                event = "TOPOLOGY_UPDATED",
-                message = "Applied topology from peer; ${connectedNodes.size} advertised neighbor(s)",
-                peerName = senderName
-            )
+        networkManager.onRoutingTableReceived = { senderName, senderNodeId, connectedNodes, connectedNodeIds, topologySequence ->
+            val applied = meshRouter.updateTopology(senderName, senderNodeId, connectedNodes, connectedNodeIds, myNodeName, topologySequence)
+            if (applied) {
+                meshRouter.recalculateKnownNodes(myNodeName, readyConnectedDevices())
+                scheduleOutboxFlush()
+                AppLogger.event(
+                    category = com.example.testresqmesh.core.utils.TerminalLogCategory.ROUTING,
+                    event = "TOPOLOGY_UPDATED",
+                    message = "Applied topology version $topologySequence from peer; ${connectedNodes.size} advertised neighbor(s)",
+                    peerName = senderName
+                )
+            }
         }
 
         networkManager.onDeviceBlocked = { senderName ->
@@ -411,11 +413,17 @@ class MeshRepository(
             messageStore.markSeen(messageId, "Me")
         }
         
-        val directEndpointId = _connectedDevices.value.find { NodeIdentity.matches(it.name, targetName) }?.endpointId
-        if (directEndpointId != null) {
-            networkManager.broadcastSeenReceipt(messageId, isPrivate, directEndpointId)
+        if (isPrivate && targetName != null) {
+            val readyDevices = readyConnectedDevices()
+            val route = meshRouter.findShortestPath(myNodeName, targetName, readyDevices)
+            val delivery = PrivateDeliveryPlanner.select(targetName, route, readyDevices)
+            if (delivery is PrivateDeliveryPlanner.Target.Endpoint) {
+                networkManager.broadcastSeenReceipt(messageId, true, delivery.endpointId, route)
+            } else {
+                AppLogger.d("MeshNetwork_E2EE", "Private seen receipt route unavailable; not broadcasting")
+            }
         } else {
-            networkManager.broadcastSeenReceipt(messageId, isPrivate, null)
+            networkManager.broadcastSeenReceipt(messageId, false, null)
         }
     }
 
@@ -630,14 +638,19 @@ class MeshRepository(
     }
 
     private suspend fun flushOutbox() {
-        val minTimestamp = System.currentTimeMillis() - OUTBOX_MAX_PENDING_AGE_MS
-        val pendingMessages = messageStore.getPendingOutbox(minTimestamp)
+        val now = System.currentTimeMillis()
+        val pendingMessages = messageStore.getPendingOutbox()
         if (pendingMessages.isEmpty()) return
 
         val readyDevices = readyConnectedDevices()
         if (readyDevices.isEmpty()) return
 
+        var retryRejectedDispatch = false
         for ((message, targetName) in pendingMessages) {
+            if (now - message.timestamp > OUTBOX_EXPIRY_MS) {
+                messageStore.markFailed(message.id)
+                continue
+            }
             if (targetName != null) {
                 // Private message retry
                 val targetPubKey = publicKeys.trustedKey(targetName) ?: continue
@@ -660,19 +673,22 @@ class MeshRepository(
                 }.getOrNull() ?: continue
 
                 val delivery = PrivateDeliveryPlanner.select(targetName, directedRouteList, readyDevices)
-                messageStore.markSent(message.id)
-                repositoryScope.launch {
-                    delay(PRIVATE_DELIVERY_TIMEOUT_MS)
-                    messageStore.markFailed(message.id)
-                }
-
-                when (delivery) {
+                val dispatchResult = when (delivery) {
                     is PrivateDeliveryPlanner.Target.Endpoint -> {
                         networkManager.sendDirectPayload(delivery.endpointId, payloadBytes)
                     }
                     PrivateDeliveryPlanner.Target.Unavailable -> {
-                        networkManager.broadcastPayload(payloadBytes)
+                        null
                     }
+                }
+                if (dispatchResult?.accepted == true) {
+                    messageStore.markSent(message.id)
+                    repositoryScope.launch {
+                        delay(PRIVATE_DELIVERY_TIMEOUT_MS)
+                        messageStore.markFailed(message.id)
+                    }
+                } else if (dispatchResult != null) {
+                    retryRejectedDispatch = true
                 }
             } else {
                 // Public message retry
@@ -697,6 +713,12 @@ class MeshRepository(
                 }
             }
         }
+        if (retryRejectedDispatch) {
+            repositoryScope.launch {
+                delay(OUTBOX_RETRY_BACKOFF_MS)
+                scheduleOutboxFlush()
+            }
+        }
     }
 
     private companion object {
@@ -706,7 +728,8 @@ class MeshRepository(
         const val BLOCK_ACK_GRACE_MS = 1_000L
         const val BLOCK_RETRY_MS = 3_000L
         const val PRIVATE_DELIVERY_TIMEOUT_MS = 15_000L
-        const val OUTBOX_MAX_PENDING_AGE_MS = 30_000L
+        const val OUTBOX_RETRY_BACKOFF_MS = 3_000L
+        const val OUTBOX_EXPIRY_MS = 24 * 60 * 60 * 1000L
     }
 
     @Synchronized
@@ -843,19 +866,21 @@ class MeshRepository(
         val message = ChatMessage(msgId, myNodeName, text, imageBase64, audioBase64, locationLat, locationLng, true, true, timestamp, isHopped = !isDirect, outboundRoute = directedRouteList)
         
         repositoryScope.launch {
+            // Persist before dispatch so a fast receipt cannot race the local message row.
             messageStore.save(message, targetName = targetName)
-            delay(PRIVATE_DELIVERY_TIMEOUT_MS)
-            messageStore.markFailed(msgId)
-        }
-
-        when (delivery) {
-            is PrivateDeliveryPlanner.Target.Endpoint -> {
-                AppLogger.d("MeshNetwork_E2EE", "Private route selected with ${directedRouteList.size - 1} hop(s)")
-                networkManager.sendDirectPayload(delivery.endpointId, payloadBytes)
+            val dispatchResult = when (delivery) {
+                is PrivateDeliveryPlanner.Target.Endpoint -> {
+                    AppLogger.d("MeshNetwork_E2EE", "Private route selected with ${directedRouteList.size - 1} hop(s)")
+                    networkManager.sendDirectPayload(delivery.endpointId, payloadBytes)
+                }
+                PrivateDeliveryPlanner.Target.Unavailable -> null
             }
-            PrivateDeliveryPlanner.Target.Unavailable -> {
-                AppLogger.d("MeshNetwork_E2EE", "Selected route next hop unavailable; broadcasting private message via hybrid fallback")
-                networkManager.broadcastPayload(payloadBytes)
+            if (dispatchResult?.accepted == true) {
+                delay(PRIVATE_DELIVERY_TIMEOUT_MS)
+                messageStore.markFailed(msgId)
+            } else {
+                messageStore.markPending(msgId)
+                AppLogger.d("MeshNetwork_E2EE", "Private dispatch was not accepted; retained for directed retry")
             }
         }
         return true

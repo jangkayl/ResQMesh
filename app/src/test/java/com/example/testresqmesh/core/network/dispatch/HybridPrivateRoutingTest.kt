@@ -3,6 +3,7 @@ package com.example.testresqmesh.core.network.dispatch
 import com.example.testresqmesh.core.network.BlockControlEnvelope
 import com.example.testresqmesh.core.network.MeshPayload
 import com.example.testresqmesh.core.network.PayloadDispatcherCallback
+import com.example.testresqmesh.core.network.TransportDispatchResult
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.protobuf.ProtoBuf
 import org.junit.Assert.assertEquals
@@ -27,10 +28,11 @@ class HybridPrivateRoutingTest {
         override fun getConnectedEndpointIdByName(name: String) = endpointMap[name]
         override fun getConnectedEndpointIdByNodeId(nodeId: String) = endpointMap[nodeId]
         override fun getStpNeighbors(): Set<String> = emptySet()
-        override fun sendDirectPayload(endpointId: String, payload: ByteArray) {
+        override fun sendDirectPayload(endpointId: String, payload: ByteArray): TransportDispatchResult {
             directPayloads.add(endpointId to payload)
+            return TransportDispatchResult.ACCEPTED
         }
-        override fun sendPriorityPayload(endpointId: String, payload: ByteArray) {}
+        override fun sendPriorityPayload(endpointId: String, payload: ByteArray) = TransportDispatchResult.ACCEPTED
         override fun sendGattPayload(endpointId: String, payload: ByteArray) {}
         override fun onHeartbeatAck(endpointId: String, challengeId: String) {}
         override fun broadcastPayload(payload: ByteArray, excludeEndpointId: String?) {
@@ -39,7 +41,7 @@ class HybridPrivateRoutingTest {
         override fun onMessageSeen(msgId: String, readerName: String) {}
         override fun onMessageDelivered(msgId: String, readerName: String, returnRoute: List<String>) {}
         override fun onPublicKeyReceived(senderName: String, senderNodeId: String, key: String) {}
-        override fun onRoutingTableReceived(senderName: String, senderNodeId: String, connectedNodes: List<String>, connectedNodeIds: List<String>) {}
+        override fun onRoutingTableReceived(senderName: String, senderNodeId: String, connectedNodes: List<String>, connectedNodeIds: List<String>, topologySequence: Long) {}
         override fun onMessageReceived(endpointId: String, msgId: String, senderName: String, text: String, isPrivate: Boolean, isSystem: Boolean, imageBase64: String?, audioBase64: String?, locationLat: Double?, locationLng: Double?, medium: String, routePath: List<String>, channelId: String) {}
         override fun onLiveAudioChunk(sender: String, channelId: String, chunk: ByteArray) {}
         override fun onDeviceNameSync(endpointId: String, realName: String) {}
@@ -79,7 +81,7 @@ class HybridPrivateRoutingTest {
     }
 
     @Test
-    fun standardMessageHandler_fallbackPath_broadcastsWhenNextHopDisconnected() {
+    fun standardMessageHandler_missingNextHop_doesNotBroadcastPrivatePayload() {
         val callback = TestDispatcherCallback(myName = "Relay#B001", myId = "B001")
         // No connection for C001 in endpointMap
 
@@ -100,11 +102,7 @@ class HybridPrivateRoutingTest {
         handler.handle("ep-alice", payload, payloadBytes, callback)
 
         assertTrue(callback.directPayloads.isEmpty())
-        assertEquals(1, callback.broadcastPayloads.size)
-        assertEquals("ep-alice", callback.broadcastPayloads[0].second)
-
-        val broadcastedPayload = ProtoBuf.decodeFromByteArray(MeshPayload.serializer(), callback.broadcastPayloads[0].first)
-        assertEquals(1, broadcastedPayload.relayHopCount)
+        assertTrue(callback.broadcastPayloads.isEmpty())
     }
 
     @Test
@@ -133,7 +131,7 @@ class HybridPrivateRoutingTest {
     }
 
     @Test
-    fun receiptHandler_fallbackPath_broadcastsWhenNextHopDisconnected() {
+    fun receiptHandler_missingNextHop_doesNotBroadcastPrivateReceipt() {
         val callback = TestDispatcherCallback(myName = "Relay#B001", myId = "B001")
         // Charlie sends receipt to Alice via Relay, but Alice endpoint is disconnected
         val receiptPayload = MeshPayload(
@@ -151,10 +149,6 @@ class HybridPrivateRoutingTest {
         handler.handle("ep-charlie", receiptPayload, payloadBytes, callback)
 
         assertTrue(callback.directPayloads.isEmpty())
-        assertEquals(1, callback.broadcastPayloads.size)
-        assertEquals("ep-charlie", callback.broadcastPayloads[0].second)
-
-        val broadcastedReceipt = ProtoBuf.decodeFromByteArray(MeshPayload.serializer(), callback.broadcastPayloads[0].first)
-        assertEquals(1, broadcastedReceipt.relayHopCount)
+        assertTrue(callback.broadcastPayloads.isEmpty())
     }
 }

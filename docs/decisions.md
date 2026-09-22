@@ -75,3 +75,7 @@ MapLibre default engine watermarks and attribution widgets are suppressed in fav
 ## D17: Hardware-bound permanent node identity and cloud backup exclusions
 
 Node IDs are derived deterministically from the SHA-256 hash of the device's hardware-backed public key (`CryptoManager.getMyNodeId()`) rather than ephemeral random UUIDs. This prevents key-versus-ID desynchronization across app restarts and re-installations. `resqmesh_prefs` (`node_id`) and `resqmesh_peer_public_keys` are excluded from Google Cloud Backup (`backup_rules.xml` and `data_extraction_rules.xml`), ensuring restored preferences cannot conflict with newly generated Keystore key pairs. Peer public key resolution supports display-name fallbacks and explicit rejection of pending key change alerts.
+
+## D18: Leased topology and accepted-only directed private delivery
+
+Topology uses leased snapshots; empty snapshots withdraw adjacency and old versions are ignored. Private traffic uses exact directed IDs, never broadcast fallback. Rejected sends remain retryable; receipt timing starts after acceptance.

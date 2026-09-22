@@ -36,7 +36,9 @@ data class MeshPayload(
     @ProtoNumber(28) val directedRouteNodeIds: List<String> = emptyList(),
     @ProtoNumber(29) val returnRouteNodeIds: List<String> = emptyList(),
     @ProtoNumber(30) val relayHopCount: Int = 0,
-    @ProtoNumber(31) val ttl: Int = 0
+    @ProtoNumber(31) val ttl: Int = 0,
+    /** Monotonic per-origin topology version. Zero denotes a legacy unversioned pulse. */
+    @ProtoNumber(32) val topologySequence: Long = 0L
 ) {
     override fun equals(other: Any?): Boolean {
         if (this === other) return true

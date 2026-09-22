@@ -43,7 +43,7 @@ class NativeBleManager(val context: Context) {
     var onLiveAudioChunk: ((String, String, ByteArray) -> Unit)? = null
     var onMessageDelivered: ((String, String, List<String>) -> Unit)? = null
     var onPublicKeyReceived: ((String, String, String) -> Unit)? = null
-    var onRoutingTableReceived: ((String, String, List<String>, List<String>) -> Unit)? = null
+    var onRoutingTableReceived: ((String, String, List<String>, List<String>, Long) -> Unit)? = null
     var onSosCancelled: (() -> Unit)? = null
     var onStatusChanged: ((String) -> Unit)? = null
     var onDeviceBlocked: ((String) -> Unit)? = null
@@ -133,9 +133,7 @@ class NativeBleManager(val context: Context) {
         override fun getConnectedEndpointIdByNodeId(nodeId: String) =
             (store.activeConnections.keys + store.activeServerConnections.keys).firstOrNull {
                 val epNodeId = nodeIdForEndpoint(it) ?: return@firstOrNull false
-                val idMatches = epNodeId.equals(nodeId, ignoreCase = true) ||
-                    epNodeId.startsWith(nodeId, ignoreCase = true) ||
-                    nodeId.startsWith(epNodeId, ignoreCase = true)
+                val idMatches = epNodeId.equals(nodeId, ignoreCase = true)
                 idMatches && store.links.isReady(it)
             }
         override fun getStpNeighbors(): Set<String> {
@@ -151,8 +149,8 @@ class NativeBleManager(val context: Context) {
         override fun onMessageSeen(msgId: String, readerName: String) { onMessageSeen?.invoke(msgId, readerName) }
         override fun onMessageDelivered(msgId: String, readerName: String, returnRoute: List<String>) { onMessageDelivered?.invoke(msgId, readerName, returnRoute) }
         override fun onPublicKeyReceived(senderName: String, senderNodeId: String, key: String) { onPublicKeyReceived?.invoke(senderName, senderNodeId, key) }
-        override fun onRoutingTableReceived(senderName: String, senderNodeId: String, connectedNodes: List<String>, connectedNodeIds: List<String>) {
-            onRoutingTableReceived?.invoke(senderName, senderNodeId, connectedNodes, connectedNodeIds)
+        override fun onRoutingTableReceived(senderName: String, senderNodeId: String, connectedNodes: List<String>, connectedNodeIds: List<String>, topologySequence: Long) {
+            onRoutingTableReceived?.invoke(senderName, senderNodeId, connectedNodes, connectedNodeIds, topologySequence)
         }
         override fun onMessageReceived(endpointId: String, msgId: String, senderName: String, text: String, isPrivate: Boolean, isSystem: Boolean, imageBase64: String?, audioBase64: String?, locationLat: Double?, locationLng: Double?, medium: String, routePath: List<String>, channelId: String) {
             this@NativeBleManager.onMessageReceived?.invoke(endpointId, msgId, senderName, text, isPrivate, isSystem, imageBase64, audioBase64, locationLat, locationLng, medium, routePath, channelId)
@@ -260,23 +258,32 @@ class NativeBleManager(val context: Context) {
     
     private var lastSystemPulseHash: Int = 0
     private var lastSystemPulseTime: Long = 0
+    // Wall-clock seed keeps versions increasing across ordinary process restarts.
+    private var topologySequence: Long = System.currentTimeMillis()
     private var pingCounter: Int = 0
 
     fun sendSystemPulse(forceFull: Boolean = false) {
         if (!store.isNodeActive.get()) return
         try {
-            val connectedNodesList = store.connectedEndpointNames.values
-                .filter { !NodeIdentity.isPlaceholder(it) }
-                .toList().sorted()
-            val connectedNodeIds = (store.activeConnections.keys + store.activeServerConnections.keys)
-                .mapNotNull { nodeIdForEndpoint(it) }
+            // Build and sort identity pairs together. Independently sorting names and IDs can bind
+            // one peer's display name to another peer's stable identity.
+            val neighbors = (store.activeConnections.keys + store.activeServerConnections.keys)
                 .distinct()
-                .sorted()
-            val currentHash = connectedNodesList.hashCode()
+                .mapNotNull { endpoint ->
+                    val name = store.connectedEndpointNames[endpoint]
+                    val nodeId = nodeIdForEndpoint(endpoint)?.uppercase()
+                    if (name.isNullOrBlank() || NodeIdentity.isPlaceholder(name) || nodeId.isNullOrBlank()) null
+                    else nodeId to name
+                }
+                .distinctBy { it.first }
+                .sortedBy { it.first }
+            val connectedNodeIds = neighbors.map { it.first }
+            val connectedNodesList = neighbors.map { it.second }
+            val currentHash = neighbors.hashCode()
             val now = System.currentTimeMillis()
             
-            // DELTA PING FIX: If topology hasn't changed and it's been less than 60s, send a 10-byte MICRO-PING instead
-            if (!forceFull && currentHash == lastSystemPulseHash && (now - lastSystemPulseTime < 60000)) {
+            // PING is link liveness only. Refresh the leased topology well before its expiry.
+            if (!forceFull && currentHash == lastSystemPulseHash && (now - lastSystemPulseTime < 30000)) {
                 pingCounter++
                 val payload = com.example.testresqmesh.core.network.MeshPayload(
                     id = "P$pingCounter",
@@ -291,6 +298,7 @@ class NativeBleManager(val context: Context) {
             // Topology changed or 60s passed! Send full 141-byte SYSTEM sync.
             lastSystemPulseHash = currentHash
             lastSystemPulseTime = now
+            topologySequence++
             
             val pulseId = java.util.UUID.randomUUID().toString()
             val payload = com.example.testresqmesh.core.network.MeshPayload(
@@ -301,7 +309,8 @@ class NativeBleManager(val context: Context) {
                 senderNodeId = myNodeId,
                 connectedNodeIds = connectedNodeIds,
                 publicKey = com.example.testresqmesh.core.network.CryptoManager.getMyPublicKeyBase64(),
-                ttl = getMeshProfileTtl()
+                ttl = getMeshProfileTtl(),
+                topologySequence = topologySequence
             )
             val payloadBytes = kotlinx.serialization.protobuf.ProtoBuf.encodeToByteArray(com.example.testresqmesh.core.network.MeshPayload.serializer(), payload)
             AppLogger.event(
@@ -663,7 +672,6 @@ class NativeBleManager(val context: Context) {
         val targets = mutableSetOf<String>()
         targets.addAll(store.activeConnections.keys)
         targets.addAll(store.activeServerConnections.keys)
-        store.connectingMacAddress?.let { targets.add(it) }
         targets.remove(excludeEndpointId)
         
         targets.forEach { targetId ->
@@ -756,39 +764,45 @@ class NativeBleManager(val context: Context) {
     }
 
     /** Sends a control payload ahead of normal GATT queue traffic; it never opens a new link. */
-    fun sendPriorityPayload(targetEndpointId: String, payloadBytes: ByteArray) {
-        if (!BluetoothAdapter.checkBluetoothAddress(targetEndpointId) || !hasReadyEndpoint(targetEndpointId)) return
-        if (l2capTransport.send(targetEndpointId, payloadBytes)) return
-        enqueueGattPayload(targetEndpointId, payloadBytes, priority = true)
+    fun sendPriorityPayload(targetEndpointId: String, payloadBytes: ByteArray): TransportDispatchResult {
+        if (!BluetoothAdapter.checkBluetoothAddress(targetEndpointId)) return TransportDispatchResult.REJECTED_INVALID_ENDPOINT
+        if (!hasReadyEndpoint(targetEndpointId)) return TransportDispatchResult.REJECTED_NOT_READY
+        if (l2capTransport.send(targetEndpointId, payloadBytes)) return TransportDispatchResult.ACCEPTED
+        return if (enqueueGattPayload(targetEndpointId, payloadBytes, priority = true)) {
+            TransportDispatchResult.ACCEPTED
+        } else {
+            TransportDispatchResult.REJECTED_QUEUE_FULL
+        }
     }
 
-    fun sendDirectPayload(targetMacAddress: String, payloadBytes: ByteArray) {
-        if (!BluetoothAdapter.checkBluetoothAddress(targetMacAddress)) return
+    fun sendDirectPayload(targetMacAddress: String, payloadBytes: ByteArray): TransportDispatchResult {
+        if (!BluetoothAdapter.checkBluetoothAddress(targetMacAddress)) return TransportDispatchResult.REJECTED_INVALID_ENDPOINT
         val fullData = MeshFrameCodec.encode(payloadBytes)
         if (fullData == null) {
             AppLogger.d("BLE_MESH", "Rejected oversized or empty outbound payload for $targetMacAddress")
-            return
+            return TransportDispatchResult.REJECTED_INVALID_FRAME
         }
         
         cacheOutgoingMessageId(payloadBytes)
 
-        if (l2capTransport.send(targetMacAddress, payloadBytes)) return
+        if (l2capTransport.send(targetMacAddress, payloadBytes)) return TransportDispatchResult.ACCEPTED
         
         val isServerConnected = store.activeServerConnections.containsKey(targetMacAddress)
         val isClientConnected = store.activeConnections.containsKey(targetMacAddress)
-        val isConnecting = store.connectingMacAddress == targetMacAddress
-
-        if (!isServerConnected && !isClientConnected && !isConnecting) {
+        if (!isServerConnected && !isClientConnected) {
             AppLogger.d("BLE_MESH", "sendDirectPayload skipped: $targetMacAddress is not directly connected; relying on mesh routing")
-            return
+            return TransportDispatchResult.REJECTED_NOT_READY
         }
+
+        if (!hasReadyEndpoint(targetMacAddress)) return TransportDispatchResult.REJECTED_NOT_READY
 
         if (!transferCoordinator.enqueue(targetMacAddress, GattTransfer(fullData), priority = false)) {
             AppLogger.d("BLE_MESH", "GATT queue full for $targetMacAddress; rejected payload")
-            return
+            return TransportDispatchResult.REJECTED_QUEUE_FULL
         }
 
         processNextPayload(targetMacAddress)
+        return TransportDispatchResult.ACCEPTED
     }
 
     fun cacheOutgoingMessageId(payloadBytes: ByteArray) {
@@ -978,20 +992,29 @@ class NativeBleManager(val context: Context) {
         connectToPersistentGatt(endpointId, endpointName)
     }
 
-    fun broadcastSeenReceipt(targetMessageId: String, isPrivate: Boolean, targetId: String? = null) {
+    fun broadcastSeenReceipt(
+        targetMessageId: String,
+        isPrivate: Boolean,
+        targetId: String? = null,
+        directedReturnRoute: List<String> = emptyList()
+    ) {
         val payload = MeshPayload(
             id = UUID.randomUUID().toString(),
             type = "SEEN",
             targetMessageId = targetMessageId,
             reader = myDeviceName,
-            isPrivate = isPrivate
+            isPrivate = isPrivate,
+            directedRoute = directedReturnRoute,
+            directedRouteNodeIds = directedReturnRoute.mapNotNull(NodeIdentity::idOf)
         )
         val bytes = ProtoBuf.encodeToByteArray(payload)
         
         if (targetId != null) {
             sendDirectPayload(targetId, bytes)
-        } else {
+        } else if (!isPrivate) {
             broadcastPayload(bytes)
+        } else {
+            AppLogger.d("BLE_MESH", "Private seen receipt has no directed next hop; not broadcasting")
         }
     }
 

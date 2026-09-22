@@ -15,7 +15,7 @@ interface MessageStore {
     suspend fun markFailed(messageId: String)
     suspend fun markPending(messageId: String)
     suspend fun markSent(messageId: String)
-    suspend fun getPendingOutbox(minTimestamp: Long): List<Pair<ChatMessage, String?>>
+    suspend fun getPendingOutbox(): List<Pair<ChatMessage, String?>>
     suspend fun deleteConversation(peerName: String)
 }
 
@@ -70,8 +70,8 @@ class RoomMessageStore(private val dao: MessageDao) : MessageStore {
         }
     }
 
-    override suspend fun getPendingOutbox(minTimestamp: Long): List<Pair<ChatMessage, String?>> {
-        return dao.getPendingOutboxMessages(minTimestamp).map {
+    override suspend fun getPendingOutbox(): List<Pair<ChatMessage, String?>> {
+        return dao.getPendingOutboxMessages().map {
             Pair(it.toChatMessage(), it.targetName)
         }
     }

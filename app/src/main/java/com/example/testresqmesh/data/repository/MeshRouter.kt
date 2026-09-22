@@ -18,6 +18,8 @@ class MeshRouter {
     private val stableRouteGraph = ConcurrentHashMap<String, Set<String>>()
     private val stableNames = ConcurrentHashMap<String, String>()
     private val lastSeenMap = ConcurrentHashMap<String, Long>()
+    private val stableLastSeenMap = ConcurrentHashMap<String, Long>()
+    private val topologySequences = ConcurrentHashMap<String, Long>()
     
     private val _topology = MutableStateFlow<Map<String, Set<String>>>(emptyMap())
     val topology: StateFlow<Map<String, Set<String>>> = _topology.asStateFlow()
@@ -25,36 +27,50 @@ class MeshRouter {
     private val _knownNodes = MutableStateFlow<List<KnownNode>>(emptyList())
     val knownNodes: StateFlow<List<KnownNode>> = _knownNodes.asStateFlow()
 
+    @Synchronized
     fun updateTopology(
         senderName: String,
         senderNodeId: String,
         connectedNodes: List<String>,
         connectedNodeIds: List<String>,
-        myNodeName: String
-    ) {
-        if (NodeIdentity.matches(senderName, myNodeName) || NodeIdentity.isPlaceholder(senderName)) return
+        myNodeName: String,
+        topologySequence: Long = 0L
+    ): Boolean {
+        if (NodeIdentity.matches(senderName, myNodeName) || NodeIdentity.isPlaceholder(senderName)) return false
+
+        val stableSender = senderNodeId.ifBlank { NodeIdentity.idOf(senderName).orEmpty() }.trim().uppercase()
+        if (stableSender.isBlank()) return false
+        val previousSequence = topologySequences[stableSender]
+        if (topologySequence > 0L) {
+            if (previousSequence != null && topologySequence <= previousSequence) return false
+            topologySequences[stableSender] = topologySequence
+        } else if (previousSequence != null) {
+            // Once versioned advertisements are seen, a delayed legacy pulse cannot overwrite them.
+            return false
+        }
 
         markNodeSeen(senderName)
+        val now = System.currentTimeMillis()
+        stableLastSeenMap[stableSender] = now
 
         val currentTopology = _topology.value.toMutableMap()
         
         // Filter out placeholder names to prevent ghost node pollution
         val validNodes = connectedNodes.filter { !NodeIdentity.isPlaceholder(it) }
         
-        validNodes.forEach { node ->
-            if (node != myNodeName) {
-                markNodeSeen(node)
-            }
-        }
-        
         currentTopology[senderName] = validNodes.toSet()
-        val stableSender = senderNodeId.ifBlank { NodeIdentity.idOf(senderName).orEmpty() }
-        if (stableSender.isNotBlank()) {
-            stableNames[stableSender] = senderName
-            val stableNeighbors = connectedNodeIds.map { it.trim().uppercase() }.filter { it.isNotBlank() }.toSet()
-            stableRouteGraph[stableSender] = stableNeighbors
-            connectedNodes.zip(connectedNodeIds).forEach { (name, nodeId) ->
-                if (nodeId.isNotBlank()) stableNames[nodeId.trim().uppercase()] = name
+        val previousName = stableNames.put(stableSender, senderName)
+        if (previousName != null && previousName != senderName) {
+            currentTopology.remove(previousName)
+            lastSeenMap.remove(previousName)
+        }
+        val stableNeighbors = connectedNodeIds.map { it.trim().uppercase() }
+            .filter { it.isNotBlank() && it != stableSender }
+            .toSet()
+        stableRouteGraph[stableSender] = stableNeighbors
+        connectedNodes.zip(connectedNodeIds).forEach { (name, nodeId) ->
+            if (nodeId.isNotBlank() && !NodeIdentity.isPlaceholder(name)) {
+                stableNames[nodeId.trim().uppercase()] = name
             }
         }
 
@@ -69,12 +85,14 @@ class MeshRouter {
         _topology.value = currentTopology
         networkGraph.clear()
         networkGraph.putAll(currentTopology)
+        return true
     }
 
     fun markNodeSeen(nodeName: String) {
         lastSeenMap[nodeName] = System.currentTimeMillis()
     }
 
+    @Synchronized
     fun removeNode(nodeName: String) {
         networkGraph.remove(nodeName)
         _topology.value = networkGraph.toMap()
@@ -83,6 +101,8 @@ class MeshRouter {
             stableRouteGraph.remove(id)
             stableRouteGraph.replaceAll { _, neighbors -> neighbors - id }
             stableNames.remove(id)
+            stableLastSeenMap.remove(id)
+            topologySequences.remove(id)
         }
     }
 
@@ -195,14 +215,7 @@ class MeshRouter {
             val path = queue.removeFirst()
             val currentNode = path.last()
             
-            val isTarget = if (currentNode == targetNodeId) {
-                true
-            } else if (currentNode.startsWith(targetNodeId) || targetNodeId.startsWith(currentNode)) {
-                val currentName = stableNames[currentNode]
-                currentName != null && NodeIdentity.matches(currentName, targetName)
-            } else {
-                false
-            }
+            val isTarget = currentNode == targetNodeId
 
             if (isTarget) {
                 return path.map { stableNames[it] ?: "#$it" }
@@ -235,12 +248,28 @@ class MeshRouter {
                 val iterator = lastSeenMap.entries.iterator()
                 while (iterator.hasNext()) {
                     val entry = iterator.next()
-                    if (now - entry.value > 10000) {
+                    if (now - entry.value > TOPOLOGY_EXPIRY_MS) {
                         val deadNode = entry.key
                         lastSeenMap.remove(deadNode)
                         networkGraph.remove(deadNode)
                         changed = true
                     }
+                }
+
+                val staleStableIds = stableLastSeenMap.entries
+                    .filter { now - it.value > TOPOLOGY_EXPIRY_MS }
+                    .map { it.key }
+                if (staleStableIds.isNotEmpty()) {
+                    synchronized(this@MeshRouter) {
+                        staleStableIds.forEach { id ->
+                            stableLastSeenMap.remove(id)
+                            stableRouteGraph.remove(id)
+                            stableNames.remove(id)
+                            topologySequences.remove(id)
+                        }
+                        stableRouteGraph.replaceAll { _, neighbors -> neighbors - staleStableIds.toSet() }
+                    }
+                    changed = true
                 }
                 
                 if (changed) {
@@ -249,5 +278,9 @@ class MeshRouter {
                 }
             }
         }
+    }
+
+    companion object {
+        const val TOPOLOGY_EXPIRY_MS = 90_000L
     }
 }

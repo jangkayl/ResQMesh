@@ -1,11 +1,11 @@
 # Current status
 
-Last reviewed: 2026-09-20
+Last reviewed: 2026-09-22
 Baseline: uncommitted `fix/startup-bootstrap-admission` working tree; the 2026-09-18 focused five-phone capture confirms block acknowledgement, direct teardown, and public/private relay, while direct-upgrade behavior is awaiting a fresh APK run.
 
 ## Current objective
 
-Make blocking reliably mutual across relays: deny direct links after identity, show the state on both phones, and require both phones to unblock locally.
+Validate convergent mesh-hop topology and directed private delivery under relay loss, queue rejection, and recovery while preserving mutual-block behavior.
 
 ## Implemented in the working tree
 
@@ -38,14 +38,14 @@ Local checks passed; physical BLE validation remains required.
 | BLOCK-01 | P0 | The 2026-09-18 five-phone capture shows acknowledgement-driven direct teardown and public/private relay; one-sided-unblock state presentation, restart persistence, and a 70-second stable-route run remain unrecorded | Focused A-B-C run covering restart, unilateral/bilateral unblock, direct non-reconnect, and 70-second relay stability |
 | ADMIT-01 | P1 | Automatic direct admission previously deferred every peer already reachable through a hop; queued startup recovery and the working-tree exception need device evidence without redundant-link churn | A routed peer bootstraps only after the last ready direct link disappears; busy startup candidates are retained; blocked/capacity-full peers remain denied |
 | LIMIT-01 | P2 | User reports five-device availability, but direct-limit/admission and routed-capacity conditions lack a recorded matrix | Record devices/build/conditions; repeat controlled five-device admission and route tests |
-| ROUTE-01 | P0 | FIXED (Working Tree): Return receipts lost a directed hop, causing stuck messages. Addressed via hybrid controlled-broadcast fallback (max 3 hops) and 15-second sender timeout. Needs device validation for GATT callback retirement. | Stable route/reconnect run with delivery receipts and no repeated callback retirement |
+| ROUTE-01 | P0 | FIXED LOCALLY: versioned empty-withdrawal topology and accepted-only directed dispatch remove stale-hop and false-send paths; private broadcast fallback is removed. Physical relay/reconnect validation remains open. | Stable A-B-C route/withdraw/recover run with receipts, queue rejection, no private broadcast, and no repeated callback retirement |
 | SEC-01 | P1 | Deterministic node ID bound to Keystore public key, backup exclusions, and key rejection flow implemented (D17); fingerprint display and interactive trust verification UI remain | Defined threat model, approval flow, fail-closed tests, and documented claim boundary |
 | SOS-01 | P1 | SOS cancellation/follow-up ownership needs sender/alert binding review | Concurrent-alert and cancel-before-location tests |
 
 ## Next actions
 
-1. Build and install the startup-admission working tree; measure two- and three-phone discovery-to-`READY` timing and the one-stalled-peer recovery path.
-2. Record unilateral/bilateral unblock, restart persistence, and 70-second relay stability for `BLOCK-01`.
+1. Build and install the current working tree; run A-B-C for 90 seconds, send five private messages each way, remove/restore B, and verify explicit withdrawal plus directed retry without private broadcast.
+2. Repeat with queue pressure and one relay restart; record dispatch acceptance/rejection, topology sequence, outbox state, receipts, and GATT retirement markers.
 3. Record APK/build identity, device matrix, and repetitions for the Samsung and five-device runs.
 4. Run the stable-ID relay card after installing this working tree; capture selected next hop, private relay route-unavailable, key-change, and GATT-retirement markers.
 5. Diagnose below-capacity auto-connect reports using [`ble-autoconnect-admission-diagnosis.md`](plans/ble-autoconnect-admission-diagnosis.md) before changing admission policy.

@@ -34,9 +34,14 @@ class SystemPulseHandler : PayloadHandler {
         if (payload.publicKey.isNotEmpty()) {
             callback.onPublicKeyReceived(sender, senderNodeId, payload.publicKey)
         }
-        if (payload.connectedNodes.isNotEmpty() || payload.connectedNodeIds.isNotEmpty()) {
-            callback.onRoutingTableReceived(sender, senderNodeId, payload.connectedNodes, payload.connectedNodeIds)
-        }
+        // An empty adjacency is an authoritative withdrawal, not "no update".
+        callback.onRoutingTableReceived(
+            sender,
+            senderNodeId,
+            payload.connectedNodes,
+            payload.connectedNodeIds,
+            payload.topologySequence
+        )
         AppLogger.event(
             category = TerminalLogCategory.SYNC,
             event = "SYSTEM_RECEIVED",
@@ -145,25 +150,12 @@ class ReceiptHandler : PayloadHandler {
                 }
                 val nextEndpoint = routeIds.getOrNull(myIndex + 1)?.let(callback::getConnectedEndpointIdByNodeId)
                 if (nextEndpoint != null) {
-                    AppLogger.d("PayloadDispatcher", "Private receipt forwarding to selected next hop")
-                    callback.sendDirectPayload(nextEndpoint, ProtoBuf.encodeToByteArray(updatedPayload))
+                    val result = callback.sendDirectPayload(nextEndpoint, ProtoBuf.encodeToByteArray(updatedPayload))
+                    AppLogger.d("PayloadDispatcher", "Private receipt next-hop dispatch: $result")
                     return
                 }
             }
-            val canRelay = if (payload.ttl > 0) {
-                payload.ttl > 1
-            } else {
-                payload.relayHopCount < MAX_PRIVATE_RELAY_HOPS
-            }
-            if (canRelay) {
-                val floodPayload = updatedPayload.copy(
-                    relayHopCount = payload.relayHopCount + 1,
-                    ttl = if (payload.ttl > 0) payload.ttl - 1 else 0
-                )
-                callback.broadcastPayload(ProtoBuf.encodeToByteArray(floodPayload), endpointId)
-            } else {
-                AppLogger.d("PayloadDispatcher", "Private receipt route unavailable and max flood hops exceeded; dropping receipt")
-            }
+            AppLogger.d("PayloadDispatcher", "Private receipt route unavailable; dropping without broadcast")
             return
         }
         if (directedRoute.isNotEmpty()) {
@@ -350,28 +342,13 @@ class StandardMessageHandler : PayloadHandler {
                     if (myIndex >= 0) {
                         val nextEndpoint = routeIds.getOrNull(myIndex + 1)?.let(callback::getConnectedEndpointIdByNodeId)
                         if (nextEndpoint != null) {
-                            AppLogger.d("PayloadDispatcher", "Private relay forwarding to selected next hop")
-                            callback.sendDirectPayload(nextEndpoint, updatedBytes)
+                            val result = callback.sendDirectPayload(nextEndpoint, updatedBytes)
+                            AppLogger.d("PayloadDispatcher", "Private relay next-hop dispatch: $result")
                             return
                         }
                     }
                 }
-                AppLogger.d("PayloadDispatcher", "Private relay route unavailable; evaluating controlled flood fallback")
-                val canRelay = if (payload.ttl > 0) {
-                    payload.ttl > 1
-                } else {
-                    payload.relayHopCount < MAX_PRIVATE_RELAY_HOPS
-                }
-                if (canRelay) {
-                    val floodPayload = updatedPayload.copy(
-                        relayHopCount = payload.relayHopCount + 1,
-                        ttl = if (payload.ttl > 0) payload.ttl - 1 else 0
-                    )
-                    val floodBytes = ProtoBuf.encodeToByteArray(floodPayload)
-                    callback.broadcastPayload(floodBytes, endpointId)
-                } else {
-                    AppLogger.d("PayloadDispatcher", "Private relay route unavailable and max flood hops exceeded; dropping payload")
-                }
+                AppLogger.d("PayloadDispatcher", "Private relay route unavailable; dropping without broadcast")
             }
         } else {
             if (payload.isSOSCancel) {
