@@ -62,19 +62,26 @@ fun NetworkScreen(
 ) {
     val state by viewModel.uiState.collectAsState()
     val nodes = remember(state) { classifyRadarNodes(state) }
-    var selectedNode by remember { mutableStateOf<NodeItemData?>(null) }
+    var selectedNodeKey by remember { mutableStateOf<String?>(null) }
     var showTopology by remember { mutableStateOf(false) }
+    val selectedNode = selectedNodeKey?.let { key ->
+        nodes.firstOrNull { com.example.testresqmesh.core.model.NodeIdentity.key(it.name) == key }
+    }
+
+    if (selectedNodeKey != null && selectedNode == null) {
+        LaunchedEffect(selectedNodeKey) { selectedNodeKey = null }
+    }
 
     if (selectedNode != null) {
         NetworkPeerDetails(
-            node = selectedNode!!,
-            knownPath = knownMeshPath(selectedNode!!, nodes, state.topology),
-            onBack = { selectedNode = null },
-            onDisconnect = { viewModel.disconnectDevice(selectedNode!!.endpointId) },
-            onConnect = { viewModel.forceConnect(selectedNode!!.endpointId, selectedNode!!.name) },
-            onBlock = { viewModel.blockDevice(selectedNode!!.name) },
-            onUnblock = { viewModel.unblockDevice(selectedNode!!.name) },
-            onMessage = { onMessagePeer(selectedNode!!.name) }
+            node = selectedNode,
+            knownPath = knownMeshPath(selectedNode),
+            onBack = { selectedNodeKey = null },
+            onDisconnect = { viewModel.disconnectDevice(selectedNode.endpointId) },
+            onConnect = { viewModel.forceConnect(selectedNode.endpointId, selectedNode.name) },
+            onBlock = { viewModel.blockDevice(selectedNode.name) },
+            onUnblock = { viewModel.unblockDevice(selectedNode.name) },
+            onMessage = { onMessagePeer(selectedNode.name) }
         )
         return
     }
@@ -90,7 +97,7 @@ fun NetworkScreen(
     NetworkList(
         nodes = nodes,
         onRefresh = viewModel::rescan,
-        onNodeClick = { selectedNode = it },
+        onNodeClick = { selectedNodeKey = com.example.testresqmesh.core.model.NodeIdentity.key(it.name) },
         onTopologyClick = { showTopology = true }
     )
 }
@@ -1065,32 +1072,12 @@ private fun NetworkTopology(topology: Map<String, Set<String>>, onBack: () -> Un
 
 /** A current topology hint, deliberately not a promise of the next delivery route. */
 internal fun knownMeshPath(
-    target: NodeItemData,
-    nodes: List<NodeItemData>,
-    topology: Map<String, Set<String>>
+    target: NodeItemData
 ): List<String> {
     if (target.kind == NodeKind.DIRECT) return listOf("You", target.label)
-    val direct = nodes.filter { it.kind == NodeKind.DIRECT }.map { it.name }
-    if (direct.isEmpty()) return emptyList()
-    val adjacency = mutableMapOf<String, MutableSet<String>>()
-    topology.forEach { (from, to) ->
-        adjacency.getOrPut(from) { mutableSetOf() }.addAll(to)
-        to.forEach { neighbor -> adjacency.getOrPut(neighbor) { mutableSetOf() }.add(from) }
+    return target.route.mapIndexed { index, name ->
+        if (index == 0) "You" else com.example.testresqmesh.core.model.NodeIdentity.displayNameOf(name).ifBlank { name }
     }
-    val queue = ArrayDeque<List<String>>()
-    direct.forEach { queue.add(listOf(it)) }
-    val visited = direct.toMutableSet()
-    while (queue.isNotEmpty()) {
-        val path = queue.removeFirst()
-        val current = path.last()
-        if (com.example.testresqmesh.core.model.NodeIdentity.matches(current, target.name)) {
-            return listOf("You") + path.map { name -> nodes.firstOrNull { com.example.testresqmesh.core.model.NodeIdentity.matches(it.name, name) }?.label ?: name }
-        }
-        adjacency[current].orEmpty().forEach { next ->
-            if (visited.add(next)) queue.add(path + next)
-        }
-    }
-    return emptyList()
 }
 
 internal fun networkStatus(kind: NodeKind): String = when (kind) {

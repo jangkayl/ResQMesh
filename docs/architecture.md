@@ -69,7 +69,7 @@ Keep these states distinct:
 - Advertising/recently seen but not connected.
 - Offline after a previously known link disappears.
 
-Stable-ID topology uses per-origin sequenced snapshots: empty lists withdraw adjacency, old versions are ignored, full refresh is 30 seconds, and UI/routes share a 90-second lease. Relayed SYSTEM pulses never rename their physical forwarder and are limited to four hops. Legacy name-only topology is display-only; private next hops require exact stable IDs.
+Stable-ID topology uses authoritative directed per-origin snapshots: empty lists withdraw adjacency, old versions are ignored, full refresh is 30 seconds, and cached fragments have a 90-second lease. Only payload-ready, identified, unblocked neighbors are advertised. UI and delivery use the same directed paths rooted at current payload-ready first hops, so a stale reverse snapshot cannot restore a withdrawn route. Relayed SYSTEM pulses never rename their physical forwarder and are limited to four hops. Legacy name-only topology is display-only.
 
 ## Private messaging
 

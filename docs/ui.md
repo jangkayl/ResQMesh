@@ -8,10 +8,10 @@ The UI uses Jetpack Compose and Material 3. Inspect the actual screen, ViewModel
 - Tactical & Utilitarian / High-Vis Safety Dark is dark-first with a Field Light Daylight preference; appearance affects presentation only.
 - Night uses Pitch Black (#000000) for OLED efficiency, Carbon/Dark Grey raised panels, restrained shadows, and 1dp borders. Daylight uses white and steel grey backgrounds with black text.
 - Both use Safety Orange (#FF5A00) for interactions/accents, green for positive states, amber for attention, and red for SOS. Use tokens, vector icons, 8dp rhythm, 16dp gutters, 18-24dp radii, and 48dp targets.
-- Use tactical mission-first hierarchy, left-aligned titles, compact bento groups, and a restrained icon-only navigation dock with persistent SOS. Ambient fields are decorative and use 150-220ms transitions.
+- Use mission-first hierarchy, left-aligned titles, compact groups, and icon-only navigation with persistent SOS. Ambient fields are decorative.
 - New top-level screens use the reusable shell: Mission, Messages, Voice, and Mesh. SOS is a persistent action rather than a navigation destination.
 - **Chat Composers** must be context-aware: hide inline media tools while typing to maximize horizontal space, providing access via a contextual floating action bubble above the input.
-- **Network & Topology** uses Tactical Operator Cards with clear glowing status borders, and interactive 2D Visual Holographic Maps for visualizing routes instead of raw text logs.
+- **Network & Topology** uses operator cards and a 2D route map instead of raw logs.
 - **Onboarding & Setup** uses a Tactical Radar Sweep splash and a civilian Secure Digital Passport card that updates in real-time, avoiding gamified/combat aesthetics.
 - Shared controls use semantic shapes, clear pressed/disabled states, and text or icon-independent status descriptions.
 - Keep business, routing, and transport decisions out of composables. ViewModels/use cases expose UI state and user actions.
@@ -30,6 +30,8 @@ UI labels must reflect verified application state:
 | Nearby | Advertising/recently observed without a usable direct link |
 | Offline | A previously known peer is not direct-ready, routed, or currently nearby |
 | Connecting / Handshaking | Radio/setup work is incomplete; private send and direct-ready claims remain unavailable |
+
+Relayed status requires a repository-verified directed path through a payload-ready first hop; cached topology is not live reachability. Unblock permits admission but never implies Direct. Lists, details, dots, counters, and message recipients re-resolve shared peer state.
 
 Avoid showing “connected” from a BLE callback alone. Counters and selected peers should use the same payload-ready/reachability definitions as routing.
 
@@ -51,7 +53,7 @@ Avoid showing “connected” from a BLE callback alone. Counters and selected p
 - Keep heartbeat/relay chatter behind Details to preserve readability.
 
 ## Hidden legacy UI
-- Legacy `RadarScreen` and `DebugTerminal` are hidden from civilian flows. Developer Debugging Mode (PIN 0000 in Settings) surfaces a top-right floating badge to open `DebugTerminal` (click) and legacy Radar overlay (long-press or header action) for field diagnostics. Offline maps are managed via Settings.
+- Legacy Radar and terminal stay outside civilian flows. Debugging Mode exposes them for field diagnostics; Settings manages offline maps.
 - Restored callbacks preserve accessibility labels without altering underlying mesh policies. Validate empty, permission-denied, and error states.
 
 ## Accessibility and interaction

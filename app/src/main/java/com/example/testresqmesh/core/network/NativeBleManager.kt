@@ -284,7 +284,8 @@ class NativeBleManager(val context: Context) {
                 .mapNotNull { endpoint ->
                     val name = store.connectedEndpointNames[endpoint]
                     val nodeId = nodeIdForEndpoint(endpoint)?.uppercase()
-                    if (name.isNullOrBlank() || NodeIdentity.isPlaceholder(name) || nodeId.isNullOrBlank()) null
+                    if (!hasReadyEndpoint(endpoint) || name.isNullOrBlank() || NodeIdentity.isPlaceholder(name) ||
+                        nodeId.isNullOrBlank() || isDeviceBlocked(name)) null
                     else nodeId to name
                 }
                 .distinctBy { it.first }

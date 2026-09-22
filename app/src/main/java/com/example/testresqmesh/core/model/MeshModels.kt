@@ -44,7 +44,9 @@ data class ConnectedDevice(
 data class KnownNode(
     val name: String,
     val isDirect: Boolean,
-    val lastSeen: Long
+    val lastSeen: Long,
+    /** Current directed path from this phone, including the local and target nodes. */
+    val route: List<String> = emptyList()
 )
 
 data class ScannedDevice(

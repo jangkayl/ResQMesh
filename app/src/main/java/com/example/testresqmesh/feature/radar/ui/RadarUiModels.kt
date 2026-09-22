@@ -23,5 +23,7 @@ data class NodeItemData(
     val isActiveRelay: Boolean = false,
     val isBlocked: Boolean = false,
     /** Human friendly text for display only. Falls back to [name] when empty. */
-    val label: String = ""
+    val label: String = "",
+    /** Current repository-verified path. Empty for nearby/offline peers. */
+    val route: List<String> = emptyList()
 )

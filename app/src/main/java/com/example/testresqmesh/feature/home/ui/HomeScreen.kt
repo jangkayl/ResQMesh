@@ -704,9 +704,8 @@ private fun TacticalTopologyPanel(
                 border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.15f))
             ) {
                 NetworkGraphVisualizer(
-                    topology = radarState.topology,
+                    nodes = classifyRadarNodes(radarState),
                     myDeviceName = myDeviceName,
-                    connectedNodes = directNodeNames,
                     showEmptyScanPrompt = false,
                     modifier = Modifier
                         .fillMaxWidth()

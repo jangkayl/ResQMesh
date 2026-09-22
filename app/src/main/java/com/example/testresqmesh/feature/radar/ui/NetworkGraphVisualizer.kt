@@ -28,9 +28,8 @@ import com.example.testresqmesh.core.ui.theme.ResQTheme
 
 @Composable
 fun NetworkGraphVisualizer(
-    topology: Map<String, Set<String>>,
+    nodes: List<NodeItemData>,
     myDeviceName: String,
-    connectedNodes: List<String> = emptyList(),
     modifier: Modifier = Modifier,
     showEmptyScanPrompt: Boolean = true
 ) {
@@ -60,7 +59,8 @@ fun NetworkGraphVisualizer(
             .background(Color.Transparent)
             .padding(8.dp)
     ) {
-        if (showEmptyScanPrompt && topology.isEmpty() && topology.values.flatten().isEmpty() && connectedNodes.isEmpty()) {
+        val graphNodes = nodes.filter { it.kind != NodeKind.OFFLINE && it.kind != NodeKind.BLOCKED_OFFLINE }
+        if (showEmptyScanPrompt && graphNodes.isEmpty()) {
             Text(
                 "Scanning tactical mesh...",
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -69,34 +69,16 @@ fun NetworkGraphVisualizer(
             )
         }
 
-        // Build node layers for radial layout
-        val allNodes = mutableSetOf<String>()
-        allNodes.add(myDeviceName)
-        topology.keys.forEach { allNodes.add(it) }
-        topology.values.flatten().forEach { allNodes.add(it) }
-        connectedNodes.forEach { allNodes.add(it) }
-
         val centerNode = myDeviceName
-        val ring1 = mutableSetOf<String>() // Direct connections
-        
-        topology[centerNode]?.let { ring1.addAll(it) }
-        connectedNodes.forEach { ring1.add(it) }
-        
-        topology.forEach { (node, edges) ->
-            if (edges.contains(centerNode)) ring1.add(node)
-        }
-
-        val ring2 = mutableSetOf<String>() // Indirect connections
-        val ring3 = mutableSetOf<String>()
-        
-        allNodes.forEach { node ->
-            if (node != centerNode && !ring1.contains(node)) {
-                val connectedToRing1 = ring1.any { r1 ->
-                    topology[r1]?.contains(node) == true || topology[node]?.contains(r1) == true
-                }
-                if (connectedToRing1) ring2.add(node) else ring3.add(node)
-            }
-        }
+        // Consume the same canonical peer rows as the list. Raw topology strings previously made
+        // truncated aliases and leased disconnected fragments appear as unexplained extra dots.
+        val ring1 = graphNodes.filter { it.kind == NodeKind.DIRECT }.map { it.name }.toSet()
+        val ring2 = graphNodes.filter {
+            it.kind == NodeKind.UNRESPONSIVE || it.kind == NodeKind.HANDSHAKING || it.kind == NodeKind.RELAY
+        }.map { it.name }.toSet()
+        val ring3 = graphNodes.filter {
+            it.kind == NodeKind.HOPPED || it.kind == NodeKind.DISCOVERED || it.kind == NodeKind.SYNCING
+        }.map { it.name }.toSet()
 
         val primaryColor = ResQTheme.colors.glowPrimary
         val successColor = ResQTheme.colors.success
@@ -147,23 +129,11 @@ fun NetworkGraphVisualizer(
             positionRing(ring2, ring2Radius)
             positionRing(ring3, ring3Radius)
 
-            // Draw Edges
-            val drawnEdges = mutableSetOf<Pair<String, String>>()
-            
-            val drawEdge = { source: String, target: String ->
-                val edge = if (source < target) Pair(source, target) else Pair(target, source)
-                if (!drawnEdges.contains(edge)) {
-                    drawnEdges.add(edge)
-                    val pos1 = nodePositions[source]
-                    val pos2 = nodePositions[target]
-                    if (pos1 != null && pos2 != null) {
-                        drawLine(color = primaryColor.copy(alpha = 0.2f), start = pos1, end = pos2, strokeWidth = 3f)
-                    }
+            ring1.forEach { target ->
+                nodePositions[target]?.let { targetPosition ->
+                    drawLine(color = primaryColor.copy(alpha = 0.2f), start = center, end = targetPosition, strokeWidth = 3f)
                 }
             }
-            
-            connectedNodes.forEach { target -> drawEdge(centerNode, target) }
-            topology.forEach { (source, targets) -> targets.forEach { target -> drawEdge(source, target) } }
 
             // Draw Nodes
             nodePositions.forEach { (node, pos) ->

@@ -53,14 +53,10 @@ fun RadarScreen(viewModel: RadarViewModel) {
 
     val nodes = remember(uiState) { classifyRadarNodes(uiState) }
     val activeNodesCount = remember(nodes) { nodes.count { it.kind == NodeKind.DIRECT } }
-    val directNodeNames = remember(nodes) { nodes.filter { it.kind == NodeKind.DIRECT }.map { it.name } }
-
     RadarScreenContent(
         activeNodesCount = activeNodesCount,
         nodes = nodes,
-        topology = uiState.topology,
         myDeviceName = myDeviceName,
-        directNodeNames = directNodeNames,
         onRefresh = { viewModel.rescan() },
         onDisconnect = { viewModel.disconnectDevice(it) },
         onForceConnect = { id, name -> viewModel.forceConnect(id, name) },
@@ -164,14 +160,15 @@ internal fun classifyRadarNodes(state: RadarUiState): List<NodeItemData> {
             val inRadioRange = state.scannedDevices.any { NodeIdentity.matches(it.name, node.name) }
             val blocked = blockedNameFor(node.name) != null
             NodeItemData(
-                endpointId = "",
                 name = node.name,
                 label = label(node.name),
-                status = if (inRadioRange) "Connected (Via Relay)" else "Hopped via Mesh",
+                endpointId = state.scannedDevices.firstOrNull { NodeIdentity.matches(it.name, node.name) }?.endpointId.orEmpty(),
+                status = if (inRadioRange) "Reachable nearby via relay" else "Reachable via mesh",
                 kind = if (inRadioRange) NodeKind.RELAY else NodeKind.HOPPED,
                 isConnected = false,
                 isActiveRelay = true,
-                isBlocked = blocked
+                isBlocked = blocked,
+                route = node.route
             )
         }
 
@@ -241,14 +238,12 @@ internal fun classifyRadarNodes(state: RadarUiState): List<NodeItemData> {
 fun RadarScreenContent(
     activeNodesCount: Int,
     nodes: List<NodeItemData>,
-    topology: Map<String, Set<String>>,
     myDeviceName: String,
     onRefresh: () -> Unit,
     onDisconnect: (String) -> Unit,
     onForceConnect: (String, String) -> Unit,
     onBlock: (String) -> Unit,
-    onUnblock: (String) -> Unit,
-    directNodeNames: List<String> = nodes.filter { it.kind == NodeKind.DIRECT }.map { it.name }
+    onUnblock: (String) -> Unit
 ) {
     Scaffold(
         topBar = {
@@ -308,10 +303,10 @@ fun RadarScreenContent(
 
                 // Ring 1 must be true physical links only. Passing every `isConnected` node also
                 // pushed relay-reachable peers into the inner ring, misrepresenting the topology.
-                NetworkGraphVisualizer(topology = topology, myDeviceName = myDeviceName, connectedNodes = directNodeNames)
+                NetworkGraphVisualizer(nodes = nodes, myDeviceName = myDeviceName)
                 
                 Text(
-                    "SCAN RANGE: 1.2KM",
+                    "LIVE MESH VIEW",
                     style = MaterialTheme.typography.labelSmall,
                     color = Color.White.copy(alpha = 0.3f),
                     modifier = Modifier.align(Alignment.BottomEnd).padding(Spacing.Medium)
@@ -333,19 +328,19 @@ fun RadarScreenContent(
                         Spacer(modifier = Modifier.width(12.dp))
                         Column(modifier = Modifier.weight(1f)) {
                             Text("Network Status", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = Color.White)
-                            Text("Mesh Protocol: v2.4 Active", style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.6f))
+                            Text("Current link and route evidence", style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.6f))
                         }
                         Surface(color = Color.White.copy(alpha = 0.1f), shape = RoundedCornerShape(12.dp)) {
-                            Text("Healthy", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = Color.White, modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp))
+                            Text("Live view", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = Color.White, modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp))
                         }
                     }
                     
                     HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), color = Color.White.copy(alpha = 0.1f))
                     
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        StatusMetric("NODES", String.format(Locale.getDefault(), "%02d", activeNodesCount))
-                        StatusMetric("DEPTH", "3 Hops")
-                        StatusMetric("RANGE", "~800m")
+                        StatusMetric("DIRECT", String.format(Locale.getDefault(), "%02d", activeNodesCount))
+                        StatusMetric("RELAYED", String.format(Locale.getDefault(), "%02d", nodes.count { it.kind == NodeKind.RELAY || it.kind == NodeKind.HOPPED }))
+                        StatusMetric("NEARBY", String.format(Locale.getDefault(), "%02d", nodes.count { it.kind == NodeKind.DISCOVERED || it.kind == NodeKind.SYNCING }))
                     }
                 }
             }
@@ -375,11 +370,14 @@ fun RadarScreenContent(
             ) {
                 // Group by explicit kind. The previous `status.contains("Connected")` matching would
                 // misfile any node whose user-chosen display name happened to contain those words.
-                val connectedNodesList = nodes.filter { it.kind == NodeKind.DIRECT || it.kind == NodeKind.HANDSHAKING }
+                val connectedNodesList = nodes.filter { it.kind == NodeKind.DIRECT }
+                val checkingNodesList = nodes.filter { it.kind == NodeKind.UNRESPONSIVE }
+                val handshakingNodesList = nodes.filter { it.kind == NodeKind.HANDSHAKING }
                 val relayNodesList = nodes.filter { it.kind == NodeKind.RELAY }
                 val hoppedNodesList = nodes.filter { it.kind == NodeKind.HOPPED }
                 val onlineNodesList = nodes.filter { it.kind == NodeKind.DISCOVERED || it.kind == NodeKind.SYNCING }
-                val offlineNodesList = nodes.filter { it.kind == NodeKind.BLOCKED_OFFLINE }
+                val offlineNodesList = nodes.filter { it.kind == NodeKind.OFFLINE }
+                val blockedOfflineNodesList = nodes.filter { it.kind == NodeKind.BLOCKED_OFFLINE }
 
                 if (connectedNodesList.isNotEmpty()) {
                     Text("CONNECTED", style = MaterialTheme.typography.labelSmall, color = InboxAccentBlue, modifier = Modifier.padding(top = Spacing.Small))
@@ -388,15 +386,29 @@ fun RadarScreenContent(
                     }
                 }
 
+                if (checkingNodesList.isNotEmpty()) {
+                    Text("CHECKING CONNECTION", style = MaterialTheme.typography.labelSmall, color = Color(0xFFF59E0B), modifier = Modifier.padding(top = Spacing.Small))
+                    checkingNodesList.forEach { node ->
+                        NearbyNodeItem(node, onDisconnect, onForceConnect, onBlock, onUnblock)
+                    }
+                }
+
+                if (handshakingNodesList.isNotEmpty()) {
+                    Text("CONNECTING", style = MaterialTheme.typography.labelSmall, color = InboxAccentBlue, modifier = Modifier.padding(top = Spacing.Small))
+                    handshakingNodesList.forEach { node ->
+                        NearbyNodeItem(node, onDisconnect, onForceConnect, onBlock, onUnblock)
+                    }
+                }
+
                 if (relayNodesList.isNotEmpty()) {
-                    Text("CONNECTED VIA RELAY", style = MaterialTheme.typography.labelSmall, color = Color(0xFF38BDF8), modifier = Modifier.padding(top = Spacing.Small))
+                    Text("REACHABLE VIA RELAY", style = MaterialTheme.typography.labelSmall, color = Color(0xFF38BDF8), modifier = Modifier.padding(top = Spacing.Small))
                     relayNodesList.forEach { node ->
                         NearbyNodeItem(node, onDisconnect, onForceConnect, onBlock, onUnblock)
                     }
                 }
 
                 if (hoppedNodesList.isNotEmpty()) {
-                    Text("MESH HOPPED", style = MaterialTheme.typography.labelSmall, color = Color(0xFFF59E0B), modifier = Modifier.padding(top = Spacing.Small))
+                    Text("REACHABLE VIA MESH", style = MaterialTheme.typography.labelSmall, color = Color(0xFFF59E0B), modifier = Modifier.padding(top = Spacing.Small))
                     hoppedNodesList.forEach { node ->
                         NearbyNodeItem(node, onDisconnect, onForceConnect, onBlock, onUnblock)
                     }
@@ -410,8 +422,15 @@ fun RadarScreenContent(
                 }
                 
                 if (offlineNodesList.isNotEmpty()) {
-                    Text("BLOCKED", style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.4f), modifier = Modifier.padding(top = Spacing.Small))
+                    Text("RECENTLY OFFLINE", style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.55f), modifier = Modifier.padding(top = Spacing.Small))
                     offlineNodesList.forEach { node ->
+                        NearbyNodeItem(node, onDisconnect, onForceConnect, onBlock, onUnblock)
+                    }
+                }
+
+                if (blockedOfflineNodesList.isNotEmpty()) {
+                    Text("BLOCKED", style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.4f), modifier = Modifier.padding(top = Spacing.Small))
+                    blockedOfflineNodesList.forEach { node ->
                         NearbyNodeItem(node, onDisconnect, onForceConnect, onBlock, onUnblock)
                     }
                 }
@@ -436,7 +455,7 @@ fun RadarScreenContent(
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        "AES-256 MESH-TUNNEL ESTABLISHED",
+                        "STATUS USES LIVE LINK AND ROUTE EVIDENCE",
                         style = MaterialTheme.typography.labelSmall,
                         color = Color.White.copy(alpha = 0.2f),
                         fontSize = 8.sp
@@ -507,6 +526,8 @@ fun NearbyNodeItem(
                     val isLive = node.kind == NodeKind.DIRECT || node.kind == NodeKind.RELAY || node.kind == NodeKind.HOPPED
                     val statusColor = when {
                         node.isBlocked -> Color.Red
+                        node.kind == NodeKind.UNRESPONSIVE -> Color(0xFFF59E0B)
+                        node.kind == NodeKind.HANDSHAKING || node.kind == NodeKind.SYNCING -> InboxAccentBlue
                         isLive -> InboxAccentBlue
                         else -> Color.White.copy(alpha = 0.4f)
                     }
@@ -522,7 +543,12 @@ fun NearbyNodeItem(
                     )
                     Spacer(modifier = Modifier.width(4.dp))
                     Text(
-                        if (node.isBlocked) "BLOCKED (DIRECT LINK DENIED)" else node.status,
+                        when {
+                            !node.isBlocked -> node.status
+                            node.kind == NodeKind.RELAY || node.kind == NodeKind.HOPPED ->
+                                "BLOCKED DIRECT · ${node.status}"
+                            else -> "BLOCKED (DIRECT LINK DENIED)"
+                        },
                         style = MaterialTheme.typography.labelSmall,
                         color = statusColor
                     )
@@ -602,7 +628,6 @@ fun RadarScreenPreview() {
         RadarScreenContent(
             activeNodesCount = mockNodes.size,
             nodes = mockNodes,
-            topology = emptyMap(),
             myDeviceName = "Me [NODE]#ME01",
             onRefresh = {},
             onDisconnect = {},

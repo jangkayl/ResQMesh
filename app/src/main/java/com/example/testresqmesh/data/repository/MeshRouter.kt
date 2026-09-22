@@ -119,15 +119,51 @@ class MeshRouter {
             newKnownNodes.add(KnownNode(device.name, isDirect = true, lastSeen = lastSeen))
         }
 
-        networkGraph.values.flatten().toSet().forEach { indirectNode ->
+        // A cached topology fragment is not, by itself, a route from this phone. Walk the graph
+        // only from current payload-ready direct peers so losing the last first hop immediately
+        // removes every "reachable via relay" claim, even while leased topology remains cached.
+        rootedStablePaths(myNodeName, connectedDevices).forEach { (nodeId, route) ->
+            if (route.size <= 2) return@forEach
+            val indirectNode = stableNames[nodeId] ?: return@forEach
             if (NodeIdentity.isPlaceholder(indirectNode)) return@forEach
             if (NodeIdentity.matches(indirectNode, myNodeName)) return@forEach
             if (newKnownNodes.any { NodeIdentity.matches(it.name, indirectNode) }) return@forEach
             val lastSeen = lastSeenMap[indirectNode] ?: System.currentTimeMillis()
-            newKnownNodes.add(KnownNode(indirectNode, isDirect = false, lastSeen = lastSeen))
+            val namedRoute = route.map { id -> stableNames[id] ?: "#$id" }
+            newKnownNodes.add(KnownNode(indirectNode, isDirect = false, lastSeen = lastSeen, route = namedRoute))
         }
 
         _knownNodes.value = newKnownNodes
+    }
+
+    private fun rootedStablePaths(
+        myNodeName: String,
+        connectedDevices: List<ConnectedDevice>
+    ): Map<String, List<String>> {
+        val myNodeId = NodeIdentity.idOf(myNodeName) ?: return emptyMap()
+        stableNames[myNodeId] = myNodeName
+        val paths = linkedMapOf<String, List<String>>()
+        val queue = ArrayDeque<String>()
+        connectedDevices.asSequence()
+            .filter { it.isPayloadReady && !it.isProvisional }
+            .forEach { device ->
+                val nodeId = device.nodeId.ifBlank { NodeIdentity.idOf(device.name).orEmpty() }.uppercase()
+                if (nodeId.isBlank() || nodeId == myNodeId || paths.containsKey(nodeId)) return@forEach
+                stableNames[nodeId] = device.name
+                paths[nodeId] = listOf(myNodeId, nodeId)
+                queue.add(nodeId)
+            }
+
+        while (queue.isNotEmpty()) {
+            val current = queue.removeFirst()
+            stableRouteGraph[current].orEmpty().forEach { neighbor ->
+                if (neighbor != myNodeId && !paths.containsKey(neighbor)) {
+                    paths[neighbor] = paths.getValue(current) + neighbor
+                    queue.add(neighbor)
+                }
+            }
+        }
+        return paths
     }
 
     /**
@@ -197,45 +233,11 @@ class MeshRouter {
     }
 
     fun findShortestPath(myNodeName: String, targetName: String, connectedDevices: List<ConnectedDevice>): List<String> {
-        val myNodeId = NodeIdentity.idOf(myNodeName) ?: return emptyList()
         val targetNodeId = NodeIdentity.idOf(targetName) ?: return emptyList()
-        stableNames[myNodeId] = myNodeName
         stableNames[targetNodeId] = targetName
-        connectedDevices.forEach { device ->
-            val nodeId = device.nodeId.ifBlank { NodeIdentity.idOf(device.name).orEmpty() }
-            if (nodeId.isNotBlank()) stableNames[nodeId] = device.name
-        }
-        val queue = ArrayDeque<List<String>>()
-        val visited = mutableSetOf<String>()
-        
-        queue.add(listOf(myNodeId))
-        visited.add(myNodeId)
-        
-        while (queue.isNotEmpty()) {
-            val path = queue.removeFirst()
-            val currentNode = path.last()
-            
-            val isTarget = currentNode == targetNodeId
-
-            if (isTarget) {
-                return path.map { stableNames[it] ?: "#$it" }
-            }
-            
-            val neighbors = mutableSetOf<String>()
-            if (currentNode == myNodeId) {
-                neighbors.addAll(connectedDevices.mapNotNull { it.nodeId.ifBlank { NodeIdentity.idOf(it.name).orEmpty() }.takeIf(String::isNotBlank) })
-            } else {
-                stableRouteGraph[currentNode]?.let { neighbors.addAll(it) }
-            }
-            
-            for (neighbor in neighbors) {
-                if (neighbor !in visited) {
-                    visited.add(neighbor)
-                    queue.add(path + neighbor)
-                }
-            }
-        }
-        return emptyList()
+        return rootedStablePaths(myNodeName, connectedDevices)[targetNodeId]
+            ?.map { stableNames[it] ?: "#$it" }
+            .orEmpty()
     }
 
     fun startTopologyCleanup(scope: CoroutineScope, myNodeName: () -> String, connectedDevices: () -> List<ConnectedDevice>) {

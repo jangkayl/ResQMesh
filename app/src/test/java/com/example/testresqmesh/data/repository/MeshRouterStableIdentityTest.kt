@@ -61,4 +61,79 @@ class MeshRouterStableIdentityTest {
         assertFalse(router.updateTopology(relay, "BBBB", listOf(target), listOf("CCCC"), me, topologySequence = 19L))
         assertEquals(emptyList<String>(), router.findShortestPath(me, target, directRelay))
     }
+
+    @Test fun cachedTopologyIsNotPublishedAsReachableWithoutReadyFirstHop() {
+        val router = MeshRouter()
+        val me = "Me#AAAA"
+        val relay = "Relay#BBBB"
+        val target = "Target#CCCC"
+
+        router.updateTopology(relay, "BBBB", listOf(target), listOf("CCCC"), me, topologySequence = 1L)
+        router.recalculateKnownNodes(me, emptyList())
+
+        assertTrue(router.knownNodes.value.isEmpty())
+    }
+
+    @Test fun losingOnlyReadyFirstHopImmediatelyRemovesIndirectReachability() {
+        val router = MeshRouter()
+        val me = "Me#AAAA"
+        val relay = "Relay#BBBB"
+        val target = "Target#CCCC"
+        val directRelay = ConnectedDevice("endpoint", relay, nodeId = "BBBB", isPayloadReady = true)
+
+        router.updateTopology(relay, "BBBB", listOf(target), listOf("CCCC"), me, topologySequence = 1L)
+        router.recalculateKnownNodes(me, listOf(directRelay))
+        assertTrue(router.knownNodes.value.any { it.name == target && !it.isDirect })
+
+        router.recalculateKnownNodes(me, emptyList())
+        assertTrue(router.knownNodes.value.isEmpty())
+    }
+
+    @Test fun configuringSocketDoesNotRootRelayReachability() {
+        val router = MeshRouter()
+        val me = "Me#AAAA"
+        val relay = "Relay#BBBB"
+        val target = "Target#CCCC"
+
+        router.updateTopology(relay, "BBBB", listOf(target), listOf("CCCC"), me, topologySequence = 1L)
+        router.recalculateKnownNodes(
+            me,
+            listOf(ConnectedDevice("endpoint", relay, nodeId = "BBBB", isPayloadReady = false))
+        )
+
+        assertTrue(router.knownNodes.value.none { !it.isDirect })
+    }
+
+    @Test fun staleReverseSnapshotCannotRestoreParentWithdrawal() {
+        val router = MeshRouter()
+        val me = "Me#AAAA"
+        val relay = "Relay#BBBB"
+        val target = "Target#CCCC"
+        val directRelay = listOf(ConnectedDevice("endpoint", relay, nodeId = "BBBB", isPayloadReady = true))
+
+        assertTrue(router.updateTopology(relay, "BBBB", listOf(target), listOf("CCCC"), me, topologySequence = 10L))
+        assertTrue(router.updateTopology(target, "CCCC", listOf(relay), listOf("BBBB"), me, topologySequence = 20L))
+        router.recalculateKnownNodes(me, directRelay)
+        assertTrue(router.knownNodes.value.any { !it.isDirect && it.name == target })
+
+        assertTrue(router.updateTopology(relay, "BBBB", emptyList(), emptyList(), me, topologySequence = 11L))
+        router.recalculateKnownNodes(me, directRelay)
+
+        assertTrue(router.knownNodes.value.none { !it.isDirect && it.name == target })
+        assertEquals(emptyList<String>(), router.findShortestPath(me, target, directRelay))
+    }
+
+    @Test fun knownRelayedNodeCarriesSameDirectedPathAsDelivery() {
+        val router = MeshRouter()
+        val me = "Me#AAAA"
+        val relay = "Relay#BBBB"
+        val target = "Target#CCCC"
+        val directRelay = listOf(ConnectedDevice("endpoint", relay, nodeId = "BBBB", isPayloadReady = true))
+
+        router.updateTopology(relay, "BBBB", listOf(target), listOf("CCCC"), me, topologySequence = 1L)
+        router.recalculateKnownNodes(me, directRelay)
+
+        val deliveryPath = router.findShortestPath(me, target, directRelay)
+        assertEquals(deliveryPath, router.knownNodes.value.single { !it.isDirect }.route)
+    }
 }
