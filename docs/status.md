@@ -1,7 +1,7 @@
 # Current status
 
 Last reviewed: 2026-09-22
-Baseline: uncommitted `fix/startup-bootstrap-admission` working tree; the 2026-09-18 focused five-phone capture confirms block acknowledgement, direct teardown, and public/private relay, while direct-upgrade behavior is awaiting a fresh APK run.
+Baseline: `fix/mesh-reliability-and-latency`; the 2026-09-18 five-phone capture confirms block acknowledgement, direct teardown, and public/private relay. Direct-upgrade behavior awaits a fresh APK run.
 
 ## Current objective
 
@@ -15,15 +15,16 @@ Validate convergent mesh-hop topology and directed private delivery under relay 
 - Inbound-progress liveness, Radar online/checking/offline feedback, and heartbeat challenge ownership tests.
 - Callback-driven GATT client writes and server notification completion for the heartbeat/fallback path.
 - GATT uses acknowledged server indications and protects healthy L2CAP from stale callbacks; permission revocation fails safely.
-- Three direct neighbors are allowed; queued stable-identity admission retries after a five-second setup watchdog. Samsung/five-device reports remain unrecorded device evidence.
+- Three direct neighbors are allowed; queued identity admission retries after a five-second watchdog. Samsung/five-device evidence remains unrecorded.
 - Private sends fail closed; link/frame/queue policy and focused unit tests cover lifecycle and heartbeat ownership.
 - The terminal, UI shell, and lean CI are implemented; phone validation remains required.
 - Tactical UI redesign and Cebu offline-map pilot are in the working tree; device validation remains required.
-- Android Notification & Deep Link System: NotificationCompat.MessagingStyle with 7-message deduplication, ResQMesh branding, and cold-launch deep-link routing.
-- Permanent cryptographic node identity: deterministic Node ID from SHA-256 hash of Keystore public key, Google Cloud Backup exclusions for key/ID prefs, explicit dismissal of pending key change alerts, and People & Paths multi-hop messaging for blocked devices (D17).
+- Notifications use `MessagingStyle`, seven-message deduplication, branding, and cold-launch routing.
+- Permanent node identity derives from the Keystore public key, excludes key/ID preferences from backup, and supports explicit dismissal of key-change alerts (D17).
 - Auto-connect zero-peer deadlock recovery: isolated node election yield schedules fallback initiator watchdog (2.5s) if elected master fails to connect; stale zombie/ghost sockets evicted on rebooted advertisement (`directConnections == 0` with >8s silence/age check) and debounced advertising updates protect active links from false teardown.
 - Stable topology snapshots: name/ID pairs stay associated, empty neighbor lists withdraw stale adjacency, per-origin sequence rejects delayed snapshots, full refresh is 30 seconds, and UI/stable routing share a 90-second lease.
 - Directed private delivery: exact stable-ID next hops only; no private message/receipt broadcast fallback. Direct dispatch returns acceptance/rejection, persistence precedes dispatch, receipt timing starts only after acceptance, and pending rows remain retryable until a 24-hour explicit expiry.
+- Stable private-conversation identity: Room history and recipient candidates collapse truncated advertisement labels and complete handshake labels by node ID, prefer the complete display label, and delete every stored alias together.
 - Direct Message Latency & Churn Recovery: Relaxed zombie eviction silence/age threshold to 15s to tolerate Android BLE advertisement caching/jitter without false-positive teardowns. Fixed mesh router to use prefix-aware node ID matching, enabling instant direct-message dispatch and receipt termination instead of delayed outbox queuing and fallback flooding.
 - Incidents: self-response rejected; optional GPS maps. TTL default 10; explicit Dense 4; no BLE/routing changes.
 
@@ -45,7 +46,7 @@ Local checks passed; physical BLE validation remains required.
 
 ## Next actions
 
-1. Build and install the current working tree; run A-B-C for 90 seconds, send five private messages each way, remove/restore B, and verify explicit withdrawal plus directed retry without private broadcast.
+1. Build and install the current working tree; run A-B-C for 90 seconds, send five private messages each way, remove/restore B, and verify explicit withdrawal plus directed retry without private broadcast or duplicate truncated-name conversations.
 2. Repeat with queue pressure and one relay restart; record dispatch acceptance/rejection, topology sequence, outbox state, receipts, and GATT retirement markers.
 3. Record APK/build identity, device matrix, and repetitions for the Samsung and five-device runs.
 4. Run the stable-ID relay card after installing this working tree; capture selected next hop, private relay route-unavailable, key-change, and GATT-retirement markers.

@@ -45,4 +45,24 @@ class RecipientCandidatesTest {
         assertEquals(RecipientAvailability.Offline, candidates.getValue(offline).availability)
         assertEquals(RecipientAvailability.Blocked, candidates.getValue(blocked).availability)
     }
+
+    @Test
+    fun candidates_mergeTruncatedAdvertisementWithCompleteHandshakeName() {
+        val advertised = "SM-P615 [NODE#A1B2"
+        val handshaked = "SM-P615 [NODE]#A1B2"
+
+        val candidates = recipientCandidates(
+            ChatUiState(
+                connectedDevices = listOf(
+                    ConnectedDevice("direct", handshaked, isPayloadReady = true, isPeerResponsive = true)
+                ),
+                scannedDevices = listOf(ScannedDevice("nearby", advertised, 0L))
+            )
+        )
+
+        assertEquals(1, candidates.size)
+        assertEquals(handshaked, candidates.single().name)
+        assertEquals("SM-P615 [NODE]", candidates.single().displayName)
+        assertEquals(RecipientAvailability.Direct, candidates.single().availability)
+    }
 }

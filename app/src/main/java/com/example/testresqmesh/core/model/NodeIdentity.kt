@@ -53,6 +53,23 @@ object NodeIdentity {
     fun key(fullName: String?): String =
         idOf(fullName) ?: fullName?.trim()?.lowercase().orEmpty()
 
+    /**
+     * Selects the most useful label among observations of one identity. Direct handshakes usually
+     * provide the complete label while BLE advertisements may end halfway through the `[NODE]`
+     * tag. Keeping this decision here prevents each UI surface from inventing its own name rules.
+     */
+    fun preferredName(names: Iterable<String>): String = names
+        .asSequence()
+        .map(String::trim)
+        .filter { it.isNotEmpty() && !isPlaceholder(it) }
+        .maxWithOrNull(
+            compareBy<String> { idOf(it) != null }
+                .thenBy { hasCompleteTag(displayNameOf(it)) }
+                .thenBy { displayNameOf(it).length }
+                .thenBy { it.length }
+        )
+        .orEmpty()
+
     /** True when the name carries no usable identity yet (blank or an "Unknown ..." placeholder). */
     fun isPlaceholder(fullName: String?): Boolean {
         val name = fullName?.trim().orEmpty()
@@ -111,5 +128,11 @@ object NodeIdentity {
         val shared = minOf(left.length, right.length)
         if (shared < MIN_FUZZY_PREFIX) return false
         return left.take(shared) == right.take(shared)
+    }
+
+    private fun hasCompleteTag(displayName: String): Boolean {
+        val opening = displayName.lastIndexOf('[')
+        val closing = displayName.lastIndexOf(']')
+        return opening >= 0 && closing > opening
     }
 }

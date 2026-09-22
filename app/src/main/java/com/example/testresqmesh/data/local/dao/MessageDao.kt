@@ -44,4 +44,7 @@ interface MessageDao {
 
     @Query("DELETE FROM messages WHERE targetName = :peerName OR (senderName = :peerName AND targetName IS NOT NULL)")
     suspend fun deleteConversationWith(peerName: String): Int
+
+    @Query("DELETE FROM messages WHERE msgId IN (:messageIds)")
+    suspend fun deleteMessagesByIds(messageIds: List<String>): Int
 }

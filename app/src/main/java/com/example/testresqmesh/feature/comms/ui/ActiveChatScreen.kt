@@ -107,12 +107,18 @@ fun ActiveChatScreen(
     val uiState by viewModel.uiState.collectAsState()
     val drafts by viewModel.privateDrafts.collectAsState()
     val isAcquiringLocation by viewModel.isAcquiringLocation.collectAsState()
-    val messages = uiState.privateMessages[name].orEmpty()
+    val conversationEntry = uiState.privateMessages.entries.firstOrNull {
+        NodeIdentity.key(it.key) == NodeIdentity.key(name)
+    }
+    val conversationName = conversationEntry?.key ?: name
+    val messages = conversationEntry?.value.orEmpty()
     val sortedMessages = remember(messages) { messages.sortedByDescending { it.timestamp } }
     val candidate = remember(uiState, name) {
         recipientCandidates(uiState).firstOrNull { NodeIdentity.matches(it.name, name) }
     }
-    val displayName = remember(name) { NodeIdentity.displayNameOf(name).ifBlank { name } }
+    val displayName = remember(conversationName) {
+        NodeIdentity.displayNameOf(conversationName).ifBlank { conversationName }
+    }
     val context = LocalContext.current
     val voiceNoteText = stringResource(R.string.private_chat_voice_note)
     val photoText = stringResource(R.string.private_chat_photo)
@@ -144,7 +150,7 @@ fun ActiveChatScreen(
             name = displayName,
             onDismiss = { showDeleteDialog = false },
             onDelete = {
-                viewModel.deleteConversationWith(name)
+                viewModel.deleteConversationWith(conversationName)
                 onBack()
             }
         )
@@ -152,20 +158,20 @@ fun ActiveChatScreen(
     if (showKeyChangeDialog) {
         AlertDialog(
             onDismissRequest = {
-                viewModel.rejectPendingPublicKeyChange(name)
+                viewModel.rejectPendingPublicKeyChange(conversationName)
                 showKeyChangeDialog = false
             },
             title = { Text("Recipient key changed") },
             text = { Text("This device advertised a different encryption key. Accept it only after verifying the recipient through a separate channel, then resend your message.") },
             confirmButton = {
                 TextButton(onClick = {
-                    viewModel.acceptPendingPublicKeyChange(name)
+                    viewModel.acceptPendingPublicKeyChange(conversationName)
                     showKeyChangeDialog = false
                 }) { Text("Accept new key") }
             },
             dismissButton = {
                 TextButton(onClick = {
-                    viewModel.rejectPendingPublicKeyChange(name)
+                    viewModel.rejectPendingPublicKeyChange(conversationName)
                     showKeyChangeDialog = false
                 }) { Text("Keep existing key") }
             }
@@ -186,8 +192,8 @@ fun ActiveChatScreen(
             },
             bottomBar = {
                 ChatInput(
-                    inputText = drafts[name].orEmpty(),
-                    onTextChange = { viewModel.updatePrivateDraft(name, it) },
+                    inputText = drafts[conversationName] ?: drafts[name].orEmpty(),
+                    onTextChange = { viewModel.updatePrivateDraft(conversationName, it) },
                     pendingImage = pendingImage,
                     onImageSelected = { pendingImage = it },
                     onClearImage = { pendingImage = null },
@@ -205,7 +211,7 @@ fun ActiveChatScreen(
                     replyingTo = replyingToMessage,
                     onCancelReply = { replyingToMessage = null },
                     onSend = {
-                        val text = drafts[name].orEmpty().trim()
+                        val text = (drafts[conversationName] ?: drafts[name].orEmpty()).trim()
                         val rawMessage = when {
                             text.isNotBlank() -> text
                             pendingAudio != null -> voiceNoteText
@@ -228,13 +234,14 @@ fun ActiveChatScreen(
                             rawMessage
                         }
                         val sent = viewModel.sendPrivateMessage(
-                            targetName = name,
+                            targetName = conversationName,
                             text = finalMessage,
                             imageBase64 = pendingImage,
                             audioBase64 = pendingAudio
                         )
                         if (sent) {
-                            viewModel.clearPrivateDraft(name)
+                            viewModel.clearPrivateDraft(conversationName)
+                            if (conversationName != name) viewModel.clearPrivateDraft(name)
                             pendingImage = null
                             pendingAudio = null
                             replyingToMessage = null
@@ -247,7 +254,7 @@ fun ActiveChatScreen(
                             viewModel.broadcastLocation(
                                 context = context,
                                 isPrivate = true,
-                                targetName = name
+                                targetName = conversationName
                             )
                         }
                     },

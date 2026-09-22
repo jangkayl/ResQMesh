@@ -271,12 +271,18 @@ internal enum class RecipientAvailability {
 }
 
 internal fun recipientCandidates(state: ChatUiState): List<RecipientCandidate> {
-    val names = linkedSetOf<String>().apply {
+    val observedNames = linkedSetOf<String>().apply {
         state.connectedDevices.mapTo(this) { it.name }
         state.knownNodes.mapTo(this) { it.name }
         state.scannedDevices.mapTo(this) { it.name }
         state.blockedDeviceNames.mapTo(this) { it }
     }.filterNot(NodeIdentity::isPlaceholder)
+
+    val names = observedNames
+        .groupBy(NodeIdentity::key)
+        .values
+        .map(NodeIdentity::preferredName)
+        .filter(String::isNotEmpty)
 
     return names.map { name ->
         val link = state.connectedDevices.firstOrNull { NodeIdentity.matches(it.name, name) }
