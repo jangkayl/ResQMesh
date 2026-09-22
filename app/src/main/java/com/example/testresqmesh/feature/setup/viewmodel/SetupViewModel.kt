@@ -15,10 +15,12 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 import com.example.testresqmesh.data.repository.IdentityProvider
+import com.example.testresqmesh.core.service.MeshSessionController
 
 class SetupViewModel(
     private val useCases: com.example.testresqmesh.core.domain.usecase.MeshUseCases,
-    private val identityProvider: IdentityProvider
+    private val identityProvider: IdentityProvider,
+    private val meshSessionController: MeshSessionController
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ConnectionUiState())
@@ -29,6 +31,7 @@ class SetupViewModel(
 
     private val _isLongRangeProfile = MutableStateFlow(true)
     val isLongRangeProfile: StateFlow<Boolean> = _isLongRangeProfile.asStateFlow()
+    val isBackgroundMeshEnabled: StateFlow<Boolean> = meshSessionController.backgroundMeshEnabled
 
     init {
         viewModelScope.launch {
@@ -127,10 +130,14 @@ class SetupViewModel(
     private fun goOnline(customName: String, nodeTag: String, teamKey: String, nodeId: String) {
         val myNodeName = "$customName [$nodeTag]#$nodeId"
         _uiState.update { it.copy(myNodeName = myNodeName) }
-        useCases.startNode(customName, nodeTag, teamKey, nodeId)
+        meshSessionController.startNode(customName, nodeTag, teamKey, nodeId)
     }
 
     fun goOffline() {
-        useCases.stopNode()
+        meshSessionController.stopNode()
+    }
+
+    fun setBackgroundMeshEnabled(enabled: Boolean) {
+        meshSessionController.setBackgroundMeshEnabled(enabled)
     }
 }

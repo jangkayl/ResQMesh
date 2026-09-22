@@ -41,6 +41,7 @@ fun ProfileScreen(
     val state by viewModel.uiState.collectAsState()
     val isDeveloperMode by viewModel.isDeveloperModeEnabled.collectAsState()
     val isLongRangeProfile by viewModel.isLongRangeProfile.collectAsState()
+    val isBackgroundMeshEnabled by viewModel.isBackgroundMeshEnabled.collectAsState()
     var showConnectionConfirm by remember { mutableStateOf(false) }
     var showPinDialog by remember { mutableStateOf(false) }
     var pinInput by remember { mutableStateOf("") }
@@ -174,6 +175,25 @@ fun ProfileScreen(
                 SettingRow(Icons.Default.Key, "Permissions", "Bluetooth, location, and microphone")
                 DividerLine()
                 SettingRow(Icons.Default.Map, "Offline maps", "Manage Cebu tactical vector packages", onClick = onOfflineMaps)
+                DividerLine()
+                SettingRow(
+                    icon = Icons.Default.NotificationsActive,
+                    title = "Keep mesh active in background",
+                    subtitle = if (isBackgroundMeshEnabled) {
+                        if (state.isOnline) "Background mesh active" else "Will start with the next mesh session"
+                    } else {
+                        "Mesh stops when the app closes"
+                    },
+                    onClick = {
+                        viewModel.setBackgroundMeshEnabled(!isBackgroundMeshEnabled)
+                    },
+                    trailing = {
+                        Switch(
+                            checked = isBackgroundMeshEnabled,
+                            onCheckedChange = viewModel::setBackgroundMeshEnabled
+                        )
+                    }
+                )
                 DividerLine()
                 SettingRow(
                     icon = Icons.Default.AltRoute,

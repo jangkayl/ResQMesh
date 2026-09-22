@@ -87,6 +87,8 @@ Incidents are additive: ready peers exchange bounded version summaries/missing e
 
 Versioned PMTiles releases use signed manifests, offline P-256 verification with Ed25519 fallback, download completion/hash checks, and atomic activation. Notifications use `MessagingStyle` for private messages and `CATEGORY_ALARM` for SOS. Cold launches still pass through identity and permission setup before entering the mesh.
 
+Background mesh is opt-in. `MeshSessionController` owns start/stop; `MeshForegroundService` anchors sessions as a non-sticky `connectedDevice` service with a silent notification and debounced repository state. It has no boot receiver or wake lock. **Go offline** stops transport and service. Unexpected service destruction stops transport; disabled mode stops it when the activity is destroyed, excluding configuration changes.
+
 ## Source map
 
 | Area | Primary paths |
@@ -101,5 +103,6 @@ Versioned PMTiles releases use signed manifests, offline P-256 verification with
 | Compose features | `feature/` and `core/ui/` |
 | UI state | `ui/state/UiStates.kt` |
 | MapLibre / Offline Maps | `core/map/`, `feature/sos/ui/SosMapScreen.kt` |
+| Background session | `core/service/MeshSessionController.kt`, `MeshForegroundService.kt` |
 
 Source code and focused device traces take precedence over this summary.

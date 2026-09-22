@@ -24,6 +24,7 @@ import com.example.testresqmesh.data.repository.IdentityProvider
 import com.example.testresqmesh.data.repository.IncidentRepository
 import com.example.testresqmesh.data.repository.MeshReadyPeerEvents
 import com.example.testresqmesh.feature.incident.viewmodel.IncidentViewModel
+import com.example.testresqmesh.core.service.MeshSessionController
 import kotlinx.coroutines.Dispatchers
 import org.koin.android.ext.koin.androidContext
 import org.koin.androidx.viewmodel.dsl.viewModel
@@ -39,6 +40,7 @@ val appModule = module {
     single(createdAtStart = true) { AppCoroutineScope(Dispatchers.IO) }
     single(createdAtStart = true) { MeshReadyPeerEvents() }
     single { MeshRepository(get(), get(), get(), get(), get<AppCoroutineScope>().scope, get()) }
+    single { MeshSessionController(androidContext(), get()) }
     single { MediaHelper(androidContext()) }
     single { com.example.testresqmesh.core.utils.NotificationHelper(androidContext()) }
     single<LocationClient> { DefaultLocationClient(androidContext()) }
@@ -99,7 +101,7 @@ val appModule = module {
         )
     }
 
-    viewModel { SetupViewModel(get(), get()) }
+    viewModel { SetupViewModel(get(), get(), get()) }
     viewModel { RadarViewModel(get()) }
     viewModel { CommunicationViewModel(get(), get()) }
     viewModel { WalkieTalkieViewModel(get(), get(), get()) }

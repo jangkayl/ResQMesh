@@ -23,7 +23,6 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
 import org.koin.android.ext.android.inject
 import com.example.testresqmesh.data.repository.MeshRepository
-import com.example.testresqmesh.core.network.NativeBleManager
 import com.example.testresqmesh.core.ui.MainContainerScreen
 import com.example.testresqmesh.feature.setup.ui.IdentitySetupScreen
 import com.example.testresqmesh.feature.setup.ui.PermissionsScreen
@@ -34,6 +33,7 @@ import com.example.testresqmesh.feature.comms.viewmodel.CommunicationViewModel
 import com.example.testresqmesh.feature.radar.viewmodel.RadarViewModel
 import com.example.testresqmesh.feature.setup.viewmodel.SetupViewModel
 import com.example.testresqmesh.core.utils.MediaHelper
+import com.example.testresqmesh.core.service.MeshSessionController
 
 import android.bluetooth.BluetoothManager
 import android.content.Context
@@ -52,8 +52,8 @@ class MainActivity : ComponentActivity() {
         var isAppInForeground = false
     }
 
-    private val networkManager: NativeBleManager by inject()
     private val mediaHelper: MediaHelper by inject()
+    private val meshSessionController: MeshSessionController by inject()
 
     private var onPermissionsResult: ((Boolean) -> Unit)? = null
     private val sosDeepLinkTriggered = mutableStateOf(false)
@@ -265,8 +265,8 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onDestroy() {
+        meshSessionController.onActivityDestroyed(isChangingConfigurations)
         super.onDestroy()
-        networkManager.stopMeshNode()
     }
 
     override fun onNewIntent(intent: android.content.Intent?) {

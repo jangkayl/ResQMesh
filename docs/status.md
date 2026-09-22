@@ -1,7 +1,7 @@
 # Current status
 
-Last reviewed: 2026-09-22
-Baseline: `fix/mesh-reliability-and-latency`; the 2026-09-18 five-phone capture confirms block acknowledgement, direct teardown, and public/private relay. Direct-upgrade behavior awaits a fresh APK run.
+Last reviewed: 2026-09-23
+Baseline: `codex/foreground-mesh-service`; background behavior awaits validation.
 
 ## Current objective
 
@@ -9,7 +9,6 @@ Validate convergent mesh-hop topology and directed private delivery under relay 
 
 ## Implemented in the working tree
 
-- Context uses canonical docs.
 - Per-attempt `BleLinkRegistry` lifecycle/readiness, generation checks, and focused tests.
 - Payload-ready routing/UI selection and endpoint-owned cleanup for stale GATT/L2CAP state.
 - Inbound-progress liveness, Radar online/checking/offline feedback, and heartbeat challenge ownership tests.
@@ -19,13 +18,13 @@ Validate convergent mesh-hop topology and directed private delivery under relay 
 - Private sends fail closed; link/frame/queue policy and focused unit tests cover lifecycle and heartbeat ownership.
 - The terminal, UI shell, and lean CI are implemented; phone validation remains required.
 - Tactical UI redesign and Cebu offline-map pilot are in the working tree; device validation remains required.
-- Notifications use `MessagingStyle`, seven-message deduplication, branding, and cold-launch routing.
+- Notifications cover bounded chats/SOS. Opt-in background mesh uses a silent `connectedDevice` service and shared session owner without reboot/process-death auto-start.
 - Permanent node identity derives from the Keystore public key, excludes key/ID preferences from backup, and supports explicit dismissal of key-change alerts (D17).
 - Zero-peer recovery schedules a 2.5-second fallback initiator; stale sockets are evicted on rebooted advertisements while debounced updates protect active links.
 - Stable topology snapshots: name/ID pairs stay associated, empty neighbor lists withdraw stale adjacency, per-origin sequence rejects delayed snapshots, full refresh is 30 seconds, and UI/stable routing share a 90-second lease.
 - UI/delivery share directed routes from ready peers; stale reverse snapshots cannot restore withdrawals. Unblock never implies Direct; details re-resolve state.
 - Directed private delivery: exact stable-ID next hops only; no private message/receipt broadcast fallback. Direct dispatch returns acceptance/rejection, persistence precedes dispatch, receipt timing starts only after acceptance, and pending rows remain retryable until a 24-hour explicit expiry.
-- Stable private-conversation identity: Room history and recipient candidates collapse truncated advertisement labels and complete handshake labels by node ID, prefer the complete display label, and delete every stored alias together.
+- Private conversations collapse advertisement/handshake aliases by node ID, prefer complete labels, and delete stored aliases together.
 - Direct Message Latency & Churn Recovery: Relaxed zombie eviction silence/age threshold to 15s to tolerate Android BLE advertisement caching/jitter without false-positive teardowns. Fixed mesh router to use prefix-aware node ID matching, enabling instant direct-message dispatch and receipt termination instead of delayed outbox queuing and fallback flooding.
 - Incidents: self-response rejected; optional GPS maps. TTL default 10; explicit Dense 4; no BLE/routing changes.
 
@@ -44,6 +43,7 @@ Local checks passed; physical BLE validation remains required.
 | SEC-01 | P1 | Deterministic node ID bound to Keystore public key, backup exclusions, and key rejection flow implemented (D17); fingerprint display and interactive trust verification UI remain | Defined threat model, approval flow, fail-closed tests, and documented claim boundary |
 | SOS-01 | P1 | SOS cancellation/follow-up ownership needs sender/alert binding review | Concurrent-alert and cancel-before-location tests |
 | INCIDENT-01 | P1 | Incident signatures/key binding and durable outbox remain open | Threat model, Room migration, and reconnect/new-join card |
+| BG-01 | P1 | Background survival/battery are unmeasured | Android 12-14+ lock-screen, stop, death, and battery runs |
 
 ## Next actions
 
@@ -51,7 +51,7 @@ Local checks passed; physical BLE validation remains required.
 2. Repeat with queue pressure and one relay restart; record dispatch acceptance/rejection, topology sequence, outbox state, receipts, and GATT retirement markers.
 3. Record APK/build identity, device matrix, and repetitions for the Samsung and five-device runs.
 4. Run the stable-ID relay card after installing this working tree; capture selected next hop, private relay route-unavailable, key-change, and GATT-retirement markers.
-5. Diagnose below-capacity auto-connect reports using [`ble-autoconnect-admission-diagnosis.md`](plans/ble-autoconnect-admission-diagnosis.md) before changing admission policy.
+5. Run the Android 12-14+ background-mesh card, including notification denial, relay, stop, task removal, and battery comparison.
 
 ## Scope guard
 

@@ -72,6 +72,12 @@ Across representative devices, measure delivery, recovery, range, battery, SOS, 
 
 Record APK, setup, steps, result, failures, markers, and report items. Continue failures with capture/timestamp.
 
+### Background mesh card
+
+- Record APK/device/API; cover Android 12-14+ and Android 13+ notifications granted/denied.
+- Enable background mesh, press Home, lock 10-15 minutes, exchange A-B and A-B-C text/SOS, reopen, then use notification **Go offline**. Repeat disabled, task-removed, force-stopped, and for one-hour idle/three-phone battery runs.
+- Expect one silent notification, continued receipts/relay, one clean stop, no boot/force-stop restart, and no active BLE without the service. Report duplicate scans/servers, churn, false status, loss, heat/drain, timestamps, battery, and focused service/`READY`/route/receipt markers.
+
 ## Latest verified results
 
 Keep only meaningful milestones; raw captures remain under `captures/`.
@@ -94,4 +100,4 @@ Keep only meaningful milestones; raw captures remain under `captures/`.
 | 2026-09-18 | Mutual-block working tree | V2424 API 34, CPH2219 API 31, CPH2127 API 31, SM-P615 API 33, SM-A236E API 33 | KAY and LAL block over a five-phone mesh | Both endpoints logged acknowledgement-driven direct teardown. Public and encrypted private traffic then crossed the V2424 relay and decrypted at both endpoints. The capture does not establish restart persistence, unilateral/bilateral unblock, 70-second route stability, or production reliability. | `captures/ble-logcat/20260918-011613/` |
 | 2026-09-18 | Stable-ID relay working tree | V2424 API 34, CPH2219 API 31, CPH2127 API 31, SM-P615 API 33 | Indirect private relay both directions | Selected routes relayed and decrypted both ways without private broadcast fallback. Some return receipts lacked a next hop; SM-P615 repeatedly retired one GATT callback link. | `captures/ble-logcat/20260918-233006/` |
 
-The transport-promotion run supports that tested behavior only. The historical Samsung failures are superseded by the later user-reported success, pending its recorded device evidence. The five-device report does not yet establish direct-link capacity, route recovery, block semantics, all disconnect paths, or production reliability; BLOCK-01 remains active.
+Historical Samsung failures are superseded by the later user report, pending recorded evidence. The five-device report does not establish capacity, recovery, block semantics, all disconnects, or production reliability; BLOCK-01 remains active.

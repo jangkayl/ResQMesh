@@ -44,16 +44,21 @@ Avoid showing “connected” from a BLE callback alone. Counters and selected p
 - SOS background uses unified multi-layered emergency illumination (sunburst halo, ambient wash, beacon rings, reticle) across both Daylight and Night operations.
 - Never render debug plaintext, keys, ciphertext previews, or sensitive location in the debug UI.
 
+## Background mesh status
+
+- Device settings provides opt-in **Keep mesh active in background**. Service-active does not imply peer-ready.
+- Its silent notification offers **Open ResQMesh** and **Go offline** using coarse repository state. Disabling only removes the background anchor; **Go offline** stops transport.
+
 ## Diagnostic terminal
 
-- The terminal is a bounded, session-only diagnostic view, not a Logcat replacement.
+- The terminal is bounded and session-only, not a Logcat replacement.
 - Categories: Connection, Sync, Transport, Routing, Security, System, Alerts. Must emit categories explicitly.
-- Direct-link summaries use client/server lifecycle evidence, not advertisements. Show peer name, endpoint, role, readiness, transport.
+- Direct summaries use lifecycle evidence, not advertisements; show peer, endpoint, role, readiness, and transport.
 - Display newest events first. If scrolling older, pause follow, show new-event count, provide jumps to Latest/Sync.
-- Keep heartbeat/relay chatter behind Details to preserve readability.
+- Keep heartbeat/relay chatter behind Details.
 
 ## Hidden legacy UI
-- Legacy Radar and terminal stay outside civilian flows. Debugging Mode exposes them for field diagnostics; Settings manages offline maps.
+- Legacy Radar/terminal stay behind Debugging Mode; Settings manages offline maps.
 - Restored callbacks preserve accessibility labels without altering underlying mesh policies. Validate empty, permission-denied, and error states.
 
 ## Accessibility and interaction
@@ -61,7 +66,7 @@ Avoid showing “connected” from a BLE callback alone. Counters and selected p
 - Provide readable contrast, touch targets, content descriptions, and text equivalents for color/status indicators.
 - Keep error and recovery messages actionable and concise.
 - Preserve user drafts when a recoverable send fails.
-- Active public and private conversations anchor the latest messages above the composer, keep it above the IME, and follow the newest message when the conversation changes. Sent community bubbles show reader circles only from recorded `seenBy` receipts.
+- Conversations anchor latest messages above the IME and follow new messages. Community reader circles require recorded `seenBy` receipts.
 - Avoid rapid status flicker; state transitions should follow repository/link evidence rather than raw scan churn.
 - Peer rows are clickable. Blocked devices are grouped under "Blocked Devices (Direct Link Denied)" and can be messaged via mesh hops ("MESSAGE VIA MESH HOP") to test multi-hop relay routing while direct links remain denied.
 - Review both appearances independently. Active screens use theme tokens, never fixed dark surfaces or white text.
