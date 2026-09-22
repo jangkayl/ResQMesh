@@ -82,6 +82,7 @@ class NativeBleManager(val context: Context) {
         context = context,
         serviceUuid = SERVICE_UUID,
         isNodeActive = { store.isNodeActive.get() },
+        hasReadyConnection = ::hasPayloadReadyDirectLink,
         onAdvertisement = ::handleAdvertisement
     )
 

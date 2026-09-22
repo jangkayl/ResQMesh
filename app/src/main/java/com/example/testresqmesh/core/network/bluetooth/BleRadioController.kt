@@ -10,12 +10,15 @@ import android.bluetooth.le.ScanFilter
 import android.bluetooth.le.ScanResult
 import android.bluetooth.le.ScanSettings
 import android.content.Context
+import android.os.Handler
+import android.os.Looper
 import android.os.ParcelUuid
 import com.example.testresqmesh.core.model.NodeIdentity
 import com.example.testresqmesh.core.network.bluetooth.state.HandshakeRadioGate
 import com.example.testresqmesh.core.utils.AppLogger
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicBoolean
+import kotlin.random.Random
 
 data class BleAdvertisement(
     val endpointId: String,
@@ -31,12 +34,20 @@ class BleRadioController(
     context: Context,
     private val serviceUuid: UUID,
     private val isNodeActive: () -> Boolean,
+    private val hasReadyConnection: () -> Boolean,
     private val onAdvertisement: (BleAdvertisement) -> Unit
 ) {
     private val adapter =
         (context.getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager).adapter
     private val scanActive = AtomicBoolean(false)
     private val handshakeGate = HandshakeRadioGate()
+    private val handler = Handler(Looper.getMainLooper())
+    private var lastScanStartAt = 0L
+    private var lastValidAdvertisementAt = 0L
+    private var recoveryAttempts = 0
+    private var staleScanThresholdMs = nextStaleScanThreshold()
+
+    private val scanRecoveryRunnable = Runnable { runScanRecoveryCheck() }
 
     val isSupported: Boolean
         get() = adapter?.bluetoothLeAdvertiser != null && adapter.bluetoothLeScanner != null
@@ -46,6 +57,7 @@ class BleRadioController(
         override fun onScanFailed(errorCode: Int) {
             scanActive.set(false)
             AppLogger.d("BLE_MESH", "Scanner failed with errorCode=$errorCode")
+            scheduleFailedScanRetry()
         }
 
         override fun onScanResult(callbackType: Int, result: ScanResult) {
@@ -83,6 +95,9 @@ class BleRadioController(
                 displayName.trim()
             }
             if (peerName.isEmpty()) return
+            lastValidAdvertisementAt = System.currentTimeMillis()
+            recoveryAttempts = 0
+            scheduleRecoveryCheck()
             onAdvertisement(
                 BleAdvertisement(result.device.address, peerName, nodeId, score, connections)
             )
@@ -122,15 +137,20 @@ class BleRadioController(
     }
 
     fun startScanning() {
+        if (!isNodeActive()) return
+        scheduleRecoveryCheck()
         val scanner = adapter?.bluetoothLeScanner ?: return
         if (handshakeGate.isActive() || !scanActive.compareAndSet(false, true)) return
         val filters = listOf(ScanFilter.Builder().setServiceUuid(ParcelUuid(serviceUuid)).build())
         val settings = ScanSettings.Builder().setScanMode(ScanSettings.SCAN_MODE_BALANCED).build()
         try {
             scanner.startScan(filters, settings, scanCallback)
+            lastScanStartAt = System.currentTimeMillis()
+            staleScanThresholdMs = nextStaleScanThreshold()
         } catch (error: Exception) {
             scanActive.set(false)
             AppLogger.d("BLE_MESH", "Scanner start failed: ${error.message}")
+            scheduleFailedScanRetry()
         }
     }
 
@@ -152,15 +172,74 @@ class BleRadioController(
         handshakeGate.activeOwnerInfo(now)
 
     fun rescan() {
+        recoveryAttempts = 0
         stopScanning()
         startScanning()
     }
 
     fun stop() {
+        handler.removeCallbacks(scanRecoveryRunnable)
         try { adapter?.bluetoothLeAdvertiser?.stopAdvertising(advertiseCallback) } catch (_: Exception) {}
         stopScanning()
         handshakeGate.clear()
+        lastScanStartAt = 0L
+        lastValidAdvertisementAt = 0L
+        recoveryAttempts = 0
     }
+
+    private fun runScanRecoveryCheck() {
+        if (!isNodeActive()) return
+        if (hasReadyConnection()) {
+            recoveryAttempts = 0
+            scheduleRecoveryCheck()
+            return
+        }
+        if (handshakeGate.isActive()) {
+            scheduleRecoveryCheck()
+            return
+        }
+
+        val now = System.currentTimeMillis()
+        val lastProgressAt = maxOf(lastScanStartAt, lastValidAdvertisementAt)
+        val millisSinceProgress = if (lastProgressAt > 0L) now - lastProgressAt else Long.MAX_VALUE
+        val scanIsStale = scanActive.get() &&
+            millisSinceProgress >= staleScanThresholdMs
+
+        if (BleScanRecoveryPolicy.shouldRestart(
+                nodeActive = true,
+                hasReadyConnection = false,
+                handshakeActive = false,
+                scanActive = scanActive.get(),
+                millisSinceScanProgress = millisSinceProgress,
+                staleAfterMs = staleScanThresholdMs
+            )) {
+            recoveryAttempts++
+            AppLogger.d(
+                "BLE_MESH",
+                "Zero-ready-peer scan watchdog restarting discovery (attempt=$recoveryAttempts, stale=$scanIsStale)"
+            )
+            stopScanning()
+            startScanning()
+        } else {
+            scheduleRecoveryCheck()
+        }
+    }
+
+    private fun scheduleFailedScanRetry() {
+        if (!isNodeActive()) return
+        recoveryAttempts++
+        val delay = BleScanRecoveryPolicy.retryDelay(recoveryAttempts) +
+            Random.nextLong(BleScanRecoveryPolicy.RETRY_JITTER_MS + 1L)
+        scheduleRecoveryCheck(delay)
+    }
+
+    private fun scheduleRecoveryCheck(delayMs: Long = BleScanRecoveryPolicy.HEALTH_CHECK_MS) {
+        handler.removeCallbacks(scanRecoveryRunnable)
+        if (isNodeActive()) handler.postDelayed(scanRecoveryRunnable, delayMs)
+    }
+
+    private fun nextStaleScanThreshold(): Long = BleScanRecoveryPolicy.STALE_SCAN_AFTER_MS +
+        Random.nextLong(BleScanRecoveryPolicy.RETRY_JITTER_MS + 1L)
 
     private fun stopScanning() {
         if (!scanActive.compareAndSet(true, false)) return

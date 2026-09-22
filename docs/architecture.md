@@ -1,6 +1,6 @@
 # Architecture
 
-Last source review: 2026-09-17, branch `fix/ble-reliability`, with Phase 4 committed. This page describes the current checkout; verify changed paths before relying on it.
+Last source review: 2026-09-23. Source and device evidence override this summary.
 
 ## System shape
 
@@ -27,7 +27,7 @@ Compose screen
 
 ## Direct-link lifecycle
 
-`NativeBleManager` is the public facade and policy owner. Its collaborators own radio, admission/election, GATT execution, L2CAP I/O, liveness, and callbacks. `BleLinkRegistry` stores endpoint/role/generation-owned link state and queues.
+`NativeBleManager` is the facade and policy owner. Collaborators own radio, admission, GATT, L2CAP, liveness, and callbacks. `BleLinkRegistry` stores generation-owned link state and queues.
 
 The intended lifecycle distinguishes radio connection from payload readiness:
 
@@ -37,13 +37,15 @@ DISCONNECTED -> CONNECTING -> DISCOVERING -> CONFIGURING -> READY
       +------------------- DISCONNECTING <---------------------+
 ```
 
-Client readiness requires discovery/CCCD; server readiness requires subscription. Fallback uses acknowledged indications, and coordinators own generation checks, bounded queues, frame bounds, L2CAP promotion, and one heartbeat per endpoint. Same-address callback ownership and queue behavior still need device evidence.
+Client readiness requires discovery/CCCD; server readiness requires subscription. Fallback uses acknowledged indications with generation checks, bounded queues, frame bounds, L2CAP promotion, and one heartbeat per endpoint.
 
-If Android revokes `BLUETOOTH_CONNECT` during orphan preemption or an in-flight GATT write/indication, the operation is caught, logged without payload content, and retired through the existing flight/link cleanup path rather than crashing the process.
+Revoked `BLUETOOTH_CONNECT` operations fail through existing flight/link cleanup without logging payload content.
 
 Client setup uses the reliable 20-byte ATT baseline; `READY` does not wait for MTU negotiation. A server callback for a live outbound endpoint is another view of that ACL, not a second destructive role.
 
-A generation-owned gate pauses scanning during setup while ready links continue traffic. Advertising is session-owned; higher election score is the sole initiator. Busy candidates stay in a stable-ID bootstrap queue, with one outbound `connectGatt` at a time.
+A generation-owned gate pauses scanning during setup while ready links carry traffic. Higher election score initiates; busy candidates remain queued by stable ID, with one outbound `connectGatt` at a time.
+
+With zero READY neighbors, failed scans retry with bounded jitter and scans lacking a valid ResQMesh advertisement for 15 seconds restart. Recovery pauses during handshakes and stops with the session, including under the background-service anchor.
 
 The elected client has a five-second connect/discovery/CCCD deadline; bootstrap retries are bounded. Server configuration is an orphan backstop, and provisional identity waiting starts only after `READY`.
 

@@ -17,15 +17,14 @@ Validate convergent mesh-hop topology and directed private delivery under relay 
 - Three direct neighbors are allowed; queued admission retries after five seconds. Samsung/five-device evidence remains unrecorded.
 - Private sends fail closed; link/frame/queue policy and focused unit tests cover lifecycle and heartbeat ownership.
 - The terminal, UI shell, and lean CI are implemented; phone validation remains required.
-- Tactical UI redesign and Cebu offline-map pilot are in the working tree; device validation remains required.
 - Notifications cover bounded chats/SOS. Opt-in background mesh uses a silent `connectedDevice` service and shared session owner without reboot/process-death auto-start.
 - Permanent node identity derives from the Keystore public key, excludes key/ID preferences from backup, and supports explicit dismissal of key-change alerts (D17).
-- Zero-peer recovery schedules a 2.5-second fallback initiator; stale sockets are evicted on rebooted advertisements while debounced updates protect active links.
+- Zero-ready recovery uses a 2.5-second fallback initiator and restarts failed or 15-second-stale scans with bounded jitter. It pauses during handshakes and applies in foreground/background sessions.
 - Stable topology snapshots: name/ID pairs stay associated, empty neighbor lists withdraw stale adjacency, per-origin sequence rejects delayed snapshots, full refresh is 30 seconds, and UI/stable routing share a 90-second lease.
 - UI/delivery share directed routes from ready peers; stale reverse snapshots cannot restore withdrawals. Unblock never implies Direct; details re-resolve state.
 - Directed private delivery: exact stable-ID next hops only; no private message/receipt broadcast fallback. Direct dispatch returns acceptance/rejection, persistence precedes dispatch, receipt timing starts only after acceptance, and pending rows remain retryable until a 24-hour explicit expiry.
 - Private conversations collapse advertisement/handshake aliases by node ID, prefer complete labels, and delete stored aliases together.
-- Direct Message Latency & Churn Recovery: Relaxed zombie eviction silence/age threshold to 15s to tolerate Android BLE advertisement caching/jitter without false-positive teardowns. Fixed mesh router to use prefix-aware node ID matching, enabling instant direct-message dispatch and receipt termination instead of delayed outbox queuing and fallback flooding.
+- Churn recovery uses a 15-second zombie threshold; prefix-aware node-ID matching enables immediate direct dispatch and receipt completion.
 - Incidents: self-response rejected; optional GPS maps. TTL default 10; explicit Dense 4; no BLE/routing changes.
 
 Local checks passed; physical BLE validation remains required.
