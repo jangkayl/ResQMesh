@@ -1,16 +1,12 @@
 package com.example.testresqmesh.feature.home.ui
 
 import androidx.annotation.StringRes
-import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -35,7 +31,6 @@ import androidx.compose.material.icons.outlined.ChatBubbleOutline
 import androidx.compose.material.icons.outlined.ChevronRight
 import androidx.compose.material.icons.outlined.GraphicEq
 import androidx.compose.material.icons.outlined.Hub
-import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.NearMe
 import androidx.compose.material.icons.outlined.PersonOutline
 import androidx.compose.material.icons.outlined.Shield
@@ -46,12 +41,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -84,7 +76,6 @@ import com.example.testresqmesh.feature.radar.ui.classifyRadarNodes
 import com.example.testresqmesh.feature.radar.viewmodel.RadarViewModel
 import com.example.testresqmesh.feature.setup.viewmodel.SetupViewModel
 import com.example.testresqmesh.ui.state.RadarUiState
-import kotlinx.coroutines.delay
 
 @Composable
 fun HomeScreen(
@@ -148,20 +139,6 @@ fun HomeScreenContent(
         if (isNodeActive) R.string.home_ready_description else R.string.home_setup_description
     )
 
-    var tickerIndex by remember { mutableStateOf(0) }
-    val tickerMessages = if (isNodeActive) {
-        listOf("SYSTEM NOMINAL", "ENCRYPTION ACTIVE", "MESH SECURE", "RADIO: 2.4GHz BLE")
-    } else {
-        listOf("SCANNING FOR PEERS...", "CHECKING RADIO...", "WAITING FOR SIGNAL")
-    }
-
-    LaunchedEffect(isNodeActive) {
-        while (true) {
-            delay(2600)
-            tickerIndex = (tickerIndex + 1) % tickerMessages.size
-        }
-    }
-
     Column(
         modifier = modifier
             .verticalScroll(rememberScrollState())
@@ -176,13 +153,7 @@ fun HomeScreenContent(
             onProfileClick = onProfileClick
         )
 
-        // 2. High-Tech Telemetry Ticker Strip
-        TacticalTelemetryTicker(
-            isOnline = isNodeActive,
-            tickerText = tickerMessages[tickerIndex]
-        )
-
-        // 2.5 Tactical Satellite & GNSS Positioning Telemetry
+        // 2. Tactical Location Status
         TacticalSatelliteTelemetryCard(
             locationStatus = locationStatus
         )
@@ -195,18 +166,10 @@ fun HomeScreenContent(
             description = readinessDescription
         )
 
-        // 3.5 Transactional Emergency Incidents
+        // 4. Emergency incidents
         if (onIncidentsClick != null) {
-            TacticalIncidentsBanner(
-                onIncidentsClick = onIncidentsClick
-            )
+            TacticalIncidentsBanner(onIncidentsClick = onIncidentsClick)
         }
-
-        // 4. Quick Tactical Operations Grid (Side-by-side action cards)
-        TacticalOperationsGrid(
-            onMessagesClick = onMessagesClick,
-            onVoiceClick = { onVoiceClick?.invoke() ?: onMessagesClick() }
-        )
 
         // 5. Live Interactive Tactical Mesh Topology Visualizer
         TacticalTopologyPanel(
@@ -217,7 +180,7 @@ fun HomeScreenContent(
             onNetworkClick = onNetworkClick
         )
 
-        // 6. Tactical Safety Beacon Status Footer
+        // 5. Tactical Safety Beacon Status Footer
         TacticalSafetyBeaconFooter()
     }
 }
@@ -308,85 +271,6 @@ private fun TacticalHeader(
                     contentDescription = stringResource(R.string.home_profile_action),
                     tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(24.dp)
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun TacticalTelemetryTicker(
-    isOnline: Boolean,
-    tickerText: String
-) {
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
-        shape = RoundedCornerShape(10.dp),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f))
-    ) {
-        Row(
-            modifier = Modifier
-                .padding(horizontal = Spacing.Medium, vertical = 6.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            val infiniteTransition = rememberInfiniteTransition(label = "pulse")
-            val pulseAlpha by infiniteTransition.animateFloat(
-                initialValue = 0.4f,
-                targetValue = 1f,
-                animationSpec = infiniteRepeatable(
-                    animation = tween(900, easing = FastOutSlowInEasing),
-                    repeatMode = RepeatMode.Reverse
-                ),
-                label = "tickerPulse"
-            )
-
-            Box(
-                modifier = Modifier
-                    .size(8.dp)
-                    .clip(CircleShape)
-                    .background(
-                        (if (isOnline) ResQTheme.colors.success else ResQTheme.colors.warning)
-                            .copy(alpha = pulseAlpha)
-                    )
-            )
-            Spacer(Modifier.width(8.dp))
-            AnimatedContent(
-                targetState = tickerText,
-                transitionSpec = { fadeIn().togetherWith(fadeOut()) },
-                modifier = Modifier.weight(1f),
-                label = "telemetryTicker"
-            ) { text ->
-                Text(
-                    text = text,
-                    style = MaterialTheme.typography.labelSmall.copy(
-                        fontFamily = FontFamily.Monospace,
-                        letterSpacing = 0.8.sp
-                    ),
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-
-            // Security badge
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(3.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Outlined.Lock,
-                    contentDescription = null,
-                    modifier = Modifier.size(12.dp),
-                    tint = MaterialTheme.colorScheme.primary
-                )
-                Text(
-                    text = "AES-GCM",
-                    style = MaterialTheme.typography.labelSmall.copy(
-                        fontSize = 9.sp,
-                        fontFamily = FontFamily.Monospace
-                    ),
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary
                 )
             }
         }

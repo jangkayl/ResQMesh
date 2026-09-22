@@ -189,7 +189,7 @@ internal fun MessagesInboxContent(
                 end = Spacing.Large,
                 bottom = 120.dp
             ),
-            verticalArrangement = Arrangement.spacedBy(Spacing.Medium)
+            verticalArrangement = Arrangement.spacedBy(Spacing.Small)
         ) {
             // 1. Tactical Comms Hub Header
             item {
