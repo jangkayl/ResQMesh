@@ -17,6 +17,10 @@ import kotlinx.serialization.decodeFromByteArray
 import kotlinx.serialization.protobuf.ProtoBuf
 import kotlinx.serialization.ExperimentalSerializationApi
 
+import com.example.testresqmesh.core.network.dispatch.DomainEventHandler
+import com.example.testresqmesh.core.network.dispatch.EventSyncRequestHandler
+import com.example.testresqmesh.core.network.dispatch.EventSyncResponseHandler
+
 @OptIn(ExperimentalSerializationApi::class)
 class PayloadDispatcher(private val callback: PayloadDispatcherCallback) {
 
@@ -28,6 +32,9 @@ class PayloadDispatcher(private val callback: PayloadDispatcherCallback) {
         BlockRequestHandler(),
         BlockAckHandler(),
         LegacyBlockControlHandler(),
+        DomainEventHandler(),
+        EventSyncRequestHandler(),
+        EventSyncResponseHandler(),
         LiveAudioHandler(),
         StandardMessageHandler()
     )

@@ -23,11 +23,11 @@ Compose screen
     -> repository / Room / UI state
 ```
 
-`PayloadDispatcher` handles system presence, ping/heartbeat, public and private messages, delivery signals, SOS, and audio-related payloads. `MeshRouter` maintains a graph of known neighbors and computes paths. This is graph-based routing, not proof of a complete distance-vector protocol or guaranteed self-healing network.
+`PayloadDispatcher` handles presence, heartbeat, messages, receipts, SOS, bounded incident events/sync, and audio. Incident events are validated before relay. `MeshRouter` maintains a graph of known neighbors; this is not proof of distance-vector routing or self-healing.
 
 ## Direct-link lifecycle
 
-`NativeBleManager` is the public facade and cross-component policy owner. `BleRadioController` owns Android advertising/scanning; `BlePeerAdmissionController` owns discovery identity/capacity/election policy; `GattTransferExecutor` owns callback-driven GATT transfers; `L2capTransport` owns socket I/O and GATT fallback; and `BleLifecycleSupervisor` owns bounded liveness, scan expiry, and stuck-lock recovery. `GattClientManager` and `GattServerManager` own Android callbacks. `BleLinkRegistry` stores per-attempt records with endpoint, role, generation, lifecycle state, GATT/server reference, queue/operation state, MTU, identity, and timestamps.
+`NativeBleManager` is the public facade and policy owner. Its collaborators own radio, admission/election, GATT execution, L2CAP I/O, liveness, and callbacks. `BleLinkRegistry` stores endpoint/role/generation-owned link state and queues.
 
 The intended lifecycle distinguishes radio connection from payload readiness:
 
@@ -79,11 +79,13 @@ This is not yet a basis for claiming authenticated end-to-end encryption or forw
 
 ## Persistence and UI
 
-`MeshRepository` joins network callbacks, `MeshRouter`, persistence, and UI-facing state through two boundaries: `MeshNetworkGateway` hides Android Bluetooth types, and `MessageStore` hides Room/DAO operations. `PrivateDeliveryPlanner` makes the pure direct/next-hop/broadcast selection before the gateway performs transport I/O. Production adapters are supplied by Koin. Room collection and background writes run in the process-owned `AppCoroutineScope`. Compose features cover setup, chat, Radar, SOS, profile, responder tracking, and audio; Active Chat header presentation and Radar row models are separated from their route-level screens. UI rules live in `docs/ui.md`; physical behavior must be checked against `docs/validation.md`.
+`MeshRepository` joins callbacks, `MeshRouter`, persistence, and UI state. `MeshNetworkGateway` hides Android Bluetooth types; `MessageStore` hides Room. `PrivateDeliveryPlanner` chooses direct or directed next-hop delivery before I/O. Koin supplies production adapters and `AppCoroutineScope` owns background work. UI rules live in `docs/ui.md`; device evidence lives in `docs/validation.md`.
+
+Incidents are additive: ready peers exchange bounded version summaries/missing events; no links, routes, admission, or Room tables change. Reporter self-response is rejected; cancellation stays creator-only. Creation can carry optional GPS coordinates, capture time, and accuracy in nullable Room/event fields. Mesh profile supplies broadcast TTL (default 10; explicit Dense 4); direct sync is unchanged. Signed remote authority and a durable incident outbox remain open.
 
 ## Offline maps and notifications
 
-Offline vector map packages (PMTiles) are distributed via versioned GitHub Releases with metadata manifests and cryptographic digital signatures. Manifest integrity is validated offline by `ManifestVerifier` using Universal ECDSA (NIST P-256 / SHA256withECDSA) with an Ed25519 composite fallback, guaranteeing native verification down to Android 7.0 (API 24) without external library bloat. `MapPackageDownloader` enforces Wi-Fi policies, follows 302 cross-domain release redirects, validates stream completion before SHA-256 hash checks, and relies on `MapStorageGuard` for atomic versioned activation. `NotificationHelper` formats incoming private messages via `NotificationCompat.MessagingStyle` (7-message history ring buffer) and SOS distress alarms via `CATEGORY_ALARM`. On cold launch from notifications, `MainActivity` routes through `IdentitySetupScreen` / `PermissionsScreen` to initialize node identity and radio hardware before entering the active mesh.
+Versioned PMTiles releases use signed manifests, offline P-256 verification with Ed25519 fallback, download completion/hash checks, and atomic activation. Notifications use `MessagingStyle` for private messages and `CATEGORY_ALARM` for SOS. Cold launches still pass through identity and permission setup before entering the mesh.
 
 ## Source map
 

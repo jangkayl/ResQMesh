@@ -33,7 +33,8 @@ class MeshRepository(
     private val messageStore: MessageStore,
     private val blockStore: BlockRelationshipStore,
     private val publicKeys: PeerPublicKeyDirectory,
-    private val repositoryScope: CoroutineScope
+    private val repositoryScope: CoroutineScope,
+    private val readyPeerEvents: MeshReadyPeerEvents
 ) {
 
     private val _connectionStatus = MutableStateFlow("Ready to deploy Mesh Node.")
@@ -197,6 +198,7 @@ class MeshRepository(
             meshRouter.recalculateKnownNodes(myNodeName, updatedList.filter { it.isPayloadReady })
             if (device.isPayloadReady) {
                 scheduleOutboxFlush()
+                readyPeerEvents.publish(device)
             }
         }
 

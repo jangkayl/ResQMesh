@@ -14,7 +14,12 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
-class SetupViewModel(private val useCases: com.example.testresqmesh.core.domain.usecase.MeshUseCases) : ViewModel() {
+import com.example.testresqmesh.data.repository.IdentityProvider
+
+class SetupViewModel(
+    private val useCases: com.example.testresqmesh.core.domain.usecase.MeshUseCases,
+    private val identityProvider: IdentityProvider
+) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ConnectionUiState())
     val uiState: StateFlow<ConnectionUiState> = _uiState.asStateFlow()
@@ -22,7 +27,7 @@ class SetupViewModel(private val useCases: com.example.testresqmesh.core.domain.
     private val _isDeveloperModeEnabled = MutableStateFlow(false)
     val isDeveloperModeEnabled: StateFlow<Boolean> = _isDeveloperModeEnabled.asStateFlow()
 
-    private val _isLongRangeProfile = MutableStateFlow(false)
+    private val _isLongRangeProfile = MutableStateFlow(true)
     val isLongRangeProfile: StateFlow<Boolean> = _isLongRangeProfile.asStateFlow()
 
     init {
@@ -41,7 +46,7 @@ class SetupViewModel(private val useCases: com.example.testresqmesh.core.domain.
     fun initDeveloperMode(context: Context) {
         val prefs = context.getSharedPreferences("resqmesh_prefs", Context.MODE_PRIVATE)
         _isDeveloperModeEnabled.value = prefs.getBoolean("developer_mode_enabled", false)
-        _isLongRangeProfile.value = prefs.getBoolean("mesh_profile_long_range", false)
+        _isLongRangeProfile.value = prefs.getBoolean("mesh_profile_long_range", true)
     }
 
     fun setMeshProfile(context: Context, longRange: Boolean) {
@@ -100,6 +105,9 @@ class SetupViewModel(private val useCases: com.example.testresqmesh.core.domain.
 
     fun checkHardwareAndGoOnline(context: Context, customName: String, nodeTag: String, teamKey: String) {
         saveIdentity(context, customName, nodeTag)
+        viewModelScope.launch {
+            identityProvider.getOrCreateUser(customName)
+        }
         val bluetoothManager = context.getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
         val bluetoothAdapter = bluetoothManager.adapter
         val locationManager = context.getSystemService(Context.LOCATION_SERVICE) as LocationManager

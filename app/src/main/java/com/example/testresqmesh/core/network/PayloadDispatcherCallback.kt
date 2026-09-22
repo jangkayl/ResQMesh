@@ -32,4 +32,7 @@ interface PayloadDispatcherCallback {
     
     fun showNotification(sender: String, text: String)
     fun showSosEmergencyNotification(sender: String, text: String)
+    fun onDomainEvent(endpointId: String, payload: MeshPayload) {}
+    fun onEventSyncRequest(endpointId: String, payload: MeshPayload) {}
+    fun onEventSyncResponse(endpointId: String, payload: MeshPayload) {}
 }

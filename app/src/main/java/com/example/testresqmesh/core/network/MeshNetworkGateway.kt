@@ -28,12 +28,16 @@ interface MeshNetworkGateway {
     var onDeviceUnblocked: ((String) -> Unit)?
     var onBlockRequest: ((String, MeshPayload, BlockControlEnvelope) -> Unit)?
     var onBlockAck: ((String, MeshPayload, BlockControlEnvelope) -> Unit)?
+    var onDomainEvent: ((String, MeshPayload) -> Unit)?
+    var onEventSyncRequest: ((String, MeshPayload) -> Unit)?
+    var onEventSyncResponse: ((String, MeshPayload) -> Unit)?
     var checkRouteExists: ((String) -> Boolean)?
     var stpNeighborsProvider: (() -> Set<String>)?
 
     fun startMeshNode(teamKey: String)
     fun stopMeshNode()
     fun hasReadyEndpoint(endpointId: String): Boolean
+    fun currentMeshTtl(): Int
     fun hasLiveSocket(endpointId: String): Boolean
     fun hasReadyLinkToIdentity(peerName: String): Boolean
     fun linkEstablishedAt(endpointId: String): Long
@@ -89,12 +93,16 @@ class NativeBleGateway(private val manager: NativeBleManager) : MeshNetworkGatew
     override var onDeviceUnblocked by manager::onDeviceUnblocked
     override var onBlockRequest by manager::onBlockRequest
     override var onBlockAck by manager::onBlockAck
+    override var onDomainEvent by manager::onDomainEvent
+    override var onEventSyncRequest by manager::onEventSyncRequest
+    override var onEventSyncResponse by manager::onEventSyncResponse
     override var checkRouteExists by manager::checkRouteExists
     override var stpNeighborsProvider by manager::stpNeighborsProvider
 
     override fun startMeshNode(teamKey: String) = manager.startMeshNode(teamKey)
     override fun stopMeshNode() = manager.stopMeshNode()
     override fun hasReadyEndpoint(endpointId: String) = manager.hasReadyEndpoint(endpointId)
+    override fun currentMeshTtl() = manager.getMeshProfileTtl()
     override fun hasLiveSocket(endpointId: String) = manager.hasLiveSocket(endpointId)
     override fun hasReadyLinkToIdentity(peerName: String) = manager.hasReadyLinkToIdentity(peerName)
     override fun linkEstablishedAt(endpointId: String) = manager.linkEstablishedAt(endpointId)

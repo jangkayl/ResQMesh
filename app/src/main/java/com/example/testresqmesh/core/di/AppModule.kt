@@ -19,6 +19,11 @@ import com.example.testresqmesh.feature.comms.viewmodel.CommunicationViewModel
 import com.example.testresqmesh.feature.comms.viewmodel.WalkieTalkieViewModel
 import com.example.testresqmesh.feature.radar.viewmodel.RadarViewModel
 import com.example.testresqmesh.feature.setup.viewmodel.SetupViewModel
+import com.example.testresqmesh.data.repository.LocalIdentityManager
+import com.example.testresqmesh.data.repository.IdentityProvider
+import com.example.testresqmesh.data.repository.IncidentRepository
+import com.example.testresqmesh.data.repository.MeshReadyPeerEvents
+import com.example.testresqmesh.feature.incident.viewmodel.IncidentViewModel
 import kotlinx.coroutines.Dispatchers
 import org.koin.android.ext.koin.androidContext
 import org.koin.androidx.viewmodel.dsl.viewModel
@@ -32,7 +37,8 @@ val appModule = module {
     single { BlockRelationshipStore(androidContext()) }
     single { PeerPublicKeyDirectory(androidContext()) }
     single(createdAtStart = true) { AppCoroutineScope(Dispatchers.IO) }
-    single { MeshRepository(get(), get(), get(), get(), get<AppCoroutineScope>().scope) }
+    single(createdAtStart = true) { MeshReadyPeerEvents() }
+    single { MeshRepository(get(), get(), get(), get(), get<AppCoroutineScope>().scope, get()) }
     single { MediaHelper(androidContext()) }
     single { com.example.testresqmesh.core.utils.NotificationHelper(androidContext()) }
     single<LocationClient> { DefaultLocationClient(androidContext()) }
@@ -43,7 +49,7 @@ val appModule = module {
     single<com.example.testresqmesh.core.map.download.ConnectivityProvider> {
         com.example.testresqmesh.core.map.download.AndroidConnectivityProvider(androidContext())
     }
-    single {
+    single(createdAtStart = true) {
         com.example.testresqmesh.core.map.download.MapPackageDownloader(
             storageGuard = get(),
             verifier = get(),
@@ -93,9 +99,23 @@ val appModule = module {
         )
     }
 
-    viewModel { SetupViewModel(get()) }
+    viewModel { SetupViewModel(get(), get()) }
     viewModel { RadarViewModel(get()) }
     viewModel { CommunicationViewModel(get(), get()) }
     viewModel { WalkieTalkieViewModel(get(), get(), get()) }
     viewModel { com.example.testresqmesh.feature.profile.viewmodel.OfflineMapViewModel(get(), get(), get()) }
+
+    single { LocalIdentityManager(androidContext(), get<AppDatabase>().userDao()) }
+    single<IdentityProvider> { get<LocalIdentityManager>() }
+    single {
+        com.example.testresqmesh.data.repository.IncidentRepository(
+            incidentDao = get<AppDatabase>().incidentDao(),
+            domainEventDao = get<AppDatabase>().domainEventDao(),
+            identityManager = get(),
+            networkGateway = get(),
+            repositoryScope = get<AppCoroutineScope>().scope,
+            readyPeerEvents = get()
+        )
+    }
+    viewModel { com.example.testresqmesh.feature.incident.viewmodel.IncidentViewModel(get(), get()) }
 }

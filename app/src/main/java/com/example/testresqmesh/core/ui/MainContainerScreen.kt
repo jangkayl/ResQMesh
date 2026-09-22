@@ -79,7 +79,10 @@ fun MainContainerScreen(
     var showAdvanced by remember { mutableStateOf(false) }
     var showOfflineMaps by remember { mutableStateOf(false) }
     var showNetworkDetails by remember { mutableStateOf(false) }
+    var showIncidents by remember { mutableStateOf(false) }
     var isCommunityConversationOpen by remember { mutableStateOf(false) }
+
+    val incidentViewModel: com.example.testresqmesh.feature.incident.viewmodel.IncidentViewModel = org.koin.androidx.compose.koinViewModel()
 
     // Legacy Radar screen remains in source intentionally. Offline maps are managed via Profile/Settings.
     
@@ -258,6 +261,28 @@ fun MainContainerScreen(
                 }
                 BackHandler { showNetworkDetails = false }
             }
+            showIncidents -> {
+                ResQAuroraBackground(modifier = Modifier.fillMaxSize()) {
+                    com.example.testresqmesh.feature.incident.ui.IncidentListScreen(
+                        viewModel = incidentViewModel,
+                        onBack = { showIncidents = false },
+                        onViewLocation = { lat, lng, reporter, description ->
+                            mapSosAlert = com.example.testresqmesh.core.model.ChatMessage(
+                                id = "incident_map_${System.currentTimeMillis()}",
+                                senderName = reporter,
+                                text = description,
+                                imageBase64 = null,
+                                audioBase64 = null,
+                                locationLat = lat,
+                                locationLng = lng,
+                                isMine = false,
+                                isPrivate = false
+                            )
+                        }
+                    )
+                }
+                BackHandler { showIncidents = false }
+            }
             else -> {
                 ResQAppShell(
                     selectedDestination = currentDestination,
@@ -285,7 +310,8 @@ fun MainContainerScreen(
                                 onMessagesClick = { currentDestination = ResQDestination.Messages },
                                 onNetworkClick = { showNetworkDetails = true },
                                 onProfileClick = { showProfile = true },
-                                onVoiceClick = { currentDestination = ResQDestination.Voice }
+                                onVoiceClick = { currentDestination = ResQDestination.Voice },
+                                onIncidentsClick = { showIncidents = true }
                             )
                             ResQDestination.Messages -> ChatContainerScreen(
                                 viewModel = commsViewModel, 

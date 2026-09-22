@@ -50,6 +50,9 @@ class NativeBleManager(val context: Context) {
     var onDeviceUnblocked: ((String) -> Unit)? = null
     var onBlockRequest: ((String, MeshPayload, BlockControlEnvelope) -> Unit)? = null
     var onBlockAck: ((String, MeshPayload, BlockControlEnvelope) -> Unit)? = null
+    var onDomainEvent: ((String, MeshPayload) -> Unit)? = null
+    var onEventSyncRequest: ((String, MeshPayload) -> Unit)? = null
+    var onEventSyncResponse: ((String, MeshPayload) -> Unit)? = null
     var checkRouteExists: ((String) -> Boolean)? = null
 
     var myDeviceName: String = "ResQMesh_Node"
@@ -62,7 +65,7 @@ class NativeBleManager(val context: Context) {
     var myNodeId: String = ""
     fun getMeshProfileTtl(): Int {
         val isLongRange = context.getSharedPreferences("resqmesh_prefs", Context.MODE_PRIVATE)
-            .getBoolean("mesh_profile_long_range", false)
+            .getBoolean("mesh_profile_long_range", true)
         return if (isLongRange) 10 else 4
     }
 
@@ -181,6 +184,15 @@ class NativeBleManager(val context: Context) {
             if (!com.example.testresqmesh.MainActivity.isAppInForeground) {
                 notificationHelper.showSosEmergencyNotification(sender, text)
             }
+        }
+        override fun onDomainEvent(endpointId: String, payload: MeshPayload) {
+            this@NativeBleManager.onDomainEvent?.invoke(endpointId, payload)
+        }
+        override fun onEventSyncRequest(endpointId: String, payload: MeshPayload) {
+            this@NativeBleManager.onEventSyncRequest?.invoke(endpointId, payload)
+        }
+        override fun onEventSyncResponse(endpointId: String, payload: MeshPayload) {
+            this@NativeBleManager.onEventSyncResponse?.invoke(endpointId, payload)
         }
     }
     

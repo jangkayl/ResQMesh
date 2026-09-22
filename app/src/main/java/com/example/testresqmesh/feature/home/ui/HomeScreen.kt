@@ -94,7 +94,8 @@ fun HomeScreen(
     onMessagesClick: () -> Unit,
     onNetworkClick: () -> Unit,
     onProfileClick: () -> Unit,
-    onVoiceClick: (() -> Unit)? = null
+    onVoiceClick: (() -> Unit)? = null,
+    onIncidentsClick: (() -> Unit)? = null
 ) {
     val connectionState by setupViewModel.uiState.collectAsState()
     val radarState by radarViewModel.uiState.collectAsState()
@@ -120,7 +121,8 @@ fun HomeScreen(
         onMessagesClick = onMessagesClick,
         onNetworkClick = onNetworkClick,
         onProfileClick = onProfileClick,
-        onVoiceClick = onVoiceClick
+        onVoiceClick = onVoiceClick,
+        onIncidentsClick = onIncidentsClick
     )
 }
 
@@ -136,6 +138,7 @@ fun HomeScreenContent(
     onNetworkClick: () -> Unit,
     onProfileClick: () -> Unit,
     onVoiceClick: (() -> Unit)? = null,
+    onIncidentsClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val readinessTitle = stringResource(
@@ -191,6 +194,13 @@ fun HomeScreenContent(
             title = readinessTitle,
             description = readinessDescription
         )
+
+        // 3.5 Transactional Emergency Incidents
+        if (onIncidentsClick != null) {
+            TacticalIncidentsBanner(
+                onIncidentsClick = onIncidentsClick
+            )
+        }
 
         // 4. Quick Tactical Operations Grid (Side-by-side action cards)
         TacticalOperationsGrid(
@@ -1070,6 +1080,67 @@ internal fun homeNetworkSummary(state: RadarUiState): HomeNetworkSummary {
         nearbyPeers = nearby,
         checkingPeers = checkingNames.distinctBy(NodeIdentity::key).size
     )
+}
+
+@Composable
+private fun TacticalIncidentsBanner(
+    onIncidentsClick: () -> Unit
+) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onIncidentsClick),
+        shape = RoundedCornerShape(18.dp),
+        color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.85f),
+        contentColor = MaterialTheme.colorScheme.onErrorContainer,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.4f)),
+        shadowElevation = 6.dp
+    ) {
+        Row(
+            modifier = Modifier.padding(Spacing.Medium),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(Spacing.Medium),
+                modifier = Modifier.weight(1f)
+            ) {
+                Surface(
+                    shape = CircleShape,
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.size(40.dp)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = Icons.Outlined.Shield,
+                            contentDescription = null,
+                            tint = Color.White,
+                            modifier = Modifier.size(22.dp)
+                        )
+                    }
+                }
+                Column {
+                    Text(
+                        text = "EMERGENCY INCIDENTS",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Black,
+                        letterSpacing = 0.5.sp
+                    )
+                    Text(
+                        text = "Track, coordinate, & resolve SOS lifecycle",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.85f)
+                    )
+                }
+            }
+            Icon(
+                imageVector = Icons.Outlined.ChevronRight,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.error
+            )
+        }
+    }
 }
 
 @Preview(showBackground = true, widthDp = 390, heightDp = 844)

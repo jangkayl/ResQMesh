@@ -18,14 +18,14 @@ Validate convergent mesh-hop topology and directed private delivery under relay 
 - Three direct neighbors are allowed; queued stable-identity admission retries after a five-second setup watchdog. Samsung/five-device reports remain unrecorded device evidence.
 - Private sends fail closed; link/frame/queue policy and focused unit tests cover lifecycle and heartbeat ownership.
 - The terminal, UI shell, and lean CI are implemented; phone validation remains required.
-- Modern Tactical & Utilitarian UI redesign (Phases 1-11): Safety Dark and Field Light themes, tactical dashboard, Walkie-Talkie radar PTT, SOS 2x2 grid with "Slide to Broadcast", context-aware chat composer, 2D mesh path visualizer, radar sweep splash, and GNSS telemetry.
-- Cebu offline map pilot: MapPackageManifest model, dual ECDSA/Ed25519 ManifestVerifier, atomic MapStorageGuard, 302-redirect downloader with truncation checks, MapLibre SosMapScreen markers, 36dp compass, telemetry bottom sheet, mapless fallback, and settings UI.
+- Tactical UI redesign and Cebu offline-map pilot are in the working tree; device validation remains required.
 - Android Notification & Deep Link System: NotificationCompat.MessagingStyle with 7-message deduplication, ResQMesh branding, and cold-launch deep-link routing.
 - Permanent cryptographic node identity: deterministic Node ID from SHA-256 hash of Keystore public key, Google Cloud Backup exclusions for key/ID prefs, explicit dismissal of pending key change alerts, and People & Paths multi-hop messaging for blocked devices (D17).
 - Auto-connect zero-peer deadlock recovery: isolated node election yield schedules fallback initiator watchdog (2.5s) if elected master fails to connect; stale zombie/ghost sockets evicted on rebooted advertisement (`directConnections == 0` with >8s silence/age check) and debounced advertising updates protect active links from false teardown.
-- Stable Core Topology & Partition Healing: Abolished connect-to-send and VIP bouncer churn during message transmission; private sends fallback to hybrid mesh broadcast if next hop is unrouted; partition bridging operates with randomized jitter and thundering herd abort.
-- Truncated Identity & Durable Outbox: Fuzzy prefix matching in `NodeIdentity` resolves duplicate device rows from 24-byte BLE advertisement truncation; disconnected/unrouted sends persist as `PENDING` and auto-flush with jitter on reconnect (30s window); dynamic packet TTL (Dense: 4, Long Range: 10) controls multi-hop propagation without room congestion.
+- Stable topology snapshots: name/ID pairs stay associated, empty neighbor lists withdraw stale adjacency, per-origin sequence rejects delayed snapshots, full refresh is 30 seconds, and UI/stable routing share a 90-second lease.
+- Directed private delivery: exact stable-ID next hops only; no private message/receipt broadcast fallback. Direct dispatch returns acceptance/rejection, persistence precedes dispatch, receipt timing starts only after acceptance, and pending rows remain retryable until a 24-hour explicit expiry.
 - Direct Message Latency & Churn Recovery: Relaxed zombie eviction silence/age threshold to 15s to tolerate Android BLE advertisement caching/jitter without false-positive teardowns. Fixed mesh router to use prefix-aware node ID matching, enabling instant direct-message dispatch and receipt termination instead of delayed outbox queuing and fallback flooding.
+- Incidents: self-response rejected; optional GPS maps. TTL default 10; explicit Dense 4; no BLE/routing changes.
 
 Local checks passed; physical BLE validation remains required.
 
@@ -41,6 +41,7 @@ Local checks passed; physical BLE validation remains required.
 | ROUTE-01 | P0 | FIXED LOCALLY: versioned empty-withdrawal topology and accepted-only directed dispatch remove stale-hop and false-send paths; private broadcast fallback is removed. Physical relay/reconnect validation remains open. | Stable A-B-C route/withdraw/recover run with receipts, queue rejection, no private broadcast, and no repeated callback retirement |
 | SEC-01 | P1 | Deterministic node ID bound to Keystore public key, backup exclusions, and key rejection flow implemented (D17); fingerprint display and interactive trust verification UI remain | Defined threat model, approval flow, fail-closed tests, and documented claim boundary |
 | SOS-01 | P1 | SOS cancellation/follow-up ownership needs sender/alert binding review | Concurrent-alert and cancel-before-location tests |
+| INCIDENT-01 | P1 | Incident signatures/key binding and durable outbox remain open | Threat model, Room migration, and reconnect/new-join card |
 
 ## Next actions
 
@@ -53,4 +54,3 @@ Local checks passed; physical BLE validation remains required.
 ## Scope guard
 
 Reliable text/SOS, honest status, recovery, and private fail-closed behavior remain ahead of speculative features.
-
