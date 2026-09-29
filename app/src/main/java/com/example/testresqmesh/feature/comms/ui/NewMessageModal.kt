@@ -1,5 +1,7 @@
 package com.example.testresqmesh.feature.comms.ui
 
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -18,6 +20,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.ChevronRight
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.PersonOutline
 import androidx.compose.material.icons.outlined.Refresh
@@ -35,13 +38,16 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.example.testresqmesh.R
 import com.example.testresqmesh.core.model.NodeIdentity
 import com.example.testresqmesh.core.ui.components.feedback.ResQEmptyState
@@ -92,7 +98,7 @@ fun NewMessageModal(
                 )
             }
             Surface(
-                modifier = Modifier.size(48.dp),
+                modifier = Modifier.size(44.dp),
                 shape = CircleShape,
                 color = MaterialTheme.colorScheme.surfaceVariant,
                 onClick = onDismiss
@@ -142,7 +148,7 @@ fun NewMessageModal(
         if (shownCandidates.isEmpty()) {
             ResQGlassSurface(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(28.dp),
+                shape = RoundedCornerShape(24.dp),
                 contentPadding = PaddingValues(vertical = Spacing.Medium)
             ) {
                 ResQEmptyState(
@@ -175,48 +181,105 @@ private fun RecipientRow(
 ) {
     val statusColor = candidate.availability.color()
     val recipientDescription = stringResource(R.string.new_message_choose_recipient, candidate.displayName)
+    val nodeId = remember(candidate.name) {
+        if (candidate.name.contains('#')) "#" + candidate.name.substringAfter('#') else ""
+    }
+
     ResQGlassSurface(
         modifier = Modifier
             .fillMaxWidth()
             .alpha(if (candidate.isSelectable) 1f else 0.64f)
             .semantics { contentDescription = recipientDescription }
             .clickable(enabled = candidate.isSelectable, onClick = onClick),
-        shape = RoundedCornerShape(24.dp),
+        shape = RoundedCornerShape(18.dp),
         contentPadding = PaddingValues(Spacing.Medium),
-        shadowElevation = 10.dp
+        shadowElevation = 4.dp
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Surface(
-                modifier = Modifier.size(48.dp),
-                shape = CircleShape,
-                color = MaterialTheme.colorScheme.secondaryContainer
-            ) {
-                Box(contentAlignment = Alignment.Center) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            // Node Avatar with Status Dot
+            Box {
+                Surface(
+                    modifier = Modifier.size(46.dp),
+                    shape = CircleShape,
+                    color = MaterialTheme.colorScheme.secondaryContainer,
+                    border = BorderStroke(1.5.dp, statusColor.copy(alpha = 0.7f))
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Text(
+                            text = candidate.initial,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Black,
+                            color = MaterialTheme.colorScheme.onSecondaryContainer
+                        )
+                    }
+                }
+
+                Box(
+                    modifier = Modifier
+                        .size(10.dp)
+                        .align(Alignment.BottomEnd)
+                        .clip(CircleShape)
+                        .background(statusColor)
+                )
+            }
+
+            Spacer(Modifier.width(Spacing.Medium))
+
+            Column(modifier = Modifier.weight(1f)) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
                     Text(
-                        text = candidate.initial,
-                        style = MaterialTheme.typography.titleLarge,
+                        text = candidate.displayName,
+                        style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSecondaryContainer
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    if (nodeId.isNotEmpty()) {
+                        Text(
+                            text = nodeId,
+                            style = MaterialTheme.typography.labelSmall.copy(
+                                fontFamily = FontFamily.Monospace,
+                                fontSize = 10.sp
+                            ),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                        )
+                    }
+                }
+
+                Spacer(Modifier.height(3.dp))
+
+                // Tactical Reachability Status Pill (satisfies onNodeWithText("Direct") test)
+                Surface(
+                    shape = RoundedCornerShape(6.dp),
+                    color = statusColor.copy(alpha = 0.12f),
+                    border = BorderStroke(1.dp, statusColor.copy(alpha = 0.35f))
+                ) {
+                    Text(
+                        text = candidate.availability.label(),
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            fontSize = 10.sp,
+                            fontFamily = FontFamily.Monospace,
+                            letterSpacing = 0.5.sp
+                        ),
+                        color = statusColor,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                     )
                 }
             }
-            Spacer(Modifier.width(Spacing.Medium))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = candidate.displayName,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Spacer(Modifier.height(Spacing.ExtraSmall))
-                Text(
-                    text = candidate.availability.label(),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = statusColor,
-                    fontWeight = FontWeight.SemiBold
-                )
-            }
+
+            Icon(
+                imageVector = Icons.Outlined.ChevronRight,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                modifier = Modifier.size(18.dp)
+            )
         }
     }
 }

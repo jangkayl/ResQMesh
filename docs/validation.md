@@ -1,6 +1,6 @@
 # Validation
 
-Builds and tests do not prove BLE behavior. The user operates phones; Codex prepares steps and analyzes evidence.
+Builds and tests do not prove BLE behavior. The user operates phones; Codex prepares steps and analyzes evidence. Check SOS map setup returns to its alert.
 
 ## Local checks
 

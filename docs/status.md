@@ -1,6 +1,6 @@
 # Current status
 
-Last reviewed: 2026-09-23
+Last reviewed: 2026-09-29
 Baseline: `codex/foreground-mesh-service`; background behavior awaits validation.
 
 ## Current objective
@@ -16,20 +16,20 @@ Validate convergent mesh-hop topology and directed private delivery under relay 
 - GATT uses acknowledged server indications and protects healthy L2CAP from stale callbacks; permission revocation fails safely.
 - Three direct neighbors are allowed; queued admission retries after five seconds. Samsung/five-device evidence remains unrecorded.
 - Private sends fail closed; link/frame/queue policy and focused unit tests cover lifecycle and heartbeat ownership.
-- The terminal, UI shell, and lean CI are implemented; phone validation remains required.
 - Notifications cover bounded chats/SOS. Opt-in background mesh uses a silent `connectedDevice` service and shared session owner without reboot/process-death auto-start.
 - Permanent node identity derives from the Keystore public key, excludes key/ID preferences from backup, and supports explicit dismissal of key-change alerts (D17).
 - Zero-ready recovery uses a 2.5-second fallback initiator and restarts failed or 15-second-stale scans with bounded jitter. It pauses during handshakes and applies in foreground/background sessions.
 - Stable topology snapshots: name/ID pairs stay associated, empty neighbor lists withdraw stale adjacency, per-origin sequence rejects delayed snapshots, full refresh is 30 seconds, and UI/stable routing share a 90-second lease.
 - UI/delivery share directed routes from ready peers; stale reverse snapshots cannot restore withdrawals. Unblock never implies Direct; details re-resolve state.
 - Directed private delivery: exact stable-ID next hops only; no private message/receipt broadcast fallback. Direct dispatch returns acceptance/rejection, persistence precedes dispatch, receipt timing starts only after acceptance, and pending rows remain retryable until a 24-hour explicit expiry.
-- Private conversations collapse advertisement/handshake aliases by node ID, prefer complete labels, and delete stored aliases together.
 - Churn recovery uses a 15-second zombie threshold; prefix-aware node-ID matching enables immediate direct dispatch and receipt completion.
 - Incidents: self-response rejected; optional GPS maps. TTL default 10; explicit Dense 4; no BLE/routing changes.
 - Name setup omits tags; IDs remain. Messages show current names by ID; phone validation is pending.
-- Main tabs have solid backgrounds and static SOS navigation. Radio plays notes serially. Animated first-launch guide explains use and reopens from Settings; phone validation is pending.
+- Messages keeps inbox rows unread until viewed in chat; Home peer chips open Network details by node ID. Phone validation pending.
+- UI wording now separates active mesh session, ready direct peer, checking link, and searching; About/Privacy and Permissions state Keystore, key-trust, and hardware limits. Phone review pending.
+- Startup errors stay visible; map setup returns to its SOS alert. Large-text and Daylight contrast need phone review.
 
-Debug build and isolated tests pass. Normal unit tests are blocked by untracked `InboxMeshStatusTest.kt`; physical validation remains required.
+Debug Kotlin and Android test compilation, unit tests, and diff hygiene pass locally. Physical validation remains.
 
 ## Open blockers
 
@@ -48,10 +48,10 @@ Debug build and isolated tests pass. Normal unit tests are blocked by untracked 
 
 ## Next actions
 
-1. Install this build; run A-B-C for 90 seconds, send five private messages each way, remove/restore B, and verify withdrawal, directed retry, and no duplicate conversations.
-2. Repeat under queue pressure and relay restart; record dispatch, topology, outbox, receipts, and GATT retirement.
-3. Record APK/build identity, device matrix, and repetitions for the Samsung and five-device runs.
-4. Run the stable-ID relay card after installing this working tree; capture selected next hop, private relay route-unavailable, key-change, and GATT-retirement markers.
+1. Check UI on phones: status, unread/peer details, startup errors, SOS map return, large text, and both appearances.
+2. Install this build; run A-B-C for 90 seconds, send five private messages each way, remove/restore B, and verify withdrawal, directed retry, and no duplicate conversations.
+3. Repeat under queue pressure and relay restart; record dispatch, topology, outbox, receipts, and GATT retirement.
+4. Record APK/build identity, device matrix, and repetitions for the Samsung and five-device runs.
 5. Run the Android 12-14+ background-mesh card, including notification denial, relay, stop, task removal, and battery comparison.
 
 ## Scope guard

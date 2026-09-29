@@ -103,6 +103,7 @@ sealed class SosMapViewState {
         val formattedLat: String,
         val formattedLng: String,
         val statusMessage: String,
+        val showInstallAction: Boolean = true,
         val isFallbackActive: Boolean = true
     ) : SosMapViewState()
 
@@ -158,7 +159,8 @@ fun resolveSosMapViewState(
             lng = lng,
             formattedLat = formatCoordinate(lat, isLat = true),
             formattedLng = formatCoordinate(lng, isLat = false),
-            statusMessage = statusMsg
+            statusMessage = statusMsg,
+            showInstallAction = packageStatus is MapPackageStatus.NotInstalled || packageStatus is MapPackageStatus.Error
         )
     }
 }
@@ -167,6 +169,7 @@ fun resolveSosMapViewState(
 fun SosMapScreen(
     alertMessage: ChatMessage,
     onBack: () -> Unit,
+    onInstallMap: () -> Unit = {},
     storageGuard: MapStorageGuard? = null
 ) {
     val context = LocalContext.current
@@ -212,7 +215,8 @@ fun SosMapScreen(
                     )
                     MaplessSosFallback(
                         alertMessage = alertMessage,
-                        state = viewState
+                        state = viewState,
+                        onInstallMap = onInstallMap
                     )
                 }
             }
@@ -242,7 +246,7 @@ private fun TacticalHeaderBar(
         IconButton(
             onClick = onBack,
             modifier = Modifier
-                .size(42.dp)
+                .size(48.dp)
                 .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.85f), CircleShape)
                 .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f), CircleShape)
         ) {
@@ -279,7 +283,7 @@ private fun TacticalHeaderBar(
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Black,
                     letterSpacing = 1.sp,
-                    color = SignalRed
+                    color = MaterialTheme.colorScheme.error
                 )
             }
             Text(
@@ -933,6 +937,7 @@ private fun MapLibreLocalMapContainer(
 fun MaplessSosFallback(
     alertMessage: ChatMessage,
     state: SosMapViewState.MaplessFallback,
+    onInstallMap: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val scrollState = rememberScrollState()
@@ -959,7 +964,7 @@ fun MaplessSosFallback(
                 Icon(
                     imageVector = Icons.Default.Warning,
                     contentDescription = null,
-                    tint = SignalRed,
+                    tint = MaterialTheme.colorScheme.onErrorContainer,
                     modifier = Modifier.size(36.dp)
                 )
                 Spacer(Modifier.width(Spacing.Medium))
@@ -971,11 +976,19 @@ fun MaplessSosFallback(
                         color = MaterialTheme.colorScheme.onErrorContainer
                     )
                     Text(
-                        text = "No verified offline vector package on device. Operating in mapless coordinate fallback mode.",
+                        text = "Coordinates remain available. Set up an offline map, then return to this alert.",
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = MaterialTheme.colorScheme.onErrorContainer
                     )
                 }
+            }
+        }
+
+        if (state.showInstallAction) {
+            Button(onClick = onInstallMap, modifier = Modifier.fillMaxWidth().height(52.dp)) {
+                Icon(Icons.Default.CloudDownload, contentDescription = null)
+                Spacer(Modifier.width(Spacing.Small))
+                Text("Set up offline map")
             }
         }
 
@@ -1091,6 +1104,7 @@ private fun NoLocationFallback(
     Box(
         modifier = modifier
             .fillMaxSize()
+            .verticalScroll(rememberScrollState())
             .padding(Spacing.Large),
         contentAlignment = Alignment.Center
     ) {
@@ -1134,24 +1148,27 @@ private fun DetailRow(
     label: String,
     value: String
 ) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 4.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        Text(
-            text = value,
-            style = MaterialTheme.typography.bodyMedium,
-            fontWeight = FontWeight.SemiBold,
-            color = MaterialTheme.colorScheme.onSurface
-        )
+    BoxWithConstraints(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+        if (maxWidth < 300.dp || value.length > 75) {
+            Column(Modifier.fillMaxWidth()) {
+                Text(label, style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(value, style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.SemiBold, textAlign = TextAlign.End,
+                    modifier = Modifier.fillMaxWidth(), color = MaterialTheme.colorScheme.onSurface)
+            }
+        } else {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.Top) {
+                Text(label, style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.weight(0.38f))
+                Text(value, style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.SemiBold, textAlign = TextAlign.End,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.weight(0.62f))
+            }
+        }
     }
 }
 

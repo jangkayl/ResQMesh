@@ -35,6 +35,7 @@ import java.util.Locale
 @Composable
 fun OfflineMapSettingsScreen(
     onBack: () -> Unit,
+    returnToSosAlert: Boolean = false,
     viewModel: OfflineMapViewModel = koinViewModel()
 ) {
     val state by viewModel.uiState.collectAsState()
@@ -91,7 +92,7 @@ fun OfflineMapSettingsScreen(
                 ) {
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = "Back",
+                        contentDescription = if (returnToSosAlert) "Back to SOS alert" else "Back",
                         tint = MaterialTheme.colorScheme.onSurface
                     )
                 }
@@ -108,7 +109,8 @@ fun OfflineMapSettingsScreen(
                         color = MaterialTheme.colorScheme.onSurface
                     )
                     Text(
-                        text = "Local vector packages for disconnected operations",
+                        text = if (returnToSosAlert) "Return to this SOS alert after setup"
+                        else "Local vector packages for disconnected operations",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )

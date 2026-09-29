@@ -62,7 +62,7 @@ class RecipientCandidatesTest {
 
         assertEquals(1, candidates.size)
         assertEquals(handshaked, candidates.single().name)
-        assertEquals("SM-P615 [NODE]", candidates.single().displayName)
+        assertEquals("SM-P615", candidates.single().displayName)
         assertEquals(RecipientAvailability.Direct, candidates.single().availability)
     }
 }

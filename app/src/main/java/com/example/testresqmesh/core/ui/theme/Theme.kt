@@ -41,8 +41,8 @@ private val NightOperationsColorScheme = darkColorScheme(
 
 private val DaylightOperationsColorScheme = lightColorScheme(
     primary = SafetyOrange,
-    onPrimary = Color(0xFFFFFFFF),
-    primaryContainer = Color(0xFFE2E8F0), // Light Steel Grey
+    onPrimary = Color(0xFF000000),
+    primaryContainer = Color(0xFFFFEDE4), // Soft Safety Orange Tint
     onPrimaryContainer = SafetyOrange,
     secondary = Color(0xFFCBD5E1),
     onSecondary = Color(0xFF000000),

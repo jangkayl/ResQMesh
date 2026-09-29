@@ -21,7 +21,9 @@ import com.example.testresqmesh.feature.sos.ui.FullScreenSosAlarm
 import com.example.testresqmesh.feature.sos.ui.ActiveSOSMonitoringScreen
 import com.example.testresqmesh.feature.sos.ui.SosMapScreen
 import com.example.testresqmesh.feature.profile.ui.ProfileScreen
-import com.example.testresqmesh.feature.profile.ui.AdvancedScreen
+import com.example.testresqmesh.feature.profile.ui.AboutScreen
+import com.example.testresqmesh.feature.profile.ui.PermissionsSettingsScreen
+import com.example.testresqmesh.feature.profile.viewmodel.AboutViewModel
 import com.example.testresqmesh.feature.comms.viewmodel.CommunicationViewModel
 import com.example.testresqmesh.feature.radar.viewmodel.RadarViewModel
 import com.example.testresqmesh.feature.setup.viewmodel.SetupViewModel
@@ -78,12 +80,15 @@ fun MainContainerScreen(
     var mapSosAlert by remember { mutableStateOf<com.example.testresqmesh.core.model.ChatMessage?>(null) }
     var showProfile by remember { mutableStateOf(false) }
     var showGuide by remember { mutableStateOf(false) }
-    var showAdvanced by remember { mutableStateOf(false) }
+    var showPermissions by remember { mutableStateOf(false) }
+    var showAbout by remember { mutableStateOf(false) }
     var showOfflineMaps by remember { mutableStateOf(false) }
     var showNetworkDetails by remember { mutableStateOf(false) }
+    var selectedNetworkPeerKey by remember { mutableStateOf<String?>(null) }
     var showIncidents by remember { mutableStateOf(false) }
     var isCommunityConversationOpen by remember { mutableStateOf(false) }
 
+    val aboutViewModel: AboutViewModel = org.koin.androidx.compose.koinViewModel()
     val incidentViewModel: com.example.testresqmesh.feature.incident.viewmodel.IncidentViewModel = org.koin.androidx.compose.koinViewModel()
 
     // Legacy Radar screen remains in source intentionally. Offline maps are managed via Profile/Settings.
@@ -157,10 +162,20 @@ fun MainContainerScreen(
                 )
                 BackHandler { commsViewModel.clearSosAlert() }
             }
+            showOfflineMaps -> {
+                ResQAuroraBackground(modifier = Modifier.fillMaxSize()) {
+                    com.example.testresqmesh.feature.profile.ui.OfflineMapSettingsScreen(
+                        onBack = { showOfflineMaps = false },
+                        returnToSosAlert = mapSosAlert != null
+                    )
+                }
+                BackHandler { showOfflineMaps = false }
+            }
             mapSosAlert != null -> {
                 SosMapScreen(
                     alertMessage = mapSosAlert!!,
-                    onBack = { mapSosAlert = null }
+                    onBack = { mapSosAlert = null },
+                    onInstallMap = { showOfflineMaps = true }
                 )
                 BackHandler { mapSosAlert = null }
             }
@@ -224,19 +239,22 @@ fun MainContainerScreen(
                 }
                 BackHandler { trackingNode = null }
             }
-            showAdvanced -> {
+            showPermissions -> {
                 ResQAuroraBackground(modifier = Modifier.fillMaxSize()) {
-                    AdvancedScreen(walkieTalkieViewModel = walkieTalkieViewModel, onBack = { showAdvanced = false })
-                }
-                BackHandler { showAdvanced = false }
-            }
-            showOfflineMaps -> {
-                ResQAuroraBackground(modifier = Modifier.fillMaxSize()) {
-                    com.example.testresqmesh.feature.profile.ui.OfflineMapSettingsScreen(
-                        onBack = { showOfflineMaps = false }
+                    PermissionsSettingsScreen(
+                        onBack = { showPermissions = false }
                     )
                 }
-                BackHandler { showOfflineMaps = false }
+                BackHandler { showPermissions = false }
+            }
+            showAbout -> {
+                ResQAuroraBackground(modifier = Modifier.fillMaxSize()) {
+                    AboutScreen(
+                        viewModel = aboutViewModel,
+                        onBack = { showAbout = false }
+                    )
+                }
+                BackHandler { showAbout = false }
             }
             showGuide -> {
                 FirstLaunchGuideScreen(
@@ -251,9 +269,10 @@ fun MainContainerScreen(
                         viewModel = setupViewModel,
                         appearance = appearance,
                         onAppearanceSelected = onAppearanceSelected,
-                        onAdvanced = { showAdvanced = true },
+                        onPermissions = { showPermissions = true },
                         onOfflineMaps = { showOfflineMaps = true },
                         onHelp = { showGuide = true },
+                        onAbout = { showAbout = true },
                         onBack = { showProfile = false }
                     )
                 }
@@ -263,13 +282,18 @@ fun MainContainerScreen(
                 ResQAuroraBackground(modifier = Modifier.fillMaxSize()) {
                     NetworkScreen(
                         viewModel = radarViewModel,
+                        initialSelectedNodeKey = selectedNetworkPeerKey,
                         onMessagePeer = { peer ->
                             showNetworkDetails = false
+                            selectedNetworkPeerKey = null
                             activeChatNode = peer
                         }
                     )
                 }
-                BackHandler { showNetworkDetails = false }
+                BackHandler {
+                    showNetworkDetails = false
+                    selectedNetworkPeerKey = null
+                }
             }
             showIncidents -> {
                 ResQAuroraBackground(modifier = Modifier.fillMaxSize()) {
@@ -318,7 +342,14 @@ fun MainContainerScreen(
                                 radarViewModel = radarViewModel,
                                 locationStatus = locationStatus,
                                 onMessagesClick = { currentDestination = ResQDestination.Messages },
-                                onNetworkClick = { showNetworkDetails = true },
+                                onNetworkClick = {
+                                    selectedNetworkPeerKey = null
+                                    showNetworkDetails = true
+                                },
+                                onPeerClick = { peerName ->
+                                    selectedNetworkPeerKey = com.example.testresqmesh.core.model.NodeIdentity.idOf(peerName)
+                                    showNetworkDetails = true
+                                },
                                 onProfileClick = { showProfile = true },
                                 onVoiceClick = { currentDestination = ResQDestination.Voice },
                                 onIncidentsClick = { showIncidents = true }

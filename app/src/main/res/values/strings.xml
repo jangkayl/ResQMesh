@@ -77,7 +77,7 @@
     <string name="mission_active_nodes">Linked Peers</string>
     <string name="mission_no_nodes">Awaiting peer radio connection...</string>
     <string name="mission_inspect_network">Inspect Node Network</string>
-    <string name="mission_beacon_ready">Emergency Beacon Armed · Offline Ready</string>
+    <string name="mission_beacon_ready">SOS action available</string>
     <string name="mission_encryption_badge">AES-GCM SECURE</string>
     <string name="messages_hub_badge">TACTICAL COMMS</string>
     <string name="messages_hub_status">SECURE MESH</string>

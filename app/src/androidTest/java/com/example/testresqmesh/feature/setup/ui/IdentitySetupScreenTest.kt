@@ -24,8 +24,6 @@ class IdentitySetupScreenTest {
                 IdentitySetupContent(
                     customName = "",
                     onCustomNameChange = {},
-                    nodeTag = "",
-                    onNodeTagChange = {},
                     onIdentityGenerated = {}
                 )
             }
@@ -45,8 +43,6 @@ class IdentitySetupScreenTest {
                 IdentitySetupContent(
                     customName = name,
                     onCustomNameChange = { name = it },
-                    nodeTag = "TEAM1",
-                    onNodeTagChange = {},
                     onIdentityGenerated = { starts += 1 }
                 )
             }

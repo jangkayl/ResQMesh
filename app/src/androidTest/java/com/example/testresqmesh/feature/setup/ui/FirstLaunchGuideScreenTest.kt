@@ -1,9 +1,10 @@
 package com.example.testresqmesh.feature.setup.ui
 
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.assertDoesNotExist
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import com.example.testresqmesh.core.ui.theme.TestResQMeshTheme
@@ -26,7 +27,7 @@ class FirstLaunchGuideScreenTest {
         composeRule.onNodeWithText("1 of 3").assertIsDisplayed()
         composeRule.onNodeWithText("Next").performClick()
         composeRule.onNodeWithText("Keep the conversation moving").assertIsDisplayed()
-        composeRule.onNodeWithContentDescription("Back").assertDoesNotExist()
+        composeRule.onAllNodesWithContentDescription("Back").assertCountEquals(0)
         composeRule.onNodeWithText("Next").performClick()
         composeRule.onNodeWithText("Ask for help with SOS").assertIsDisplayed()
         composeRule.onNodeWithText("Skip").performClick()

@@ -7,6 +7,7 @@ import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import com.example.testresqmesh.core.ui.theme.TestResQMeshTheme
 import com.example.testresqmesh.ui.state.RadarUiState
 import org.junit.Assert.assertEquals
@@ -43,7 +44,8 @@ class HomeScreenTest {
         composeRule.onNodeWithText("Nearby sharing is on").assertIsDisplayed()
         composeRule.onNodeWithText("1 direct").assertIsDisplayed()
         composeRule.onNodeWithText("The SOS action stays ready in the navigation dock.").assertIsDisplayed()
-        composeRule.onNodeWithText("TACTICAL POSITION SECURED").assertIsDisplayed()
+        composeRule.onNodeWithText("Location found").assertIsDisplayed()
+        composeRule.onAllNodesWithText("MESH ACTIVE").assertCountEquals(0)
         composeRule.onAllNodesWithText("Start a conversation").assertCountEquals(0)
         composeRule.onAllNodesWithText("AES-GCM").assertCountEquals(0)
     }
@@ -70,7 +72,6 @@ class HomeScreenTest {
             }
         }
 
-        composeRule.onNodeWithText("No people nearby · Tap to inspect").performClick()
         composeRule.onNodeWithText("Your network").performClick()
         composeRule.onNodeWithText("EMERGENCY INCIDENTS").performClick()
         composeRule.onNodeWithContentDescription("Open profile").performClick()
@@ -80,5 +81,28 @@ class HomeScreenTest {
             assertEquals(1, profileOpened)
             assertEquals(1, incidentsOpened)
         }
+    }
+
+    @Test
+    fun linkedPeerChip_passesSelectedPeerToDetailsAction() {
+        var selectedPeer: String? = null
+        composeRule.setContent {
+            TestResQMeshTheme {
+                HomeScreenContent(
+                    isNodeActive = true,
+                    summary = HomeNetworkSummary(1, 0, 0, 0),
+                    radarState = RadarUiState(),
+                    myDeviceName = "Alpha#B2",
+                    directNodeNames = listOf("Ari#A1"),
+                    onMessagesClick = {},
+                    onNetworkClick = {},
+                    onPeerClick = { selectedPeer = it },
+                    onProfileClick = {}
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("Ari#A1").performScrollTo().performClick()
+        composeRule.runOnIdle { assertEquals("Ari#A1", selectedPeer) }
     }
 }

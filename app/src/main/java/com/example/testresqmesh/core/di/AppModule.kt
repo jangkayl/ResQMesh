@@ -110,6 +110,7 @@ val appModule = module {
     viewModel { CommunicationViewModel(get(), get()) }
     viewModel { WalkieTalkieViewModel(get(), get(), get()) }
     viewModel { com.example.testresqmesh.feature.profile.viewmodel.OfflineMapViewModel(get(), get(), get()) }
+    viewModel { com.example.testresqmesh.feature.profile.viewmodel.AboutViewModel() }
 
     single { LocalIdentityManager(androidContext(), get<AppDatabase>().userDao()) }
     single<IdentityProvider> { get<LocalIdentityManager>() }

@@ -58,11 +58,12 @@ import com.example.testresqmesh.feature.radar.viewmodel.RadarViewModel
 @Composable
 fun NetworkScreen(
     viewModel: RadarViewModel,
+    initialSelectedNodeKey: String? = null,
     onMessagePeer: (String) -> Unit = {}
 ) {
     val state by viewModel.uiState.collectAsState()
     val nodes = remember(state) { classifyRadarNodes(state) }
-    var selectedNodeKey by remember { mutableStateOf<String?>(null) }
+    var selectedNodeKey by remember(initialSelectedNodeKey) { mutableStateOf(initialSelectedNodeKey) }
     var showTopology by remember { mutableStateOf(false) }
     val selectedNode = selectedNodeKey?.let { key ->
         nodes.firstOrNull { com.example.testresqmesh.core.model.NodeIdentity.key(it.name) == key }

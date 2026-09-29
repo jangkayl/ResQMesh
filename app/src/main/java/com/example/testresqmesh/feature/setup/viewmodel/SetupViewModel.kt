@@ -1,11 +1,15 @@
 package com.example.testresqmesh.feature.setup.viewmodel
 
+import android.Manifest
 import android.bluetooth.BluetoothManager
 import android.content.Context
+import android.content.pm.PackageManager
 import android.location.LocationManager
+import android.os.Build
 // Removed WifiManager import
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import androidx.core.content.ContextCompat
 import com.example.testresqmesh.data.repository.MeshRepository
 import com.example.testresqmesh.ui.state.ConnectionUiState
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -17,6 +21,8 @@ import kotlinx.coroutines.launch
 import com.example.testresqmesh.data.repository.IdentityProvider
 import com.example.testresqmesh.core.service.MeshSessionController
 import com.example.testresqmesh.core.model.NodeIdentity
+
+data class MeshStartError(val message: String, val needsAppPermission: Boolean = false)
 
 class SetupViewModel(
     private val useCases: com.example.testresqmesh.core.domain.usecase.MeshUseCases,
@@ -102,25 +108,56 @@ class SetupViewModel(
         return permanentNodeId
     }
 
-    fun checkHardwareAndGoOnline(context: Context, customName: String, nodeTag: String, teamKey: String) {
+    /** Returns an actionable preflight error; a null result means startup was requested. */
+    fun checkHardwareAndGoOnline(context: Context, customName: String, nodeTag: String, teamKey: String): MeshStartError? {
         saveIdentity(context, customName, nodeTag)
         viewModelScope.launch {
             identityProvider.getOrCreateUser(customName)
+        }
+        fun hasPermission(permission: String): Boolean =
+            ContextCompat.checkSelfPermission(context, permission) == PackageManager.PERMISSION_GRANTED
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
+            !(hasPermission(Manifest.permission.BLUETOOTH_SCAN) &&
+                hasPermission(Manifest.permission.BLUETOOTH_CONNECT) &&
+                hasPermission(Manifest.permission.BLUETOOTH_ADVERTISE))
+        ) {
+            return startPreflightError("Allow Nearby Devices access in app settings, then try again.", needsAppPermission = true)
+        }
+        if (!hasPermission(Manifest.permission.ACCESS_FINE_LOCATION) &&
+            !hasPermission(Manifest.permission.ACCESS_COARSE_LOCATION)
+        ) {
+            return startPreflightError("Allow Location access in app settings, then try again.", needsAppPermission = true)
         }
         val bluetoothManager = context.getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
         val bluetoothAdapter = bluetoothManager.adapter
         val locationManager = context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
         val missing = mutableListOf<String>()
-        if (bluetoothAdapter == null || !bluetoothAdapter.isEnabled) missing.add("Bluetooth")
-        if (!locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER) && !locationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER)) missing.add("Location/GPS")
+        val bluetoothEnabled = try {
+            bluetoothAdapter?.isEnabled == true
+        } catch (_: SecurityException) {
+            return startPreflightError("Allow Nearby Devices access in app settings, then try again.", needsAppPermission = true)
+        }
+        val locationEnabled = try {
+            locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER) ||
+                locationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER)
+        } catch (_: SecurityException) {
+            return startPreflightError("Allow Location access in app settings, then try again.", needsAppPermission = true)
+        }
+        if (!bluetoothEnabled) missing.add("Bluetooth")
+        if (!locationEnabled) missing.add("Location")
 
         if (missing.isNotEmpty()) {
-            val errorMsg = "HARDWARE ERROR: Please turn on ${missing.joinToString(", ")} to deploy Mesh Node."
-            _uiState.update { it.copy(connectionStatus = errorMsg, isOnline = false) }
+            return startPreflightError("Turn on ${missing.joinToString(" and ")} in phone settings, then try again.")
         } else {
             val nodeId = getSavedNodeId(context)
             goOnline(customName, nodeTag, teamKey, nodeId)
+            return null
         }
+    }
+
+    private fun startPreflightError(message: String, needsAppPermission: Boolean = false): MeshStartError {
+        _uiState.update { it.copy(connectionStatus = message, isOnline = false) }
+        return MeshStartError(message, needsAppPermission)
     }
 
     private fun goOnline(customName: String, nodeTag: String, teamKey: String, nodeId: String) {

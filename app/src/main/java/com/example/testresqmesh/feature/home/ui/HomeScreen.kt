@@ -14,6 +14,7 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -27,6 +28,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.CellTower
 import androidx.compose.material.icons.outlined.ChatBubbleOutline
 import androidx.compose.material.icons.outlined.ChevronRight
 import androidx.compose.material.icons.outlined.GraphicEq
@@ -34,6 +36,7 @@ import androidx.compose.material.icons.outlined.Hub
 import androidx.compose.material.icons.outlined.NearMe
 import androidx.compose.material.icons.outlined.PersonOutline
 import androidx.compose.material.icons.outlined.Shield
+import androidx.compose.material.icons.outlined.WarningAmber
 import androidx.compose.material.icons.outlined.WifiTethering
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -48,14 +51,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -84,6 +84,7 @@ fun HomeScreen(
     locationStatus: LocationStatus = LocationStatus.READY,
     onMessagesClick: () -> Unit,
     onNetworkClick: () -> Unit,
+    onPeerClick: (String) -> Unit,
     onProfileClick: () -> Unit,
     onVoiceClick: (() -> Unit)? = null,
     onIncidentsClick: (() -> Unit)? = null
@@ -97,7 +98,7 @@ fun HomeScreen(
         val customName = prefs.getString("custom_name", android.os.Build.MODEL) ?: android.os.Build.MODEL
         val tag = prefs.getString("node_tag", "") ?: ""
         val nodeId = prefs.getString("node_id", "") ?: ""
-        if (nodeId.isEmpty()) customName else com.example.testresqmesh.core.model.NodeIdentity.qualifiedName(customName, tag, nodeId)
+        if (nodeId.isEmpty()) customName else NodeIdentity.qualifiedName(customName, tag, nodeId)
     }
     val nodes = remember(radarState) { classifyRadarNodes(radarState) }
     val directNodeNames = remember(nodes) { nodes.filter { it.kind == NodeKind.DIRECT }.map { it.name } }
@@ -111,6 +112,7 @@ fun HomeScreen(
         locationStatus = locationStatus,
         onMessagesClick = onMessagesClick,
         onNetworkClick = onNetworkClick,
+        onPeerClick = onPeerClick,
         onProfileClick = onProfileClick,
         onVoiceClick = onVoiceClick,
         onIncidentsClick = onIncidentsClick
@@ -127,6 +129,7 @@ fun HomeScreenContent(
     locationStatus: LocationStatus = LocationStatus.READY,
     onMessagesClick: () -> Unit,
     onNetworkClick: () -> Unit,
+    onPeerClick: (String) -> Unit = { onNetworkClick() },
     onProfileClick: () -> Unit,
     onVoiceClick: (() -> Unit)? = null,
     onIncidentsClick: (() -> Unit)? = null,
@@ -144,108 +147,130 @@ fun HomeScreenContent(
             .verticalScroll(rememberScrollState())
             .padding(horizontal = Spacing.Large)
             .padding(top = Spacing.Large, bottom = 120.dp),
-        verticalArrangement = Arrangement.spacedBy(Spacing.Large)
+        verticalArrangement = Arrangement.spacedBy(Spacing.Medium)
     ) {
-        // 1. Tactical Call-Sign Header
-        TacticalHeader(
+        // 1. Tactical Callsign Header with Live RF Status Beacon
+        TacticalIdentityHeader(
             myDeviceName = myDeviceName,
-            isOnline = isNodeActive,
+            isNodeActive = isNodeActive,
+            summary = summary,
             onProfileClick = onProfileClick
         )
 
-        // 2. Tactical Location Status
-        TacticalSatelliteTelemetryCard(
+        // 2. Mission Command & Location Telemetry Panel
+        MissionCommandTelemetryCard(
+            isNodeActive = isNodeActive,
+            title = readinessTitle,
+            description = readinessDescription,
             locationStatus = locationStatus
         )
 
-        // 3. Central Mission Readiness Command Panel
-        TacticalMissionSignalPanel(
-            isNodeActive = isNodeActive,
+        // 3. Tactical Mesh Density Pods (Direct, Relay, Nearby)
+        TacticalMeshMetricsRow(
             summary = summary,
-            title = readinessTitle,
-            description = readinessDescription
+            onNetworkClick = onNetworkClick
         )
 
-        // 4. Emergency incidents
-        if (onIncidentsClick != null) {
-            TacticalIncidentsBanner(onIncidentsClick = onIncidentsClick)
-        }
-
-        // 5. Live Interactive Tactical Mesh Topology Visualizer
-        TacticalTopologyPanel(
+        // 4. Live Tactical Mesh Radar & Linked Peers Viewport
+        LiveMeshRadarCard(
             summary = summary,
             radarState = radarState,
             myDeviceName = myDeviceName,
             directNodeNames = directNodeNames,
-            onNetworkClick = onNetworkClick
+            onNetworkClick = onNetworkClick,
+            onPeerClick = onPeerClick
         )
 
-        // 5. Tactical Safety Beacon Status Footer
+        // 5. Operations Launchpad (Messages, Walkie-Talkie & Incidents)
+        TacticalOperationsLaunchpad(
+            onMessagesClick = onMessagesClick,
+            onVoiceClick = onVoiceClick,
+            onIncidentsClick = onIncidentsClick
+        )
+
+        // 6. Tactical Safety Beacon Status Footer
         TacticalSafetyBeaconFooter()
     }
 }
 
+/**
+ * Header displaying the node callsign, deterministic ID pill, live radio beacon indicator,
+ * and quick access to profile settings.
+ */
 @Composable
-private fun TacticalHeader(
+private fun TacticalIdentityHeader(
     myDeviceName: String,
-    isOnline: Boolean,
+    isNodeActive: Boolean,
+    summary: HomeNetworkSummary,
     onProfileClick: () -> Unit
 ) {
+    val displayName = NodeIdentity.displayNameOf(myDeviceName)
+    val nodeId = remember(myDeviceName) {
+        if (myDeviceName.contains('#')) "#" + myDeviceName.substringAfter('#') else ""
+    }
+    val (meshStatus, meshStatusColor) = when {
+        !isNodeActive -> "MESH OFFLINE" to ResQTheme.colors.warning
+        summary.directPeers > 0 -> "DIRECT LINK READY" to ResQTheme.colors.success
+        summary.relayedPeers > 0 -> "PEER REACHABLE" to ResQTheme.colors.success
+        summary.checkingPeers > 0 -> "CHECKING CONNECTION" to ResQTheme.colors.warning
+        else -> "SEARCHING FOR PEERS" to ResQTheme.colors.warning
+    }
+
+    val infiniteTransition = rememberInfiniteTransition(label = "RfBeaconPulse")
+    val beaconAlpha by infiniteTransition.animateFloat(
+        initialValue = 0.4f,
+        targetValue = 1.0f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1000, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "beaconAlpha"
+    )
+
     Row(
         modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
     ) {
-        Column(modifier = Modifier.weight(1f)) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                Surface(
-                    shape = RoundedCornerShape(4.dp),
-                    color = if (isOnline) ResQTheme.colors.success.copy(alpha = 0.15f) else ResQTheme.colors.warning.copy(alpha = 0.15f),
-                    border = BorderStroke(
-                        1.dp,
-                        if (isOnline) ResQTheme.colors.success.copy(alpha = 0.5f) else ResQTheme.colors.warning.copy(alpha = 0.5f)
-                    )
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(6.dp)
-                                .clip(CircleShape)
-                                .background(if (isOnline) ResQTheme.colors.success else ResQTheme.colors.warning)
-                        )
-                        Spacer(Modifier.width(4.dp))
-                        Text(
-                            text = if (isOnline) "MESH ACTIVE" else "STANDBY",
-                            style = MaterialTheme.typography.labelSmall.copy(
-                                fontSize = 9.sp,
-                                letterSpacing = 1.sp,
-                                fontFamily = FontFamily.Monospace
-                            ),
-                            fontWeight = FontWeight.Bold,
-                            color = if (isOnline) ResQTheme.colors.success else ResQTheme.colors.warning
-                        )
-                    }
-                }
-                Text(
-                    text = "RESQMESH OPS",
-                    style = MaterialTheme.typography.labelSmall.copy(
-                        fontSize = 10.sp,
-                        letterSpacing = 1.2.sp,
-                        fontFamily = FontFamily.Monospace
-                    ),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-                    fontWeight = FontWeight.Bold
+        Column(modifier = Modifier.weight(1f).padding(end = Spacing.Medium)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                // Live RF Status Beacon Dot
+                Box(
+                    modifier = Modifier
+                        .size(8.dp)
+                        .graphicsLayer { alpha = if (isNodeActive) beaconAlpha else 0.4f }
+                        .clip(CircleShape)
+                        .background(meshStatusColor)
                 )
+                Spacer(Modifier.width(6.dp))
+                Text(
+                    text = meshStatus,
+                    style = MaterialTheme.typography.labelSmall.copy(
+                        fontFamily = FontFamily.Monospace,
+                        fontSize = 10.sp,
+                        letterSpacing = 1.sp
+                    ),
+                    fontWeight = FontWeight.Bold,
+                    color = meshStatusColor
+                )
+                if (nodeId.isNotEmpty()) {
+                    Spacer(Modifier.width(6.dp))
+                    Text(
+                        text = nodeId,
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 10.sp
+                        ),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                    )
+                }
             }
-            Spacer(Modifier.height(4.dp))
+
+            Spacer(Modifier.height(2.dp))
+
             Text(
-                text = com.example.testresqmesh.core.model.NodeIdentity.displayNameOf(myDeviceName),
-                style = MaterialTheme.typography.titleLarge,
+                text = displayName,
+                style = MaterialTheme.typography.headlineMedium,
                 fontWeight = FontWeight.Black,
                 color = MaterialTheme.colorScheme.onSurface,
                 maxLines = 1,
@@ -253,16 +278,13 @@ private fun TacticalHeader(
             )
         }
 
-        // Profile Avatar with tactical ring
+        // Profile / Civilian Identity Button
         Surface(
-            modifier = Modifier.size(52.dp),
-            shape = CircleShape,
+            modifier = Modifier.size(48.dp),
+            shape = RoundedCornerShape(14.dp),
             color = MaterialTheme.colorScheme.surface,
-            border = BorderStroke(
-                2.dp,
-                if (isOnline) ResQTheme.colors.success.copy(alpha = 0.6f) else MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)
-            ),
-            shadowElevation = 6.dp,
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
+            shadowElevation = 2.dp,
             onClick = onProfileClick
         ) {
             Box(contentAlignment = Alignment.Center) {
@@ -270,322 +292,365 @@ private fun TacticalHeader(
                     imageVector = Icons.Outlined.PersonOutline,
                     contentDescription = stringResource(R.string.home_profile_action),
                     tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(24.dp)
+                    modifier = Modifier.size(22.dp)
                 )
             }
         }
     }
 }
 
+/**
+ * Unified Mission Command & Telemetry Card combining network readiness state
+ * and satellite GPS positioning into a cohesive operational banner.
+ */
 @Composable
-private fun TacticalMissionSignalPanel(
+private fun MissionCommandTelemetryCard(
     isNodeActive: Boolean,
-    summary: HomeNetworkSummary,
     title: String,
     description: String,
+    locationStatus: LocationStatus
 ) {
-    val containerColor = if (isNodeActive) MaterialTheme.colorScheme.primaryContainer else ResQTheme.colors.warningContainer
-    val contentColor = if (isNodeActive) MaterialTheme.colorScheme.onPrimaryContainer else ResQTheme.colors.onWarningContainer
-    val dotColor = if (isNodeActive) ResQTheme.colors.success else ResQTheme.colors.warning
+    val statusColor = if (isNodeActive) ResQTheme.colors.success else ResQTheme.colors.warning
+    val statusBg = if (isNodeActive) ResQTheme.colors.success.copy(alpha = 0.12f) else ResQTheme.colors.warning.copy(alpha = 0.12f)
 
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(22.dp),
-        color = containerColor,
-        contentColor = contentColor,
-        border = BorderStroke(1.dp, contentColor.copy(alpha = 0.15f)),
-        shadowElevation = 8.dp
+        shape = RoundedCornerShape(20.dp),
+        color = MaterialTheme.colorScheme.surface,
+        border = BorderStroke(1.dp, statusColor.copy(alpha = 0.35f)),
+        shadowElevation = 4.dp
     ) {
         Column(
-            modifier = Modifier.padding(Spacing.Large),
+            modifier = Modifier.padding(Spacing.Medium),
             verticalArrangement = Arrangement.spacedBy(Spacing.Medium)
         ) {
+            // Readiness Header
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(
-                        modifier = Modifier
-                            .size(10.dp)
-                            .clip(CircleShape)
-                            .background(dotColor)
-                            .semantics { contentDescription = title }
-                    )
-                    Spacer(Modifier.width(Spacing.Small))
-                    Text(
-                        text = stringResource(if (isNodeActive) R.string.mission_online else R.string.mission_check),
-                        style = MaterialTheme.typography.labelMedium.copy(letterSpacing = 1.sp),
-                        fontWeight = FontWeight.Black
-                    )
-                }
-
                 Surface(
                     shape = RoundedCornerShape(12.dp),
-                    color = contentColor.copy(alpha = 0.12f)
+                    color = statusBg,
+                    modifier = Modifier.size(38.dp)
                 ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = if (isNodeActive) Icons.Outlined.WifiTethering else Icons.Outlined.CellTower,
+                            contentDescription = null,
+                            tint = statusColor,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                }
+
+                Spacer(Modifier.width(Spacing.Medium))
+
+                Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = if (summary.directPeers > 0) "OPTIMAL LINK" else if (isNodeActive) "STANDBY" else "OFFLINE",
-                        style = MaterialTheme.typography.labelSmall.copy(
-                            fontSize = 10.sp,
-                            fontFamily = FontFamily.Monospace
-                        ),
+                        text = title,
+                        style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
-                        color = contentColor
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Spacer(Modifier.height(1.dp))
+                    Text(
+                        text = description,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
 
-            Column {
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold
-                )
-                Spacer(Modifier.height(2.dp))
-                Text(
-                    text = description,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = contentColor.copy(alpha = 0.85f)
-                )
+            // Integrated GPS Telemetry Pill
+            TacticalGpsTelemetryPill(locationStatus = locationStatus)
+        }
+    }
+}
+
+/**
+ * Compact, high-visibility satellite GPS telemetry chip embedded inside the command card.
+ */
+@Composable
+private fun TacticalGpsTelemetryPill(
+    locationStatus: LocationStatus
+) {
+    val infiniteTransition = rememberInfiniteTransition(label = "GpsPillPulse")
+    val pulseAlpha by infiniteTransition.animateFloat(
+        initialValue = 0.35f,
+        targetValue = 1.0f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(900, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "pulseAlpha"
+    )
+
+    val (statusColor, titleText, descText) = when (locationStatus) {
+        LocationStatus.ACQUIRING -> Triple(
+            ResQTheme.colors.warning,
+            "Finding your location",
+            "Your phone is looking for a location to use with SOS."
+        )
+        LocationStatus.READY -> Triple(
+            ResQTheme.colors.success,
+            "Location found",
+            "A last known location is available. SOS will request an update."
+        )
+        LocationStatus.ERROR_DENIED -> Triple(
+            MaterialTheme.colorScheme.error,
+            "Location permission needed",
+            "Allow location access to include your position with SOS."
+        )
+        LocationStatus.ERROR_DISABLED -> Triple(
+            ResQTheme.colors.warning,
+            "Phone location is off",
+            "Turn on Location in your phone settings for SOS."
+        )
+        LocationStatus.IDLE -> Triple(
+            MaterialTheme.colorScheme.onSurfaceVariant,
+            "Location not checked yet",
+            "Your phone will check for a location when ready."
+        )
+    }
+
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(12.dp),
+        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.55f),
+        border = BorderStroke(1.dp, statusColor.copy(alpha = 0.35f))
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = Spacing.Medium, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(24.dp)
+                    .clip(CircleShape)
+                    .background(statusColor.copy(alpha = 0.15f)),
+                contentAlignment = Alignment.Center
+            ) {
+                if (locationStatus == LocationStatus.ACQUIRING) {
+                    CircularProgressIndicator(
+                        modifier = Modifier
+                            .size(16.dp)
+                            .graphicsLayer { alpha = pulseAlpha },
+                        strokeWidth = 2.dp,
+                        color = statusColor
+                    )
+                } else if (locationStatus == LocationStatus.READY) {
+                    Box(
+                        modifier = Modifier
+                            .size(8.dp)
+                            .clip(CircleShape)
+                            .background(statusColor)
+                    )
+                } else {
+                    Icon(
+                        imageVector = Icons.Outlined.NearMe,
+                        contentDescription = null,
+                        tint = statusColor,
+                        modifier = Modifier.size(13.dp)
+                    )
+                }
             }
 
-            // 3 Tactical Metric Pods
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                TacticalMetricPod(
-                    label = stringResource(R.string.mission_metric_direct),
-                    value = summary.directPeers,
-                    color = ResQTheme.colors.success,
-                    contentColor = contentColor
+            Spacer(Modifier.width(10.dp))
+
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = titleText,
+                    style = MaterialTheme.typography.bodySmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
                 )
-                TacticalMetricPod(
-                    label = stringResource(R.string.mission_metric_relay),
-                    value = summary.relayedPeers,
-                    color = MaterialTheme.colorScheme.primary,
-                    contentColor = contentColor
-                )
-                TacticalMetricPod(
-                    label = stringResource(R.string.mission_metric_nearby),
-                    value = summary.nearbyPeers,
-                    color = ResQTheme.colors.warning,
-                    contentColor = contentColor
+                Text(
+                    text = descText,
+                    style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
             }
         }
     }
 }
 
+/**
+ * Clean, tactile metric pods for mesh density (Direct 🟢, Relay 🔵, Nearby 🟡).
+ */
 @Composable
-private fun TacticalMetricPod(
+private fun TacticalMeshMetricsRow(
+    summary: HomeNetworkSummary,
+    onNetworkClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.Small)
+    ) {
+        TacticalMetricTile(
+            modifier = Modifier.weight(1f),
+            label = stringResource(R.string.mission_metric_direct),
+            value = summary.directPeers,
+            accentColor = ResQTheme.colors.success,
+            subtitle = "Direct peers",
+            onClick = onNetworkClick
+        )
+        TacticalMetricTile(
+            modifier = Modifier.weight(1f),
+            label = stringResource(R.string.mission_metric_relay),
+            value = summary.relayedPeers,
+            accentColor = MaterialTheme.colorScheme.primary,
+            subtitle = "Multi-hop",
+            onClick = onNetworkClick
+        )
+        TacticalMetricTile(
+            modifier = Modifier.weight(1f),
+            label = stringResource(R.string.mission_metric_nearby),
+            value = summary.nearbyPeers,
+            accentColor = ResQTheme.colors.warning,
+            subtitle = "Unconnected",
+            onClick = onNetworkClick
+        )
+    }
+}
+
+@Composable
+private fun TacticalMetricTile(
+    modifier: Modifier = Modifier,
     label: String,
     value: Int,
-    color: Color,
-    contentColor: Color
+    accentColor: Color,
+    subtitle: String,
+    onClick: () -> Unit
 ) {
     Surface(
+        modifier = modifier.clickable(onClick = onClick),
         shape = RoundedCornerShape(14.dp),
-        color = Color.Transparent,
-        modifier = Modifier.width(96.dp)
+        color = MaterialTheme.colorScheme.surface,
+        border = BorderStroke(1.dp, accentColor.copy(alpha = 0.25f)),
+        shadowElevation = 2.dp
     ) {
         Column(
-            modifier = Modifier.padding(vertical = 10.dp, horizontal = 8.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
+            modifier = Modifier.padding(vertical = 10.dp, horizontal = 10.dp),
+            horizontalAlignment = Alignment.Start
         ) {
-            Box(
-                contentAlignment = Alignment.Center,
-                modifier = Modifier.size(46.dp)
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+                modifier = Modifier.fillMaxWidth()
             ) {
-                CircularProgressIndicator(
-                    progress = { (value.toFloat() / 10f).coerceIn(0f, 1f) },
-                    modifier = Modifier.fillMaxSize(),
-                    color = color,
-                    trackColor = color.copy(alpha = 0.2f),
-                    strokeWidth = 4.5.dp,
-                )
                 Text(
-                    text = value.toString(),
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Black,
-                    color = contentColor
+                    text = label,
+                    style = MaterialTheme.typography.labelSmall.copy(
+                        fontFamily = FontFamily.Monospace,
+                        fontSize = 10.sp,
+                        letterSpacing = 0.5.sp
+                    ),
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Box(
+                    modifier = Modifier
+                        .size(7.dp)
+                        .clip(CircleShape)
+                        .background(accentColor)
                 )
             }
-            Spacer(Modifier.height(6.dp))
+
+            Spacer(Modifier.height(4.dp))
+
             Text(
-                text = label,
-                style = MaterialTheme.typography.labelSmall.copy(
-                    fontSize = 10.sp,
-                    letterSpacing = 0.5.sp
+                text = value.toString(),
+                style = MaterialTheme.typography.headlineMedium.copy(
+                    fontFamily = FontFamily.Monospace
                 ),
-                fontWeight = FontWeight.Bold,
-                color = contentColor.copy(alpha = 0.8f)
+                fontWeight = FontWeight.Black,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+
+            Text(
+                text = subtitle,
+                style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp),
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
             )
         }
     }
 }
 
+/**
+ * Dedicated Live Mesh Radar Viewport & Linked Peers Shelf.
+ */
 @Composable
-private fun TacticalOperationsGrid(
-    onMessagesClick: () -> Unit,
-    onVoiceClick: () -> Unit
-) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(Spacing.Medium)
-    ) {
-        // Card 1: Encrypted Messages
-        ResQGlassSurface(
-            modifier = Modifier
-                .weight(1f)
-                .clickable(onClick = onMessagesClick),
-            shape = RoundedCornerShape(18.dp),
-            contentPadding = androidx.compose.foundation.layout.PaddingValues(Spacing.Medium),
-            shadowElevation = 6.dp
-        ) {
-            Column {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    HomeCardIcon(
-                        icon = Icons.Outlined.ChatBubbleOutline,
-                        color = MaterialTheme.colorScheme.primaryContainer,
-                        contentColor = MaterialTheme.colorScheme.primary
-                    )
-                    Icon(
-                        imageVector = Icons.Outlined.ChevronRight,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(18.dp)
-                    )
-                }
-                Spacer(Modifier.height(Spacing.Medium))
-                Text(
-                    text = stringResource(R.string.mission_message_title),
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Spacer(Modifier.height(2.dp))
-                Text(
-                    text = stringResource(R.string.mission_message_description),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
-        }
-
-        // Card 2: Tactical Voice Comms (PTT)
-        ResQGlassSurface(
-            modifier = Modifier
-                .weight(1f)
-                .clickable(onClick = onVoiceClick),
-            shape = RoundedCornerShape(18.dp),
-            contentPadding = androidx.compose.foundation.layout.PaddingValues(Spacing.Medium),
-            shadowElevation = 6.dp
-        ) {
-            Column {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    HomeCardIcon(
-                        icon = Icons.Outlined.GraphicEq,
-                        color = Color(0xFF0D9488).copy(alpha = 0.2f),
-                        contentColor = Color(0xFF0D9488)
-                    )
-                    Icon(
-                        imageVector = Icons.Outlined.ChevronRight,
-                        contentDescription = null,
-                        tint = Color(0xFF0D9488),
-                        modifier = Modifier.size(18.dp)
-                    )
-                }
-                Spacer(Modifier.height(Spacing.Medium))
-                Text(
-                    text = stringResource(R.string.mission_voice_title),
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Spacer(Modifier.height(2.dp))
-                Text(
-                    text = stringResource(R.string.mission_voice_description),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun TacticalTopologyPanel(
+private fun LiveMeshRadarCard(
     summary: HomeNetworkSummary,
     radarState: RadarUiState,
     myDeviceName: String,
     directNodeNames: List<String>,
-    onNetworkClick: () -> Unit
+    onNetworkClick: () -> Unit,
+    onPeerClick: (String) -> Unit
 ) {
     val hasDirectConnection = summary.directPeers >= 1
 
     ResQGlassSurface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onNetworkClick),
-        shape = RoundedCornerShape(22.dp),
-        contentPadding = androidx.compose.foundation.layout.PaddingValues(Spacing.Medium),
-        shadowElevation = 8.dp
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(20.dp),
+        contentPadding = PaddingValues(Spacing.Medium),
+        shadowElevation = 6.dp
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(Spacing.Medium)) {
-            // Header Row
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                HomeCardIcon(
-                    icon = Icons.Outlined.Hub,
-                    color = if (hasDirectConnection) ResQTheme.colors.success else MaterialTheme.colorScheme.surfaceVariant,
-                    contentColor = if (hasDirectConnection) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
-                    isGlowing = hasDirectConnection
+            // Header Row (Clickable for Network details)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable(onClick = onNetworkClick),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.Hub,
+                    contentDescription = null,
+                    tint = if (hasDirectConnection) ResQTheme.colors.success else MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(24.dp)
                 )
-                Spacer(Modifier.width(Spacing.Medium))
+
+                Spacer(Modifier.width(Spacing.Small))
+
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = stringResource(R.string.mission_topology_title),
+                        text = stringResource(R.string.home_network_title),
                         style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
                     )
-                    Spacer(Modifier.height(2.dp))
+                    Spacer(Modifier.height(1.dp))
                     Text(
                         text = summary.label() + " · Tap to inspect",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
+
                 Icon(
                     imageVector = Icons.Outlined.ChevronRight,
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(20.dp)
                 )
             }
 
-            // Live Tactical Mesh Topology Visualizer Viewport
+            // Live Tactical Mesh Topology Visualizer Viewport (Clickable for People & Paths)
             Surface(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(16.dp)),
+                    .clip(RoundedCornerShape(14.dp))
+                    .clickable(onClick = onNetworkClick),
                 color = MaterialTheme.colorScheme.surface.copy(alpha = 0.5f),
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.15f))
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.25f))
             ) {
                 NetworkGraphVisualizer(
                     nodes = classifyRadarNodes(radarState),
@@ -593,17 +658,17 @@ private fun TacticalTopologyPanel(
                     showEmptyScanPrompt = false,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(250.dp)
+                        .height(210.dp)
                 )
             }
 
-            // Active Connected Peer Chips Strip
+            // Active Linked Peers Shelf
             if (directNodeNames.isNotEmpty()) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
@@ -614,12 +679,13 @@ private fun TacticalTopologyPanel(
                     )
                     directNodeNames.forEach { peerName ->
                         Surface(
-                            shape = RoundedCornerShape(8.dp),
+                            shape = RoundedCornerShape(10.dp),
                             color = ResQTheme.colors.success.copy(alpha = 0.12f),
-                            border = BorderStroke(1.dp, ResQTheme.colors.success.copy(alpha = 0.35f))
+                            border = BorderStroke(1.dp, ResQTheme.colors.success.copy(alpha = 0.35f)),
+                            modifier = Modifier.clickable { onPeerClick(peerName) }
                         ) {
                             Row(
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                modifier = Modifier.padding(horizontal = 9.dp, vertical = 5.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Box(
@@ -662,189 +728,190 @@ private fun TacticalTopologyPanel(
     }
 }
 
-private data class GpsCardVisuals(
-    val cardColor: Color,
-    val borderColor: Color,
-    val statusColor: Color,
-    val titleText: String,
-    val descText: String,
-    val badgeText: String
-)
-
+/**
+ * Tactical Operations Launchpad providing rapid shortcuts to local messages,
+ * walkie-talkie voice comms, and active emergency incident tracking.
+ */
 @Composable
-private fun TacticalSatelliteTelemetryCard(
-    locationStatus: LocationStatus,
-    modifier: Modifier = Modifier
+private fun TacticalOperationsLaunchpad(
+    onMessagesClick: () -> Unit,
+    onVoiceClick: (() -> Unit)?,
+    onIncidentsClick: (() -> Unit)?
 ) {
-    val infiniteTransition = rememberInfiniteTransition(label = "GpsPulse")
-    val pulseAlpha by infiniteTransition.animateFloat(
-        initialValue = 0.35f,
-        targetValue = 1.0f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(900, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "pulseAlpha"
-    )
-    val pulseScale by infiniteTransition.animateFloat(
-        initialValue = 0.95f,
-        targetValue = 1.08f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(900, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "pulseScale"
-    )
-
-    val visuals = when (locationStatus) {
-        LocationStatus.ACQUIRING -> GpsCardVisuals(
-            cardColor = ResQTheme.colors.warning.copy(alpha = 0.08f),
-            borderColor = ResQTheme.colors.warning.copy(alpha = 0.45f),
-            statusColor = ResQTheme.colors.warning,
-            titleText = "ACQUIRING SATELLITE FIX",
-            descText = "SEARCHING GNSS CONSTELLATION • CACHING FOR FAST SOS",
-            badgeText = "SEARCHING"
-        )
-        LocationStatus.READY -> GpsCardVisuals(
-            cardColor = ResQTheme.colors.success.copy(alpha = 0.08f),
-            borderColor = ResQTheme.colors.success.copy(alpha = 0.45f),
-            statusColor = ResQTheme.colors.success,
-            titleText = "TACTICAL POSITION SECURED",
-            descText = "EMERGENCY GNSS CACHED • ARMED FOR RAPID BROADCAST",
-            badgeText = "LOCKED"
-        )
-        LocationStatus.ERROR_DENIED -> GpsCardVisuals(
-            cardColor = MaterialTheme.colorScheme.error.copy(alpha = 0.08f),
-            borderColor = MaterialTheme.colorScheme.error.copy(alpha = 0.4f),
-            statusColor = MaterialTheme.colorScheme.error,
-            titleText = "LOCATION ACCESS RESTRICTED",
-            descText = "LOCATION PERMISSION DENIED • EMERGENCY ACCURACY DEGRADED",
-            badgeText = "RESTRICTED"
-        )
-        LocationStatus.ERROR_DISABLED -> GpsCardVisuals(
-            cardColor = ResQTheme.colors.warning.copy(alpha = 0.08f),
-            borderColor = ResQTheme.colors.warning.copy(alpha = 0.4f),
-            statusColor = ResQTheme.colors.warning,
-            titleText = "DEVICE GNSS INACTIVE",
-            descText = "SYSTEM LOCATION SERVICE DISABLED • ENABLE IN SETTINGS",
-            badgeText = "DISABLED"
-        )
-        LocationStatus.IDLE -> GpsCardVisuals(
-            cardColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
-            borderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f),
-            statusColor = MaterialTheme.colorScheme.onSurfaceVariant,
-            titleText = "GNSS TELEMETRY STANDBY",
-            descText = "BACKGROUND GNSS ENGINE INITIALIZING",
-            badgeText = "STANDBY"
-        )
-    }
-
-    Surface(
-        modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(14.dp),
-        color = visuals.cardColor,
-        border = BorderStroke(1.dp, visuals.borderColor)
-    ) {
+    Column(verticalArrangement = Arrangement.spacedBy(Spacing.Medium)) {
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = Spacing.Medium, vertical = 10.dp),
-            verticalAlignment = Alignment.CenterVertically
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(Spacing.Medium)
         ) {
-            // Animated Radar Beacon / Satellite Status Icon
-            Box(
+            // Card 1: Local Messages
+            ResQGlassSurface(
                 modifier = Modifier
-                    .size(34.dp)
-                    .clip(CircleShape)
-                    .background(visuals.statusColor.copy(alpha = 0.15f)),
-                contentAlignment = Alignment.Center
+                    .weight(1f)
+                    .clickable(onClick = onMessagesClick),
+                shape = RoundedCornerShape(16.dp),
+                contentPadding = PaddingValues(Spacing.Medium),
+                shadowElevation = 4.dp
             ) {
-                if (locationStatus == LocationStatus.ACQUIRING) {
-                    Box(
-                        modifier = Modifier
-                            .size(26.dp)
-                            .graphicsLayer {
-                                scaleX = pulseScale
-                                scaleY = pulseScale
-                                alpha = pulseAlpha
-                            }
-                            .clip(CircleShape)
-                            .background(visuals.statusColor.copy(alpha = 0.25f))
+                Column {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        HomeCardIcon(
+                            icon = Icons.Outlined.ChatBubbleOutline,
+                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
+                            contentColor = MaterialTheme.colorScheme.primary
+                        )
+                        Icon(
+                            imageVector = Icons.Outlined.ChevronRight,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                    Spacer(Modifier.height(Spacing.Medium))
+                    Text(
+                        text = stringResource(R.string.messages_title),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(18.dp),
-                        strokeWidth = 2.dp,
-                        color = visuals.statusColor
-                    )
-                } else if (locationStatus == LocationStatus.READY) {
-                    Box(
-                        modifier = Modifier
-                            .size(10.dp)
-                            .clip(CircleShape)
-                            .background(visuals.statusColor)
-                    )
-                } else {
-                    Icon(
-                        imageVector = Icons.Outlined.NearMe,
-                        contentDescription = null,
-                        tint = visuals.statusColor,
-                        modifier = Modifier.size(16.dp)
+                    Spacer(Modifier.height(2.dp))
+                    Text(
+                        text = "Public and private BLE messages",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
             }
 
-            Spacer(Modifier.width(10.dp))
-
-            Column(modifier = Modifier.weight(1f)) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    modifier = Modifier.fillMaxWidth()
+            // Card 2: Tactical Voice Comms (PTT)
+            if (onVoiceClick != null) {
+                ResQGlassSurface(
+                    modifier = Modifier
+                        .weight(1f)
+                        .clickable(onClick = onVoiceClick),
+                    shape = RoundedCornerShape(16.dp),
+                    contentPadding = PaddingValues(Spacing.Medium),
+                    shadowElevation = 4.dp
                 ) {
-                    Text(
-                        text = visuals.titleText,
-                        style = MaterialTheme.typography.labelSmall.copy(
-                            fontWeight = FontWeight.Bold,
-                            letterSpacing = 0.6.sp,
-                            fontFamily = FontFamily.Monospace
-                        ),
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                    Surface(
-                        shape = RoundedCornerShape(4.dp),
-                        color = visuals.statusColor.copy(alpha = 0.18f)
-                    ) {
+                    Column {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            HomeCardIcon(
+                                icon = Icons.Outlined.GraphicEq,
+                                color = Color(0xFF0D9488).copy(alpha = 0.15f),
+                                contentColor = Color(0xFF0D9488)
+                            )
+                            Icon(
+                                imageVector = Icons.Outlined.ChevronRight,
+                                contentDescription = null,
+                                tint = Color(0xFF0D9488),
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                        Spacer(Modifier.height(Spacing.Medium))
                         Text(
-                            text = visuals.badgeText,
-                            style = MaterialTheme.typography.labelSmall.copy(
-                                fontSize = 8.5.sp,
-                                fontWeight = FontWeight.Bold,
-                                letterSpacing = 0.5.sp,
-                                fontFamily = FontFamily.Monospace
-                            ),
-                            color = visuals.statusColor,
-                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            text = stringResource(R.string.mission_voice_title),
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Spacer(Modifier.height(2.dp))
+                        Text(
+                            text = stringResource(R.string.mission_voice_description),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                     }
                 }
-                Spacer(Modifier.height(2.dp))
-                Text(
-                    text = visuals.descText,
-                    style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.5.sp),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
             }
+        }
+
+        // Emergency Incidents Banner
+        if (onIncidentsClick != null) {
+            TacticalIncidentsBanner(onIncidentsClick = onIncidentsClick)
         }
     }
 }
 
 @Composable
+private fun TacticalIncidentsBanner(
+    onIncidentsClick: () -> Unit
+) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onIncidentsClick),
+        shape = RoundedCornerShape(16.dp),
+        color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.85f),
+        contentColor = MaterialTheme.colorScheme.onErrorContainer,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.4f)),
+        shadowElevation = 4.dp
+    ) {
+        Row(
+            modifier = Modifier.padding(Spacing.Medium),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(Spacing.Medium),
+                modifier = Modifier.weight(1f)
+            ) {
+                Surface(
+                    shape = CircleShape,
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.size(38.dp)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = Icons.Outlined.WarningAmber,
+                            contentDescription = null,
+                            tint = Color.White,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                }
+                Column {
+                    Text(
+                        text = "EMERGENCY INCIDENTS",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Black,
+                        letterSpacing = 0.5.sp
+                    )
+                    Text(
+                        text = "Track, coordinate, & resolve SOS lifecycle",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.85f)
+                    )
+                }
+            }
+            Icon(
+                imageVector = Icons.Outlined.ChevronRight,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.error
+            )
+        }
+    }
+}
+
+/** Explains where to find the SOS action without implying delivery readiness. */
+@Composable
 private fun TacticalSafetyBeaconFooter() {
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
         shape = RoundedCornerShape(12.dp),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.06f))
     ) {
@@ -885,25 +952,25 @@ private fun HomeCardIcon(
 ) {
     Surface(
         modifier = Modifier
-            .size(44.dp)
+            .size(42.dp)
             .then(
                 if (isGlowing) Modifier.shadow(
-                    elevation = 10.dp,
-                    shape = RoundedCornerShape(14.dp),
+                    elevation = 8.dp,
+                    shape = RoundedCornerShape(12.dp),
                     ambientColor = color.copy(alpha = 0.5f),
                     spotColor = color.copy(alpha = 0.6f)
                 ) else Modifier
             ),
-        shape = RoundedCornerShape(14.dp),
+        shape = RoundedCornerShape(12.dp),
         color = color,
-        border = if (isGlowing) BorderStroke(1.5.dp, Color.White.copy(alpha = 0.4f)) else null
+        border = BorderStroke(1.dp, if (isGlowing) Color.White.copy(alpha = 0.4f) else contentColor.copy(alpha = 0.25f))
     ) {
         Box(contentAlignment = Alignment.Center) {
             Icon(
                 imageVector = icon,
                 contentDescription = null,
                 tint = contentColor,
-                modifier = Modifier.size(22.dp)
+                modifier = Modifier.size(20.dp)
             )
         }
     }
@@ -963,67 +1030,6 @@ internal fun homeNetworkSummary(state: RadarUiState): HomeNetworkSummary {
         nearbyPeers = nearby,
         checkingPeers = checkingNames.distinctBy(NodeIdentity::key).size
     )
-}
-
-@Composable
-private fun TacticalIncidentsBanner(
-    onIncidentsClick: () -> Unit
-) {
-    Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onIncidentsClick),
-        shape = RoundedCornerShape(18.dp),
-        color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.85f),
-        contentColor = MaterialTheme.colorScheme.onErrorContainer,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.4f)),
-        shadowElevation = 6.dp
-    ) {
-        Row(
-            modifier = Modifier.padding(Spacing.Medium),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(Spacing.Medium),
-                modifier = Modifier.weight(1f)
-            ) {
-                Surface(
-                    shape = CircleShape,
-                    color = MaterialTheme.colorScheme.error,
-                    modifier = Modifier.size(40.dp)
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(
-                            imageVector = Icons.Outlined.Shield,
-                            contentDescription = null,
-                            tint = Color.White,
-                            modifier = Modifier.size(22.dp)
-                        )
-                    }
-                }
-                Column {
-                    Text(
-                        text = "EMERGENCY INCIDENTS",
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.Black,
-                        letterSpacing = 0.5.sp
-                    )
-                    Text(
-                        text = "Track, coordinate, & resolve SOS lifecycle",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.85f)
-                    )
-                }
-            }
-            Icon(
-                imageVector = Icons.Outlined.ChevronRight,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.error
-            )
-        }
-    }
 }
 
 @Preview(showBackground = true, widthDp = 390, heightDp = 844)
