@@ -28,6 +28,15 @@ class RadarNodeClassificationTest {
         assertEquals(NodeKind.UNRESPONSIVE, nodes.single().kind)
     }
 
+    @Test fun ordinaryPeerLabelOmitsIdAndLegacyDefaultTag() {
+        val nodes = classifyRadarNodes(RadarUiState(
+            connectedDevices = listOf(ConnectedDevice("ep", "Ari [NODE]#A1B2", nodeId = "A1B2", isPayloadReady = true))
+        ))
+
+        assertEquals("Ari", nodes.single().label)
+        assertEquals("Ari [NODE]#A1B2", nodes.single().name)
+    }
+
     @Test fun recentlyDisconnectedPeerRemainsVisibleAsOffline() {
         val peer = ConnectedDevice("old-endpoint", "Peer#BBBB", nodeId = "BBBB", isPayloadReady = true)
 

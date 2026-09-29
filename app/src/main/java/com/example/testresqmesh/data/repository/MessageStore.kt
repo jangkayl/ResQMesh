@@ -102,8 +102,5 @@ internal fun groupPrivateMessages(messages: List<MessageEntity>): Map<String, Li
                 if (entity.isMine) entity.targetName ?: entity.senderName else entity.senderName
             }
             val canonicalPeer = NodeIdentity.preferredName(peerNames).ifBlank { peerNames.first() }
-            canonicalPeer to entities.map { entity ->
-                val message = entity.toChatMessage()
-                if (message.isMine) message else message.copy(senderName = canonicalPeer)
-            }
+            canonicalPeer to entities.map { it.toChatMessage() }
         }

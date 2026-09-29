@@ -9,4 +9,21 @@
     <string name="onboarding_permissions_extra_access_note">Android may also ask for notifications or microphone access.</string>
     <string name="onboarding_permissions_allow_action">Allow access</string>
     <string name="onboarding_permissions_offline_note">Works without cellular service or internet.</string>
+    <string name="guide_header">How ResQMesh works</string>
+    <string name="guide_progress">%1$d of %2$d</string>
+    <string name="guide_skip">Skip</string>
+    <string name="guide_close">Close</string>
+    <string name="guide_back">Back</string>
+    <string name="guide_next">Next</string>
+    <string name="guide_done">Done</string>
+    <string name="guide_start_setup">Start setup</string>
+    <string name="guide_purpose_title">When networks go quiet</string>
+    <string name="guide_purpose_body">ResQMesh helps nearby phones exchange messages over Bluetooth, without mobile data or internet.</string>
+    <string name="guide_purpose_note">Another phone can relay a message when a usable mesh path exists. Range and delivery are not guaranteed.</string>
+    <string name="guide_use_title">Keep the conversation moving</string>
+    <string name="guide_use_body">Check connection status on Home. Send text in Messages, or share recorded voice notes in Radio.</string>
+    <string name="guide_use_note">To find nearby ResQMesh phones, choose your name and allow the requested access during setup.</string>
+    <string name="guide_sos_title">Ask for help with SOS</string>
+    <string name="guide_sos_body">Open the red SOS action, choose the emergency type, then slide to broadcast your alert.</string>
+    <string name="guide_sos_note">Sending does not confirm receipt. Contact emergency services whenever they are available.</string>
 </resources>

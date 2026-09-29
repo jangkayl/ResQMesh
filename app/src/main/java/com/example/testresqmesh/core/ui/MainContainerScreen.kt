@@ -25,6 +25,7 @@ import com.example.testresqmesh.feature.profile.ui.AdvancedScreen
 import com.example.testresqmesh.feature.comms.viewmodel.CommunicationViewModel
 import com.example.testresqmesh.feature.radar.viewmodel.RadarViewModel
 import com.example.testresqmesh.feature.setup.viewmodel.SetupViewModel
+import com.example.testresqmesh.feature.setup.ui.FirstLaunchGuideScreen
 import com.example.testresqmesh.core.utils.MediaHelper
 import com.example.testresqmesh.core.ui.components.layout.ResQAppShell
 import com.example.testresqmesh.core.ui.components.layout.ResQAuroraBackground
@@ -76,6 +77,7 @@ fun MainContainerScreen(
     var isSOSActive by remember { mutableStateOf(false) }
     var mapSosAlert by remember { mutableStateOf<com.example.testresqmesh.core.model.ChatMessage?>(null) }
     var showProfile by remember { mutableStateOf(false) }
+    var showGuide by remember { mutableStateOf(false) }
     var showAdvanced by remember { mutableStateOf(false) }
     var showOfflineMaps by remember { mutableStateOf(false) }
     var showNetworkDetails by remember { mutableStateOf(false) }
@@ -236,6 +238,13 @@ fun MainContainerScreen(
                 }
                 BackHandler { showOfflineMaps = false }
             }
+            showGuide -> {
+                FirstLaunchGuideScreen(
+                    isReplay = true,
+                    onDone = { showGuide = false },
+                    onClose = { showGuide = false }
+                )
+            }
             showProfile -> {
                 ResQAuroraBackground(modifier = Modifier.fillMaxSize()) {
                     ProfileScreen(
@@ -244,6 +253,7 @@ fun MainContainerScreen(
                         onAppearanceSelected = onAppearanceSelected,
                         onAdvanced = { showAdvanced = true },
                         onOfflineMaps = { showOfflineMaps = true },
+                        onHelp = { showGuide = true },
                         onBack = { showProfile = false }
                     )
                 }

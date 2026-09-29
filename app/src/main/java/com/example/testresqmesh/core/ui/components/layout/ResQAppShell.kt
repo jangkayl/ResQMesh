@@ -2,12 +2,6 @@ package com.example.testresqmesh.core.ui.components.layout
 
 import androidx.annotation.StringRes
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -44,7 +38,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
@@ -76,7 +69,7 @@ fun ResQAppShell(
     showNavigation: Boolean = true,
     content: @Composable (PaddingValues) -> Unit
 ) {
-    ResQAuroraBackground(modifier = modifier.fillMaxSize()) {
+    Box(modifier = modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         Scaffold(
             modifier = Modifier.fillMaxSize(),
             containerColor = Color.Transparent,
@@ -158,8 +151,7 @@ private fun ResQFloatingIslandNavBar(
 
                 Spacer(Modifier.width(8.dp))
 
-                // Integrated Glowing SOS Emergency Beacon
-                ResQAnimatedSosBeacon(
+                ResQStaticSosButton(
                     onClick = onSosActivated,
                     enabled = sosEnabled
                 )
@@ -222,58 +214,17 @@ private fun ResQIslandNavItem(
 }
 
 @Composable
-private fun ResQAnimatedSosBeacon(
+private fun ResQStaticSosButton(
     onClick: () -> Unit,
     enabled: Boolean
 ) {
-    val infiniteTransition = rememberInfiniteTransition(label = "sosPulseTransition")
-    val pulseScale by infiniteTransition.animateFloat(
-        initialValue = 0.94f,
-        targetValue = 1.06f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(900, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "sosScale"
-    )
-
-    val haloAlpha by infiniteTransition.animateFloat(
-        initialValue = 0.2f,
-        targetValue = 0.6f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(900, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "sosHalo"
-    )
-
     Box(
         contentAlignment = Alignment.Center,
         modifier = Modifier.padding(end = 4.dp)
     ) {
-        // Outer Glowing Aura when armed
-        if (enabled) {
-            Box(
-                modifier = Modifier
-                    .size(52.dp)
-                    .graphicsLayer {
-                        scaleX = pulseScale * 1.15f
-                        scaleY = pulseScale * 1.15f
-                    }
-                    .clip(RoundedCornerShape(22.dp))
-                    .background(ResQTheme.colors.sos.copy(alpha = haloAlpha * 0.35f))
-            )
-        }
-
         Surface(
             modifier = Modifier
                 .size(width = 62.dp, height = 50.dp)
-                .graphicsLayer {
-                    if (enabled) {
-                        scaleX = pulseScale
-                        scaleY = pulseScale
-                    }
-                }
                 .shadow(
                     elevation = if (enabled) 12.dp else 0.dp,
                     shape = RoundedCornerShape(20.dp),

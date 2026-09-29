@@ -27,5 +27,6 @@ data class ChatUiState(
     val connectedDevices: List<ConnectedDevice> = emptyList(),
     val knownNodes: List<KnownNode> = emptyList(),
     val scannedDevices: List<ScannedDevice> = emptyList(),
-    val blockedDeviceNames: Set<String> = emptySet()
+    val blockedDeviceNames: Set<String> = emptySet(),
+    val peerNames: Map<String, String> = emptyMap()
 )

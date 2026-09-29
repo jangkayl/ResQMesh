@@ -13,13 +13,14 @@ class MessageStoreIdentityTest {
         val grouped = groupPrivateMessages(
             listOf(
                 entity("outgoing", sender = "Me [NODE]#FFFF", target = truncated, isMine = true, timestamp = 1L),
-                entity("incoming", sender = complete, target = complete, isMine = false, timestamp = 2L)
+                entity("incoming", sender = complete, target = complete, isMine = false, timestamp = 2L),
+                entity("older-label", sender = truncated, target = truncated, isMine = false, timestamp = 3L)
             )
         )
 
         assertEquals(setOf(complete), grouped.keys)
-        assertEquals(listOf("outgoing", "incoming"), grouped.getValue(complete).map { it.id })
-        assertEquals(complete, grouped.getValue(complete).last().senderName)
+        assertEquals(listOf("outgoing", "incoming", "older-label"), grouped.getValue(complete).map { it.id })
+        assertEquals(truncated, grouped.getValue(complete).last().senderName)
     }
 
     private fun entity(

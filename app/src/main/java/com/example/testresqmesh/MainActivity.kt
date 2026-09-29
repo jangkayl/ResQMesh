@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
@@ -25,8 +26,11 @@ import org.koin.android.ext.android.inject
 import com.example.testresqmesh.data.repository.MeshRepository
 import com.example.testresqmesh.core.ui.MainContainerScreen
 import com.example.testresqmesh.feature.setup.ui.IdentitySetupScreen
+import com.example.testresqmesh.feature.setup.ui.FirstLaunchGuideScreen
 import com.example.testresqmesh.feature.setup.ui.PermissionsScreen
 import com.example.testresqmesh.feature.setup.ui.SplashScreen
+import com.example.testresqmesh.feature.setup.FirstLaunchGuideStore
+import com.example.testresqmesh.feature.setup.GuideState
 import com.example.testresqmesh.core.ui.theme.TestResQMeshTheme
 import com.example.testresqmesh.core.ui.theme.AppAppearance
 import com.example.testresqmesh.feature.comms.viewmodel.CommunicationViewModel
@@ -43,7 +47,7 @@ import android.widget.Toast
 
 
 enum class AppState {
-    Splash, Permissions, IdentitySetup, Main
+    Splash, Guide, Permissions, IdentitySetup, Main
 }
 
 class MainActivity : ComponentActivity() {
@@ -119,14 +123,16 @@ class MainActivity : ComponentActivity() {
                 var permissionsState by remember { mutableStateOf(hasRequiredPermissions()) }
                 var hardwareState by remember { mutableStateOf(isHardwareEnabledSafe()) }
 
-                val hasDeepLink = remember {
+                val hasDeepLink =
                     sosDeepLinkTriggered.value || pendingChatNode.value != null || pendingViewMap.value
+                var guidePending by rememberSaveable {
+                    mutableStateOf(FirstLaunchGuideStore.load(applicationContext) == GuideState.Pending)
                 }
 
                 // Track navigation stage:
                 // If opened via notification intent from closed/recent state, go directly to setup (or permissions if required).
                 // If opened normally, start with Splash.
-                var currentStage by remember {
+                var currentStage by rememberSaveable {
                     mutableStateOf(
                         if (hasDeepLink) {
                             if (permissionsState && hardwareState) AppState.IdentitySetup else AppState.Permissions
@@ -134,6 +140,16 @@ class MainActivity : ComponentActivity() {
                             AppState.Splash
                         }
                     )
+                }
+
+                fun setupStage(): AppState =
+                    if (permissionsState && hardwareState) AppState.IdentitySetup else AppState.Permissions
+
+                // An alert or chat intent takes precedence over an unfinished introduction.
+                LaunchedEffect(hasDeepLink) {
+                    if (hasDeepLink && (currentStage == AppState.Splash || currentStage == AppState.Guide)) {
+                        currentStage = setupStage()
+                    }
                 }
 
                 val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
@@ -149,8 +165,8 @@ class MainActivity : ComponentActivity() {
                 }
 
                 // If already online (e.g. background mesh service active), allow direct progression to Main
-                LaunchedEffect(setupState.isOnline) {
-                    if (setupState.isOnline && currentStage != AppState.Main) {
+                LaunchedEffect(setupState.isOnline, guidePending, hasDeepLink) {
+                    if (setupState.isOnline && (!guidePending || hasDeepLink) && currentStage != AppState.Main) {
                         currentStage = AppState.Main
                     }
                 }
@@ -162,13 +178,21 @@ class MainActivity : ComponentActivity() {
                     androidx.compose.foundation.layout.Box(modifier = Modifier.fillMaxSize().systemBarsPadding()) {
                         when (currentStage) {
                             AppState.Splash -> SplashScreen {
-                                // If fully set up, go to Identity Setup, else go to Permissions
-                                currentStage = if (permissionsState && hardwareState) {
-                                    AppState.IdentitySetup
-                                } else {
-                                    AppState.Permissions
-                                }
+                                currentStage = if (guidePending && !hasDeepLink) AppState.Guide else setupStage()
                             }
+                            AppState.Guide -> FirstLaunchGuideScreen(
+                                isReplay = false,
+                                onDone = {
+                                    FirstLaunchGuideStore.complete(applicationContext)
+                                    guidePending = false
+                                    currentStage = AppState.Permissions
+                                },
+                                onClose = {
+                                    FirstLaunchGuideStore.complete(applicationContext)
+                                    guidePending = false
+                                    currentStage = AppState.Permissions
+                                }
+                            )
                             AppState.Permissions -> PermissionsScreen(
                                 onAllSet = { currentStage = AppState.IdentitySetup },
                                 hasPermissions = permissionsState,

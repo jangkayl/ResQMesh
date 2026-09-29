@@ -13,6 +13,8 @@ import com.example.testresqmesh.core.location.LocationClient
 import com.example.testresqmesh.data.repository.MeshRepository
 import com.example.testresqmesh.data.repository.MessageStore
 import com.example.testresqmesh.data.repository.RoomMessageStore
+import com.example.testresqmesh.data.repository.PeerNameStore
+import com.example.testresqmesh.data.repository.RoomPeerNameStore
 import com.example.testresqmesh.data.repository.BlockRelationshipStore
 import com.example.testresqmesh.data.repository.PeerPublicKeyDirectory
 import com.example.testresqmesh.feature.comms.viewmodel.CommunicationViewModel
@@ -35,11 +37,12 @@ val appModule = module {
     single<MeshNetworkGateway> { NativeBleGateway(get()) }
     single { AppDatabase.getDatabase(androidContext()) }
     single<MessageStore> { RoomMessageStore(get<AppDatabase>().messageDao()) }
+    single<PeerNameStore> { RoomPeerNameStore(get<AppDatabase>().peerNameDao()) }
     single { BlockRelationshipStore(androidContext()) }
     single { PeerPublicKeyDirectory(androidContext()) }
     single(createdAtStart = true) { AppCoroutineScope(Dispatchers.IO) }
     single(createdAtStart = true) { MeshReadyPeerEvents() }
-    single { MeshRepository(get(), get(), get(), get(), get<AppCoroutineScope>().scope, get()) }
+    single { MeshRepository(get(), get(), get(), get(), get<AppCoroutineScope>().scope, get(), get()) }
     single { MeshSessionController(androidContext(), get()) }
     single { MediaHelper(androidContext()) }
     single { com.example.testresqmesh.core.utils.NotificationHelper(androidContext()) }
@@ -97,6 +100,7 @@ val appModule = module {
             observeTopology = ObserveTopologyUseCase(get()),
             observePublicMessages = ObservePublicMessagesUseCase(get()),
             observePrivateMessages = ObservePrivateMessagesUseCase(get()),
+            observePeerNames = ObservePeerNamesUseCase(get()),
             observeBlockedDeviceNames = ObserveBlockedDeviceNamesUseCase(get())
         )
     }

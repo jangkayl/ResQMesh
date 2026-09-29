@@ -10,6 +10,35 @@ import org.junit.Test
 class ConversationPreviewsTest {
 
     @Test
+    fun currentShorterNameUpdatesInboxWithoutChangingConversationIdentity() {
+        val oldName = "Alexander#A1"
+        val storedMessage = message("old", oldName, 1L)
+        val state = ChatUiState(
+            privateMessages = mapOf(oldName to listOf(storedMessage)),
+            peerNames = mapOf("A1" to "Alex#A1")
+        )
+
+        val preview = conversationPreviews(state).single()
+        assertEquals(oldName, preview.id)
+        assertEquals("Alex", preview.displayName)
+        assertEquals(oldName, preview.lastMessage.senderName)
+    }
+
+    @Test
+    fun identicalHumanNamesRemainSeparateByStableId() {
+        val state = ChatUiState(
+            privateMessages = mapOf(
+                "Old A#A1" to listOf(message("a", "Old A#A1", 1L)),
+                "Old B#B2" to listOf(message("b", "Old B#B2", 2L))
+            ),
+            peerNames = mapOf("A1" to "Alex#A1", "B2" to "Alex#B2")
+        )
+
+        assertEquals(2, conversationPreviews(state).size)
+        assertEquals(setOf("Alex"), conversationPreviews(state).map { it.displayName }.toSet())
+    }
+
+    @Test
     fun previews_usePayloadReadinessForDirectStatus() {
         val ari = "Ari [NODE]#A1"
         val bea = "Bea [NODE]#B2"

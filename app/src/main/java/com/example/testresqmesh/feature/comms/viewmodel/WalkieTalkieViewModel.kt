@@ -3,10 +3,14 @@ package com.example.testresqmesh.feature.comms.viewmodel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.testresqmesh.core.utils.MediaHelper
+import com.example.testresqmesh.core.model.NodeIdentity
 import com.example.testresqmesh.data.repository.MeshRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.launch
 
 import com.example.testresqmesh.core.utils.LiveAudioEngine
@@ -22,7 +26,16 @@ class WalkieTalkieViewModel(
 
     val currentChannelId: StateFlow<String> = useCases.observeCurrentChannelId()
     
-    val currentSpeaker: StateFlow<String?> = liveAudioEngine.currentSpeaker
+    val currentSpeaker: StateFlow<String?> = combine(
+        mediaHelper.currentRadioSpeaker,
+        liveAudioEngine.currentSpeaker,
+        useCases.observePeerNames()
+    ) { radioSender, liveSender, names ->
+        val sender = radioSender ?: liveSender
+        sender?.let {
+            NodeIdentity.displayNameOf(NodeIdentity.currentName(it, names)).ifBlank { NodeIdentity.displayNameOf(it) }
+        }
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, null)
     
     fun setChannel(channelId: String) {
         useCases.setChannel(channelId)
@@ -39,9 +52,9 @@ class WalkieTalkieViewModel(
     init {
         viewModelScope.launch {
             useCases.observeIncomingVoiceMessage().collect { message ->
-                if (_isWalkieTalkieMode.value) {
-                    message.audioBase64?.let { base64 ->
-                        mediaHelper.playVoiceMail(base64)
+                message.audioBase64?.let { base64 ->
+                    mediaHelper.enqueueRadioVoice(message.id, base64, message.senderName)
+                    if (_isWalkieTalkieMode.value) {
                         useCases.broadcastSeenReceipt(message.id, message.isPrivate, message.senderName)
                     }
                 }
@@ -62,10 +75,16 @@ class WalkieTalkieViewModel(
 
     fun toggleWalkieTalkieMode() {
         _isWalkieTalkieMode.value = !_isWalkieTalkieMode.value
+        mediaHelper.setRadioMonitoring(_isWalkieTalkieMode.value)
         if (_isWalkieTalkieMode.value) {
             liveAudioEngine.startPlayback(useCases.observeIncomingLiveAudioChunk())
         } else {
             liveAudioEngine.stopPlayback()
         }
+    }
+
+    override fun onCleared() {
+        mediaHelper.setRadioMonitoring(false)
+        super.onCleared()
     }
 }

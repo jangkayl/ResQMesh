@@ -10,11 +10,13 @@ import com.example.testresqmesh.data.local.dao.DomainEventDao
 import com.example.testresqmesh.data.local.dao.IncidentDao
 import com.example.testresqmesh.data.local.dao.MessageDao
 import com.example.testresqmesh.data.local.dao.NodeDao
+import com.example.testresqmesh.data.local.dao.PeerNameDao
 import com.example.testresqmesh.data.local.dao.UserDao
 import com.example.testresqmesh.data.local.entity.DomainEventEntity
 import com.example.testresqmesh.data.local.entity.IncidentEntity
 import com.example.testresqmesh.data.local.entity.MessageEntity
 import com.example.testresqmesh.data.local.entity.NodeEntity
+import com.example.testresqmesh.data.local.entity.PeerNameEntity
 import com.example.testresqmesh.data.local.entity.UserEntity
 
 @Database(
@@ -23,13 +25,15 @@ import com.example.testresqmesh.data.local.entity.UserEntity
         MessageEntity::class,
         UserEntity::class,
         IncidentEntity::class,
-        DomainEventEntity::class
+        DomainEventEntity::class,
+        PeerNameEntity::class
     ],
-    version = 6,
+    version = 7,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
     abstract fun nodeDao(): NodeDao
+    abstract fun peerNameDao(): PeerNameDao
     abstract fun messageDao(): MessageDao
     abstract fun userDao(): UserDao
     abstract fun incidentDao(): IncidentDao
@@ -74,6 +78,12 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        private val MIGRATION_6_7 = object : Migration(6, 7) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("CREATE TABLE IF NOT EXISTS `peer_names` (`nodeId` TEXT NOT NULL, `fullName` TEXT NOT NULL, PRIMARY KEY(`nodeId`))")
+            }
+        }
+
         private fun removeLegacyAttachmentSchema(database: SupportSQLiteDatabase) {
             database.execSQL(
                 "CREATE TABLE IF NOT EXISTS messages_new (msgId TEXT NOT NULL, senderName TEXT NOT NULL, targetName TEXT, text TEXT, imageBase64 TEXT, audioBase64 TEXT, locationLat REAL, locationLng REAL, timestamp INTEGER NOT NULL, isSOS INTEGER NOT NULL, isMine INTEGER NOT NULL, deliveredTo TEXT NOT NULL, seenBy TEXT NOT NULL, outboundRoute TEXT NOT NULL, PRIMARY KEY(msgId))"
@@ -93,7 +103,7 @@ abstract class AppDatabase : RoomDatabase() {
                     context.applicationContext,
                     AppDatabase::class.java,
                     "resqmesh_database"
-                ).addMigrations(MIGRATION_1_4, MIGRATION_2_4, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6).build()
+                ).addMigrations(MIGRATION_1_4, MIGRATION_2_4, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7).build()
                 INSTANCE = instance
                 instance
             }

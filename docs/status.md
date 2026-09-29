@@ -26,8 +26,10 @@ Validate convergent mesh-hop topology and directed private delivery under relay 
 - Private conversations collapse advertisement/handshake aliases by node ID, prefer complete labels, and delete stored aliases together.
 - Churn recovery uses a 15-second zombie threshold; prefix-aware node-ID matching enables immediate direct dispatch and receipt completion.
 - Incidents: self-response rejected; optional GPS maps. TTL default 10; explicit Dense 4; no BLE/routing changes.
+- Name setup omits tags; IDs remain. Messages show current names by ID; phone validation is pending.
+- Main tabs have solid backgrounds and static SOS navigation. Radio plays notes serially. Animated first-launch guide explains use and reopens from Settings; phone validation is pending.
 
-Local checks passed; physical BLE validation remains required.
+Debug build and isolated tests pass. Normal unit tests are blocked by untracked `InboxMeshStatusTest.kt`; physical validation remains required.
 
 ## Open blockers
 
@@ -46,12 +48,12 @@ Local checks passed; physical BLE validation remains required.
 
 ## Next actions
 
-1. Build and install the current working tree; run A-B-C for 90 seconds, send five private messages each way, remove/restore B, and verify explicit withdrawal plus directed retry without private broadcast or duplicate truncated-name conversations.
-2. Repeat with queue pressure and one relay restart; record dispatch acceptance/rejection, topology sequence, outbox state, receipts, and GATT retirement markers.
+1. Install this build; run A-B-C for 90 seconds, send five private messages each way, remove/restore B, and verify withdrawal, directed retry, and no duplicate conversations.
+2. Repeat under queue pressure and relay restart; record dispatch, topology, outbox, receipts, and GATT retirement.
 3. Record APK/build identity, device matrix, and repetitions for the Samsung and five-device runs.
 4. Run the stable-ID relay card after installing this working tree; capture selected next hop, private relay route-unavailable, key-change, and GATT-retirement markers.
 5. Run the Android 12-14+ background-mesh card, including notification denial, relay, stop, task removal, and battery comparison.
 
 ## Scope guard
 
-Reliable text/SOS, honest status, recovery, and private fail-closed behavior remain ahead of speculative features.
+Reliable text/SOS, honest status, recovery, and private fail-closed behavior take priority.

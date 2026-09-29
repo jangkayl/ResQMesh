@@ -40,6 +40,7 @@ data class MeshUseCases(
     val observeTopology: ObserveTopologyUseCase,
     val observePublicMessages: ObservePublicMessagesUseCase,
     val observePrivateMessages: ObservePrivateMessagesUseCase,
+    val observePeerNames: ObservePeerNamesUseCase,
     val observeBlockedDeviceNames: ObserveBlockedDeviceNamesUseCase
 )
 
@@ -184,6 +185,10 @@ class ObservePublicMessagesUseCase(private val repository: MeshRepository) {
 
 class ObservePrivateMessagesUseCase(private val repository: MeshRepository) {
     operator fun invoke(): StateFlow<Map<String, List<ChatMessage>>> = repository.privateMessages
+}
+
+class ObservePeerNamesUseCase(private val repository: MeshRepository) {
+    operator fun invoke(): StateFlow<Map<String, String>> = repository.peerNames
 }
 
 class ObserveBlockedDeviceNamesUseCase(private val repository: MeshRepository) {

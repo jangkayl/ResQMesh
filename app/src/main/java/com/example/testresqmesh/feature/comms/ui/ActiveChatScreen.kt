@@ -116,8 +116,8 @@ fun ActiveChatScreen(
     val candidate = remember(uiState, name) {
         recipientCandidates(uiState).firstOrNull { NodeIdentity.matches(it.name, name) }
     }
-    val displayName = remember(conversationName) {
-        NodeIdentity.displayNameOf(conversationName).ifBlank { conversationName }
+    val displayName = remember(conversationName, uiState.peerNames) {
+        NodeIdentity.displayNameOf(NodeIdentity.currentName(conversationName, uiState.peerNames)).ifBlank { conversationName }
     }
     val context = LocalContext.current
     val voiceNoteText = stringResource(R.string.private_chat_voice_note)

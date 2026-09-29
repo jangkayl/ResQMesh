@@ -811,7 +811,7 @@ internal data class ConversationPreview(
 internal fun conversationPreviews(state: ChatUiState): List<ConversationPreview> =
     state.privateMessages.mapNotNull { (id, messages) ->
         val latest = messages.maxByOrNull { it.timestamp } ?: return@mapNotNull null
-        val displayName = NodeIdentity.displayNameOf(id).ifBlank { id }
+        val displayName = NodeIdentity.displayNameOf(NodeIdentity.currentName(id, state.peerNames)).ifBlank { id }
         val directLink = state.connectedDevices.firstOrNull { NodeIdentity.matches(it.name, id) }
         val status = when {
             directLink?.isPayloadReady == true && directLink.isPeerResponsive && !directLink.isProvisional -> ConversationStatus.Direct

@@ -23,9 +23,14 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.channels.BufferOverflow
+import kotlinx.coroutines.CancellationException
 import java.util.UUID
 
 class MeshRepository(
@@ -34,7 +39,8 @@ class MeshRepository(
     private val blockStore: BlockRelationshipStore,
     private val publicKeys: PeerPublicKeyDirectory,
     private val repositoryScope: CoroutineScope,
-    private val readyPeerEvents: MeshReadyPeerEvents
+    private val readyPeerEvents: MeshReadyPeerEvents,
+    private val peerNameStore: PeerNameStore
 ) {
 
     private val _connectionStatus = MutableStateFlow("Ready to deploy Mesh Node.")
@@ -76,6 +82,29 @@ class MeshRepository(
     val privateMessages = messageStore.privateMessages
         .stateIn(repositoryScope, SharingStarted.Eagerly, emptyMap())
 
+    private val recentPeerNames = MutableStateFlow<Map<String, String>>(emptyMap())
+    val peerNames = combine(peerNameStore.names, recentPeerNames) { saved, recent -> saved + recent }
+        .stateIn(repositoryScope, SharingStarted.Eagerly, emptyMap())
+    private val observedPeerNames = Channel<String>(64, BufferOverflow.DROP_OLDEST)
+
+    private fun recordPeerName(name: String, fromReadyLink: Boolean = false) {
+        val id = NodeIdentity.idOf(name) ?: return
+        if (id == NodeIdentity.idOf(myNodeName)) return
+        if (NodeIdentity.isPlaceholder(name) || name.substringBeforeLast('#').isBlank()) return
+        if (!fromReadyLink && readyConnectedDevices().any { NodeIdentity.idOf(it.name) == id && it.name != name }) return
+        if (recentPeerNames.value[id] == name) return
+        recentPeerNames.update { it + (id to name) }
+        observedPeerNames.trySend(name)
+    }
+
+    private fun currentPeerName(name: String): String {
+        val id = NodeIdentity.idOf(name) ?: return name
+        return recentPeerNames.value[id]
+            ?: peerNames.value[id]
+            ?: readyConnectedDevices().firstOrNull { NodeIdentity.idOf(it.name) == id }?.name
+            ?: name
+    }
+
     private val _isOnline = MutableStateFlow(false)
     val isOnline = _isOnline.asStateFlow()
 
@@ -85,6 +114,17 @@ class MeshRepository(
 
     init {
         setupCallbacks()
+        repositoryScope.launch {
+            for (name in observedPeerNames) {
+                try {
+                    peerNameStore.observeFullName(name)
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (_: Exception) {
+                    AppLogger.d("PeerNames", "Unable to persist a peer display name")
+                }
+            }
+        }
         meshRouter.startTopologyCleanup(repositoryScope, { myNodeName }, { readyConnectedDevices() })
     }
 
@@ -192,6 +232,7 @@ class MeshRepository(
             // published into the routing tables or they would pollute the topology with ghost nodes.
             if (device.isPayloadReady && !device.isProvisional && !NodeIdentity.isPlaceholder(device.name)) {
                 meshRouter.markNodeSeen(device.name)
+                recordPeerName(device.name, fromReadyLink = true)
             }
 
             _connectedDevices.value = updatedList
@@ -344,6 +385,7 @@ class MeshRepository(
 
         networkManager.onMessageReceived = { endpointId, msgId, sender, text, isPrivate, isSystem, img, audio, lat, lng, medium, routePath, channelId ->
             if (sender != myNodeName) {
+                if (!isSystem) recordPeerName(sender)
                 meshRouter.markNodeSeen(sender)
                 meshRouter.recalculateKnownNodes(myNodeName, readyConnectedDevices())
 
@@ -430,7 +472,7 @@ class MeshRepository(
     }
 
     fun startNode(customName: String, nodeTag: String, teamKey: String, nodeId: String) {
-        myNodeName = "$customName [$nodeTag]#$nodeId"
+        myNodeName = NodeIdentity.qualifiedName(customName, nodeTag, nodeId)
         networkManager.myDeviceName = myNodeName
         networkManager.myNodeId = nodeId
         synchronizeBlockRelationships()
@@ -655,14 +697,15 @@ class MeshRepository(
             }
             if (targetName != null) {
                 // Private message retry
-                val targetPubKey = publicKeys.trustedKey(targetName) ?: continue
-                val directedRouteList = meshRouter.findShortestPath(myNodeName, targetName, readyDevices)
+                val currentTarget = currentPeerName(targetName)
+                val targetPubKey = publicKeys.trustedKey(currentTarget) ?: continue
+                val directedRouteList = meshRouter.findShortestPath(myNodeName, currentTarget, readyDevices)
                 val payloadBytes = runCatching {
                     PayloadFactory.buildPrivatePayload(
                         msgId = message.id,
                         timestamp = message.timestamp,
                         senderName = myNodeName,
-                        targetName = targetName,
+                        targetName = currentTarget,
                         text = message.text,
                         imageBase64 = message.imageBase64,
                         audioBase64 = message.audioBase64,
@@ -674,7 +717,7 @@ class MeshRepository(
                     )
                 }.getOrNull() ?: continue
 
-                val delivery = PrivateDeliveryPlanner.select(targetName, directedRouteList, readyDevices)
+                val delivery = PrivateDeliveryPlanner.select(currentTarget, directedRouteList, readyDevices)
                 val dispatchResult = when (delivery) {
                     is PrivateDeliveryPlanner.Target.Endpoint -> {
                         networkManager.sendDirectPayload(delivery.endpointId, payloadBytes)
@@ -811,10 +854,11 @@ class MeshRepository(
     fun sendPrivateMessage(targetName: String, text: String, imageBase64: String?, audioBase64: String?, locationLat: Double? = null, locationLng: Double? = null): Boolean {
         val msgId = UUID.randomUUID().toString()
         val timestamp = System.currentTimeMillis()
+        val currentTarget = currentPeerName(targetName)
         
         val readyDevices = readyConnectedDevices()
-        val directedRouteList = if (readyDevices.isNotEmpty()) meshRouter.findShortestPath(myNodeName, targetName, readyDevices) else emptyList()
-        val targetPubKey = publicKeys.trustedKey(targetName)
+        val directedRouteList = if (readyDevices.isNotEmpty()) meshRouter.findShortestPath(myNodeName, currentTarget, readyDevices) else emptyList()
+        val targetPubKey = publicKeys.trustedKey(currentTarget)
         
         // If we are completely offline or route is unavailable, save as Pending outbox message
         if (readyDevices.isEmpty() || targetPubKey == null || directedRouteList.isEmpty()) {
@@ -833,14 +877,14 @@ class MeshRepository(
                 outboundRoute = emptyList()
             )
             repositoryScope.launch {
-                messageStore.save(message, targetName = targetName)
+                messageStore.save(message, targetName = currentTarget)
                 messageStore.markPending(msgId)
             }
             AppLogger.d("MeshNetwork_E2EE", "Private send queued as Pending for $targetName (no immediate route)")
             return true
         }
 
-        if (publicKeys.hasPendingChange(targetName)) {
+        if (publicKeys.hasPendingChange(currentTarget)) {
             AppLogger.d("MeshNetwork_E2EE", "Private send blocked: recipient key change requires approval")
             return false
         }
@@ -849,7 +893,7 @@ class MeshRepository(
             msgId = msgId,
             timestamp = timestamp,
             senderName = myNodeName,
-            targetName = targetName,
+            targetName = currentTarget,
             text = text,
             imageBase64 = imageBase64,
             audioBase64 = audioBase64,
@@ -863,13 +907,13 @@ class MeshRepository(
             return false
         }
 
-        val delivery = PrivateDeliveryPlanner.select(targetName, directedRouteList, readyDevices)
-        val isDirect = readyDevices.any { NodeIdentity.matches(it.name, targetName) }
+        val delivery = PrivateDeliveryPlanner.select(currentTarget, directedRouteList, readyDevices)
+        val isDirect = readyDevices.any { NodeIdentity.matches(it.name, currentTarget) }
         val message = ChatMessage(msgId, myNodeName, text, imageBase64, audioBase64, locationLat, locationLng, true, true, timestamp, isHopped = !isDirect, outboundRoute = directedRouteList)
         
         repositoryScope.launch {
             // Persist before dispatch so a fast receipt cannot race the local message row.
-            messageStore.save(message, targetName = targetName)
+            messageStore.save(message, targetName = currentTarget)
             val dispatchResult = when (delivery) {
                 is PrivateDeliveryPlanner.Target.Endpoint -> {
                     AppLogger.d("MeshNetwork_E2EE", "Private route selected with ${directedRouteList.size - 1} hop(s)")

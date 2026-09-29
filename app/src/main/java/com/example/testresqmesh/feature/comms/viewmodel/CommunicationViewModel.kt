@@ -63,6 +63,11 @@ class CommunicationViewModel(
             }
         }
         viewModelScope.launch {
+            useCases.observePeerNames().collect { names ->
+                _uiState.update { it.copy(peerNames = names) }
+            }
+        }
+        viewModelScope.launch {
             useCases.observeConnectedDevices().collect { devices ->
                 _uiState.update { it.copy(connectedDevices = devices) }
             }

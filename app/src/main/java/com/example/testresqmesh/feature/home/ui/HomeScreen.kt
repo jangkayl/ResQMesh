@@ -95,9 +95,9 @@ fun HomeScreen(
     val myDeviceName = remember(context) {
         val prefs = context.getSharedPreferences("resqmesh_prefs", android.content.Context.MODE_PRIVATE)
         val customName = prefs.getString("custom_name", android.os.Build.MODEL) ?: android.os.Build.MODEL
-        val tag = prefs.getString("node_tag", "NODE") ?: "NODE"
+        val tag = prefs.getString("node_tag", "") ?: ""
         val nodeId = prefs.getString("node_id", "") ?: ""
-        if (nodeId.isEmpty()) "$customName [$tag]" else "$customName [$tag]#$nodeId"
+        if (nodeId.isEmpty()) customName else com.example.testresqmesh.core.model.NodeIdentity.qualifiedName(customName, tag, nodeId)
     }
     val nodes = remember(radarState) { classifyRadarNodes(radarState) }
     val directNodeNames = remember(nodes) { nodes.filter { it.kind == NodeKind.DIRECT }.map { it.name } }
@@ -244,7 +244,7 @@ private fun TacticalHeader(
             }
             Spacer(Modifier.height(4.dp))
             Text(
-                text = myDeviceName,
+                text = com.example.testresqmesh.core.model.NodeIdentity.displayNameOf(myDeviceName),
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Black,
                 color = MaterialTheme.colorScheme.onSurface,

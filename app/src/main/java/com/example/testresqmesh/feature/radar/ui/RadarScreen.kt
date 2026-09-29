@@ -46,9 +46,9 @@ fun RadarScreen(viewModel: RadarViewModel) {
     val myDeviceName = remember(context) {
         val prefs = context.getSharedPreferences("resqmesh_prefs", android.content.Context.MODE_PRIVATE)
         val customName = prefs.getString("custom_name", android.os.Build.MODEL) ?: android.os.Build.MODEL
-        val tag = prefs.getString("node_tag", "NODE") ?: "NODE"
+        val tag = prefs.getString("node_tag", "") ?: ""
         val nodeId = prefs.getString("node_id", "") ?: ""
-        if (nodeId.isEmpty()) "$customName [$tag]" else "$customName [$tag]#$nodeId"
+        if (nodeId.isEmpty()) customName else NodeIdentity.qualifiedName(customName, tag, nodeId)
     }
 
     val nodes = remember(uiState) { classifyRadarNodes(uiState) }
@@ -88,8 +88,7 @@ internal fun classifyRadarNodes(state: RadarUiState): List<NodeItemData> {
 
     fun label(fullName: String): String {
         val display = NodeIdentity.displayNameOf(fullName).ifBlank { fullName }
-        val id = NodeIdentity.idOf(fullName)
-        return if (id == null) display else "$display #$id"
+        return display
     }
 
     // 1. Physical direct links. Authoritative: a socket either exists or it does not.
@@ -617,18 +616,18 @@ fun NearbyNodeItem(
 @Composable
 fun RadarScreenPreview() {
     val mockNodes = listOf(
-        NodeItemData("id2", "Node_BK29 [MEDIC]#BK29", "Connected (Direct)", NodeKind.DIRECT, isConnected = true, isActiveRelay = true, label = "Node_BK29 [MEDIC] #BK29"),
-        NodeItemData("id6", "Node_QQ12 [NODE]#QQ12", "Linking (Handshaking)", NodeKind.HANDSHAKING, isConnected = true, label = "Node 4F:A2"),
-        NodeItemData("id4", "Node_MN04 [NODE]#MN04", "Connected (Via Relay)", NodeKind.RELAY, isActiveRelay = true, label = "Node_MN04 [NODE] #MN04"),
-        NodeItemData("", "Node_L005 [NODE]#L005", "Hopped via Mesh", NodeKind.HOPPED, isActiveRelay = true, label = "Node_L005 [NODE] #L005"),
-        NodeItemData("id1", "Node_X77A [NODE]#X77A", "Discovered / Scanning...", NodeKind.DISCOVERED, label = "Node_X77A [NODE] #X77A"),
-        NodeItemData("id5", "Node_PJ88 [NODE]#PJ88", "SYNCING...", NodeKind.SYNCING, label = "Node_PJ88 [NODE] #PJ88")
+        NodeItemData("id2", "Ari [TEAM1]#BK29", "Connected (Direct)", NodeKind.DIRECT, isConnected = true, isActiveRelay = true, label = "Ari [TEAM1]"),
+        NodeItemData("id6", "Bea#QQ12", "Linking (Handshaking)", NodeKind.HANDSHAKING, isConnected = true, label = "Node 4F:A2"),
+        NodeItemData("id4", "Cai#MN04", "Connected (Via Relay)", NodeKind.RELAY, isActiveRelay = true, label = "Cai"),
+        NodeItemData("", "Dee#L005", "Hopped via Mesh", NodeKind.HOPPED, isActiveRelay = true, label = "Dee"),
+        NodeItemData("id1", "Eli#X77A", "Discovered / Scanning...", NodeKind.DISCOVERED, label = "Eli"),
+        NodeItemData("id5", "Fay#PJ88", "SYNCING...", NodeKind.SYNCING, label = "Fay")
     )
     TestResQMeshTheme {
         RadarScreenContent(
             activeNodesCount = mockNodes.size,
             nodes = mockNodes,
-            myDeviceName = "Me [NODE]#ME01",
+            myDeviceName = "Me#ME01",
             onRefresh = {},
             onDisconnect = {},
             onForceConnect = { _, _ -> },

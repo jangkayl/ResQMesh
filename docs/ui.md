@@ -1,6 +1,6 @@
 # UI guidance
 
-The UI uses Jetpack Compose and Material 3. Inspect the actual screen, ViewModel, and shared state before changing behavior; this page owns stable presentation rules rather than component-by-component descriptions.
+The UI uses Jetpack Compose and Material 3; inspect source before editing.
 
 ## Component and state boundaries
 
@@ -8,11 +8,14 @@ The UI uses Jetpack Compose and Material 3. Inspect the actual screen, ViewModel
 - Tactical & Utilitarian / High-Vis Safety Dark is dark-first with a Field Light Daylight preference; appearance affects presentation only.
 - Night uses Pitch Black (#000000) for OLED efficiency, Carbon/Dark Grey raised panels, restrained shadows, and 1dp borders. Daylight uses white and steel grey backgrounds with black text.
 - Both use Safety Orange (#FF5A00) for interactions/accents, green for positive states, amber for attention, and red for SOS. Use tokens, vector icons, 8dp rhythm, 16dp gutters, 18-24dp radii, and 48dp targets.
-- Use mission-first hierarchy, left-aligned titles, compact groups, and icon-only navigation with persistent SOS. Ambient fields are decorative.
+- Use left-aligned titles, compact groups, and icon-only navigation with persistent SOS.
 - New top-level screens use the reusable shell: Mission, Messages, Voice, and Mesh. SOS is a persistent action rather than a navigation destination.
-- **Chat Composers** must be context-aware: hide inline media tools while typing to maximize horizontal space, providing access via a contextual floating action bubble above the input.
+- Mission, Messages, and Voice use a solid theme background. Their navigation SOS action stays visually prominent without a continuous pulse; dedicated SOS screens retain their emergency treatment.
+- **Chat Composers** hide inline media tools while typing; a floating action bubble retains access.
 - **Network & Topology** uses operator cards and a 2D route map instead of raw logs.
-- **Onboarding & Setup** uses a Tactical Radar Sweep splash and a civilian Secure Digital Passport card that updates in real-time, avoiding gamified/combat aesthetics.
+- Setup uses a radar splash and civilian identity card.
+- First-launch guide: three skippable animated pages, progress dots, no in-page Back; Settings replay.
+- Setup has no tag input. Ordinary names omit `[NODE]` and ID; peer details show ID. Inbox and chat headers show current names.
 - Shared controls use semantic shapes, clear pressed/disabled states, and text or icon-independent status descriptions.
 - Keep business, routing, and transport decisions out of composables. ViewModels/use cases expose UI state and user actions.
 - Keep route-level composables responsible for state collection and side effects; move reusable stateless presentation into feature `ui/components` files.
@@ -31,9 +34,9 @@ UI labels must reflect verified application state:
 | Offline | A previously known peer is not direct-ready, routed, or currently nearby |
 | Connecting / Handshaking | Radio/setup work is incomplete; private send and direct-ready claims remain unavailable |
 
-Relayed status requires a repository-verified directed path through a payload-ready first hop; cached topology is not live reachability. Unblock permits admission but never implies Direct. Lists, details, dots, counters, and message recipients re-resolve shared peer state.
+Relayed status requires a verified path through a ready first hop; cached topology is not live reachability. Unblock never implies Direct. UI surfaces re-resolve shared peer state.
 
-Avoid showing “connected” from a BLE callback alone. Counters and selected peers should use the same payload-ready/reachability definitions as routing.
+Never show “connected” from a BLE callback alone. Counters use routing's readiness definitions.
 
 ## Messaging and safety feedback
 
@@ -41,6 +44,7 @@ Avoid showing “connected” from a BLE callback alone. Counters and selected p
 - Distinguish queued, sending, delivered, failed, and blocked outcomes; do not imply peer receipt from enqueue.
 - SOS alerts and cancellation feedback must identify the relevant alert/sender.
 - SOS uses one accessible slide ("Slide to Broadcast"); early release resets it.
+- Radio plays recorded notes in order and shows the current speaker name. Off clears its queue; manual chat audio takes priority, then Radio resumes.
 - SOS background uses unified multi-layered emergency illumination (sunburst halo, ambient wash, beacon rings, reticle) across both Daylight and Night operations.
 - Never render debug plaintext, keys, ciphertext previews, or sensitive location in the debug UI.
 
@@ -73,6 +77,6 @@ Avoid showing “connected” from a BLE callback alone. Counters and selected p
 
 ## Validation
 
-For UI-only presentation changes, run focused Compose/local checks where available and inspect affected states. For any label driven by BLE, route, key, delivery, or SOS behavior, use the corresponding physical test in `validation.md`; a screenshot alone cannot prove the underlying state is correct.
+Run focused UI checks and inspect affected states. BLE, route, key, delivery, and SOS labels require physical tests from `validation.md`.
 
 The active civilian-first refactor is normally reviewed one screen at a time. The user may explicitly approve a continuous pass; phone review is still required before presentation behavior is accepted.

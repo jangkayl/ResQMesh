@@ -35,6 +35,7 @@ fun ProfileScreen(
     onAppearanceSelected: (AppAppearance) -> Unit,
     onAdvanced: () -> Unit,
     onOfflineMaps: () -> Unit = {},
+    onHelp: () -> Unit = {},
     onBack: () -> Unit
 ) {
     val context = LocalContext.current
@@ -216,6 +217,8 @@ fun ProfileScreen(
         item { SettingsLabel("MORE") }
         item {
             SettingsCard {
+                SettingRow(Icons.Default.Info, "How to use ResQMesh", "Purpose, messaging, Radio, and SOS", onClick = onHelp)
+                DividerLine()
                 SettingRow(Icons.Default.Lock, "Privacy", "Private messages require a ready link")
                 DividerLine()
                 SettingRow(Icons.Default.Info, "About", "ResQMesh")

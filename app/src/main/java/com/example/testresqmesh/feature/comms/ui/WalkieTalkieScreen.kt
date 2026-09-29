@@ -226,7 +226,7 @@ fun WalkieTalkieScreen(
                             )
                             Spacer(Modifier.width(8.dp))
                             Text(
-                                text = "INCOMING RX: $speaker",
+                                text = "NOW PLAYING: $speaker",
                                 fontWeight = FontWeight.ExtraBold,
                                 color = ResQTheme.colors.success,
                                 style = MaterialTheme.typography.labelSmall
@@ -505,4 +505,3 @@ fun WalkieTalkieScreen(
         Spacer(Modifier.height(Spacing.Large))
     }
 }
-

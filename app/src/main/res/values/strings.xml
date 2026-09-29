@@ -42,9 +42,6 @@
     <string name="identity_name_label">Name</string>
     <string name="identity_name_placeholder">e.g. Ari Santos</string>
     <string name="identity_name_error">Enter your name.</string>
-    <string name="identity_tag_label">Tag (optional)</string>
-    <string name="identity_tag_placeholder">e.g. TEAM1</string>
-    <string name="identity_tag_hint">Up to 6 letters or numbers.</string>
     <string name="identity_start_action">Continue</string>
     <string name="identity_change_note">Choose a name people know.</string>
     <string name="home_profile_action">Open profile</string>

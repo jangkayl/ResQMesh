@@ -521,7 +521,8 @@ private fun NetworkPeerDetails(
                     overflow = TextOverflow.Ellipsis
                 )
                 Text(
-                    text = if (node.endpointId.isNotBlank()) "ENDPOINT: ${node.endpointId.uppercase()}" else "OFFLINE RELAY IDENTITY",
+                    text = com.example.testresqmesh.core.model.NodeIdentity.idOf(node.name)?.let { "DEVICE ID: $it" }
+                        ?: if (node.endpointId.isNotBlank()) "ENDPOINT: ${node.endpointId.uppercase()}" else "IDENTITY UNAVAILABLE",
                     fontFamily = FontFamily.Monospace,
                     fontSize = 10.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,

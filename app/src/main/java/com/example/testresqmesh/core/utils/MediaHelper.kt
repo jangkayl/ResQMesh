@@ -53,8 +53,14 @@ class MediaHelper(private val context: Context) {
         }
     }
 
-    private val playbackQueue = java.util.concurrent.ConcurrentLinkedQueue<String>()
-    private var isPlaying = false
+    private val radioQueue = RadioVoiceQueue()
+    private var radioMonitoring = false
+    private var radioResumePositionMs = 0
+    private var manualAudio: String? = null
+    private var playingFile: File? = null
+
+    private val _currentRadioSpeaker = MutableStateFlow<String?>(null)
+    val currentRadioSpeaker: StateFlow<String?> = _currentRadioSpeaker
 
     private val _currentlyPlayingAudio = MutableStateFlow<String?>(null)
     val currentlyPlayingAudio: StateFlow<String?> = _currentlyPlayingAudio
@@ -64,60 +70,97 @@ class MediaHelper(private val context: Context) {
     }
 
     fun togglePlayVoiceMail(base64Audio: String) {
-        if (_currentlyPlayingAudio.value == base64Audio) {
+        if (manualAudio == base64Audio) {
             stopVoiceMail()
             return
         }
-        stopVoiceMail()
-        playbackQueue.offer(base64Audio)
-        playNextInQueue()
+        if (radioQueue.current != null && manualAudio == null) {
+            radioResumePositionMs = mediaPlayer?.currentPosition ?: radioResumePositionMs
+        }
+        releasePlayer()
+        manualAudio = base64Audio
+        playAudio(base64Audio, isRadio = false)
     }
 
     fun stopVoiceMail() {
-        try {
-            playbackQueue.clear()
-            mediaPlayer?.stop()
-            mediaPlayer?.release()
-            mediaPlayer = null
-        } catch (e: Exception) {
-            Log.e("MediaHelper", "Error stopping playback", e)
-        } finally {
-            isPlaying = false
-            _currentlyPlayingAudio.value = null
+        if (manualAudio == null) return
+        releasePlayer()
+        manualAudio = null
+        playNextRadioNote()
+    }
+
+    fun setRadioMonitoring(enabled: Boolean) {
+        if (radioMonitoring == enabled) return
+        radioMonitoring = enabled
+        radioQueue.setMonitoring(enabled)
+        if (!enabled) {
+            radioResumePositionMs = 0
+            if (manualAudio == null) releasePlayer()
         }
     }
 
-    private fun playNextInQueue() {
-        if (isPlaying) return
-        val nextAudio = playbackQueue.poll() ?: run {
-            _currentlyPlayingAudio.value = null
-            return
-        }
+    fun enqueueRadioVoice(id: String, base64Audio: String, sender: String) {
+        if (!radioQueue.enqueue(RadioVoiceQueue.Note(id, base64Audio, sender))) return
+        playNextRadioNote()
+    }
 
+    private fun playNextRadioNote() {
+        if (!radioMonitoring || manualAudio != null || mediaPlayer != null) return
+        val note = radioQueue.currentOrNext() ?: return
+        playAudio(note.audio, isRadio = true)
+    }
+
+    private fun releasePlayer() {
+        mediaPlayer?.setOnCompletionListener(null)
         try {
-            this.isPlaying = true
-            _currentlyPlayingAudio.value = nextAudio
-            val decodedBytes = Base64.decode(nextAudio, Base64.NO_WRAP)
-            val tempPlayFile = File(context.cacheDir, "temp_audio_play_${System.currentTimeMillis()}.amr")
-            tempPlayFile.writeBytes(decodedBytes)
+            mediaPlayer?.stop()
+        } catch (_: IllegalStateException) {
+            // A failed prepare may leave the player unable to stop.
+        }
+        mediaPlayer?.release()
+        mediaPlayer = null
+        playingFile?.delete()
+        playingFile = null
+        _currentlyPlayingAudio.value = null
+        _currentRadioSpeaker.value = null
+    }
 
-            mediaPlayer = MediaPlayer().apply {
+    private fun playAudio(base64Audio: String, isRadio: Boolean) {
+        try {
+            val decodedBytes = Base64.decode(base64Audio, Base64.NO_WRAP)
+            val tempPlayFile = File.createTempFile("temp_audio_play_", ".amr", context.cacheDir)
+            playingFile = tempPlayFile
+            tempPlayFile.writeBytes(decodedBytes)
+            val player = MediaPlayer()
+            mediaPlayer = player
+            player.apply {
                 setDataSource(tempPlayFile.absolutePath)
                 prepare()
-                start()
-                setOnCompletionListener { 
-                    it.release()
-                    tempPlayFile.delete()
-                    this@MediaHelper.isPlaying = false
-                    this@MediaHelper._currentlyPlayingAudio.value = null
-                    playNextInQueue() 
+                if (isRadio && radioResumePositionMs > 0) seekTo(radioResumePositionMs)
+                setOnCompletionListener {
+                    releasePlayer()
+                    if (isRadio) {
+                        radioQueue.completeCurrent()
+                        radioResumePositionMs = 0
+                    } else {
+                        manualAudio = null
+                    }
+                    playNextRadioNote()
                 }
+                start()
             }
+            _currentlyPlayingAudio.value = base64Audio
+            _currentRadioSpeaker.value = if (isRadio) radioQueue.current?.sender else null
         } catch (e: Exception) {
             Log.e("MediaHelper", "Playback failed", e)
-            this.isPlaying = false
-            this._currentlyPlayingAudio.value = null
-            playNextInQueue()
+            releasePlayer()
+            if (isRadio) {
+                radioQueue.completeCurrent()
+                radioResumePositionMs = 0
+            } else {
+                manualAudio = null
+            }
+            playNextRadioNote()
         }
     }
 

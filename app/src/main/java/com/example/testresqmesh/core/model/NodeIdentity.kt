@@ -3,8 +3,9 @@ package com.example.testresqmesh.core.model
 /**
  * Canonical node identity resolution for the ResQMesh network.
  *
- * A fully qualified node name has the shape `"<display name> [<TAG>]#<NODE_ID>"` where `NODE_ID`
- * is a short, stable, per-install identifier persisted in SharedPreferences (`node_id`).
+ * A fully qualified node name has the shape `"<display name> [<TAG>]#<NODE_ID>"`
+ * (or `"<display name>#<NODE_ID>"` when the optional tag is blank) where `NODE_ID`
+ * is a stable identifier derived from the local public key.
  *
  * A BLE advertisement can only carry 26 bytes of `0xFFFF` manufacturer data, so the human readable
  * part of the name is routinely truncated on the wire. The previous approach of comparing truncated
@@ -26,6 +27,16 @@ object NodeIdentity {
      */
     private const val MIN_FUZZY_PREFIX = 6
 
+    /** The old default was a label, not a role. Do not carry it into new identities. */
+    fun optionalTag(tag: String?): String = tag?.trim().orEmpty().takeUnless {
+        it.equals("NODE", ignoreCase = true)
+    }.orEmpty()
+
+    fun qualifiedName(displayName: String, tag: String?, nodeId: String): String {
+        val suffix = optionalTag(tag).let { if (it.isEmpty()) "" else " [$it]" }
+        return "$displayName$suffix#$nodeId"
+    }
+
     /** Placeholder assigned to an inbound GATT server link before the handshake reveals its name. */
     const val UNKNOWN_NAME = "Unknown Node"
 
@@ -41,9 +52,7 @@ object NodeIdentity {
 
     /** Strips the `#NODE_ID` suffix, leaving the human readable portion of the name. */
     fun displayNameOf(fullName: String?): String {
-        val name = fullName?.trim().orEmpty()
-        val index = name.lastIndexOf(ID_DELIMITER)
-        return if (index <= 0) name else name.substring(0, index).trim()
+        return humanPart(fullName).replace(Regex("\\s+\\[NODE]$", RegexOption.IGNORE_CASE), "")
     }
 
     /**
@@ -53,10 +62,16 @@ object NodeIdentity {
     fun key(fullName: String?): String =
         idOf(fullName) ?: fullName?.trim()?.lowercase().orEmpty()
 
+    /** Resolve presentation through a stable ID; never let a matching human name merge devices. */
+    fun currentName(storedName: String, peerNames: Map<String, String>): String {
+        val id = idOf(storedName) ?: return storedName
+        return peerNames[id]?.takeIf { idOf(it) == id && !isPlaceholder(it) } ?: storedName
+    }
+
     /**
      * Selects the most useful label among observations of one identity. Direct handshakes usually
-     * provide the complete label while BLE advertisements may end halfway through the `[NODE]`
-     * tag. Keeping this decision here prevents each UI surface from inventing its own name rules.
+     * provide the complete label while BLE advertisements may truncate the name or optional tag.
+     * Keeping this decision here prevents each UI surface from inventing its own name rules.
      */
     fun preferredName(names: Iterable<String>): String = names
         .asSequence()
@@ -64,7 +79,9 @@ object NodeIdentity {
         .filter { it.isNotEmpty() && !isPlaceholder(it) }
         .maxWithOrNull(
             compareBy<String> { idOf(it) != null }
-                .thenBy { hasCompleteTag(displayNameOf(it)) }
+                .thenBy { !hasIncompleteTag(humanPart(it)) }
+                .thenBy { !humanPart(it).endsWith("[NODE]", ignoreCase = true) }
+                .thenBy { hasCompleteTag(humanPart(it)) }
                 .thenBy { displayNameOf(it).length }
                 .thenBy { it.length }
         )
@@ -134,5 +151,14 @@ object NodeIdentity {
         val opening = displayName.lastIndexOf('[')
         val closing = displayName.lastIndexOf(']')
         return opening >= 0 && closing > opening
+    }
+
+    private fun hasIncompleteTag(displayName: String): Boolean =
+        displayName.lastIndexOf('[') > displayName.lastIndexOf(']')
+
+    private fun humanPart(fullName: String?): String {
+        val name = fullName?.trim().orEmpty()
+        val index = name.lastIndexOf(ID_DELIMITER)
+        return if (index <= 0) name else name.substring(0, index).trim()
     }
 }

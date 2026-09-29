@@ -47,7 +47,7 @@ import kotlinx.coroutines.launch
  * Modern Secure Digital Passport Identity Setup Screen.
  *
  * Implements a high-trust, civilian-friendly digital wallet pass aesthetic.
- * As the user types their display name and tag, the floating passport card
+ * As the user types their display name, the floating passport card
  * dynamically updates in real-time with responsive animations.
  *
  * Fully keyboard-responsive: with imePadding and smart auto-scrolling, the input boxes
@@ -57,18 +57,15 @@ import kotlinx.coroutines.launch
 fun IdentitySetupScreen(viewModel: SetupViewModel, onIdentityGenerated: () -> Unit) {
     val context = LocalContext.current
     var customName by remember { mutableStateOf(viewModel.getSavedName(context)) }
-    var nodeTag by remember { mutableStateOf(viewModel.getSavedTag(context)) }
 
     IdentitySetupContent(
         customName = customName,
         onCustomNameChange = { customName = it },
-        nodeTag = nodeTag,
-        onNodeTagChange = { nodeTag = it },
         onIdentityGenerated = {
             viewModel.checkHardwareAndGoOnline(
                 context = context,
                 customName = customName.ifEmpty { Build.MODEL },
-                nodeTag = nodeTag.ifEmpty { "NODE" },
+                nodeTag = "",
                 teamKey = "PUBLIC"
             )
             onIdentityGenerated()
@@ -80,8 +77,6 @@ fun IdentitySetupScreen(viewModel: SetupViewModel, onIdentityGenerated: () -> Un
 fun IdentitySetupContent(
     customName: String,
     onCustomNameChange: (String) -> Unit,
-    nodeTag: String,
-    onNodeTagChange: (String) -> Unit,
     onIdentityGenerated: () -> Unit
 ) {
     val scrollState = rememberScrollState()
@@ -182,7 +177,7 @@ fun IdentitySetupContent(
                         .fillMaxWidth()
                         .padding(passportPadding)
                 ) {
-                    // Top Pass Bar: App identifier & Tag chip
+                    // Top Pass Bar: App identifier
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
@@ -208,23 +203,6 @@ fun IdentitySetupContent(
                             )
                         }
 
-                        // Dynamic Tag Badge
-                        Surface(
-                            shape = RoundedCornerShape(8.dp),
-                            color = primaryColor.copy(alpha = 0.15f),
-                            border = BorderStroke(1.dp, primaryColor.copy(alpha = 0.35f))
-                        ) {
-                            Text(
-                                text = if (nodeTag.isNotBlank()) "#${nodeTag.uppercase()}" else "#NODE",
-                                style = MaterialTheme.typography.labelSmall.copy(
-                                    fontSize = 11.sp,
-                                    fontFamily = FontFamily.Monospace
-                                ),
-                                fontWeight = FontWeight.Bold,
-                                color = primaryColor,
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
-                            )
-                        }
                     }
 
                     Spacer(Modifier.height(if (isKeyboardOpen) 10.dp else 16.dp))
@@ -329,7 +307,7 @@ fun IdentitySetupContent(
 
             Spacer(Modifier.height(if (isKeyboardOpen) 12.dp else Spacing.ExtraLarge))
 
-            // ── INPUT FORM: Display Name & Node Tag ──
+            // ── INPUT FORM: Display Name ──
             ResQTextField(
                 value = customName,
                 onValueChange = onCustomNameChange,
@@ -346,35 +324,6 @@ fun IdentitySetupContent(
                 leadingIcon = { Icon(Icons.Outlined.Person, contentDescription = null) },
                 isError = isNameInvalid,
                 errorMessage = if (isNameInvalid) stringResource(R.string.identity_name_error) else null
-            )
-
-            Spacer(Modifier.height(12.dp))
-
-            ResQTextField(
-                value = nodeTag,
-                onValueChange = { value ->
-                    if (value.length <= 6 && value.all { it.isLetterOrDigit() }) {
-                        onNodeTagChange(value.uppercase())
-                    }
-                },
-                modifier = Modifier.onFocusChanged { focusState ->
-                    if (focusState.isFocused) {
-                        coroutineScope.launch {
-                            delay(150)
-                            scrollState.animateScrollTo(scrollState.maxValue)
-                        }
-                    }
-                },
-                label = stringResource(R.string.identity_tag_label),
-                placeholder = stringResource(R.string.identity_tag_placeholder)
-            )
-
-            Spacer(Modifier.height(Spacing.ExtraSmall))
-
-            Text(
-                text = stringResource(R.string.identity_tag_hint),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
 
             Spacer(Modifier.height(if (isKeyboardOpen) 16.dp else Spacing.ExtraLarge))
@@ -416,8 +365,6 @@ private fun IdentitySetupPreview() {
         IdentitySetupContent(
             customName = "Ari Santos",
             onCustomNameChange = {},
-            nodeTag = "TEAM1",
-            onNodeTagChange = {},
             onIdentityGenerated = {}
         )
     }

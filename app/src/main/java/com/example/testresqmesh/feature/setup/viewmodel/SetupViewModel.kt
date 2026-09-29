@@ -16,6 +16,7 @@ import kotlinx.coroutines.launch
 
 import com.example.testresqmesh.data.repository.IdentityProvider
 import com.example.testresqmesh.core.service.MeshSessionController
+import com.example.testresqmesh.core.model.NodeIdentity
 
 class SetupViewModel(
     private val useCases: com.example.testresqmesh.core.domain.usecase.MeshUseCases,
@@ -83,18 +84,13 @@ class SetupViewModel(
         context.getSharedPreferences("resqmesh_prefs", Context.MODE_PRIVATE)
             .edit()
             .putString("custom_name", name)
-            .putString("node_tag", tag)
+            .putString("node_tag", NodeIdentity.optionalTag(tag))
             .apply()
     }
 
     fun getSavedName(context: Context): String {
         return context.getSharedPreferences("resqmesh_prefs", Context.MODE_PRIVATE)
             .getString("custom_name", android.os.Build.MODEL) ?: android.os.Build.MODEL
-    }
-
-    fun getSavedTag(context: Context): String {
-        return context.getSharedPreferences("resqmesh_prefs", Context.MODE_PRIVATE)
-            .getString("node_tag", "NODE") ?: "NODE"
     }
 
     fun getSavedNodeId(context: Context): String {
@@ -128,7 +124,7 @@ class SetupViewModel(
     }
 
     private fun goOnline(customName: String, nodeTag: String, teamKey: String, nodeId: String) {
-        val myNodeName = "$customName [$nodeTag]#$nodeId"
+        val myNodeName = NodeIdentity.qualifiedName(customName, nodeTag, nodeId)
         _uiState.update { it.copy(myNodeName = myNodeName) }
         meshSessionController.startNode(customName, nodeTag, teamKey, nodeId)
     }

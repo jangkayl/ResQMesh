@@ -59,7 +59,9 @@ Discovery does not automatically turn every nearby routed peer into another dire
 
 ## Identity, routing, and presence
 
-Stable `NodeIdentity` IDs identify peers across changing BLE endpoint addresses. A MAC/endpoint identifies a physical transport attempt and must not replace node identity. Private-message rows and new-message candidates are grouped by the stable ID rather than the raw BLE label; when an advertisement contains a truncated label and the handshake later supplies the complete label, the complete label becomes the single conversation display name. UI and routing should select payload-ready links, not merely scanned or radio-connected endpoints.
+Stable `NodeIdentity` IDs identify peers across changing BLE endpoints. Private conversations group by ID. A separate ID-keyed Room name record updates from ready direct handshakes and received messages; shortened advertisements cannot overwrite it. Inbox and chat headers show that saved current name while historical messages retain their recorded labels. UI and routing select payload-ready links, not scanned or radio-connected endpoints.
+
+Peer names retain `#nodeId`. Setup sends no tag; older saved `[NODE]` defaults are omitted and incoming custom tags remain compatible, unverified labels.
 
 A block relationship is persisted by stable identity, not MAC. A `BLOCK_REQUEST` is encrypted to the target and may traverse direct or relay links; the receiver persists complementary direct-link denial and replies with `BLOCK_ACK` before the initiator tears down direct endpoints. Each device releases only its own record—there is no remote `UNBLOCK` command—so both must unblock locally before direct admission resumes. Relayed text, private messages, SOS, receipts, and live audio are intentionally not filtered. Inbound central MACs may be unknown at ACL setup; a direct SYSTEM identity pulse is therefore gated before the peer is published or ordinary direct traffic is dispatched. This working-tree protocol still requires its physical validation card.
 
