@@ -48,8 +48,8 @@ interface MeshNetworkGateway {
     fun releaseDirectIdentity(deviceName: String)
     fun disconnectDirectIdentity(deviceName: String, reason: String)
     fun isDeviceBlocked(deviceName: String): Boolean
-    fun broadcastPayload(payloadBytes: ByteArray, excludeEndpointId: String? = null)
-    fun broadcastPriorityPayload(payloadBytes: ByteArray, excludeEndpointId: String? = null)
+    fun broadcastPayload(payloadBytes: ByteArray, excludeEndpointId: String? = null): BroadcastDispatchResult
+    fun broadcastPriorityPayload(payloadBytes: ByteArray, excludeEndpointId: String? = null): BroadcastDispatchResult
     fun sendDirectPayload(targetEndpointId: String, payloadBytes: ByteArray): TransportDispatchResult
     fun sendPriorityPayload(targetEndpointId: String, payloadBytes: ByteArray): TransportDispatchResult
     fun broadcastSeenReceipt(

@@ -30,6 +30,13 @@ interface MessageDao {
     @Query("UPDATE messages SET deliveredTo = :deliveredTo WHERE msgId = :msgId")
     suspend fun updateDeliveredTo(msgId: String, deliveredTo: String): Int
 
+    /** A receipt may arrive while the timeout is running. Only an unacknowledged send may fail. */
+    @Query("UPDATE messages SET deliveredTo = 'FAILED' WHERE msgId = :msgId AND deliveredTo = '' AND seenBy = ''")
+    suspend fun failUnacknowledgedSend(msgId: String): Int
+
+    @Query("UPDATE messages SET deliveredTo = 'FAILED' WHERE msgId = :msgId AND deliveredTo = 'PENDING' AND seenBy = ''")
+    suspend fun expirePendingSend(msgId: String): Int
+
     @Query("UPDATE messages SET seenBy = :seenBy WHERE msgId = :msgId")
     suspend fun updateSeenBy(msgId: String, seenBy: String): Int
 

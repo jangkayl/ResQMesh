@@ -1,6 +1,7 @@
 package com.example.testresqmesh.data.repository
 
 import android.content.Context
+import android.content.SharedPreferences
 import com.example.testresqmesh.core.model.BlockRelationship
 import com.example.testresqmesh.core.model.BlockRelationshipOrigin
 import com.example.testresqmesh.core.model.BlockRelationshipStatus
@@ -12,8 +13,8 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 /** Persists direct-link block relationships by stable node identity, never BLE address. */
-class BlockRelationshipStore(context: Context) {
-    private val preferences = context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE)
+class BlockRelationshipStore(private val preferences: SharedPreferences) {
+    constructor(context: Context) : this(context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE))
     private val lock = Any()
     private val _relationships = MutableStateFlow(load())
     val relationships: StateFlow<Map<String, BlockRelationship>> = _relationships.asStateFlow()

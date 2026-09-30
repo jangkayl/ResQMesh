@@ -13,8 +13,18 @@ class GattTransferCoordinator(private val store: BleStateStore) {
     fun enqueue(endpoint: String, transfer: GattTransfer, priority: Boolean): Boolean {
         val queue = store.pendingQueues.computeIfAbsent(endpoint) { java.util.concurrent.ConcurrentLinkedDeque() }
         synchronized(queue) {
-            if (queue.size >= MeshFrameCodec.MAX_PENDING_TRANSFERS) return false
-            if (priority) queue.addFirst(transfer) else queue.addLast(transfer)
+            val active = store.gattFlights[endpoint]?.transfer
+            val count = queue.size + if (active == null) 0 else 1
+            val bytes = queue.sumOf { it.frame.size.toLong() } + (active?.frame?.size ?: 0)
+            if (!OutboundQueuePolicy.canAccept(count, bytes, transfer.frame.size, priority)) return false
+            transfer.priority = priority
+            if (priority) {
+                // Preserve FIFO among control/fallback frames while overtaking ordinary work.
+                val ordinary = queue.filter { !it.priority }
+                queue.removeAll(ordinary.toSet())
+                queue.addLast(transfer)
+                queue.addAll(ordinary)
+            } else queue.addLast(transfer)
         }
         store.isWriting.putIfAbsent(endpoint, java.util.concurrent.atomic.AtomicBoolean(false))
         return true
@@ -32,13 +42,13 @@ class GattTransferCoordinator(private val store: BleStateStore) {
             if (store.gattFlights.remove(endpoint, stale)) stale.writing.set(false)
         }
         if (!writing.compareAndSet(false, true)) return null
-        val transfer = queue.pollFirst()
-        if (transfer == null) {
-            writing.set(false)
-            return null
-        }
-        return GattTransferFlight(transfer, link, queue, writing, gatt, serverDevice).also {
-            store.gattFlights[endpoint] = it
+        return synchronized(queue) {
+            val transfer = queue.pollFirst()
+            if (transfer == null) {
+                writing.set(false)
+                return@synchronized null
+            }
+            GattTransferFlight(transfer, link, queue, writing, gatt, serverDevice).also { store.gattFlights[endpoint] = it }
         }
     }
 
@@ -68,9 +78,10 @@ class GattTransferCoordinator(private val store: BleStateStore) {
             (role != BleLinkRole.CLIENT || flight.gatt === gatt) &&
             (role != BleLinkRole.SERVER || flight.serverDevice === device)
 
-    fun completeChunk(flight: GattTransferFlight): Completion {
+    fun completeChunk(flight: GattTransferFlight, now: Long = System.currentTimeMillis()): Completion {
         val endpoint = flight.link.endpoint
-        if (store.gattFlights[endpoint] !== flight) return Completion.STALE
+        if (!owns(flight)) return Completion.STALE
+        flight.link.lastAcknowledgedWriteAt = now
         flight.offset += flight.chunkLength
         flight.chunkLength = 0
         flight.retryCount = 0

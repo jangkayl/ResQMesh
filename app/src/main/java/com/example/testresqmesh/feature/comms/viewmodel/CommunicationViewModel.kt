@@ -94,6 +94,8 @@ class CommunicationViewModel(
         useCases.sendPublicMessage(text, imageBase64, audioBase64)
     }
 
+    val publicSendFeedback: SharedFlow<String> = useCases.sendPublicMessage.feedback
+
     fun startLocationTracking() {
         locationClient.startTracking(30000L)
     }

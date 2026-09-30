@@ -70,6 +70,10 @@ fun MainContainerScreen(
     onClearInitialViewMap: (() -> Unit)? = null
 ) {
     val context = LocalContext.current
+    val publicSendSnackbar = remember { androidx.compose.material3.SnackbarHostState() }
+    LaunchedEffect(commsViewModel) {
+        commsViewModel.publicSendFeedback.collect { publicSendSnackbar.showSnackbar(it) }
+    }
     val notificationHelper = remember(context) { NotificationHelper(context) }
     var currentDestination by remember { mutableStateOf(ResQDestination.Mission) }
     
@@ -398,6 +402,11 @@ fun MainContainerScreen(
                 }
             )
         }
+
+        androidx.compose.material3.SnackbarHost(
+            hostState = publicSendSnackbar,
+            modifier = Modifier.align(Alignment.BottomCenter).padding(horizontal = 16.dp, vertical = 88.dp)
+        )
 
         DebugTerminal(
             onOpenRadar = {

@@ -15,6 +15,7 @@ interface MessageStore {
     suspend fun markDelivered(messageId: String, readerName: String)
     suspend fun markSeen(messageId: String, readerName: String)
     suspend fun markFailed(messageId: String)
+    suspend fun expirePending(messageId: String)
     suspend fun markPending(messageId: String)
     suspend fun markSent(messageId: String)
     suspend fun getPendingOutbox(): List<Pair<ChatMessage, String?>>
@@ -48,10 +49,11 @@ class RoomMessageStore(private val dao: MessageDao) : MessageStore {
     }
 
     override suspend fun markFailed(messageId: String) {
-        val message = dao.getMessageById(messageId) ?: return
-        if (message.deliveredTo.isNotEmpty() && message.deliveredTo != "PENDING") return
-        if (message.seenBy.isNotEmpty()) return
-        dao.updateDeliveredTo(messageId, "FAILED")
+        dao.failUnacknowledgedSend(messageId)
+    }
+
+    override suspend fun expirePending(messageId: String) {
+        dao.expirePendingSend(messageId)
     }
 
     override suspend fun markPending(messageId: String) {

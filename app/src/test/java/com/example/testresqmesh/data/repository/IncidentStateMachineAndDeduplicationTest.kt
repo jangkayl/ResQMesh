@@ -52,8 +52,7 @@ class IncidentStateMachineAndDeduplicationTest {
                 "getMyDeviceName" -> "Alpha [TEAM]#NODE1"
                 "getMyNodeId" -> "NODE1"
                 "currentMeshTtl" -> 10
-                "broadcastPriorityPayload" -> Unit
-                "broadcastPayload" -> Unit
+                "broadcastPriorityPayload", "broadcastPayload" -> com.example.testresqmesh.core.network.BroadcastDispatchResult(emptyMap())
                 else -> null
             }
         } as MeshNetworkGateway

@@ -22,6 +22,17 @@ class HandshakeRadioGate {
 
     @Synchronized fun isActive(): Boolean = owners.isNotEmpty()
 
+    fun reconcileOwners(isLiveOwner: (String) -> Boolean): Boolean {
+        // Do not hold the gate lock while querying the registry: retirement takes the registry
+        // lock first. New generations acquired during this pass are outside this snapshot.
+        val snapshot = synchronized(this) { owners.keys.toList() }
+        var becameIdle = false
+        snapshot.forEach { owner ->
+            if (!isLiveOwner(owner)) becameIdle = finish(owner) || becameIdle
+        }
+        return becameIdle && !isActive()
+    }
+
     @Synchronized fun activeOwnerInfo(now: Long = System.currentTimeMillis()): Pair<String?, Long> {
         val entry = owners.entries.firstOrNull() ?: return null to 0L
         return entry.key to (now - entry.value).coerceAtLeast(0L)

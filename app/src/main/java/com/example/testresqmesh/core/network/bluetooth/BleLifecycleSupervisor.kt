@@ -4,6 +4,7 @@ import android.os.Handler
 import com.example.testresqmesh.core.network.bluetooth.state.BleLivenessPolicy
 import com.example.testresqmesh.core.network.bluetooth.state.BleStateStore
 import com.example.testresqmesh.core.network.bluetooth.state.HeartbeatCoordinator
+import com.example.testresqmesh.core.network.bluetooth.state.BleLinkRole
 import com.example.testresqmesh.core.utils.AppLogger
 
 /** Runs bounded liveness, stale-link, scan-expiry, and connect-lock recovery policy. */
@@ -42,7 +43,12 @@ class BleLifecycleSupervisor(
                 }
                 if (BleLivenessPolicy.isStale(lastInbound, now)) {
                     val probe = heartbeats.pending(endpoint)
-                    if (probe != null && now - probe.createdAt < MAX_PROBE_AGE_MS &&
+                    val acknowledgedProgress = BleLinkRole.entries.maxOf { role ->
+                        store.links.current(endpoint, role)?.lastAcknowledgedWriteAt ?: 0L
+                    }.coerceAtLeast(if (store.activeL2capSockets.containsKey(endpoint)) store.l2capOutboundProgressTimes[endpoint] ?: 0L else 0L)
+                    if (BleLivenessPolicy.hasRecentOutboundProgress(acknowledgedProgress, now)) {
+                        AppLogger.d("BLE_MESH", "Deferring silent-link retirement on $endpoint while owned writes are progressing")
+                    } else if (probe != null && now - probe.createdAt < MAX_PROBE_AGE_MS &&
                         (probe.sentAt == 0L || !probe.expired(now, heartbeatAckTimeoutMs))) {
                         AppLogger.d("BLE_MESH", "Waiting for generation-bound GATT heartbeat result on $endpoint")
                     } else {

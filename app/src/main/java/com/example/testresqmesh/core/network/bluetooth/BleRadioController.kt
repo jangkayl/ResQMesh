@@ -177,6 +177,13 @@ class BleRadioController(
         startScanning()
     }
 
+    fun reconcileHandshakeOwners(isLiveOwner: (String) -> Boolean) {
+        if (handshakeGate.reconcileOwners(isLiveOwner)) {
+            AppLogger.d("BLE_MESH", "Removed orphaned radio handshake owners; scanning resumed")
+            startScanning()
+        }
+    }
+
     fun stop() {
         handler.removeCallbacks(scanRecoveryRunnable)
         try { adapter?.bluetoothLeAdvertiser?.stopAdvertising(advertiseCallback) } catch (_: Exception) {}

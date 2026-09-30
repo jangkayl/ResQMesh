@@ -30,6 +30,8 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.BufferOverflow
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.CancellationException
 import java.util.UUID
 
@@ -66,6 +68,8 @@ class MeshRepository(
     val incomingSosAlert: StateFlow<ChatMessage?> = _incomingSosAlert.asStateFlow()
 
     val incomingVoiceMessage = kotlinx.coroutines.flow.MutableSharedFlow<ChatMessage>(extraBufferCapacity = 10)
+    private val _publicSendFeedback = kotlinx.coroutines.flow.MutableSharedFlow<String>(extraBufferCapacity = 8)
+    val publicSendFeedback: kotlinx.coroutines.flow.SharedFlow<String> = _publicSendFeedback
     val incomingLiveAudioChunk = kotlinx.coroutines.flow.MutableSharedFlow<Pair<String, ByteArray>>(extraBufferCapacity = 100)
 
     fun clearSosAlert() {
@@ -111,6 +115,7 @@ class MeshRepository(
     private var myNodeName: String = ""
     val blockRelationships = blockStore.relationships
     private val blockRetryJobs = mutableMapOf<String, Job>()
+    private val outboxMutex = Mutex()
 
     init {
         setupCallbacks()
@@ -681,7 +686,7 @@ class MeshRepository(
         }
     }
 
-    private suspend fun flushOutbox() {
+    private suspend fun flushOutbox() = outboxMutex.withLock {
         val now = System.currentTimeMillis()
         val pendingMessages = messageStore.getPendingOutbox()
         if (pendingMessages.isEmpty()) return
@@ -692,12 +697,14 @@ class MeshRepository(
         var retryRejectedDispatch = false
         for ((message, targetName) in pendingMessages) {
             if (now - message.timestamp > OUTBOX_EXPIRY_MS) {
-                messageStore.markFailed(message.id)
+                messageStore.expirePending(message.id)
                 continue
             }
             if (targetName != null) {
                 // Private message retry
                 val currentTarget = currentPeerName(targetName)
+                // A saved pending row must not bypass the same key-change refusal as a new send.
+                if (publicKeys.hasPendingChange(currentTarget)) continue
                 val targetPubKey = publicKeys.trustedKey(currentTarget) ?: continue
                 val directedRouteList = meshRouter.findShortestPath(myNodeName, currentTarget, readyDevices)
                 val payloadBytes = runCatching {
@@ -750,11 +757,17 @@ class MeshRepository(
                     isSOSCancel = false,
                     channelId = _currentChannelId.value
                 )
-                messageStore.markSent(message.id)
-                if (message.isSOS) {
+                val result = if (message.isSOS) {
                     networkManager.broadcastPriorityPayload(payloadBytes)
                 } else {
                     networkManager.broadcastPayload(payloadBytes)
+                }
+                if (result.anyAccepted) {
+                    messageStore.markSent(message.id)
+                } else if (result.neighbors.values.any { it == com.example.testresqmesh.core.network.TransportDispatchResult.REJECTED_INVALID_FRAME }) {
+                    messageStore.expirePending(message.id)
+                } else {
+                    retryRejectedDispatch = true
                 }
             }
         }
@@ -825,16 +838,23 @@ class MeshRepository(
             channelId = _currentChannelId.value
         )
 
-        val readyDevices = readyConnectedDevices()
         val message = ChatMessage(messageId, myNodeName, text, imageBase64, audioBase64, locationLat, locationLng, true, false, timestamp, isSOS = isSOS)
         repositoryScope.launch {
-            messageStore.save(message, targetName = null)
-            if (readyDevices.isEmpty()) {
-                messageStore.markPending(messageId)
+            outboxMutex.withLock {
+                // Persist first, so acceptance and receipts cannot race an absent database row.
+                messageStore.save(message.copy(deliveredTo = listOf("PENDING")), targetName = null)
+                val result = if (readyConnectedDevices().isEmpty()) {
+                    com.example.testresqmesh.core.network.BroadcastDispatchResult(emptyMap())
+                } else if (isSOS) networkManager.broadcastPriorityPayload(payloadBytes) else networkManager.broadcastPayload(payloadBytes)
+                if (result.anyAccepted) {
+                    messageStore.markSent(messageId)
+                } else if (result.neighbors.values.any { it == com.example.testresqmesh.core.network.TransportDispatchResult.REJECTED_INVALID_FRAME }) {
+                    messageStore.expirePending(messageId)
+                } else {
+                    scheduleOutboxFlush()
+                }
+                result.feedback()?.let { _publicSendFeedback.emit(it) }
             }
-        }
-        if (readyDevices.isNotEmpty()) {
-            if (isSOS) networkManager.broadcastPriorityPayload(payloadBytes) else networkManager.broadcastPayload(payloadBytes)
         }
         return messageId
     }
@@ -855,6 +875,10 @@ class MeshRepository(
         val msgId = UUID.randomUUID().toString()
         val timestamp = System.currentTimeMillis()
         val currentTarget = currentPeerName(targetName)
+        if (publicKeys.hasPendingChange(currentTarget)) {
+            AppLogger.d("MeshNetwork_E2EE", "Private send blocked: recipient key change requires approval")
+            return false
+        }
         
         val readyDevices = readyConnectedDevices()
         val directedRouteList = if (readyDevices.isNotEmpty()) meshRouter.findShortestPath(myNodeName, currentTarget, readyDevices) else emptyList()
@@ -882,11 +906,6 @@ class MeshRepository(
             }
             AppLogger.d("MeshNetwork_E2EE", "Private send queued as Pending for $targetName (no immediate route)")
             return true
-        }
-
-        if (publicKeys.hasPendingChange(currentTarget)) {
-            AppLogger.d("MeshNetwork_E2EE", "Private send blocked: recipient key change requires approval")
-            return false
         }
 
         val payloadBytes = runCatching { PayloadFactory.buildPrivatePayload(

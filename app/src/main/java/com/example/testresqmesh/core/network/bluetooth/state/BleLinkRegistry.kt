@@ -30,6 +30,9 @@ class BleLink(
     @Volatile var lastInteractionAt: Long = startedAt
     @Volatile var readyAt: Long = 0L
     @Volatile var retryCount: Int = 0
+    @Volatile var lastAcknowledgedWriteAt: Long = 0L
+
+    val handshakeOwner: String get() = "${role.name.lowercase(java.util.Locale.ROOT)}:$endpoint:$generation"
 }
 
 /** Sole owner of link lifecycle transitions. Later phases migrate the remaining endpoint maps. */
@@ -54,6 +57,22 @@ class BleLinkRegistry {
     @Synchronized fun isCurrent(link: BleLink): Boolean = links[link.endpoint to link.role] === link
 
     @Synchronized fun current(endpoint: String, role: BleLinkRole): BleLink? = links[endpoint to role]
+
+    @Synchronized fun ownsEndpoint(endpoint: String, captured: List<BleLink>): Boolean =
+        captured.isNotEmpty() && BleLinkRole.entries.mapNotNull { current(endpoint, it) } == captured
+
+    @Synchronized fun isSetupOwner(owner: String): Boolean = links.values.any {
+        it.handshakeOwner == owner &&
+            (it.state == BleLinkState.CONNECTING || it.state == BleLinkState.DISCOVERING || it.state == BleLinkState.CONFIGURING)
+    }
+
+    /** Release only this attempt's setup ownership, before stale callbacks lose access to it. */
+    @Synchronized fun retire(link: BleLink, releaseOwner: (String) -> Unit): Boolean {
+        if (!isCurrent(link)) return false
+        transition(link, BleLinkState.DISCONNECTING)
+        releaseOwner(link.handshakeOwner)
+        return forget(link)
+    }
 
     @Synchronized fun hasLiveRole(endpoint: String, role: BleLinkRole): Boolean =
         links[endpoint to role]?.state?.let {

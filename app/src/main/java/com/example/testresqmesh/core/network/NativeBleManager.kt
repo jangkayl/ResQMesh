@@ -149,7 +149,7 @@ class NativeBleManager(val context: Context) {
             this@NativeBleManager.enqueueGattPayload(endpointId, payload, priority = true)
         }
         override fun onHeartbeatAck(endpointId: String, challengeId: String) = this@NativeBleManager.onHeartbeatAck(endpointId, challengeId)
-        override fun broadcastPayload(payload: ByteArray, excludeEndpointId: String?) = this@NativeBleManager.broadcastPayload(payload, excludeEndpointId)
+        override fun broadcastPayload(payload: ByteArray, excludeEndpointId: String?) { this@NativeBleManager.broadcastPayload(payload, excludeEndpointId) }
         override fun onMessageSeen(msgId: String, readerName: String) { onMessageSeen?.invoke(msgId, readerName) }
         override fun onMessageDelivered(msgId: String, readerName: String, returnRoute: List<String>) { onMessageDelivered?.invoke(msgId, readerName, returnRoute) }
         override fun onPublicKeyReceived(senderName: String, senderNodeId: String, key: String) { onPublicKeyReceived?.invoke(senderName, senderNodeId, key) }
@@ -230,7 +230,7 @@ class NativeBleManager(val context: Context) {
     )
     private val l2capTransport = L2capTransport(
         store, handler, ::hasLiveSocket, ::processBinaryPayload, ::promoteGattWorkToL2cap,
-        ::startHeartbeatChallenge, { endpoint, payload -> enqueueGattPayload(endpoint, payload) },
+        ::startHeartbeatChallenge, { endpoint, payload -> enqueueGattPayload(endpoint, payload, priority = true) },
         { sendSystemPulse(forceFull = true) }
     )
     private val lifecycleSupervisor = BleLifecycleSupervisor(
@@ -366,10 +366,7 @@ class NativeBleManager(val context: Context) {
         
         store.activeConnections.values.forEach { it.disconnect(); it.close() }
         store.activeConnections.clear()
-        store.activeL2capSockets.values.forEach { socket ->
-            try { socket.close() } catch (e: Exception) {}
-        }
-        store.activeL2capSockets.clear()
+        l2capTransport.stop()
         store.pendingQueues.clear()
         store.gattFlights.clear()
         heartbeatCoordinator.clear()
@@ -509,9 +506,7 @@ class NativeBleManager(val context: Context) {
     /** Retire the data socket and compatibility state only after the last GATT role ends. */
     fun cleanupEndpointIfUnowned(endpointId: String) {
         if (hasLiveSocket(endpointId)) return
-        store.activeL2capSockets.remove(endpointId)?.let { socket ->
-            try { socket.close() } catch (e: Exception) {}
-        }
+        l2capTransport.disconnect(endpointId)
         store.pendingQueues.remove(endpointId)
         store.gattFlights.remove(endpointId)?.writing?.set(false)
         heartbeatCoordinator.remove(endpointId)
@@ -537,8 +532,15 @@ class NativeBleManager(val context: Context) {
     /** A direct neighbor is usable only after its GATT role has reached payload READY. */
     private fun hasPayloadReadyDirectLink(): Boolean =
         (store.activeConnections.keys + store.activeServerConnections.keys).any { endpoint ->
-            store.links.isReady(endpoint)
+            isUsableDirectNeighbor(endpoint)
         }
+
+    private fun isUsableDirectNeighbor(endpoint: String): Boolean {
+        val name = store.connectedEndpointNames[endpoint]
+        return com.example.testresqmesh.core.network.bluetooth.state.BleDirectPeerPolicy.isUsable(
+            hasReadyEndpoint(endpoint), name, nodeIdForEndpoint(endpoint), name?.let(::isDeviceBlocked) == true
+        )
+    }
 
     /** When this link was established, or [Long.MAX_VALUE] when unknown. */
     fun linkEstablishedAt(endpointId: String): Long =
@@ -584,8 +586,9 @@ class NativeBleManager(val context: Context) {
         val endpoints = store.activeConnections.keys + store.activeServerConnections.keys
         return endpoints
             .map { endpoint ->
-                nodeIdForEndpoint(endpoint)
-                    ?: NodeIdentity.key(store.connectedEndpointNames[endpoint]).ifEmpty { endpoint }
+                com.example.testresqmesh.core.network.bluetooth.state.BleDirectPeerPolicy.capacityKey(
+                    store.connectedEndpointNames[endpoint], nodeIdForEndpoint(endpoint), endpoint
+                )
             }
             .toSet()
             .size
@@ -593,7 +596,7 @@ class NativeBleManager(val context: Context) {
 
     fun distinctReadyLinkCount(): Int {
         val endpoints = (store.activeConnections.keys + store.activeServerConnections.keys)
-            .filter { store.links.isReady(it) }
+            .filter { isUsableDirectNeighbor(it) }
         return endpoints
             .map { endpoint ->
                 nodeIdForEndpoint(endpoint)
@@ -636,7 +639,13 @@ class NativeBleManager(val context: Context) {
             val isDirectIdentityPulse = payload.type == "SYSTEM" && payload.routePath.isEmpty() && payload.senderName.isNotEmpty()
             if (isDirectIdentityPulse && isDeviceBlocked(payload.senderName)) {
                 AppLogger.d("BLE_MESH", "Identity gate rejected direct blocked peer ${payload.senderName} on $endpointId")
-                handler.post { disconnectDirectIdentity(payload.senderName, "identity gate") }
+                val rejectedLinks = BleLinkRole.entries.mapNotNull { store.links.current(endpointId, it) }
+                handler.post {
+                    // The receiving socket can still be Unknown Node. Retire it by captured ownership,
+                    // never by the unbound name, and never retire a replacement on the same endpoint.
+                    if (store.links.ownsEndpoint(endpointId, rejectedLinks)) disconnectFromEndpoint(endpointId)
+                    disconnectDirectIdentity(payload.senderName, "identity gate")
+                }
                 return
             }
             
@@ -681,26 +690,24 @@ class NativeBleManager(val context: Context) {
         payloadDispatcher.dispatch(endpointId, payloadBytes)
     }
 
-    fun broadcastPayload(payloadBytes: ByteArray, excludeEndpointId: String? = null) {
+    fun broadcastPayload(payloadBytes: ByteArray, excludeEndpointId: String? = null): BroadcastDispatchResult {
         cacheOutgoingMessageId(payloadBytes)
         val targets = mutableSetOf<String>()
         targets.addAll(store.activeConnections.keys)
         targets.addAll(store.activeServerConnections.keys)
         targets.remove(excludeEndpointId)
         
-        targets.forEach { targetId ->
-            sendDirectPayload(targetId, payloadBytes)
-        }
+        return BroadcastDispatchResult(targets.associateWith { sendDirectPayload(it, payloadBytes) })
     }
 
     /** SOS/control callers may overtake a queued low-priority attachment frame. */
-    fun broadcastPriorityPayload(payloadBytes: ByteArray, excludeEndpointId: String? = null) {
+    fun broadcastPriorityPayload(payloadBytes: ByteArray, excludeEndpointId: String? = null): BroadcastDispatchResult {
         cacheOutgoingMessageId(payloadBytes)
         val targets = mutableSetOf<String>()
         targets.addAll(store.activeConnections.keys)
         targets.addAll(store.activeServerConnections.keys)
         targets.remove(excludeEndpointId)
-        targets.forEach { sendPriorityPayload(it, payloadBytes) }
+        return BroadcastDispatchResult(targets.associateWith { sendPriorityPayload(it, payloadBytes) })
     }
 
     /** Queue one complete framed payload, bypassing L2CAP for a GATT health check. */
@@ -743,20 +750,25 @@ class NativeBleManager(val context: Context) {
     private fun markHeartbeatSent(endpoint: String, link: com.example.testresqmesh.core.network.bluetooth.state.BleLink, id: String) {
         if (!store.links.isCurrent(link)) return
         val sent = heartbeatCoordinator.markSent(endpoint, link.generation, id) ?: return
-        handler.postDelayed({
-            if (heartbeatCoordinator.pending(endpoint) != sent) return@postDelayed
+        fun checkAck() {
+            if (heartbeatCoordinator.pending(endpoint) != sent) return
             val current = store.links.current(endpoint, sent.role)
             if (current == null || current.generation != sent.generation) {
                 heartbeatCoordinator.remove(endpoint, sent)
-                return@postDelayed
+                return
             }
             if (store.connectionInteractionTimes[endpoint]?.let { it > sent.sentAt } == true) {
                 heartbeatCoordinator.remove(endpoint, sent)
-                return@postDelayed
+                return
             }
             if (store.activeL2capSockets.containsKey(endpoint)) {
                 heartbeatCoordinator.remove(endpoint, sent)
-                return@postDelayed
+                return
+            }
+            if (com.example.testresqmesh.core.network.bluetooth.state.BleLivenessPolicy.hasRecentOutboundProgress(
+                    current.lastAcknowledgedWriteAt, System.currentTimeMillis())) {
+                handler.postDelayed({ checkAck() }, HEARTBEAT_ACK_TIMEOUT_MS)
+                return
             }
             if (sent.expired(System.currentTimeMillis(), HEARTBEAT_ACK_TIMEOUT_MS)) {
                 heartbeatCoordinator.remove(endpoint, sent)
@@ -764,7 +776,8 @@ class NativeBleManager(val context: Context) {
                 store.activeConnections[endpoint]?.let { forceGattDisconnect(endpoint, it) }
                 store.activeServerConnections[endpoint]?.let { gattServer?.cancelConnection(it) }
             }
-        }, HEARTBEAT_ACK_TIMEOUT_MS)
+        }
+        handler.postDelayed({ checkAck() }, HEARTBEAT_ACK_TIMEOUT_MS)
     }
 
     private fun onHeartbeatAck(endpoint: String, id: String) {
@@ -779,9 +792,13 @@ class NativeBleManager(val context: Context) {
 
     /** Sends a control payload ahead of normal GATT queue traffic; it never opens a new link. */
     fun sendPriorityPayload(targetEndpointId: String, payloadBytes: ByteArray): TransportDispatchResult {
+        if (!com.example.testresqmesh.core.network.bluetooth.state.OutboundQueuePolicy.fitsSingleTransfer(payloadBytes.size + Int.SIZE_BYTES, true)) {
+            return TransportDispatchResult.REJECTED_INVALID_FRAME
+        }
         if (!BluetoothAdapter.checkBluetoothAddress(targetEndpointId)) return TransportDispatchResult.REJECTED_INVALID_ENDPOINT
         if (!hasReadyEndpoint(targetEndpointId)) return TransportDispatchResult.REJECTED_NOT_READY
-        if (l2capTransport.send(targetEndpointId, payloadBytes)) return TransportDispatchResult.ACCEPTED
+        val l2capResult = l2capTransport.send(targetEndpointId, payloadBytes, priority = true)
+        if (l2capResult != TransportDispatchResult.REJECTED_NOT_READY) return l2capResult
         return if (enqueueGattPayload(targetEndpointId, payloadBytes, priority = true)) {
             TransportDispatchResult.ACCEPTED
         } else {
@@ -790,6 +807,9 @@ class NativeBleManager(val context: Context) {
     }
 
     fun sendDirectPayload(targetMacAddress: String, payloadBytes: ByteArray): TransportDispatchResult {
+        if (!com.example.testresqmesh.core.network.bluetooth.state.OutboundQueuePolicy.fitsSingleTransfer(payloadBytes.size + Int.SIZE_BYTES, false)) {
+            return TransportDispatchResult.REJECTED_INVALID_FRAME
+        }
         if (!BluetoothAdapter.checkBluetoothAddress(targetMacAddress)) return TransportDispatchResult.REJECTED_INVALID_ENDPOINT
         val fullData = MeshFrameCodec.encode(payloadBytes)
         if (fullData == null) {
@@ -799,7 +819,8 @@ class NativeBleManager(val context: Context) {
         
         cacheOutgoingMessageId(payloadBytes)
 
-        if (l2capTransport.send(targetMacAddress, payloadBytes)) return TransportDispatchResult.ACCEPTED
+        val l2capResult = l2capTransport.send(targetMacAddress, payloadBytes)
+        if (l2capResult != TransportDispatchResult.REJECTED_NOT_READY) return l2capResult
         
         val isServerConnected = store.activeServerConnections.containsKey(targetMacAddress)
         val isClientConnected = store.activeConnections.containsKey(targetMacAddress)
@@ -834,8 +855,7 @@ class NativeBleManager(val context: Context) {
             return
         }
         if (link != null) {
-            store.links.transition(link, BleLinkState.DISCONNECTING)
-            store.links.forget(link)
+            store.links.retire(link) { finishRadioHandshake(it, "forced client retirement") }
         }
         try {
             gatt?.disconnect()
@@ -883,7 +903,18 @@ class NativeBleManager(val context: Context) {
         if (promoted.isEmpty()) return
 
         AppLogger.d("BLE_MESH", "Promoting ${promoted.size} queued GATT transfer(s) to L2CAP for $endpoint")
-        promoted.forEach { transfer -> sendDirectPayload(endpoint, transfer.payloadBytes()) }
+        var deferred = false
+        promoted.forEach { transfer ->
+            val result = if (deferred) TransportDispatchResult.REJECTED_QUEUE_FULL
+                else l2capTransport.send(endpoint, transfer.payloadBytes(), transfer.priority)
+            if (!result.accepted) {
+                deferred = true
+                // Keep deferred promotion work until the socket writer frees capacity. Never lose
+                // an already accepted frame or create a second GATT lane beside a congested socket.
+                store.pendingQueues[endpoint]?.addLast(transfer)
+                AppLogger.d("BLE_MESH", "L2CAP promotion deferred on $endpoint: $result")
+            }
+        }
     }
 
     fun disconnectFromEndpoint(endpointId: String) {
@@ -892,8 +923,7 @@ class NativeBleManager(val context: Context) {
             BleLinkRole.SERVER
         ).forEach { role ->
             store.links.current(endpointId, role)?.let { link ->
-                store.links.transition(link, BleLinkState.DISCONNECTING)
-                store.links.forget(link)
+                store.links.retire(link) { finishRadioHandshake(it, "endpoint retirement") }
             }
         }
         val gatt = store.activeConnections.remove(endpointId)
@@ -909,10 +939,7 @@ class NativeBleManager(val context: Context) {
             } catch (e: Exception) {}
         }
 
-        val l2cap = store.activeL2capSockets.remove(endpointId)
-        try {
-            l2cap?.close()
-        } catch (e: Exception) {}
+        l2capTransport.disconnect(endpointId)
 
         store.connectionEstablishTime.remove(endpointId)
         store.pendingQueues.remove(endpointId)
@@ -986,7 +1013,11 @@ class NativeBleManager(val context: Context) {
     }
     
     fun rescan() {
-        radioController.rescan()
+        handler.post {
+            radioController.reconcileHandshakeOwners(store.links::isSetupOwner)
+            peerAdmissionController.drainCandidates()
+            radioController.rescan()
+        }
     }
     
     fun forceConnectToDevice(endpointId: String, endpointName: String) {

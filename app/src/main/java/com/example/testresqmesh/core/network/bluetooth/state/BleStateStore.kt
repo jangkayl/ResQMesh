@@ -26,6 +26,7 @@ class BleStateStore {
     val chunkBuffers = ConcurrentHashMap<String, ByteArray>()
     val connectionMtu = ConcurrentHashMap<String, Int>()
     val connectionInteractionTimes = ConcurrentHashMap<String, Long>()
+    val l2capOutboundProgressTimes = ConcurrentHashMap<String, Long>()
     val blockedDevices = ConcurrentHashMap<String, Boolean>()
     val orphanDetectionTime = ConcurrentHashMap<String, Long>()
     

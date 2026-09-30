@@ -18,12 +18,16 @@ class GattTransferCoordinatorTest {
 
         assertTrue(coordinator.enqueue("peer", ordinary, priority = false))
         assertTrue(coordinator.enqueue("peer", priority, priority = true))
-        repeat(MeshFrameCodec.MAX_PENDING_TRANSFERS - 2) {
+        repeat(MeshFrameCodec.MAX_PENDING_TRANSFERS - OutboundQueuePolicy.RESERVED_CONTROL_TRANSFERS - 2) {
             assertTrue(coordinator.enqueue("peer", GattTransfer(byteArrayOf(3)), priority = false))
         }
 
         assertSame(priority, store.pendingQueues["peer"]?.first)
         assertFalse(coordinator.enqueue("peer", GattTransfer(byteArrayOf(4)), priority = false))
+        repeat(OutboundQueuePolicy.RESERVED_CONTROL_TRANSFERS) {
+            assertTrue(coordinator.enqueue("peer", GattTransfer(byteArrayOf(5)), priority = true))
+        }
+        assertFalse(coordinator.enqueue("peer", GattTransfer(byteArrayOf(6)), priority = true))
         assertEquals(MeshFrameCodec.MAX_PENDING_TRANSFERS, store.pendingQueues["peer"]?.size)
     }
 
@@ -52,6 +56,33 @@ class GattTransferCoordinatorTest {
 
         assertFalse(fixture.coordinator.owns(stale))
         assertFalse(fixture.coordinator.callbackMatches(stale, BleLinkRole.SERVER, null, null))
+        fixture.coordinator.beginChunk(stale, 1)
+        assertEquals(GattTransferCoordinator.Completion.STALE, fixture.coordinator.completeChunk(stale, now = 10L))
+        assertEquals(0L, fixture.store.links.current("peer", BleLinkRole.SERVER)!!.lastAcknowledgedWriteAt)
+    }
+
+    @Test fun activeVoiceBytesCountAgainstAdmissionButLeaveControlHeadroom() {
+        val f = readyServerFixture()
+        val voice = GattTransfer(ByteArray(OutboundQueuePolicy.MAX_ORDINARY_BYTES))
+        assertTrue(f.coordinator.enqueue("peer", voice, false))
+        val active = f.coordinator.claimNext("peer", f.link, null, null)!!
+        assertFalse(f.coordinator.enqueue("peer", GattTransfer(byteArrayOf(1)), false))
+        assertTrue(f.coordinator.enqueue("peer", GattTransfer(byteArrayOf(2)), true))
+        f.coordinator.beginChunk(active, 20)
+        assertEquals(GattTransferCoordinator.Completion.MORE, f.coordinator.completeChunk(active, now = 50L))
+        assertEquals(50L, f.link.lastAcknowledgedWriteAt)
+    }
+
+    @Test fun fallbackAndControlTransfersRemainFifoAheadOfOrdinaryQueue() {
+        val store = BleStateStore()
+        val coordinator = GattTransferCoordinator(store)
+        val ordinary = GattTransfer(byteArrayOf(0))
+        val first = GattTransfer(byteArrayOf(1))
+        val second = GattTransfer(byteArrayOf(2))
+        coordinator.enqueue("peer", ordinary, false)
+        coordinator.enqueue("peer", first, true)
+        coordinator.enqueue("peer", second, true)
+        assertEquals(listOf(first, second, ordinary), store.pendingQueues["peer"]!!.toList())
     }
 
     @Test fun promotionReturnsActiveTransferBeforeQueuedTransfersAndReleasesWriter() {
