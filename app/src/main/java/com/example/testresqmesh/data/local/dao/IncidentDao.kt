@@ -15,8 +15,9 @@ interface IncidentDao {
     @Query("SELECT * FROM incidents WHERE status != 'RESOLVED' AND status != 'CANCELLED' ORDER BY createdAt DESC")
     fun getActiveIncidents(): Flow<List<IncidentEntity>>
 
-    @Query("SELECT * FROM incidents WHERE status != 'RESOLVED' AND status != 'CANCELLED' ORDER BY updatedAt DESC LIMIT :limit")
-    suspend fun getActiveIncidentsForSync(limit: Int): List<IncidentEntity>
+    // Terminal incidents must be advertised too, or a reconnecting peer can retain stale OPEN state.
+    @Query("SELECT * FROM incidents ORDER BY updatedAt DESC LIMIT :limit")
+    suspend fun getRecentIncidentsForSync(limit: Int): List<IncidentEntity>
 
     @Query("SELECT * FROM incidents WHERE incidentId = :incidentId LIMIT 1")
     suspend fun getIncidentById(incidentId: String): IncidentEntity?

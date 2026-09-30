@@ -8,12 +8,14 @@ import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.example.testresqmesh.data.local.dao.DomainEventDao
 import com.example.testresqmesh.data.local.dao.IncidentDao
+import com.example.testresqmesh.data.local.dao.IncidentOfferDao
 import com.example.testresqmesh.data.local.dao.MessageDao
 import com.example.testresqmesh.data.local.dao.NodeDao
 import com.example.testresqmesh.data.local.dao.PeerNameDao
 import com.example.testresqmesh.data.local.dao.UserDao
 import com.example.testresqmesh.data.local.entity.DomainEventEntity
 import com.example.testresqmesh.data.local.entity.IncidentEntity
+import com.example.testresqmesh.data.local.entity.IncidentOfferEntity
 import com.example.testresqmesh.data.local.entity.MessageEntity
 import com.example.testresqmesh.data.local.entity.NodeEntity
 import com.example.testresqmesh.data.local.entity.PeerNameEntity
@@ -26,10 +28,11 @@ import com.example.testresqmesh.data.local.entity.UserEntity
         UserEntity::class,
         IncidentEntity::class,
         DomainEventEntity::class,
-        PeerNameEntity::class
+        PeerNameEntity::class,
+        IncidentOfferEntity::class
     ],
-    version = 7,
-    exportSchema = false
+    version = 8,
+    exportSchema = true
 )
 abstract class AppDatabase : RoomDatabase() {
     abstract fun nodeDao(): NodeDao
@@ -37,6 +40,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun messageDao(): MessageDao
     abstract fun userDao(): UserDao
     abstract fun incidentDao(): IncidentDao
+    abstract fun incidentOfferDao(): IncidentOfferDao
     abstract fun domainEventDao(): DomainEventDao
 
     companion object {
@@ -84,6 +88,20 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        private val MIGRATION_7_8 = object : Migration(7, 8) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE incidents ADD COLUMN workflowVersion INTEGER NOT NULL DEFAULT 1")
+                db.execSQL("ALTER TABLE incidents ADD COLUMN reporterSigningKey TEXT")
+                db.execSQL("ALTER TABLE incidents ADD COLUMN selectionId TEXT")
+                db.execSQL("ALTER TABLE incidents ADD COLUMN selectionOfferId TEXT")
+                db.execSQL("ALTER TABLE incidents ADD COLUMN selectionOfferRevision INTEGER")
+                db.execSQL("ALTER TABLE incidents ADD COLUMN selectedHelperKey TEXT")
+                db.execSQL("ALTER TABLE incidents ADD COLUMN selectionConfirmedAt INTEGER")
+                db.execSQL("CREATE TABLE IF NOT EXISTS incident_offers (offerId TEXT NOT NULL PRIMARY KEY, incidentId TEXT NOT NULL, helperKey TEXT NOT NULL, helperNodeId TEXT NOT NULL, helperName TEXT NOT NULL, note TEXT NOT NULL, revision INTEGER NOT NULL, withdrawn INTEGER NOT NULL, updatedAt INTEGER NOT NULL)")
+                db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS index_incident_offers_incidentId_helperKey ON incident_offers (incidentId, helperKey)")
+            }
+        }
+
         private fun removeLegacyAttachmentSchema(database: SupportSQLiteDatabase) {
             database.execSQL(
                 "CREATE TABLE IF NOT EXISTS messages_new (msgId TEXT NOT NULL, senderName TEXT NOT NULL, targetName TEXT, text TEXT, imageBase64 TEXT, audioBase64 TEXT, locationLat REAL, locationLng REAL, timestamp INTEGER NOT NULL, isSOS INTEGER NOT NULL, isMine INTEGER NOT NULL, deliveredTo TEXT NOT NULL, seenBy TEXT NOT NULL, outboundRoute TEXT NOT NULL, PRIMARY KEY(msgId))"
@@ -99,14 +117,16 @@ abstract class AppDatabase : RoomDatabase() {
 
         fun getDatabase(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
-                val instance = Room.databaseBuilder(
-                    context.applicationContext,
-                    AppDatabase::class.java,
-                    "resqmesh_database"
-                ).addMigrations(MIGRATION_1_4, MIGRATION_2_4, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7).build()
+                val instance = buildDatabase(context, "resqmesh_database")
                 INSTANCE = instance
                 instance
             }
         }
+
+        internal fun buildDatabase(context: Context, name: String): AppDatabase =
+            Room.databaseBuilder(context.applicationContext, AppDatabase::class.java, name)
+                .addMigrations(MIGRATION_1_4, MIGRATION_2_4, MIGRATION_3_4,
+                    MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8)
+                .build()
     }
 }

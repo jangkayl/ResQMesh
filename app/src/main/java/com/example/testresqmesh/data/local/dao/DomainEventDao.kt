@@ -32,4 +32,14 @@ interface DomainEventDao {
 
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertEvent(event: DomainEventEntity): Long
+
+    @Query("UPDATE domain_events SET applied = :applied WHERE eventId = :eventId")
+    suspend fun setApplied(eventId: String, applied: Boolean): Int
+
+    @Query("SELECT * FROM domain_events WHERE applied = 1 ORDER BY rowid ASC LIMIT :limit OFFSET :offset")
+    suspend fun getSyncPage(limit: Int, offset: Int): List<DomainEventEntity>
+
+    @Query("SELECT * FROM domain_events WHERE entityId = :incidentId AND applied = 0 ORDER BY timestamp ASC, eventId ASC")
+    suspend fun getUnappliedForIncident(incidentId: String): List<DomainEventEntity>
+
 }

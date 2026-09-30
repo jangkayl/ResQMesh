@@ -114,10 +114,16 @@ val appModule = module {
 
     single { LocalIdentityManager(androidContext(), get<AppDatabase>().userDao()) }
     single<IdentityProvider> { get<LocalIdentityManager>() }
+    single<com.example.testresqmesh.data.repository.IncidentEventSigning> {
+        com.example.testresqmesh.data.repository.KeystoreIncidentEventSigning()
+    }
     single {
         com.example.testresqmesh.data.repository.IncidentRepository(
             incidentDao = get<AppDatabase>().incidentDao(),
             domainEventDao = get<AppDatabase>().domainEventDao(),
+            offerDao = get<AppDatabase>().incidentOfferDao(),
+            database = get<AppDatabase>(),
+            eventSigning = get(),
             identityManager = get(),
             networkGateway = get(),
             repositoryScope = get<AppCoroutineScope>().scope,

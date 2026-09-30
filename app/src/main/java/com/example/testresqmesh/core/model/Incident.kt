@@ -6,6 +6,7 @@ import kotlinx.serialization.Serializable
 enum class IncidentState {
     OPEN,
     ACKNOWLEDGED,
+    AWAITING_HELPER,
     ASSIGNED,
     RESPONDING,
     RESOLVED,

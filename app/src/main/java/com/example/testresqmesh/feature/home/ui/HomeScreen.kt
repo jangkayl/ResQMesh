@@ -87,7 +87,9 @@ fun HomeScreen(
     onPeerClick: (String) -> Unit,
     onProfileClick: () -> Unit,
     onVoiceClick: (() -> Unit)? = null,
-    onIncidentsClick: (() -> Unit)? = null
+    onIncidentsClick: (() -> Unit)? = null,
+    activeIncidentCount: Int = 0,
+    criticalIncidentCount: Int = 0
 ) {
     val connectionState by setupViewModel.uiState.collectAsState()
     val radarState by radarViewModel.uiState.collectAsState()
@@ -115,7 +117,9 @@ fun HomeScreen(
         onPeerClick = onPeerClick,
         onProfileClick = onProfileClick,
         onVoiceClick = onVoiceClick,
-        onIncidentsClick = onIncidentsClick
+        onIncidentsClick = onIncidentsClick,
+        activeIncidentCount = activeIncidentCount,
+        criticalIncidentCount = criticalIncidentCount
     )
 }
 
@@ -133,6 +137,8 @@ fun HomeScreenContent(
     onProfileClick: () -> Unit,
     onVoiceClick: (() -> Unit)? = null,
     onIncidentsClick: (() -> Unit)? = null,
+    activeIncidentCount: Int = 0,
+    criticalIncidentCount: Int = 0,
     modifier: Modifier = Modifier
 ) {
     val readinessTitle = stringResource(
@@ -185,7 +191,9 @@ fun HomeScreenContent(
         TacticalOperationsLaunchpad(
             onMessagesClick = onMessagesClick,
             onVoiceClick = onVoiceClick,
-            onIncidentsClick = onIncidentsClick
+            onIncidentsClick = onIncidentsClick,
+            activeIncidentCount = activeIncidentCount,
+            criticalIncidentCount = criticalIncidentCount
         )
 
         // 6. Tactical Safety Beacon Status Footer
@@ -736,7 +744,9 @@ private fun LiveMeshRadarCard(
 private fun TacticalOperationsLaunchpad(
     onMessagesClick: () -> Unit,
     onVoiceClick: (() -> Unit)?,
-    onIncidentsClick: (() -> Unit)?
+    onIncidentsClick: (() -> Unit)?,
+    activeIncidentCount: Int = 0,
+    criticalIncidentCount: Int = 0
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(Spacing.Medium)) {
         Row(
@@ -840,24 +850,54 @@ private fun TacticalOperationsLaunchpad(
 
         // Emergency Incidents Banner
         if (onIncidentsClick != null) {
-            TacticalIncidentsBanner(onIncidentsClick = onIncidentsClick)
+            TacticalIncidentsBanner(
+                activeIncidentCount = activeIncidentCount,
+                criticalIncidentCount = criticalIncidentCount,
+                onIncidentsClick = onIncidentsClick
+            )
         }
     }
 }
 
 @Composable
 private fun TacticalIncidentsBanner(
+    activeIncidentCount: Int,
+    criticalIncidentCount: Int,
     onIncidentsClick: () -> Unit
 ) {
+    val hasActive = activeIncidentCount > 0
+    val isCritical = criticalIncidentCount > 0
+    val infiniteTransition = rememberInfiniteTransition(label = "HomePulse")
+    val pulseAlpha by if (isCritical) {
+        infiniteTransition.animateFloat(
+            initialValue = 0.5f,
+            targetValue = 1.0f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(800, easing = FastOutSlowInEasing),
+                repeatMode = RepeatMode.Reverse
+            ),
+            label = "homePulseAlpha"
+        )
+    } else {
+        androidx.compose.runtime.remember { androidx.compose.runtime.mutableFloatStateOf(1f) }
+    }
+
     Surface(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onIncidentsClick),
         shape = RoundedCornerShape(16.dp),
-        color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.85f),
-        contentColor = MaterialTheme.colorScheme.onErrorContainer,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.4f)),
-        shadowElevation = 4.dp
+        color = if (hasActive) MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.85f)
+        else MaterialTheme.colorScheme.surface,
+        contentColor = if (hasActive) MaterialTheme.colorScheme.onErrorContainer
+        else MaterialTheme.colorScheme.onSurface,
+        border = BorderStroke(
+            width = if (isCritical) 1.5.dp else 1.dp,
+            color = if (isCritical) MaterialTheme.colorScheme.error.copy(alpha = pulseAlpha)
+            else if (hasActive) MaterialTheme.colorScheme.error.copy(alpha = 0.4f)
+            else MaterialTheme.colorScheme.outlineVariant
+        ),
+        shadowElevation = if (hasActive) 4.dp else 1.dp
     ) {
         Row(
             modifier = Modifier.padding(Spacing.Medium),
@@ -871,36 +911,71 @@ private fun TacticalIncidentsBanner(
             ) {
                 Surface(
                     shape = CircleShape,
-                    color = MaterialTheme.colorScheme.error,
+                    color = if (hasActive) MaterialTheme.colorScheme.error
+                    else MaterialTheme.colorScheme.surfaceVariant,
                     modifier = Modifier.size(38.dp)
                 ) {
                     Box(contentAlignment = Alignment.Center) {
                         Icon(
-                            imageVector = Icons.Outlined.WarningAmber,
+                            imageVector = if (hasActive) Icons.Outlined.WarningAmber else Icons.Outlined.Shield,
                             contentDescription = null,
-                            tint = Color.White,
+                            tint = if (hasActive) Color.White else MaterialTheme.colorScheme.primary,
                             modifier = Modifier.size(20.dp)
                         )
                     }
                 }
-                Column {
+                Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = "EMERGENCY INCIDENTS",
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.Black,
                         letterSpacing = 0.5.sp
                     )
-                    Text(
-                        text = "Track, coordinate, & resolve SOS lifecycle",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.85f)
-                    )
+                    Spacer(Modifier.height(3.dp))
+                    if (isCritical) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Surface(
+                                shape = RoundedCornerShape(6.dp),
+                                color = MaterialTheme.colorScheme.error
+                            ) {
+                                Text(
+                                    text = "🚨 $criticalIncidentCount CRITICAL",
+                                    style = MaterialTheme.typography.labelSmall.copy(
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.Black
+                                    ),
+                                    color = Color.White,
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                )
+                            }
+                            Text(
+                                text = "• $activeIncidentCount Active",
+                                style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold),
+                                color = MaterialTheme.colorScheme.onErrorContainer
+                            )
+                        }
+                    } else if (hasActive) {
+                        Text(
+                            text = "$activeIncidentCount active incidents known on this phone",
+                            style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.SemiBold),
+                            color = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.9f)
+                        )
+                    } else {
+                        Text(
+                            text = "No active incidents recorded on this phone",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 }
             }
             Icon(
                 imageVector = Icons.Outlined.ChevronRight,
                 contentDescription = null,
-                tint = MaterialTheme.colorScheme.error
+                tint = if (hasActive) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
     }

@@ -94,6 +94,7 @@ fun MainContainerScreen(
 
     val aboutViewModel: AboutViewModel = org.koin.androidx.compose.koinViewModel()
     val incidentViewModel: com.example.testresqmesh.feature.incident.viewmodel.IncidentViewModel = org.koin.androidx.compose.koinViewModel()
+    val incidentMetrics by incidentViewModel.metrics.collectAsState()
 
     // Legacy Radar screen remains in source intentionally. Offline maps are managed via Profile/Settings.
     
@@ -300,9 +301,11 @@ fun MainContainerScreen(
                 }
             }
             showIncidents -> {
+                val incidentRadarState by radarViewModel.uiState.collectAsState()
                 ResQAuroraBackground(modifier = Modifier.fillMaxSize()) {
                     com.example.testresqmesh.feature.incident.ui.IncidentListScreen(
                         viewModel = incidentViewModel,
+                        radarState = incidentRadarState,
                         onBack = { showIncidents = false },
                         onViewLocation = { lat, lng, reporter, description ->
                             mapSosAlert = com.example.testresqmesh.core.model.ChatMessage(
@@ -356,7 +359,9 @@ fun MainContainerScreen(
                                 },
                                 onProfileClick = { showProfile = true },
                                 onVoiceClick = { currentDestination = ResQDestination.Voice },
-                                onIncidentsClick = { showIncidents = true }
+                                onIncidentsClick = { showIncidents = true },
+                                activeIncidentCount = incidentMetrics.totalActive,
+                                criticalIncidentCount = incidentMetrics.criticalCount
                             )
                             ResQDestination.Messages -> ChatContainerScreen(
                                 viewModel = commsViewModel, 

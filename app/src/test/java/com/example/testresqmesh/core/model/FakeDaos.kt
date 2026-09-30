@@ -18,9 +18,8 @@ class IncidentEntityFakeDao : IncidentDao {
     override fun getActiveIncidents(): Flow<List<IncidentEntity>> =
         flow.map { it.values.filter { it.status != "RESOLVED" && it.status != "CANCELLED" }.sortedByDescending { it.createdAt } }
 
-    override suspend fun getActiveIncidentsForSync(limit: Int): List<IncidentEntity> =
-        store.values.filter { it.status != "RESOLVED" && it.status != "CANCELLED" }
-            .sortedByDescending { it.updatedAt }.take(limit)
+    override suspend fun getRecentIncidentsForSync(limit: Int): List<IncidentEntity> =
+        store.values.sortedByDescending { it.updatedAt }.take(limit)
 
     override suspend fun getIncidentById(incidentId: String): IncidentEntity? = store[incidentId]
 
@@ -71,4 +70,18 @@ class DomainEventEntityFakeDao : DomainEventDao {
         flow.value = store.toMap()
         return 1L
     }
+
+    override suspend fun setApplied(eventId: String, applied: Boolean): Int {
+        store[eventId]?.let { store[eventId] = it.copy(applied = applied) }
+        flow.value = store.toMap()
+        return if (eventId in store) 1 else 0
+    }
+
+    override suspend fun getSyncPage(limit: Int, offset: Int): List<DomainEventEntity> =
+        store.values.filter { it.applied }
+            .drop(offset).take(limit)
+
+    override suspend fun getUnappliedForIncident(incidentId: String): List<DomainEventEntity> =
+        store.values.filter { it.entityId == incidentId && !it.applied }
+            .sortedWith(compareBy<DomainEventEntity> { it.timestamp }.thenBy { it.eventId })
 }
