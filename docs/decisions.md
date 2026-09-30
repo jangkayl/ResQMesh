@@ -58,24 +58,32 @@ Discovery retains a healthy routed path instead of forming a redundant direct AC
 Before selecting a difficult fix or feature, compare the smallest viable change, a structural alternative, and a non-code/operational alternative when relevant. Evaluate capstone value, production value, reliability impact, Android/device support, security, complexity, migration risk, and physical-test cost. Do not treat an explored option as an accepted requirement.
 ## D13: Offline maps use MapLibre and local PMTiles
 
-Replaced osmdroid and dynamic public raster tile downloading with MapLibre Native and downloaded local PMTiles packages. This ensures true offline reliability, avoids violating OSM tile scraping policies, and provides high-performance vector rendering.
+MapLibre Native with local PMTiles replaces osmdroid and public raster tile downloads. This supports offline maps without scraping OSM tiles.
 
 ## D14: Offline map manifest verification uses Universal ECDSA (NIST P-256)
 
-Replaced Ed25519 with Universal ECDSA (NIST P-256 / secp256r1, SHA256withECDSA) as the default map package signature algorithm, with Ed25519 composite fallback. Ed25519 is natively supported only on Android 11+ (API 30+), throwing runtime security provider exceptions on older Android versions (API 24–29). ECDSA provides universal hardware-accelerated verification across all supported Android versions with zero third-party cryptography library overhead.
+Map packages default to ECDSA P-256 signatures with Ed25519 fallback because Android 24–29 lack native Ed25519 support. No extra cryptography library is required.
 
 ## D15: Notification deep link routing preserves node setup flow
 
-Cold-launch from private message or SOS alert notifications routes to `IdentitySetupScreen` (or `PermissionsScreen` if permissions are ungranted) rather than jumping directly to the homepage (`MainContainerScreen`). Node identity, hardware readiness, and mesh startup must complete before the user enters the active mesh. Target chat nodes and SOS map views are preserved and automatically opened once setup is completed. Active in-session notifications continue direct navigation without re-prompting setup.
+Cold notification launches complete identity, permissions, and mesh setup before opening the saved chat or SOS destination. In-session notifications navigate directly.
 
 ## D16: Tactical map overlays and emergency cartography filtering
 
-MapLibre default engine watermarks and attribution widgets are suppressed in favor of unified in-sheet OpenStreetMap legal attribution to maximize screen real estate during disaster response. Emergency POI cartography strictly filters medical infrastructure (`hospital`, `clinic`, `doctors`) from general commercial amenities to prevent false alarms or clutter, while non-emergency POIs render as subtle labels at zoom 15+. Map overlays use compact 36dp true-north compass dials, distinct high-vis custom markers (cyan GPS puck vs. crimson SOS teardrop), and vertical slide sheets.
+Maps show in-sheet OpenStreetMap attribution. Emergency POIs include medical infrastructure (`hospital`, `clinic`, `doctors`); other amenities appear as subtle labels at zoom 15+. Overlays use a 36dp compass, distinct GPS/SOS markers, and slide sheets.
 
 ## D17: Hardware-bound permanent node identity and cloud backup exclusions
 
-Node IDs are derived deterministically from the SHA-256 hash of the device's hardware-backed public key (`CryptoManager.getMyNodeId()`) rather than ephemeral random UUIDs. This prevents key-versus-ID desynchronization across app restarts and re-installations. `resqmesh_prefs` (`node_id`) and `resqmesh_peer_public_keys` are excluded from Google Cloud Backup (`backup_rules.xml` and `data_extraction_rules.xml`), ensuring restored preferences cannot conflict with newly generated Keystore key pairs. Peer public key resolution supports display-name fallbacks and explicit rejection of pending key change alerts.
+Node IDs derive from the Keystore public-key hash (`CryptoManager.getMyNodeId()`). Identity and peer-key preferences are excluded from cloud backup to avoid restoring keys without their Keystore pair. Pending key changes require explicit rejection.
 
 ## D18: Leased topology and accepted-only directed private delivery
 
 Topology uses leased snapshots; empty snapshots withdraw adjacency and old versions are ignored. Private traffic uses exact directed IDs, never broadcast fallback. Rejected sends remain retryable; receipt timing starts after acceptance.
+
+## D19: Reporter-selected civilian lead helper
+
+New incidents use one active offer per helper with a short reason. Only the reporter selects, revokes, resolves, or cancels; a selected helper confirms or declines. Loss of a direct or relayed route changes the connection label, never the incident decision. Offers remain pending while the reporter is unavailable. No second assignee, vote, open comment thread, automatic failover, verified-responder claim, or guarantee against duplicate physical response is implied. Incident signing keys provide device-key continuity only; first-contact trust and deployment authority remain open.
+
+## D20: Bound voice pressure without changing the payload protocol
+
+Keep three direct neighbors and whole-frame compatibility. Each GATT/L2CAP queue counts active bytes and reserves control capacity: 128 transfers, 2 MiB ordinary bytes, eight slots/64 KiB headroom. Acknowledged progress delays silence retirement; attempts alone do not. Public broadcasts expose neighbor acceptance, persist before dispatch, and retry wholly rejected sends only. Larger-scale media scheduling depends on the phone matrix in status.

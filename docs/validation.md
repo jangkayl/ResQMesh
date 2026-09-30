@@ -15,13 +15,13 @@ Use checks proportional to the change. Do not repeat broad tests after an unrela
 
 ## Pull-request CI gate
 
-`.github/workflows/lean-qa.yml` repeats the build, unit tests, error-level Android Lint, documentation check, and diff hygiene on every pull request. Superseded runs for the same pull request are cancelled. Any failed command blocks readiness; AI review may explain the failure but cannot waive it. The workflow does not deploy, merge, run an emulator, or claim physical BLE validation.
+`.github/workflows/lean-qa.yml` runs build, unit tests, Lint, docs, and diff hygiene on pull requests. Failed checks block readiness. CI neither deploys nor validates physical BLE behavior.
 
-After local checks pass, Codex reports the result and waits for explicit user approval before creating a pull request. Merging is always a separate explicit user action.
+Codex reports local checks and waits for explicit approval before creating a pull request or merging.
 
 ## Physical-device boundary
 
-Codex may build an APK and report its path; producing an APK is not physical testing. The user installs it, launches/stops the app, changes phone settings, operates the UI, and performs the scenario. Codex does not operate physical phones unless explicitly requested for the current task.
+Codex may build an APK. The user installs and operates physical phones unless explicitly requesting otherwise.
 
 Record build identity, device models/API, steps, result, and failure time.
 
@@ -40,11 +40,11 @@ Analyze the reported window and app markers first:
 - Characteristic write and acknowledged-indication `onNotificationSent` completion/failure.
 - Queue/in-flight changes and bounded timeouts.
 - L2CAP open, EOF/write failure, ownership removal, and GATT fallback.
-- L2CAP promotion of queued GATT work; after promotion, late/missing GATT callbacks must not retire the healthy link.
+- L2CAP promotion; late GATT callbacks must not retire the link.
 - Heartbeat challenge, send completion, acknowledgment, and timeout.
 - Public-key receipt, missing-key refusal, and decrypt failure without content.
 - Route creation/withdrawal, relay, dedupe, and delivery state.
-- Stable node ID route selection, key trust/change state, and a private route-unavailable decision. Private payloads and receipts must not broadcast after such a decision.
+- Stable-ID route, key trust/change, and route-unavailable decisions; private traffic must not broadcast afterward.
 
 Expand to system logs only if app markers are insufficient. Never summarize whole captures or reproduce sensitive data.
 
@@ -72,13 +72,17 @@ Arrange A-B-C so A and C depend on B; send both directions, remove and restore B
 
 For A-B-C-D, make A/D indirect, send five private messages each way, then reconnect one relay. Record next hop, receipt, and GATT retirement; failed routes must not private-broadcast or loop.
 
+### Reporter-selected helper card
+
+Record APK, devices/API, and A-B-C topology. A reports; B and C offer. A selects B. Disconnect B before confirmation: A shows awaiting and unreachable, without reassignment. Restore B, confirm, and disconnect again: A keeps B selected with a separate connection label. A revokes B, selects C, then restores B: B sees revocation and its old confirmation cannot apply. C confirms; A resolves or cancels. Reconnect all phones and add a new phone; compare history and offers. Report missing/duplicate events, stale lead, false delivery, or wrong route labels. Physical validation remains open.
+
 ### Level 4: release/capstone matrix
 
 Across representative devices, measure delivery, recovery, range, battery, SOS, private-send failure, and hardware-specific failures. Do not infer production guarantees from one run.
 
 ## Required test card
 
-Record APK, setup, steps, result, failures, markers, and report items. Continue failures with capture/timestamp.
+Record APK, setup, steps, failures, and markers. Follow the [block/voice card and tracker](status.md); continue failures with capture/timestamp.
 
 ### Background mesh card
 
@@ -108,4 +112,4 @@ Keep only meaningful milestones; raw captures remain under `captures/`.
 | 2026-09-18 | Mutual-block working tree | V2424 API 34, CPH2219 API 31, CPH2127 API 31, SM-P615 API 33, SM-A236E API 33 | KAY and LAL block over a five-phone mesh | Both endpoints logged acknowledgement-driven direct teardown. Public and encrypted private traffic then crossed the V2424 relay and decrypted at both endpoints. The capture does not establish restart persistence, unilateral/bilateral unblock, 70-second route stability, or production reliability. | `captures/ble-logcat/20260918-011613/` |
 | 2026-09-18 | Stable-ID relay working tree | V2424 API 34, CPH2219 API 31, CPH2127 API 31, SM-P615 API 33 | Indirect private relay both directions | Selected routes relayed and decrypted both ways without private broadcast fallback. Some return receipts lacked a next hop; SM-P615 repeatedly retired one GATT callback link. | `captures/ble-logcat/20260918-233006/` |
 
-Historical Samsung failures are superseded by the later user report, pending recorded evidence. The five-device report does not establish capacity, recovery, block semantics, all disconnects, or production reliability; BLOCK-01 remains active.
+The later Samsung report supersedes older failures pending capture. The five-device report does not establish stable capacity or reliability; BLOCK-01 remains active.

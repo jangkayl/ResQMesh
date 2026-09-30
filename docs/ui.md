@@ -5,19 +5,19 @@ The UI uses Jetpack Compose and Material 3; inspect source before editing.
 ## Component and state boundaries
 
 - Reuse shared components and theme tokens before local styling.
-- Tactical & Utilitarian / High-Vis Safety Dark is dark-first with a Field Light Daylight preference; appearance affects presentation only.
+- Dark-first tactical UI has a daylight preference; appearance affects presentation only.
 - Night uses black backgrounds, grey raised panels, and 1dp borders. Daylight uses white/grey backgrounds with black text.
-- Both use Safety Orange (#FF5A00) for interactions/accents, green for positive states, amber for attention, and red for SOS. Use tokens, vector icons, 8dp rhythm, 16dp gutters, 18-24dp radii, and 48dp targets.
+- Use Safety Orange (#FF5A00) for actions, green for positive states, amber for attention, red for SOS, theme tokens, and 48dp targets.
 - Home: larger name, plain location labels, network view inside nearby sharing.
-- New top-level screens use the reusable shell: Mission, Messages, Voice, and Mesh. SOS is a persistent action rather than a navigation destination.
+- Mission, Messages, Voice, and Mesh use the shared shell; SOS stays a persistent action.
 - Mission, Messages, and Voice use a solid theme background. Their navigation SOS action stays visually prominent without a continuous pulse; dedicated SOS screens retain their emergency treatment.
 - **Chat Composers** hide inline media tools while typing; a floating action bubble retains access.
-- **Network & Topology** uses operator cards and a 2D route map instead of raw logs.
+- **Network & Topology** uses cards and a 2D route map.
 - First-launch guide: three skippable animated pages, progress dots, no in-page Back; Settings replay.
 - Setup has no tag input. Ordinary names omit `[NODE]` and ID; peer details show ID. Inbox and chat headers show current names.
 - Shared controls use semantic shapes, clear pressed/disabled states, and text or icon-independent status descriptions.
 - Keep business, routing, and transport decisions out of composables. ViewModels/use cases expose UI state and user actions.
-- Keep route-level composables responsible for state collection and side effects; move reusable stateless presentation into feature `ui/components` files.
+- Route composables collect state; reusable stateless UI lives in feature `ui/components`.
 
 ## Connection language
 
@@ -35,14 +35,17 @@ UI labels must reflect verified application state:
 Relayed status requires a verified path through a ready first hop; cached topology is not live reachability. Unblock never implies Direct. UI surfaces re-resolve shared peer state.
 
 Never show “connected” from a BLE callback alone. Counters use routing's readiness definitions.
-Home may show an active mesh session without a ready peer; direct-ready and checking labels must use peer/link evidence. Permissions describe OS grants, not Bluetooth power, location-service state, or peer readiness. About and Privacy copy must state Keystore and first-seen key-trust limits without claiming authenticated E2EE or guaranteed delivery.
+Home may show an active mesh without a ready peer; direct-ready and checking need link evidence. Permissions describe OS grants, not Bluetooth or peer readiness. About and Privacy state Keystore and first-seen trust limits without claiming authenticated E2EE or delivery.
 
 ## Messaging and safety feedback
+
+Public queue rejection/partial acceptance uses feedback; acceptance never implies recipient delivery.
 
 - Failed private sends remain unsent and explain missing readiness/keys without exposing crypto details.
 - Distinguish queued, sending, delivered, failed, and blocked outcomes; do not imply peer receipt from enqueue.
 - Inbox rows do not mark private messages seen; visible chat bubbles do. Keep Unread selectable at zero and use filter-specific empty states.
 - SOS alerts and cancellation feedback must identify the relevant alert/sender.
+- Incidents distinguish local save, pending selection, confirmation, and sync uncertainty. Offers are self-reported by helpers. Unreachability never auto-reassigns. Detail sheets use 3 tabs (Briefing, Offers, Timeline), docked tactical actions, reachability dots, and capability chips.
 - SOS uses one accessible slide ("Slide to Broadcast"); early release resets it.
 - Radio plays recorded notes in order and shows the current speaker name. Off clears its queue; manual chat audio takes priority, then Radio resumes.
 - SOS illumination works in both appearances.

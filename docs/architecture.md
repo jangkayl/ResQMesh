@@ -1,10 +1,10 @@
 # Architecture
 
-Last source review: 2026-09-23. Source and device evidence override this summary.
+Last reviewed: 2026-09-30. Source and device evidence prevail.
 
 ## System shape
 
-ResQMesh is a single-module Android application written in Kotlin. Jetpack Compose provides the UI, Room stores nodes and messages, Kotlin serialization encodes the outer Protobuf `MeshPayload`, Koin supplies dependencies, and coroutines connect network events to repositories and ViewModels. The minimum SDK is 24 and the target SDK is 36.
+ResQMesh is a Kotlin Android app (SDK 24–36). Compose provides UI, Room stores state, Kotlin serialization encodes `MeshPayload`, Koin supplies dependencies, and coroutines connect events to repositories and ViewModels.
 
 The active transport is native BLE advertising/scanning plus GATT client/server roles and optional L2CAP payloads. GATT remains required for setup, readiness, heartbeat, and fallback. Direct dispatch reports acceptance or an exact rejection; only a receipt proves delivery. Nearby Connections and Wi-Fi Direct are not implemented.
 
@@ -43,19 +43,19 @@ Revoked `BLUETOOTH_CONNECT` operations fail through existing flight/link cleanup
 
 Client setup uses the reliable 20-byte ATT baseline; `READY` does not wait for MTU negotiation. A server callback for a live outbound endpoint is another view of that ACL, not a second destructive role.
 
-A generation-owned gate pauses scanning during setup while ready links carry traffic. Higher election score initiates; busy candidates remain queued by stable ID, with one outbound `connectGatt` at a time.
+A generation-owned gate pauses scanning during setup. Retirement releases its owner before forgetting the link; Refresh removes orphan owners and drains candidates without disturbing live handshakes. Higher election score initiates; busy candidates remain queued by stable ID, with one outbound `connectGatt` at a time.
 
-With zero READY neighbors, failed scans retry with bounded jitter and scans lacking a valid ResQMesh advertisement for 15 seconds restart. Recovery pauses during handshakes and stops with the session, including under the background-service anchor.
+Without identified, unblocked READY neighbors, failed scans retry with jitter; scans without valid advertisements for 15 seconds restart. Recovery pauses during live handshakes and stops with the session.
 
 The elected client has a five-second connect/discovery/CCCD deadline; bootstrap retries are bounded. Server configuration is an orphan backstop, and provisional identity waiting starts only after `READY`.
 
-Outbound GATT uses Android's `AUTO` transport for known-good peers because the project previously observed immediate disconnects with globally forced LE on some OEM pairs. If `AUTO` reaches `CONNECTED` but receives no ATT service-discovery response, the stable peer identity is marked for explicit `TRANSPORT_LE` on the next attempt in that app session. This is a per-peer compatibility fallback, not a Samsung model allowlist.
+Outbound GATT uses `AUTO` for known-good peers. If it connects without an ATT discovery response, that peer retries with `TRANSPORT_LE` in the session. This is a per-peer fallback.
 
-When L2CAP becomes available, it takes ownership of any active or queued GATT transfer. The payload is resent in full over L2CAP and the obsolete GATT flight is disarmed, so a late or missing GATT completion callback cannot tear down a healthy L2CAP path. If a GATT callback fails after that handoff race, the manager preserves L2CAP and promotes the payload instead of retiring the link.
+L2CAP promotion resends complete frames and disarms obsolete GATT flights. Deferred promotion stays queued until capacity returns. Each socket has one bounded writer with FIFO ordinary/control lanes; control may overtake waiting frames. Each transport queue retains at most 128 transfers including active, with eight control slots reserved. Ordinary byte admission is 2 MiB plus 64 KiB control headroom. GATT frames remain non-interruptible. Owned acknowledged GATT chunks and successful L2CAP writes protect progressing transfers from silence retirement; stalled operations retain deadlines.
 
-Each phone admits at most three distinct direct GATT neighbors. A mesh may contain more than four devices because additional nodes are expected to be reached through routing; the three-link rule is not a total mesh-size claim. The rule still needs multi-phone measurement before any stable-capacity claim.
+Each phone admits at most three direct GATT neighbors; unidentified endpoints occupy separate slots, while routed nodes do not count. Stable capacity needs multi-phone measurement.
 
-Discovery does not automatically turn every nearby routed peer into another direct ACL: when at least one payload-ready direct neighbor exists, the existing route is retained. If the last payload-ready direct neighbor disappears, a nearby, unblocked routed peer may pass ordinary election and capacity admission to bootstrap recovery. Radar's explicit **Connect Directly** request follows the same blocked-identity, duplicate-link, and three-neighbor capacity checks; it is not a block bypass.
+Discovery preserves healthy routes instead of creating redundant ACLs. After the last usable neighbor disappears, nearby unblocked peers may bootstrap through normal election/capacity admission. **Connect Directly** retains block, duplicate, and three-neighbor guards.
 
 ## Identity, routing, and presence
 
@@ -65,7 +65,7 @@ Peer names retain `#nodeId`. Setup sends no tag; older saved `[NODE]` defaults a
 
 A block relationship is persisted by stable identity, not MAC. A `BLOCK_REQUEST` is encrypted to the target and may traverse direct or relay links; the receiver persists complementary direct-link denial and replies with `BLOCK_ACK` before the initiator tears down direct endpoints. Each device releases only its own record—there is no remote `UNBLOCK` command—so both must unblock locally before direct admission resumes. Relayed text, private messages, SOS, receipts, and live audio are intentionally not filtered. Inbound central MACs may be unknown at ACL setup; a direct SYSTEM identity pulse is therefore gated before the peer is published or ordinary direct traffic is dispatched. This working-tree protocol still requires its physical validation card.
 
-Keep these states distinct:
+Unknown blocked identity pulses retire the captured receiving generation even before name binding. Keep these states distinct:
 
 - Direct and payload-ready.
 - Direct but configuring or unresponsive.
@@ -79,13 +79,15 @@ Stable-ID topology uses authoritative directed per-origin snapshots: empty lists
 
 CryptoManager uses an Android Keystore RSA key pair and per-message AES-GCM content encryption. The local node ID is deterministically derived from the SHA-256 hash of the hardware public key (CryptoManager.getMyNodeId()). Preferences holding node identity and peer public keys are excluded from Android Auto/Cloud Backup. The working tree refuses private sends without a payload-ready local link, stable directed route, and usable recipient key. Private forwarding and return receipts use only the planned exact stable-ID hop; an unavailable or rejected hop is never converted into broadcast. Locally originated messages are persisted before dispatch, remain pending when transport does not accept them, and retry when route/key/readiness state changes; pending rows explicitly expire after 24 hours. A 15-second delivery timeout starts only after immediate transport acceptance. Public keys learned in SYSTEM pulses are persisted by stable node ID using trust on first use: a changed key is held pending rather than silently replacing the pinned key, and pending change alerts can be explicitly dismissed without clobbering keys. Public keys are public metadata, not secret material.
 
+Pending key changes pause private sends and retries. Conditional Room updates protect receipts.
+
 This is not yet a basis for claiming authenticated end-to-end encryption or forward secrecy. TOFU can detect a later substitution but does not authenticate the first observation; out-of-band key verification UI remains an open production concern.
 
 ## Persistence and UI
 
-`MeshRepository` joins callbacks, `MeshRouter`, persistence, and UI state. `MeshNetworkGateway` hides Android Bluetooth types; `MessageStore` hides Room. `PrivateDeliveryPlanner` chooses direct or directed next-hop delivery before I/O. Koin supplies production adapters and `AppCoroutineScope` owns background work. UI rules live in `docs/ui.md`; device evidence lives in `docs/validation.md`.
+`MeshRepository` joins callbacks, routing, persistence, and UI. Gateway broadcast results report per-neighbor acceptance. Public sends persist pending before dispatch; wholly rejected sends retry, partial acceptance does not rebroadcast, and feedback never implies delivery. A mutex serializes public dispatch/outbox flush. `MeshNetworkGateway` hides Bluetooth types; `MessageStore` hides Room. `PrivateDeliveryPlanner` chooses exact hops. Koin supplies adapters and `AppCoroutineScope` owns background work. UI rules: `docs/ui.md`; evidence: `docs/validation.md`.
 
-Incidents are additive: ready peers exchange bounded version summaries/missing events; no links, routes, admission, or Room tables change. Reporter self-response is rejected; cancellation stays creator-only. Creation can carry optional GPS coordinates, capture time, and accuracy in nullable Room/event fields. Mesh profile supplies broadcast TTL (default 10; explicit Dense 4); direct sync is unchanged. Signed remote authority and a durable incident outbox remain open.
+Incidents are additive to BLE/routing. New workflow-v2 requests hold independent helper offers (one per helper signing key, with revisions) and a reporter-owned lead selection. The selected helper must confirm; only the reporter resolves or cancels. Older records keep workflow-v1 behavior. Room 7→8 adds offer and selection fields. Accepted v2 events and projections are saved in one Room transaction; signed P-256 event envelopes bind later decisions to the key carried by the initial report or offer. This proves key continuity, not real-world identity or first-contact trust. Reconnect exchanges applied event pages as well as legacy bounded summaries; physical convergence and durable delivery remain unverified. Optional incident location remains a captured snapshot, not a live location guarantee.
 
 ## Offline maps and notifications
 
