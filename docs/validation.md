@@ -11,7 +11,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\check_docs.ps1
 git diff --check
 ```
 
-Use proportional checks; documentation-only edits do not require another broad run.
+Check proportionally.
 
 ## Pull-request CI gate
 
@@ -78,7 +78,7 @@ Record APK hash/version, devices/API, topology, timestamps. A reports; B/C offer
 
 ### Incident closure replay card
 
-Candidate APK SHA-256: `DD8B7A738FA347FB8CF80E6C95F07FD53755C73BF240D019DE1428EED02C957B`. Record devices/API/timestamps. Same build on reporter A/helper B; establish READY. Offer → select → disconnect → B withdraws → reconnect until A sees withdrawal → A cancels → restart B/reconnect. Both must show cancelled history without a helper; repeat five times. Separately confirm/resolve: retain confirmed-helper history; delayed confirmation must not reopen. Report stale selections, duplicates, convergence time. Capture `INCIDENT_HELP`, `CLOSURE_WAITING_DEPENDENCIES`, `WITHDRAWAL_CLEARED_SELECTION`, `SUPERSEDED_SELECTION_SKIPPED`, `INCIDENT_REPO`, READY; omit private content. Ordering uses local tests; Room execution remains open.
+Record devices/API/timestamps. Same build on reporter A/helper B; establish READY. Offer → select → disconnect → B withdraws → reconnect until A sees withdrawal → A cancels → restart B/reconnect. Both must show cancelled history without a helper; repeat five times. Separately confirm/resolve: retain confirmed-helper history; delayed confirmation must not reopen. Report stale selections, duplicates, convergence time. Capture `INCIDENT_HELP`, `CLOSURE_WAITING_DEPENDENCIES`, `WITHDRAWAL_CLEARED_SELECTION`, `SUPERSEDED_SELECTION_SKIPPED`, `INCIDENT_REPO`, READY; omit private content. Ordering uses local tests; Room execution remains open.
 
 ### Level 4: release/capstone matrix
 
@@ -86,7 +86,11 @@ Across representative devices, measure delivery, recovery, range, battery, SOS, 
 
 ## Required test card
 
-Record APK, setup, steps, failures, and markers. Follow the [block/voice card and tracker](status.md); continue failures with capture/timestamp.
+Record APK, setup, failures, timestamps, and markers; follow the [block/voice tracker](status.md).
+
+### Automatic incident-sync card
+
+Use `app/build/incident-sync-qa/TEST_CARD.md` with the APK hash. Cover READY/reconnect, connected helper updates, restart, A–B–C, and mixed traffic without Refresh; record convergence/latency/retries and `INCIDENT_SYNC` markers. Phone reliability remains open.
 
 ### Background mesh card
 
@@ -116,4 +120,4 @@ Keep only meaningful milestones; raw captures remain under `captures/`.
 | 2026-09-18 | Mutual-block working tree | V2424 API 34, CPH2219 API 31, CPH2127 API 31, SM-P615 API 33, SM-A236E API 33 | KAY and LAL block over a five-phone mesh | Both endpoints logged acknowledgement-driven direct teardown. Public and encrypted private traffic then crossed the V2424 relay and decrypted at both endpoints. The capture does not establish restart persistence, unilateral/bilateral unblock, 70-second route stability, or production reliability. | `captures/ble-logcat/20260918-011613/` |
 | 2026-09-18 | Stable-ID relay working tree | V2424 API 34, CPH2219 API 31, CPH2127 API 31, SM-P615 API 33 | Indirect private relay both directions | Selected routes relayed and decrypted both ways without private broadcast fallback. Some return receipts lacked a next hop; SM-P615 repeatedly retired one GATT callback link. | `captures/ble-logcat/20260918-233006/` |
 
-The later Samsung report supersedes older failures pending capture. The five-device report does not establish stable capacity or reliability; BLOCK-01 remains active.
+Samsung recovery and five-device availability need capture/matrix evidence; capacity and BLOCK-01 remain open.

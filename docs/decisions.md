@@ -1,6 +1,6 @@
 # Engineering decisions
 
-This page records durable choices, not brainstorming transcripts. New ideas remain in the Codex task until the user accepts, rejects for a lasting reason, or defers them. Code and physical evidence can require a decision to be revised.
+This page records durable choices. New ideas remain in the Codex task until accepted, rejected, or deferred. Source and device evidence can revise decisions.
 
 ## D1: Reliability before transport expansion
 
@@ -47,15 +47,16 @@ Pull requests repeat the debug build, unit tests, canonical-document checks, and
 
 ## D11: Blocking is mutual direct-link denial, with independent local release
 
-A block request must reach the named peer through a direct or relayed path, make both phones show and enforce the direct-link denial, and then remove their direct socket. Public/private text, SOS, receipts, and live audio remain routable through other peers. The remote phone does not automatically unblock when the initiator does: each phone must explicitly tap Unblock locally before a direct link may return. The protocol requires stable-identity persistence, acknowledgement/retry, and post-identity admission enforcement; it is implemented in the working tree but remains unvalidated. This is a routing-debug policy, not a privacy or authenticated-security claim.
+Block requests reach the peer directly or through a relay; acknowledgement precedes direct teardown. Both phones persist denial by stable identity and must explicitly unblock locally. Text/private/SOS/receipts/audio remain routable through other peers. Restart persistence, identity admission, and acknowledgement/retry require phone validation. This is a routing-debug policy, not authenticated security.
 
 ## D12: Direct links may bootstrap recovery, but do not replace healthy routes by default
 
 Discovery retains a healthy routed path instead of forming a redundant direct ACL for every nearby peer. Once no payload-ready direct neighbor remains, an unblocked nearby routed peer may proceed through the normal election, cooldown, and capacity checks to restore direct reachability. An explicit user request uses those same checks and cannot override direct-link block denial or capacity. Device validation must confirm recovery without churn.
 
-## Considering new work
+## D21: Incident synchronization uses history and projection digests
 
-Before selecting a difficult fix or feature, compare the smallest viable change, a structural alternative, and a non-code/operational alternative when relevant. Evaluate capstone value, production value, reliability impact, Android/device support, security, complexity, migration risk, and physical-test cost. Do not treat an explored option as an accepted requirement.
+Immediate broadcasts remain the fast path. After READY, incident changes, and every 30 seconds (±3 seconds), neighbors compare SHA-256 event-history and replicated-state digests. Different histories exchange missing original events; equal histories with different state rebuild projections. Signed authority still gates application/relay. Matching reporter versions or queue acceptance never proves synchronization. Completion belongs to one current peer/snapshot with no pending dependencies. Repair uses bounded ordinary pages and small control exchanges; legacy fallback has limited guarantees. Room separates validation from projection application. Pairing, transports, and range are unchanged; physical convergence, airtime, latency, and battery require measurements.
+
 ## D13: Offline maps use MapLibre and local PMTiles
 
 MapLibre Native with local PMTiles replaces osmdroid and public raster tile downloads. This supports offline maps without scraping OSM tiles.

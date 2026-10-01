@@ -16,6 +16,9 @@ interface IncidentOfferDao {
     @Query("SELECT * FROM incident_offers WHERE incidentId = :incidentId ORDER BY updatedAt DESC, offerId")
     suspend fun getForIncident(incidentId: String): List<IncidentOfferEntity>
 
+    @Query("DELETE FROM incident_offers WHERE incidentId = :incidentId")
+    suspend fun deleteForIncident(incidentId: String): Int
+
     @Query("SELECT * FROM incident_offers WHERE offerId = :offerId LIMIT 1")
     suspend fun getById(offerId: String): IncidentOfferEntity?
 

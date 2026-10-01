@@ -684,6 +684,12 @@ class IncidentHelpWorkflowTest {
             flow.map { it.filter { offer -> !offer.withdrawn } }
         override suspend fun getForIncident(incidentId: String): List<IncidentOfferEntity> =
             rows.values.filter { it.incidentId == incidentId }
+        override suspend fun deleteForIncident(incidentId: String): Int {
+            val ids = rows.values.filter { it.incidentId == incidentId }.map { it.offerId }
+            ids.forEach { rows.remove(it) }
+            flow.value = rows.values.toList()
+            return ids.size
+        }
         override suspend fun getById(offerId: String): IncidentOfferEntity? = rows[offerId]
         override suspend fun getByHelper(incidentId: String, helperKey: String): IncidentOfferEntity? =
             rows.values.firstOrNull { it.incidentId == incidentId && it.helperKey == helperKey }

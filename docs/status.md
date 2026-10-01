@@ -1,10 +1,10 @@
 # Current status
 
-Last reviewed: 2026-10-01. Baseline: `43bace8`, `feat/mesh-reliability-and-incident-coordination`.
+Last reviewed: 2026-10-02. Branch: `fix/emergency-incident-auto-sync`.
 
 ## Current objective
 
-Validate block recovery/recorded voice before five/ten-phone measurements. Runtime validation and UI/security/background work remain open.
+Validate automatic incident convergence, then block recovery/recorded voice before five/ten-phone measurements. Runtime validation and UI/security/background work remain open.
 
 [Phone validation pending](plans/capstone-demo-readiness.md): [incident UX redesign](plans/emergency-incidents-ux-redesign.md), withdrawal cleanup, reporter identity, and selected-offer editing guards.
 
@@ -20,9 +20,9 @@ Delivery and build checks passed (debug/release, unit tests, Android-test compil
 
 ## Reliability tracking checklist
 
-Check off physical phases only after recording APK identity, device matrix, timestamps, results, and capture.
+Record APK/device matrix, timestamps, results, and capture before checking physical phases.
 
-Use the [physical test checklist](plans/physical-reliability-tests.md) for ordered steps and reporting. Record the installed APK identity; the checked build is below.
+Use the [physical checklist](plans/physical-reliability-tests.md); record the installed APK.
 
 - [x] R1: Reject unknown blocked endpoints by captured generation; release retired handshake owners; Refresh reconciles orphan owners.
 - [x] R2: Only identified, unblocked READY neighbors suppress isolated recovery; unidentified endpoints occupy separate capacity slots.
@@ -40,7 +40,7 @@ Per-transport queue defaults: 128 retained transfers including active; ordinary 
 
 ## Open blockers
 
-Closure replay checks passed: build, 213 tests, Android-test compilation, Lint. Phone/Room validation remains open.
+Protocol-v2 incident sync adds history/state hashes, bounded repair/retries, READY snapshots, and a 30-second backstop. Room 9→10 separates validation/application. 229 tests/build/Lint passed; Room OOM/phone validation pending.
 
 | ID | Priority | Remaining completion evidence |
 | --- | --- | --- |
@@ -52,12 +52,12 @@ Closure replay checks passed: build, 213 tests, Android-test compilation, Lint. 
 | LIMIT-01 | P2 | R9/R10 measured matrix; prior five-device report is not stable-capacity proof |
 | SEC-01 | P1 | Fingerprint verification UI and first-contact trust boundary |
 | SOS-01 | P1 | Concurrent alert/cancellation ownership and load-time priority |
-| INCIDENT-01 | P1 | Room migration instrumentation, durable event reconciliation, A–B–C helper convergence |
+| INCIDENT-01 | P1 | Room runtime plus reconnect/connected-update and A–B–C convergence on phones |
 | BG-01 | P1 | Android 12–14+ lock-screen, process-death, and battery measurements |
 
 ## Immediate phone card
 
-**Build/devices:** debug 1.0.1/code 2, SHA-256 `1F2B1CA38782DD72097519F81D9B2D84DF42357F298C07E8A7E62C64EFC9AE5F`. Local checks passed; APK includes identity and offer editing guards. Record A/B/C names, models/API, and GATT/L2CAP use. User installs and operates phones. Capture with `scripts/capture_ble_logcat.ps1 -DurationMinutes 10`.
+**Build/devices:** debug 1.0.1/code 2, SHA-256 `CE385EAD12D75A96E3C147FD068D7CF2C1EB0665A012F08C56F1A868CE0A9E18`. Local checks passed; APK includes identity and offer editing guards. Record A/B/C names, models/API, and GATT/L2CAP use. User installs and operates phones. Capture with `scripts/capture_ble_logcat.ps1 -DurationMinutes 10`.
 
 **Setup/steps:** same APK on all three phones; verify actual READY links and public/private text. Block A↔C. Keep B unblocked. Observe 90 seconds; remove/restore B, Refresh A/C, and repeat five times. Unblock only A, then both; restart one app at a time without clearing block preferences. Repeat with five short recorded notes, then simultaneous 5/15/30-second notes from A/C plus public text and test SOS. Test L2CAP and a GATT-only pair/path where available; record an unavailable transport case as untested.
 
@@ -67,8 +67,8 @@ Closure replay checks passed: build, 213 tests, Android-test compilation, Lint. 
 
 ## Next actions
 
-1. Run R7 before expanding traffic; identify the installed APK.
-2. Run R8; investigate the exact failure window if it fails.
-3. Advance to R9, then R10 only after the smaller matrix passes.
-4. Run incident closure, identity/offer, migration, UI, and background cards.
+1. Run the automatic incident-sync card in validation; record APK identity, convergence time, retries, and text/SOS latency.
+2. Run R7/R8 and investigate focused failure windows before expanding traffic.
+3. Advance to R9/R10 only after the smaller matrix passes.
+4. Run closure, identity/offer, UI, and background cards.
 5. Choose R11 from measured bottlenecks; keep text/SOS and private fail-closed behavior first.

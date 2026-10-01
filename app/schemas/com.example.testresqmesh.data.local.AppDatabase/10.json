@@ -1,0 +1,558 @@
+{
+  "formatVersion": 1,
+  "database": {
+    "version": 10,
+    "identityHash": "fe6cc99a1199cb9121b75a8c8934dcc3",
+    "entities": [
+      {
+        "tableName": "nodes",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`macAddress` TEXT NOT NULL, `nodeName` TEXT NOT NULL, `publicKey` TEXT, `lastSeenTimestamp` INTEGER NOT NULL, `isBlocked` INTEGER NOT NULL, PRIMARY KEY(`macAddress`))",
+        "fields": [
+          {
+            "fieldPath": "macAddress",
+            "columnName": "macAddress",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "nodeName",
+            "columnName": "nodeName",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "publicKey",
+            "columnName": "publicKey",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "lastSeenTimestamp",
+            "columnName": "lastSeenTimestamp",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "isBlocked",
+            "columnName": "isBlocked",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "macAddress"
+          ]
+        },
+        "indices": [],
+        "foreignKeys": []
+      },
+      {
+        "tableName": "messages",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`msgId` TEXT NOT NULL, `senderName` TEXT NOT NULL, `targetName` TEXT, `text` TEXT, `imageBase64` TEXT, `audioBase64` TEXT, `locationLat` REAL, `locationLng` REAL, `timestamp` INTEGER NOT NULL, `isSOS` INTEGER NOT NULL, `isMine` INTEGER NOT NULL, `deliveredTo` TEXT NOT NULL, `seenBy` TEXT NOT NULL, `outboundRoute` TEXT NOT NULL, PRIMARY KEY(`msgId`))",
+        "fields": [
+          {
+            "fieldPath": "msgId",
+            "columnName": "msgId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "senderName",
+            "columnName": "senderName",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "targetName",
+            "columnName": "targetName",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "text",
+            "columnName": "text",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "imageBase64",
+            "columnName": "imageBase64",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "audioBase64",
+            "columnName": "audioBase64",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "locationLat",
+            "columnName": "locationLat",
+            "affinity": "REAL",
+            "notNull": false
+          },
+          {
+            "fieldPath": "locationLng",
+            "columnName": "locationLng",
+            "affinity": "REAL",
+            "notNull": false
+          },
+          {
+            "fieldPath": "timestamp",
+            "columnName": "timestamp",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "isSOS",
+            "columnName": "isSOS",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "isMine",
+            "columnName": "isMine",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "deliveredTo",
+            "columnName": "deliveredTo",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "seenBy",
+            "columnName": "seenBy",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "outboundRoute",
+            "columnName": "outboundRoute",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "msgId"
+          ]
+        },
+        "indices": [],
+        "foreignKeys": []
+      },
+      {
+        "tableName": "users",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`userId` TEXT NOT NULL, `deviceId` TEXT NOT NULL, `displayName` TEXT NOT NULL, `publicKey` TEXT, `createdAt` INTEGER NOT NULL, PRIMARY KEY(`userId`))",
+        "fields": [
+          {
+            "fieldPath": "userId",
+            "columnName": "userId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "deviceId",
+            "columnName": "deviceId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "displayName",
+            "columnName": "displayName",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "publicKey",
+            "columnName": "publicKey",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "createdAt",
+            "columnName": "createdAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "userId"
+          ]
+        },
+        "indices": [],
+        "foreignKeys": []
+      },
+      {
+        "tableName": "incidents",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`incidentId` TEXT NOT NULL, `creatorId` TEXT NOT NULL, `creatorName` TEXT NOT NULL, `incidentType` TEXT NOT NULL, `severity` TEXT NOT NULL, `description` TEXT NOT NULL, `areaDescription` TEXT NOT NULL, `latitude` REAL, `longitude` REAL, `locationCapturedAt` INTEGER, `locationAccuracyMeters` REAL, `status` TEXT NOT NULL, `primaryResponderId` TEXT, `primaryResponderName` TEXT, `version` INTEGER NOT NULL, `createdAt` INTEGER NOT NULL, `updatedAt` INTEGER NOT NULL, `workflowVersion` INTEGER NOT NULL DEFAULT 1, `reporterSigningKey` TEXT, `selectionId` TEXT, `selectionOfferId` TEXT, `selectionOfferRevision` INTEGER, `selectedHelperKey` TEXT, `selectionConfirmedAt` INTEGER, `title` TEXT NOT NULL DEFAULT '', PRIMARY KEY(`incidentId`))",
+        "fields": [
+          {
+            "fieldPath": "incidentId",
+            "columnName": "incidentId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "creatorId",
+            "columnName": "creatorId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "creatorName",
+            "columnName": "creatorName",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "incidentType",
+            "columnName": "incidentType",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "severity",
+            "columnName": "severity",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "description",
+            "columnName": "description",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "areaDescription",
+            "columnName": "areaDescription",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "latitude",
+            "columnName": "latitude",
+            "affinity": "REAL",
+            "notNull": false
+          },
+          {
+            "fieldPath": "longitude",
+            "columnName": "longitude",
+            "affinity": "REAL",
+            "notNull": false
+          },
+          {
+            "fieldPath": "locationCapturedAt",
+            "columnName": "locationCapturedAt",
+            "affinity": "INTEGER",
+            "notNull": false
+          },
+          {
+            "fieldPath": "locationAccuracyMeters",
+            "columnName": "locationAccuracyMeters",
+            "affinity": "REAL",
+            "notNull": false
+          },
+          {
+            "fieldPath": "status",
+            "columnName": "status",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "primaryResponderId",
+            "columnName": "primaryResponderId",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "primaryResponderName",
+            "columnName": "primaryResponderName",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "version",
+            "columnName": "version",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "createdAt",
+            "columnName": "createdAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "updatedAt",
+            "columnName": "updatedAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "workflowVersion",
+            "columnName": "workflowVersion",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "1"
+          },
+          {
+            "fieldPath": "reporterSigningKey",
+            "columnName": "reporterSigningKey",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "selectionId",
+            "columnName": "selectionId",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "selectionOfferId",
+            "columnName": "selectionOfferId",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "selectionOfferRevision",
+            "columnName": "selectionOfferRevision",
+            "affinity": "INTEGER",
+            "notNull": false
+          },
+          {
+            "fieldPath": "selectedHelperKey",
+            "columnName": "selectedHelperKey",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "selectionConfirmedAt",
+            "columnName": "selectionConfirmedAt",
+            "affinity": "INTEGER",
+            "notNull": false
+          },
+          {
+            "fieldPath": "title",
+            "columnName": "title",
+            "affinity": "TEXT",
+            "notNull": true,
+            "defaultValue": "''"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "incidentId"
+          ]
+        },
+        "indices": [],
+        "foreignKeys": []
+      },
+      {
+        "tableName": "domain_events",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`eventId` TEXT NOT NULL, `entityId` TEXT NOT NULL, `entityType` TEXT NOT NULL, `eventType` TEXT NOT NULL, `actorId` TEXT NOT NULL, `actorName` TEXT NOT NULL, `logicalVersion` INTEGER NOT NULL, `timestamp` INTEGER NOT NULL, `payloadJson` TEXT NOT NULL, `signature` TEXT, `applied` INTEGER NOT NULL, `validationStatus` TEXT NOT NULL DEFAULT 'UNVERIFIED', PRIMARY KEY(`eventId`))",
+        "fields": [
+          {
+            "fieldPath": "eventId",
+            "columnName": "eventId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "entityId",
+            "columnName": "entityId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "entityType",
+            "columnName": "entityType",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "eventType",
+            "columnName": "eventType",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "actorId",
+            "columnName": "actorId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "actorName",
+            "columnName": "actorName",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "logicalVersion",
+            "columnName": "logicalVersion",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "timestamp",
+            "columnName": "timestamp",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "payloadJson",
+            "columnName": "payloadJson",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "signature",
+            "columnName": "signature",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "applied",
+            "columnName": "applied",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "validationStatus",
+            "columnName": "validationStatus",
+            "affinity": "TEXT",
+            "notNull": true,
+            "defaultValue": "'UNVERIFIED'"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "eventId"
+          ]
+        },
+        "indices": [],
+        "foreignKeys": []
+      },
+      {
+        "tableName": "peer_names",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`nodeId` TEXT NOT NULL, `fullName` TEXT NOT NULL, PRIMARY KEY(`nodeId`))",
+        "fields": [
+          {
+            "fieldPath": "nodeId",
+            "columnName": "nodeId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "fullName",
+            "columnName": "fullName",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "nodeId"
+          ]
+        },
+        "indices": [],
+        "foreignKeys": []
+      },
+      {
+        "tableName": "incident_offers",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`offerId` TEXT NOT NULL, `incidentId` TEXT NOT NULL, `helperKey` TEXT NOT NULL, `helperNodeId` TEXT NOT NULL, `helperName` TEXT NOT NULL, `note` TEXT NOT NULL, `revision` INTEGER NOT NULL, `withdrawn` INTEGER NOT NULL, `updatedAt` INTEGER NOT NULL, PRIMARY KEY(`offerId`))",
+        "fields": [
+          {
+            "fieldPath": "offerId",
+            "columnName": "offerId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "incidentId",
+            "columnName": "incidentId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "helperKey",
+            "columnName": "helperKey",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "helperNodeId",
+            "columnName": "helperNodeId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "helperName",
+            "columnName": "helperName",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "note",
+            "columnName": "note",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "revision",
+            "columnName": "revision",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "withdrawn",
+            "columnName": "withdrawn",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "updatedAt",
+            "columnName": "updatedAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "offerId"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_incident_offers_incidentId_helperKey",
+            "unique": true,
+            "columnNames": [
+              "incidentId",
+              "helperKey"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_incident_offers_incidentId_helperKey` ON `${TABLE_NAME}` (`incidentId`, `helperKey`)"
+          }
+        ],
+        "foreignKeys": []
+      }
+    ],
+    "views": [],
+    "setupQueries": [
+      "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'fe6cc99a1199cb9121b75a8c8934dcc3')"
+    ]
+  }
+}

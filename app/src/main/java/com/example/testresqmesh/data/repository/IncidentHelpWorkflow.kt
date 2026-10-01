@@ -30,6 +30,7 @@ class IncidentHelpWorkflow(
     private val publish: (DomainEventEntity, Boolean) -> Unit
 ) {
     private val mutex = Mutex()
+    private var deferredDuringApply = false
 
     fun observeOffers(incidentId: String): Flow<List<IncidentOfferEntity>> = offers.observeForIncident(incidentId)
     fun observeAllActiveOffers(): Flow<List<IncidentOfferEntity>> = offers.observeAllActiveOffers()
@@ -167,7 +168,23 @@ class IncidentHelpWorkflow(
         return applied
     }
 
-    suspend fun apply(event: DomainEventEntity): Boolean = mutex.withLock { applyLocked(event) }
+    suspend fun apply(event: DomainEventEntity): Boolean = mutex.withLock { applyValidated(event) }
+
+    internal suspend fun <T> withReplayLock(block: suspend () -> T): T = mutex.withLock { block() }
+    internal suspend fun applyDuringReplay(event: DomainEventEntity): Boolean = applyValidated(event)
+
+    private suspend fun applyValidated(event: DomainEventEntity): Boolean {
+        val prior = events.getEventById(event.eventId)
+        if (prior != null && (IncidentSyncSnapshot.eventHash(prior) != IncidentSyncSnapshot.eventHash(event) ||
+                prior.validationStatus == "REJECTED" || prior.applied)) return false
+        deferredDuringApply = false
+        val applied = applyLocked(event)
+        if (!applied && !deferredDuringApply && events.getEventById(event.eventId)?.applied != true) {
+            if (prior == null) events.insertEvent(event.copy(applied = false, validationStatus = "REJECTED"))
+            else events.setValidationStatus(event.eventId, "REJECTED")
+        }
+        return applied
+    }
 
     private suspend fun applyLocked(event: DomainEventEntity): Boolean {
         if (event.entityType != EntityType.INCIDENT.name ||
@@ -176,16 +193,18 @@ class IncidentHelpWorkflow(
         reconcileWithdrawnSelectionLocked(event.entityId)
         val prior = events.getEventById(event.eventId)
         if (prior?.applied == true) return false
-        if (prior != null && prior.copy(applied = false) != event.copy(applied = false)) return false
+        if (prior != null && IncidentSyncSnapshot.eventHash(prior) != IncidentSyncSnapshot.eventHash(event)) return false
         val incident = incidents.getIncidentById(event.entityId)
-        suspend fun defer() {
-            if (prior == null) events.insertEvent(event.copy(applied = false))
+        suspend fun defer(verified: Boolean = false) {
+            deferredDuringApply = true
+            if (prior == null) events.insertEvent(event.copy(applied = false, validationStatus = if (verified) "ACCEPTED" else "UNVERIFIED"))
+            else events.setValidationStatus(event.eventId, if (verified) "ACCEPTED" else "UNVERIFIED")
         }
         if (incident == null) {
             defer()
             return false
         }
-        if (incident.workflowVersion != 2 || incident.status in TERMINAL) return false
+        if (incident.workflowVersion != 2) return false
         val payload = runCatching { JSONObject(event.payloadJson) }.getOrNull() ?: return false
         val offer = payload.optString("offerId").takeIf { it.isNotBlank() }?.let { offers.getById(it) }
         val helperKey = payload.optString("helperKey")
@@ -193,8 +212,10 @@ class IncidentHelpWorkflow(
             (event.eventType in setOf(EventType.INCIDENT_LEAD_CONFIRMED.name,
                 EventType.INCIDENT_LEAD_DECLINED.name) && incident.selectedHelperKey == null)) {
             val historicalSelection = selectionEvent(incident, payload.optString("selectionId"))
-            if (historicalSelection != null && selectionSupersededBy(incident, historicalSelection) != null)
+            if (historicalSelection != null && selectionSupersededBy(incident, historicalSelection) != null) {
+                retainHistoricalDecision(event, incident, historicalSelection)
                 return false
+            }
             if (!event.signature.isNullOrBlank()) defer()
             return false
         }
@@ -205,7 +226,33 @@ class IncidentHelpWorkflow(
             else -> incident.reporterSigningKey
         }
         if (actorKey.isNullOrBlank() || !signer.verify(event, actorKey) ||
-            (event.eventType == EventType.INCIDENT_OFFER_WITHDRAWN.name && helperKey != actorKey)) return false
+            (event.eventType == EventType.INCIDENT_OFFER_WITHDRAWN.name && helperKey != actorKey)) {
+            if (prior != null) events.setValidationStatus(event.eventId, "REJECTED")
+            return false
+        }
+
+        // Valid late helper decisions remain immutable history; they never reopen terminal state.
+        if (incident.status in TERMINAL) {
+            val frontier = events.getEventsForEntity(event.entityId).filter {
+                it.applied && it.validationStatus == "ACCEPTED" && it.eventType in OFFER_TYPES &&
+                    runCatching { JSONObject(it.payloadJson).optString("offerId") == payload.optString("offerId") }.getOrDefault(false)
+            }.maxOfOrNull { it.logicalVersion } ?: (offer?.revision ?: 0L)
+            val byHelper = offers.getByHelper(event.entityId, actorKey)
+            val selection = selectionEvent(incident, payload.optString("selectionId"))
+            if (event.eventType in HELPER_DECISIONS && selection != null)
+                retainHistoricalDecision(event, incident, selection)
+            else if (event.eventType in OFFER_TYPES && event.actorId != incident.creatorId &&
+                payload.optString("offerId").isNotBlank() && payload.optLong("revision") == event.logicalVersion &&
+                (event.eventType != EventType.INCIDENT_OFFER_UPDATED.name || payload.optString("note").trim().length in 1..240) &&
+                (offer == null || offer.helperKey == actorKey) &&
+                (byHelper == null || byHelper.offerId == payload.optString("offerId"))) {
+                if (event.logicalVersion > frontier + 1L) { defer(verified = true); return false }
+                if (event.logicalVersion != frontier + 1L) return false
+                if (prior == null) events.insertEvent(event.copy(applied = true, validationStatus = "ACCEPTED"))
+                else { events.setApplied(event.eventId, true); events.setValidationStatus(event.eventId, "ACCEPTED") }
+            }
+            return false
+        }
 
         var updatedIncident: IncidentEntity? = null
         var updatedOffer: IncidentOfferEntity? = null
@@ -220,7 +267,7 @@ class IncidentHelpWorkflow(
                     (byHelper != null && byHelper.offerId != offerId) ||
                     event.actorId == incident.creatorId) return false
                 if (revision > (byHelper?.revision ?: 0L) + 1L) {
-                    defer()
+                    defer(verified = true)
                     return false
                 }
                 if (revision != (byHelper?.revision ?: 0L) + 1L) return false
@@ -237,7 +284,7 @@ class IncidentHelpWorkflow(
                     payload.optLong("revision") != event.logicalVersion)
                     return false
                 if (event.logicalVersion > offer.revision + 1) {
-                    defer()
+                    defer(verified = true)
                     return false
                 }
                 if (event.logicalVersion != offer.revision + 1) return false
@@ -253,7 +300,7 @@ class IncidentHelpWorkflow(
                     (event.logicalVersion > incident.version && incident.status != IncidentState.OPEN.name) ||
                     (event.logicalVersion == incident.version + 1 &&
                         (offer == null || offer.revision < payload.optLong("offerRevision")))) {
-                    defer()
+                    defer(verified = true)
                     return false
                 }
                 if (incident.status != IncidentState.OPEN.name ||
@@ -285,7 +332,7 @@ class IncidentHelpWorkflow(
             }
             EventType.INCIDENT_LEAD_REVOKED.name -> {
                 if (event.actorId == incident.creatorId && event.logicalVersion > incident.version + 1) {
-                    defer()
+                    defer(verified = true)
                     return false
                 }
                 if (event.actorId != incident.creatorId ||
@@ -315,7 +362,7 @@ class IncidentHelpWorkflow(
                                 prerequisite.entityType != EntityType.INCIDENT.name ||
                                 prerequisite.eventType !in TYPES)) return false
                         if (prerequisite?.applied != true) {
-                            defer()
+                            defer(verified = true)
                             AppLogger.d("INCIDENT_HELP", "CLOSURE_WAITING_DEPENDENCIES incident=${event.entityId}")
                             return false
                         }
@@ -325,7 +372,7 @@ class IncidentHelpWorkflow(
                     closingIncident = closureProjection(incident, payload) ?: return false
                 }
                 if (event.actorId == incident.creatorId && event.logicalVersion > incident.version + 1) {
-                    defer()
+                    defer(verified = true)
                     return false
                 }
                 if (event.actorId != incident.creatorId || event.logicalVersion != incident.version + 1 ||
@@ -340,8 +387,8 @@ class IncidentHelpWorkflow(
         suspend fun persist() {
             updatedOffer?.let { offers.upsert(it) }
             updatedIncident?.let { incidents.insertOrUpdate(it) }
-            if (prior == null) events.insertEvent(event.copy(applied = true))
-            else events.setApplied(event.eventId, true)
+            if (prior == null) events.insertEvent(event.copy(applied = true, validationStatus = "ACCEPTED"))
+            else { events.setApplied(event.eventId, true); events.setValidationStatus(event.eventId, "ACCEPTED") }
         }
         if (database != null) database.withTransaction { persist() } else persist()
         if (event.eventType == EventType.INCIDENT_OFFER_WITHDRAWN.name && updatedIncident != null) {
@@ -352,6 +399,17 @@ class IncidentHelpWorkflow(
             AppLogger.d("INCIDENT_HELP", "SUPERSEDED_SELECTION_SKIPPED incident=${event.entityId} version=${event.logicalVersion}")
         }
         return true
+    }
+
+    private suspend fun retainHistoricalDecision(event: DomainEventEntity, incident: IncidentEntity,
+        selection: DomainEventEntity) {
+        if (event.eventType !in HELPER_DECISIONS || event.actorId == incident.creatorId ||
+            event.logicalVersion != selection.logicalVersion) return
+        val key = JSONObject(selection.payloadJson).optString("helperKey")
+        if (key.isBlank() || !signer.verify(event, key)) return
+        if (events.getEventById(event.eventId) == null)
+            events.insertEvent(event.copy(applied = true, validationStatus = "ACCEPTED"))
+        else { events.setApplied(event.eventId, true); events.setValidationStatus(event.eventId, "ACCEPTED") }
     }
 
     private suspend fun offerForSelectionIsWithdrawn(incident: IncidentEntity): Boolean =

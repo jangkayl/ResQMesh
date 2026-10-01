@@ -21,6 +21,8 @@ class IncidentEntityFakeDao : IncidentDao {
     override suspend fun getRecentIncidentsForSync(limit: Int): List<IncidentEntity> =
         store.values.sortedByDescending { it.updatedAt }.take(limit)
 
+    override suspend fun getSyncIncidents(): List<IncidentEntity> = store.values.sortedBy { it.incidentId }
+
     override suspend fun getIncidentById(incidentId: String): IncidentEntity? = store[incidentId]
 
     override fun observeIncidentById(incidentId: String): Flow<IncidentEntity?> =
@@ -77,11 +79,29 @@ class DomainEventEntityFakeDao : DomainEventDao {
         return if (eventId in store) 1 else 0
     }
 
+    override suspend fun setValidationStatus(eventId: String, status: String): Int {
+        store[eventId]?.let { store[eventId] = it.copy(validationStatus = status) }
+        flow.value = store.toMap()
+        return if (eventId in store) 1 else 0
+    }
+    override suspend fun deleteRejectedEvent(eventId: String): Int {
+        if (store[eventId]?.validationStatus != "REJECTED") return 0
+        store.remove(eventId); flow.value = store.toMap(); return 1
+    }
+
+    override suspend fun getIncidentHistory(): List<DomainEventEntity> = store.values.filter { it.entityType == "INCIDENT" }
+    override fun observeIncidentHistory(): Flow<List<DomainEventEntity>> = flow.map { it.values.filter { e -> e.entityType == "INCIDENT" } }
+    override suspend fun resetIncidentApplication(incidentId: String): Int {
+        val ids = store.values.filter { it.entityId == incidentId && it.validationStatus == "ACCEPTED" }.map { it.eventId }
+        ids.forEach { setApplied(it, false) }
+        return ids.size
+    }
+
     override suspend fun getSyncPage(limit: Int, offset: Int): List<DomainEventEntity> =
         store.values.filter { it.applied }
             .drop(offset).take(limit)
 
     override suspend fun getUnappliedForIncident(incidentId: String): List<DomainEventEntity> =
-        store.values.filter { it.entityId == incidentId && !it.applied }
+        store.values.filter { it.entityId == incidentId && !it.applied && it.validationStatus != "REJECTED" }
             .sortedWith(compareBy<DomainEventEntity> { it.timestamp }.thenBy { it.eventId })
 }

@@ -19,6 +19,9 @@ interface IncidentDao {
     @Query("SELECT * FROM incidents ORDER BY updatedAt DESC LIMIT :limit")
     suspend fun getRecentIncidentsForSync(limit: Int): List<IncidentEntity>
 
+    @Query("SELECT * FROM incidents ORDER BY incidentId")
+    suspend fun getSyncIncidents(): List<IncidentEntity>
+
     @Query("SELECT * FROM incidents WHERE incidentId = :incidentId LIMIT 1")
     suspend fun getIncidentById(incidentId: String): IncidentEntity?
 

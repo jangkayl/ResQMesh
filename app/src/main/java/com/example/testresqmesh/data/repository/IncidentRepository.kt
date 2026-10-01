@@ -20,6 +20,10 @@ import com.example.testresqmesh.data.local.entity.IncidentEntity
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.flow.collect
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.encodeToByteArray
@@ -40,9 +44,27 @@ class IncidentRepository(
     private val database: AppDatabase? = null,
     private val eventSigning: IncidentEventSigning? = null
 ) {
+    private val projectionMutex = Mutex()
     private val helpWorkflow = if (offerDao != null && eventSigning != null)
         IncidentHelpWorkflow(database, incidentDao, offerDao, domainEventDao, identityManager,
             eventSigning, ::broadcastDomainEvent) else null
+    private var rebuilding = false
+    private val syncStore = object : IncidentSyncStore {
+        override suspend fun snapshot(): IncidentSyncSnapshot {
+            suspend fun read(): IncidentSyncSnapshot {
+                val incidents = incidentDao.getSyncIncidents()
+                val offers = incidents.flatMap { offerDao?.getForIncident(it.incidentId).orEmpty() }
+                return IncidentSyncSnapshot(domainEventDao.getIncidentHistory(), incidents, offers)
+            }
+            return if (database != null) database.withTransaction { read() } else read()
+        }
+        override suspend fun ingest(json: JSONObject): IncidentIngestionResult = ingestIncomingEventJson(json.toString())
+        override suspend fun replay(incidentId: String) = replayPendingForIncident(incidentId)
+        override suspend fun rebuild(incidentId: String) = rebuildProjection(incidentId)
+    }
+    private val syncCoordinator = readyPeerEvents?.let {
+        IncidentSyncCoordinator(networkGateway, it, syncStore, repositoryScope, ::startLegacyReconciliationWithPeer)
+    }
     init {
         helpWorkflow?.let { workflow ->
             repositoryScope.launch {
@@ -55,35 +77,43 @@ class IncidentRepository(
         }
         networkGateway.onDomainEvent = { endpointId, payload ->
             repositoryScope.launch {
-                if (applyIncomingEventJson(payload.text)) {
+                val result = ingestIncomingEventJson(payload.text)
+                if (result == IncidentIngestionResult.APPLIED) {
                     forwardAcceptedDomainEvent(payload, endpointId)
-                    val incidentId = runCatching { JSONObject(payload.text).optString("entityId") }.getOrDefault("")
-                    replayPendingForIncident(incidentId)
                 }
+                val incidentId = runCatching { JSONObject(payload.text).optString("entityId") }.getOrDefault("")
+                replayPendingForIncident(incidentId)
             }
         }
         networkGateway.onEventSyncRequest = { endpointId, payload ->
             repositoryScope.launch {
-                handleSyncRequest(endpointId, payload.text)
+                if (runCatching { JSONObject(payload.text).optInt("protocol") == 2 }.getOrDefault(false))
+                    syncCoordinator?.receive(endpointId, payload)
+                else handleSyncRequest(endpointId, payload.text)
             }
         }
         networkGateway.onEventSyncResponse = { endpointId, payload ->
             repositoryScope.launch {
-                handleSyncResponse(endpointId, payload.text)
+                if (runCatching { JSONObject(payload.text).optInt("protocol") == 2 }.getOrDefault(false))
+                    syncCoordinator?.response(endpointId, payload)
+                else handleSyncResponse(endpointId, payload.text)
             }
         }
-        readyPeerEvents?.let { readyEvents ->
-            repositoryScope.launch {
-                readyEvents.events.collect { peer ->
-                    if (networkGateway.hasReadyEndpoint(peer.endpointId)) {
-                        startReconciliationWithPeer(peer.endpointId)
-                    }
-                }
-            }
+        repositoryScope.launch {
+            domainEventDao.getIncidentHistory().filter { !it.applied && it.validationStatus != "REJECTED" }
+                .map { it.entityId }.distinct().forEach { replayPendingForIncident(it) }
+        }
+        if (syncCoordinator != null) {
+            repositoryScope.launch { domainEventDao.observeIncidentHistory().collect { syncCoordinator.changed() } }
+            repositoryScope.launch { incidentDao.getAllIncidents().collect { syncCoordinator.changed() } }
+            offerDao?.let { dao -> repositoryScope.launch {
+                dao.observeAllActiveOffers().collect { syncCoordinator.changed() }
+            } }
         }
     }
 
     fun getAllIncidents(): Flow<List<IncidentEntity>> = incidentDao.getAllIncidents()
+    internal suspend fun syncSnapshot(): IncidentSyncSnapshot = syncStore.snapshot()
     fun getActiveIncidents(): Flow<List<IncidentEntity>> = incidentDao.getActiveIncidents()
     fun observeIncidentById(id: String): Flow<IncidentEntity?> = incidentDao.observeIncidentById(id)
     fun observeEventsForIncident(id: String): Flow<List<DomainEventEntity>> = domainEventDao.observeEventsForEntity(id)
@@ -392,7 +422,10 @@ class IncidentRepository(
         return true
     }
 
-    suspend fun applyIncomingEventJson(eventJson: String): Boolean {
+    suspend fun applyIncomingEventJson(eventJson: String): Boolean =
+        ingestIncomingEventJson(eventJson) == IncidentIngestionResult.APPLIED
+
+    suspend fun ingestIncomingEventJson(eventJson: String): IncidentIngestionResult {
         return try {
             val json = JSONObject(eventJson)
             val event = DomainEventEntity(
@@ -408,14 +441,50 @@ class IncidentRepository(
                 signature = json.optString("signature").takeIf { it.isNotBlank() },
                 applied = true
             )
-            applyIncomingEvent(event)
+            ingestIncomingEvent(event)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
         } catch (e: Exception) {
-            AppLogger.d("INCIDENT_REPO", "Failed to deserialize domain event: ${e.message}")
-            false
+            AppLogger.d("INCIDENT_REPO", "Failed to deserialize domain event")
+            IncidentIngestionResult.REJECTED
         }
     }
 
-    suspend fun applyIncomingEvent(event: DomainEventEntity): Boolean {
+    suspend fun applyIncomingEvent(event: DomainEventEntity): Boolean =
+        ingestIncomingEvent(event) == IncidentIngestionResult.APPLIED
+
+    suspend fun ingestIncomingEvent(event: DomainEventEntity): IncidentIngestionResult = projectionMutex.withLock {
+        ingestEventLocked(event)
+    }
+
+    private suspend fun ingestEventLocked(event: DomainEventEntity): IncidentIngestionResult {
+        var prior = domainEventDao.getEventById(event.eventId)
+        // Invalid first arrivals cannot reserve an ID against a later authentic original.
+        if (prior?.validationStatus == "REJECTED" &&
+            (prior.signature != event.signature || IncidentSyncSnapshot.eventHash(prior) != IncidentSyncSnapshot.eventHash(event))) {
+            domainEventDao.deleteRejectedEvent(event.eventId)
+            prior = null
+        }
+        if (prior != null && IncidentSyncSnapshot.eventHash(prior) != IncidentSyncSnapshot.eventHash(event)) {
+            AppLogger.d("INCIDENT_SYNC", "REJECTED reason=conflicting-event-id")
+            return IncidentIngestionResult.REJECTED
+        }
+        if (prior?.validationStatus == "REJECTED") return IncidentIngestionResult.REJECTED
+        if (prior?.applied == true) return IncidentIngestionResult.DUPLICATE
+        val applied = applyIncomingEventProjection(event)
+        val stored = domainEventDao.getEventById(event.eventId)
+        val result = when {
+            applied || stored?.applied == true -> IncidentIngestionResult.APPLIED
+            stored != null && stored.validationStatus != "REJECTED" -> IncidentIngestionResult.DEFERRED
+            else -> IncidentIngestionResult.REJECTED
+        }
+        if (result == IncidentIngestionResult.APPLIED) syncCoordinator?.changed()
+        if (result == IncidentIngestionResult.DEFERRED)
+            AppLogger.d("INCIDENT_SYNC", "DEPENDENCY_PENDING incident=${event.entityId}")
+        return result
+    }
+
+    private suspend fun applyIncomingEventProjection(event: DomainEventEntity): Boolean {
         val existingIncident = incidentDao.getIncidentById(event.entityId)
         if (existingIncident?.workflowVersion == 2 && event.eventType !in IncidentHelpWorkflow.TYPES &&
             event.eventType !in setOf(EventType.INCIDENT_RESOLVED.name, EventType.INCIDENT_CANCELLED.name)) {
@@ -424,33 +493,37 @@ class IncidentRepository(
         if (event.eventType in IncidentHelpWorkflow.TYPES ||
             (event.eventType in setOf(EventType.INCIDENT_RESOLVED.name, EventType.INCIDENT_CANCELLED.name) &&
                 existingIncident?.workflowVersion == 2)) {
-            return helpWorkflow?.apply(event) ?: false
+            return if (rebuilding) helpWorkflow?.applyDuringReplay(event) ?: false else helpWorkflow?.apply(event) ?: false
         }
+        return if (database != null) database.withTransaction { applyLegacyProjection(event) }
+            else applyLegacyProjection(event)
+    }
+
+    private suspend fun applyLegacyProjection(event: DomainEventEntity): Boolean {
         // Deduplication: Has this exact business event been recorded already?
-        if (domainEventDao.hasEvent(event.eventId)) {
+        if (domainEventDao.getEventById(event.eventId)?.applied == true) {
             AppLogger.d("INCIDENT_REPO", "Deduplication: Event ${event.eventId} already processed, skipping.")
             return false
         }
 
         if (event.entityType != EntityType.INCIDENT.name) {
-            domainEventDao.insertEvent(event)
-            return true
+            return rejectIncoming(event, "not an incident event")
         }
 
         val current = incidentDao.getIncidentById(event.entityId)
         val isCompetingAssignment = event.eventType == EventType.INCIDENT_ASSIGNED.name &&
             current?.status == IncidentState.ASSIGNED.name && event.logicalVersion == current.version
         if (event.eventType == EventType.INCIDENT_CREATED.name && event.logicalVersion != 1L) {
-            domainEventDao.insertEvent(event.copy(applied = false))
+            domainEventDao.insertEvent(event.copy(applied = false, validationStatus = "REJECTED"))
             return false
         }
         if (event.eventType != EventType.INCIDENT_CREATED.name && !isCompetingAssignment) {
-            if (!IncidentPolicy.mayPerform(current, event.eventType, event.actorId) ||
-                event.logicalVersion != (current?.version ?: 0L) + 1L
-            ) {
-                domainEventDao.insertEvent(event.copy(applied = false))
+            if (current == null || event.logicalVersion > current.version + 1L) {
+                domainEventDao.insertEvent(event.copy(applied = false, validationStatus = "UNVERIFIED"))
                 return false
             }
+            if (!IncidentPolicy.mayPerform(current, event.eventType, event.actorId) || event.logicalVersion != current.version + 1L)
+                return rejectIncoming(event, "invalid legacy authority or version")
         }
         val applied = when (event.eventType) {
             EventType.INCIDENT_CREATED.name -> {
@@ -507,8 +580,9 @@ class IncidentRepository(
                         database.withTransaction {
                             incidentDao.insertOrUpdate(newIncident)
                             domainEventDao.insertEvent(event.copy(applied = true))
+                            domainEventDao.setApplied(event.eventId, true)
+                            domainEventDao.setValidationStatus(event.eventId, "ACCEPTED")
                         }
-                        replayPendingForIncident(event.entityId)
                         return true
                     }
                     incidentDao.insertOrUpdate(newIncident)
@@ -627,12 +701,15 @@ class IncidentRepository(
         }
 
         domainEventDao.insertEvent(event.copy(applied = applied))
+        domainEventDao.setApplied(event.eventId, applied)
+        domainEventDao.setValidationStatus(event.eventId, if (applied) "ACCEPTED" else "REJECTED")
         return applied
     }
 
     private suspend fun rejectIncoming(event: DomainEventEntity, reason: String): Boolean {
         AppLogger.d("INCIDENT_REPO", "Rejected incident event ${event.eventId}: $reason")
-        domainEventDao.insertEvent(event.copy(applied = false))
+        domainEventDao.insertEvent(event.copy(applied = false, validationStatus = "REJECTED"))
+        domainEventDao.setValidationStatus(event.eventId, "REJECTED")
         return false
     }
 
@@ -663,10 +740,13 @@ class IncidentRepository(
 
             val bytes = ProtoBuf.encodeToByteArray(payload)
             if (isP0) {
-                networkGateway.broadcastPriorityPayload(bytes)
+                val result = networkGateway.broadcastPriorityPayload(bytes)
+                AppLogger.d("INCIDENT_SYNC", "BROADCAST event=${event.eventId} accepted=${result.acceptedCount} targets=${result.neighbors.size}")
             } else {
-                networkGateway.broadcastPayload(bytes)
+                val result = networkGateway.broadcastPayload(bytes)
+                AppLogger.d("INCIDENT_SYNC", "BROADCAST event=${event.eventId} accepted=${result.acceptedCount} targets=${result.neighbors.size}")
             }
+            syncCoordinator?.changed()
         }
     }
 
@@ -687,13 +767,19 @@ class IncidentRepository(
             relayHopCount = payload.relayHopCount + 1,
             ttl = if (payload.ttl > 0) payload.ttl - 1 else 0
         )
-        networkGateway.broadcastPayload(ProtoBuf.encodeToByteArray(updated), sourceEndpointId)
+        val result = networkGateway.broadcastPayload(ProtoBuf.encodeToByteArray(updated), sourceEndpointId)
+        AppLogger.d("INCIDENT_SYNC", "RELAY accepted=${result.acceptedCount} targets=${result.neighbors.size}")
     }
 
     /**
      * Reconnection Synchronization: sends recent event IDs to a newly connected peer.
      */
     fun startReconciliationWithPeer(endpointId: String) {
+        if (syncCoordinator != null) syncCoordinator.triggerEndpoint(endpointId)
+        else startLegacyReconciliationWithPeer(endpointId)
+    }
+
+    private fun startLegacyReconciliationWithPeer(endpointId: String) {
         repositoryScope.launch {
             if (!networkGateway.hasReadyEndpoint(endpointId)) return@launch
             requestEventPage(endpointId, 0)
@@ -717,7 +803,7 @@ class IncidentRepository(
                 text = json
             )
             val bytes = ProtoBuf.encodeToByteArray(payload)
-            networkGateway.sendDirectPayload(endpointId, bytes)
+            dispatchLegacyPayload(endpointId, bytes)
         }
     }
 
@@ -738,7 +824,7 @@ class IncidentRepository(
                         .put("events", JSONArray().apply { events.forEach { put(eventToJson(it)) } })
                         .toString()
                 )
-                networkGateway.sendDirectPayload(endpointId, ProtoBuf.encodeToByteArray(response))
+                dispatchLegacyPayload(endpointId, ProtoBuf.encodeToByteArray(response))
                 return
             }
             if (json.optInt("protocol", SYNC_PROTOCOL) != SYNC_PROTOCOL) return
@@ -789,7 +875,7 @@ class IncidentRepository(
                     }.toString()
                 )
                 val bytes = ProtoBuf.encodeToByteArray(respPayload)
-                networkGateway.sendDirectPayload(endpointId, bytes)
+                dispatchLegacyPayload(endpointId, bytes)
             }
         } catch (e: Exception) {
             AppLogger.d("INCIDENT_REPO", "Failed handling sync request: ${e.message}")
@@ -847,13 +933,25 @@ class IncidentRepository(
             text = JSONObject().put("type", "INCIDENT_EVENT_PAGE")
                 .put("offset", offset).toString()
         )
-        networkGateway.sendDirectPayload(endpointId, ProtoBuf.encodeToByteArray(request))
+        dispatchLegacyPayload(endpointId, ProtoBuf.encodeToByteArray(request))
+    }
+
+    private fun dispatchLegacyPayload(endpointId: String, bytes: ByteArray) {
+        repositoryScope.launch {
+            repeat(4) { attempt ->
+                if (!networkGateway.hasReadyEndpoint(endpointId)) return@launch
+                val result = networkGateway.sendDirectPayload(endpointId, bytes)
+                AppLogger.d("INCIDENT_SYNC", "LEGACY_SEND endpoint=$endpointId accepted=${result.accepted} bytes=${bytes.size}")
+                if (result.accepted) return@launch
+                if (attempt < 3) delay(longArrayOf(2_000, 4_000, 8_000)[attempt])
+            }
+        }
     }
 
     private suspend fun replayPendingForIncident(incidentId: String) {
         if (incidentId.isBlank()) return
         helpWorkflow?.reconcileWithdrawnSelection(incidentId)
-        repeat(MAX_SYNC_EVENTS + 1) {
+        while (true) {
             var progressed = false
             // Helper revision streams do not share the reporter's logical version. Drain
             // available offer changes before reporter closure, including legacy empty payloads.
@@ -868,5 +966,35 @@ class IncidentRepository(
             }
             if (!progressed) return
         }
+    }
+
+    private suspend fun rebuildProjection(incidentId: String) = projectionMutex.withLock {
+        suspend fun rebuild() {
+            suspend fun work() {
+                val original = domainEventDao.getEventsForEntity(incidentId)
+                    .filter { it.validationStatus == "ACCEPTED" }
+                if (original.none { it.eventType == EventType.INCIDENT_CREATED.name }) return
+                incidentDao.deleteIncident(incidentId)
+                offerDao?.deleteForIncident(incidentId)
+                domainEventDao.resetIncidentApplication(incidentId)
+                rebuilding = true
+                try {
+                    var pending = original.sortedWith(compareBy<DomainEventEntity> {
+                        if (it.eventType == EventType.INCIDENT_CREATED.name) 0 else if (it.eventType in IncidentHelpWorkflow.OFFER_TYPES) 1 else 2
+                    }.thenBy { it.logicalVersion }.thenBy { it.eventId })
+                    while (pending.isNotEmpty()) {
+                        var progressed = false
+                        pending.forEach { if (ingestEventLocked(it) == IncidentIngestionResult.APPLIED) progressed = true }
+                        pending = pending.filter { domainEventDao.getEventById(it.eventId)?.applied != true }
+                        if (!progressed) break
+                    }
+                    check(incidentDao.getIncidentById(incidentId) != null)
+                    check(pending.isEmpty()) { "history replay incomplete" }
+                    AppLogger.d("INCIDENT_SYNC", "PROJECTION_REBUILT incident=$incidentId")
+                } finally { rebuilding = false }
+            }
+            if (database != null) database.withTransaction { work() } else work()
+        }
+        if (helpWorkflow != null) helpWorkflow.withReplayLock { rebuild() } else rebuild()
     }
 }

@@ -36,10 +36,25 @@ interface DomainEventDao {
     @Query("UPDATE domain_events SET applied = :applied WHERE eventId = :eventId")
     suspend fun setApplied(eventId: String, applied: Boolean): Int
 
+    @Query("UPDATE domain_events SET validationStatus = :status WHERE eventId = :eventId")
+    suspend fun setValidationStatus(eventId: String, status: String): Int
+
+    @Query("DELETE FROM domain_events WHERE eventId = :eventId AND validationStatus = 'REJECTED'")
+    suspend fun deleteRejectedEvent(eventId: String): Int
+
+    @Query("SELECT * FROM domain_events WHERE entityType = 'INCIDENT' ORDER BY entityId, eventId")
+    suspend fun getIncidentHistory(): List<DomainEventEntity>
+
+    @Query("SELECT * FROM domain_events WHERE entityType = 'INCIDENT' ORDER BY entityId, eventId")
+    fun observeIncidentHistory(): Flow<List<DomainEventEntity>>
+
+    @Query("UPDATE domain_events SET applied = 0 WHERE entityId = :incidentId AND validationStatus = 'ACCEPTED'")
+    suspend fun resetIncidentApplication(incidentId: String): Int
+
     @Query("SELECT * FROM domain_events WHERE applied = 1 ORDER BY rowid ASC LIMIT :limit OFFSET :offset")
     suspend fun getSyncPage(limit: Int, offset: Int): List<DomainEventEntity>
 
-    @Query("SELECT * FROM domain_events WHERE entityId = :incidentId AND applied = 0 ORDER BY timestamp ASC, eventId ASC")
+    @Query("SELECT * FROM domain_events WHERE entityId = :incidentId AND applied = 0 AND validationStatus != 'REJECTED' ORDER BY timestamp ASC, eventId ASC")
     suspend fun getUnappliedForIncident(incidentId: String): List<DomainEventEntity>
 
 }

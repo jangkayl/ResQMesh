@@ -117,7 +117,7 @@ val appModule = module {
     single<com.example.testresqmesh.data.repository.IncidentEventSigning> {
         com.example.testresqmesh.data.repository.KeystoreIncidentEventSigning()
     }
-    single {
+    single(createdAtStart = true) {
         com.example.testresqmesh.data.repository.IncidentRepository(
             incidentDao = get<AppDatabase>().incidentDao(),
             domainEventDao = get<AppDatabase>().domainEventDao(),

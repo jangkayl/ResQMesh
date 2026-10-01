@@ -9,9 +9,44 @@ import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.json.JSONObject
 
 @RunWith(AndroidJUnit4::class)
 class AppDatabaseMigrationTest {
+    @Test fun versionNineToTenSeparatesValidationFromApplicationWithoutLosingHistory() = runBlocking {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val testContext = InstrumentationRegistry.getInstrumentation().context
+        val name = "migration_9_10_test.db"
+        context.deleteDatabase(name)
+        val file = context.getDatabasePath(name)
+        file.parentFile?.mkdirs()
+        SQLiteDatabase.openOrCreateDatabase(file, null).use { old ->
+            val entities = JSONObject(testContext.assets.open("com.example.testresqmesh.data.local.AppDatabase/9.json")
+                .bufferedReader().use { it.readText() }).getJSONObject("database").getJSONArray("entities")
+            for (i in 0 until entities.length()) {
+                val entity = entities.getJSONObject(i)
+                val table = entity.getString("tableName")
+                old.execSQL(entity.getString("createSql").replace("\${TABLE_NAME}", table))
+                val indexes = entity.getJSONArray("indices")
+                for (j in 0 until indexes.length())
+                    old.execSQL(indexes.getJSONObject(j).getString("createSql").replace("\${TABLE_NAME}", table))
+            }
+            old.execSQL("INSERT INTO domain_events VALUES ('accepted', 'i', 'INCIDENT', 'INCIDENT_CREATED', 'a', 'A', 1, 1, '{}', NULL, 1)")
+            old.execSQL("INSERT INTO domain_events VALUES ('pending', 'i', 'INCIDENT', 'INCIDENT_CANCELLED', 'a', 'A', 2, 2, '{}', NULL, 0)")
+            old.version = 9
+        }
+        try {
+            val upgraded = AppDatabase.buildDatabase(context, name)
+            try {
+                val events = upgraded.domainEventDao()
+                assertEquals("ACCEPTED", events.getEventById("accepted")?.validationStatus)
+                assertEquals(true, events.getEventById("accepted")?.applied)
+                assertEquals("UNVERIFIED", events.getEventById("pending")?.validationStatus)
+                assertEquals(false, events.getEventById("pending")?.applied)
+                assertEquals(2, events.getIncidentHistory().size)
+            } finally { upgraded.close() }
+        } finally { context.deleteDatabase(name) }
+    }
     @Test fun versionSixToEightKeepsMessagesAndLegacyIncidents() = runBlocking {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val name = "migration_6_7_test.db"

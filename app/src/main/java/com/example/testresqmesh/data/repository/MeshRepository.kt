@@ -241,6 +241,7 @@ class MeshRepository(
             }
 
             _connectedDevices.value = updatedList
+            readyPeerEvents.update(updatedList.filterNot { networkManager.isDeviceBlocked(it.name) })
             meshRouter.recalculateKnownNodes(myNodeName, updatedList.filter { it.isPayloadReady })
             if (device.isPayloadReady) {
                 scheduleOutboxFlush()
@@ -261,6 +262,7 @@ class MeshRepository(
                 meshRouter.removeNode(disconnectedDevice.name)
             }
             meshRouter.recalculateKnownNodes(myNodeName, readyConnectedDevices())
+            readyPeerEvents.update(readyConnectedDevices().filterNot { networkManager.isDeviceBlocked(it.name) })
         }
 
         networkManager.onDeviceLivenessChanged = { endpointId, responsive ->
@@ -490,6 +492,7 @@ class MeshRepository(
         networkManager.stopMeshNode()
         _isOnline.value = false
         _connectedDevices.value = emptyList()
+        readyPeerEvents.update(emptyList())
         _scannedDevices.value = emptyList()
     }
 

@@ -6,7 +6,7 @@ Last reviewed: 2026-10-01. Source and device evidence prevail.
 
 ResQMesh is a Kotlin Android app (SDK 24–36). Compose provides UI, Room stores state, Kotlin serialization encodes `MeshPayload`, Koin supplies dependencies, and coroutines connect events to repositories and ViewModels.
 
-The active transport is native BLE advertising/scanning plus GATT client/server roles and optional L2CAP payloads. GATT remains required for setup, readiness, heartbeat, and fallback. Direct dispatch reports acceptance or an exact rejection; only a receipt proves delivery. Nearby Connections and Wi-Fi Direct are not implemented.
+Native BLE advertising/scanning, GATT, and optional L2CAP carry traffic. GATT owns setup, readiness, heartbeat, and fallback. Direct dispatch reports acceptance or an exact rejection; only a receipt proves delivery. Nearby Connections and Wi-Fi Direct are not implemented.
 
 ## Data path
 
@@ -87,7 +87,7 @@ This is not yet a basis for claiming authenticated end-to-end encryption or forw
 
 `MeshRepository` joins callbacks, routing, persistence, and UI. Gateway broadcast results report per-neighbor acceptance. Public sends persist pending before dispatch; wholly rejected sends retry, partial acceptance does not rebroadcast, and feedback never implies delivery. A mutex serializes public dispatch/outbox flush. `MeshNetworkGateway` hides Bluetooth types; `MessageStore` hides Room. `PrivateDeliveryPlanner` chooses exact hops. Koin supplies adapters and `AppCoroutineScope` owns background work. UI rules: `docs/ui.md`; evidence: `docs/validation.md`.
 
-Local identity lives in Room; serialized setup/rename preserves user/device IDs and keys and mirrors preferences. Incident ownership uses creator ID and signing key, never names. Report-time names and signed activity stay unchanged. Workflow-v2 offers have independent helper revisions. Selection locks local editing; helpers confirm commitment. Withdrawal or valid offline newer revisions atomically clear selection and reopen requests without advancing reporter versions. Loading/replay repairs stale projections; superseded selections consume reporter versions, and signed historical evidence permits revocation no-ops without clearing newer selections. Only reporters select/resolve/cancel; replacement is never automatic. Workflow-v1 and terminal history remain unchanged. Accepted events/projections share a Room transaction. P-256 signatures prove key continuity, not real-world identity. Reconnect exchanges applied event pages and bounded summaries; physical convergence and durable delivery remain unverified. Location is a snapshot.
+Local identity lives in Room; serialized setup/rename preserves user/device IDs and keys and mirrors preferences. Incident ownership uses creator ID and signing key, never names. Report-time names and signed activity stay unchanged. Workflow-v2 offers have independent helper revisions. Selection locks local editing; helpers confirm commitment. Withdrawal or valid offline newer revisions atomically clear selection and reopen requests without advancing reporter versions. Loading/replay repairs stale projections; superseded selections consume reporter versions, and signed historical evidence permits revocation no-ops without clearing newer selections. Only reporters select/resolve/cancel; replacement is never automatic. Workflow-v1 and terminal history remain unchanged. Accepted events/projections share a Room transaction. P-256 signatures prove key continuity, not real-world identity. IncidentSyncCoordinator compares SHA-256 history/state digests after READY/changes and every 30 seconds, repairs missing events in bounded pages, and verifies peer/snapshot completion. Room 9 to 10 separates validation from application. Legacy fallback is limited; physical convergence remains open. Location is a snapshot.
 
 Closure signs prerequisite IDs and reconstructs helper history from signed events; confirmation time is event time. Missing dependencies defer closure across pages. Legacy empty closures prioritize available offer changes but cannot identify missing prerequisites. Use matching builds; older apps ignore dependencies.
 
@@ -113,4 +113,4 @@ Background mesh is opt-in. `MeshSessionController` owns start/stop; `MeshForegro
 | MapLibre / Offline Maps | `core/map/`, `feature/sos/ui/SosMapScreen.kt` |
 | Background session | `core/service/MeshSessionController.kt`, `MeshForegroundService.kt` |
 
-Source code and focused device traces take precedence over this summary.
+Source and device traces prevail.
