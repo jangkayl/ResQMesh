@@ -287,4 +287,100 @@ class IncidentStateMachineAndDeduplicationTest {
         assertEquals(10.3157, payload.getDouble("latitude"), 0.0)
         assertEquals(12.0, payload.getDouble("locationAccuracyMeters"), 0.0)
     }
+
+    @Test
+    fun incidentTitleRoundTripsThroughCreationAndPayload() = testScope.runTest {
+        val incident = incidentRepository.createIncident(
+            incidentType = "Medical",
+            severity = "Serious",
+            description = "Patient injured",
+            areaDescription = "Gate 2",
+            title = "Help moving an injured person"
+        )
+        assertEquals("Help moving an injured person", incident.title)
+        val stored = incidentDao.getIncidentById(incident.incidentId)
+        assertEquals("Help moving an injured person", stored?.title)
+        val payload = JSONObject(domainEventDao.getEventsForEntity(incident.incidentId).single().payloadJson)
+        assertEquals("Help moving an injured person", payload.getString("title"))
+    }
+
+    @Test
+    fun incomingIncidentAcceptsValidTitleAndLegacyMissingTitle() = testScope.runTest {
+        val validWithTitle = DomainEventEntity(
+            eventId = "EVT-TITLE-1", entityId = "INC-TITLE-1", entityType = EntityType.INCIDENT.name,
+            eventType = EventType.INCIDENT_CREATED.name, actorId = "USR-REMOTE", actorName = "Remote",
+            logicalVersion = 1L, timestamp = 1000L,
+            payloadJson = JSONObject().put("incidentType", "Fire").put("title", "Warehouse fire on 2nd floor").toString()
+        )
+        assertTrue(incidentRepository.applyIncomingEvent(validWithTitle))
+        assertEquals("Warehouse fire on 2nd floor", incidentDao.getIncidentById("INC-TITLE-1")?.title)
+
+        val legacyNoTitle = DomainEventEntity(
+            eventId = "EVT-TITLE-2", entityId = "INC-TITLE-2", entityType = EntityType.INCIDENT.name,
+            eventType = EventType.INCIDENT_CREATED.name, actorId = "USR-REMOTE", actorName = "Remote",
+            logicalVersion = 1L, timestamp = 1000L,
+            payloadJson = JSONObject().put("incidentType", "Medical").toString()
+        )
+        assertTrue(incidentRepository.applyIncomingEvent(legacyNoTitle))
+        assertEquals("", incidentDao.getIncidentById("INC-TITLE-2")?.title)
+    }
+
+    @Test
+    fun incomingIncidentRejectsNonTextOrOver80Title() = testScope.runTest {
+        val nonTextTitle = DomainEventEntity(
+            eventId = "EVT-TITLE-BAD1", entityId = "INC-TITLE-BAD1", entityType = EntityType.INCIDENT.name,
+            eventType = EventType.INCIDENT_CREATED.name, actorId = "USR-REMOTE", actorName = "Remote",
+            logicalVersion = 1L, timestamp = 1000L,
+            payloadJson = "{\"incidentType\":\"Fire\",\"title\":12345}"
+        )
+        assertFalse(incidentRepository.applyIncomingEvent(nonTextTitle))
+
+        val over80Title = DomainEventEntity(
+            eventId = "EVT-TITLE-BAD2", entityId = "INC-TITLE-BAD2", entityType = EntityType.INCIDENT.name,
+            eventType = EventType.INCIDENT_CREATED.name, actorId = "USR-REMOTE", actorName = "Remote",
+            logicalVersion = 1L, timestamp = 1000L,
+            payloadJson = JSONObject().put("incidentType", "Fire").put("title", "A".repeat(81)).toString()
+        )
+        assertFalse(incidentRepository.applyIncomingEvent(over80Title))
+    }
+
+    @Test
+    fun signedIncidentCreationVerifiesTitleAndRejectsTampering() = testScope.runTest {
+        val testSigner = object : IncidentEventSigning {
+            override val publicKey: String = "test-pub-key"
+            override fun sign(event: DomainEventEntity): String = "sig-${event.payloadJson}"
+            override fun verify(event: DomainEventEntity, publicKey: String): Boolean =
+                event.signature == "sig-${event.payloadJson}"
+        }
+        val signingRepo = IncidentRepository(
+            incidentDao = incidentDao,
+            domainEventDao = domainEventDao,
+            identityManager = fakeIdentityManager,
+            networkGateway = fakeNetworkGateway,
+            repositoryScope = testScope,
+            eventSigning = testSigner
+        )
+        val validPayload = JSONObject().apply {
+            put("incidentType", "Medical")
+            put("title", "Signed Title")
+            put("workflowVersion", 2)
+            put("reporterSigningKey", "test-pub-key")
+        }.toString()
+        val validEvent = DomainEventEntity(
+            eventId = "EVT-SIGNED-1", entityId = "INC-SIGNED-1", entityType = EntityType.INCIDENT.name,
+            eventType = EventType.INCIDENT_CREATED.name, actorId = "USR-REMOTE", actorName = "Remote",
+            logicalVersion = 1L, timestamp = 1000L, payloadJson = validPayload
+        ).let { it.copy(signature = testSigner.sign(it)) }
+
+        assertTrue(signingRepo.applyIncomingEvent(validEvent))
+        assertEquals("Signed Title", incidentDao.getIncidentById("INC-SIGNED-1")?.title)
+
+        // Tampering with title invalidates signature
+        val tamperedPayload = JSONObject(validPayload).put("title", "Tampered Title").toString()
+        val tamperedEvent = validEvent.copy(
+            eventId = "EVT-SIGNED-2", entityId = "INC-SIGNED-2",
+            payloadJson = tamperedPayload
+        )
+        assertFalse(signingRepo.applyIncomingEvent(tamperedEvent))
+    }
 }

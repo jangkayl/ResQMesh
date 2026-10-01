@@ -45,7 +45,7 @@ Public queue rejection/partial acceptance uses feedback; acceptance never implie
 - Distinguish queued, sending, delivered, failed, and blocked outcomes; do not imply peer receipt from enqueue.
 - Inbox rows do not mark private messages seen; visible chat bubbles do. Keep Unread selectable at zero and use filter-specific empty states.
 - SOS alerts and cancellation feedback must identify the relevant alert/sender.
-- Incidents distinguish local save, pending selection, confirmation, and sync uncertainty. Offers are self-reported by helpers. Unreachability never auto-reassigns. Detail sheets use 3 tabs (Briefing, Offers, Timeline), docked tactical actions, reachability dots, and capability chips.
+- Incidents show historical reporter names and owner badges. Identity loading/errors explain unavailable controls. Selection locks offer editing; withdrawal removes selection. Route loss never reassigns. Details use one page, docked actions, and verified connection labels.
 - SOS uses one accessible slide ("Slide to Broadcast"); early release resets it.
 - Radio plays recorded notes in order and shows the current speaker name. Off clears its queue; manual chat audio takes priority, then Radio resumes.
 - SOS illumination works in both appearances.

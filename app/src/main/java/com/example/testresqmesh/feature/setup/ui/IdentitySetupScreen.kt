@@ -57,18 +57,29 @@ import kotlinx.coroutines.launch
 fun IdentitySetupScreen(viewModel: SetupViewModel, onIdentityGenerated: () -> Unit) {
     val context = LocalContext.current
     var customName by remember { mutableStateOf(viewModel.getSavedName(context)) }
+    val scope = rememberCoroutineScope()
+    var saving by remember { mutableStateOf(false) }
+    var startError by remember { mutableStateOf<String?>(null) }
 
     IdentitySetupContent(
         customName = customName,
         onCustomNameChange = { customName = it },
+        isSaving = saving,
+        errorMessage = startError,
         onIdentityGenerated = {
-            viewModel.checkHardwareAndGoOnline(
-                context = context,
-                customName = customName.ifEmpty { Build.MODEL },
-                nodeTag = "",
-                teamKey = "PUBLIC"
-            )
-            onIdentityGenerated()
+            if (!saving) scope.launch {
+                saving = true
+                try {
+                    val error = viewModel.checkHardwareAndGoOnline(
+                        context = context,
+                        customName = customName.ifEmpty { Build.MODEL },
+                        nodeTag = "",
+                        teamKey = "PUBLIC"
+                    )
+                    startError = error?.message
+                    if (error == null) onIdentityGenerated()
+                } finally { saving = false }
+            }
         }
     )
 }
@@ -77,7 +88,9 @@ fun IdentitySetupScreen(viewModel: SetupViewModel, onIdentityGenerated: () -> Un
 fun IdentitySetupContent(
     customName: String,
     onCustomNameChange: (String) -> Unit,
-    onIdentityGenerated: () -> Unit
+    onIdentityGenerated: () -> Unit,
+    isSaving: Boolean = false,
+    errorMessage: String? = null
 ) {
     val scrollState = rememberScrollState()
     val coroutineScope = rememberCoroutineScope()
@@ -329,7 +342,9 @@ fun IdentitySetupContent(
             Spacer(Modifier.height(if (isKeyboardOpen) 16.dp else Spacing.ExtraLarge))
 
             // Continue CTA Button
+            errorMessage?.let { Text(it, color = MaterialTheme.colorScheme.error) }
             ResQButton(
+                enabled = !isSaving,
                 onClick = {
                     submitAttempted = true
                     if (customName.isNotBlank()) onIdentityGenerated()

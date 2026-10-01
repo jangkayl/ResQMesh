@@ -1,44 +1,46 @@
 package com.example.testresqmesh.feature.incident.ui
 
 import androidx.compose.animation.*
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material.icons.outlined.*
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.outlined.FilterList
+import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.testresqmesh.core.ui.theme.ResQTheme
+import com.example.testresqmesh.core.model.NodeIdentity
 import com.example.testresqmesh.core.ui.theme.Spacing
-import com.example.testresqmesh.data.local.entity.IncidentEntity
+import com.example.testresqmesh.core.ui.theme.TacticalBlack
+import com.example.testresqmesh.core.ui.theme.TacticalCarbon
 import com.example.testresqmesh.feature.incident.ui.components.CreateIncidentSheet
 import com.example.testresqmesh.feature.incident.ui.components.IncidentDetailSheet
+import com.example.testresqmesh.feature.incident.ui.components.IncidentFilterSheet
 import com.example.testresqmesh.feature.incident.ui.components.TacticalIncidentCard
+import com.example.testresqmesh.feature.incident.viewmodel.IncidentDestination
+import com.example.testresqmesh.feature.incident.viewmodel.IncidentViewModel
+import com.example.testresqmesh.data.repository.IncidentOwnership
 import com.example.testresqmesh.feature.radar.ui.NodeKind
 import com.example.testresqmesh.feature.radar.ui.classifyRadarNodes
-import com.example.testresqmesh.core.model.NodeIdentity
 import com.example.testresqmesh.ui.state.RadarUiState
-import com.example.testresqmesh.feature.incident.viewmodel.IncidentMetrics
-import com.example.testresqmesh.feature.incident.viewmodel.IncidentScope
-import com.example.testresqmesh.feature.incident.viewmodel.IncidentViewModel
-import com.example.testresqmesh.feature.incident.viewmodel.TriageQuickFilter
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -50,54 +52,54 @@ fun IncidentListScreen(
 ) {
     val filteredIncidents by viewModel.filteredIncidents.collectAsState()
     val metrics by viewModel.metrics.collectAsState()
-    val currentScope by viewModel.scope.collectAsState()
-    val currentTriage by viewModel.triageFilter.collectAsState()
+    val currentDestination by viewModel.destination.collectAsState()
+    val filters by viewModel.filters.collectAsState()
+    val appliedFilterCount by viewModel.appliedFilterCount.collectAsState()
     val searchQuery by viewModel.searchQuery.collectAsState()
-    val selectedTypeFilter by viewModel.selectedTypeFilter.collectAsState()
 
     val selectedIncident by viewModel.selectedIncident.collectAsState()
     val events by viewModel.incidentEvents.collectAsState()
     val offers by viewModel.offers.collectAsState()
     val actionMessage by viewModel.actionMessage.collectAsState()
     val actionBusy by viewModel.actionBusy.collectAsState()
-    val localUser by viewModel.localUser.collectAsState()
+    val identity by viewModel.identityState.collectAsState()
+    val localUser = identity.user
     val offersByIncident by viewModel.offersByIncident.collectAsState()
     val myOfferedIncidentIds by viewModel.myOfferedIncidentIds.collectAsState()
 
     var showCreateSheet by remember { mutableStateOf(false) }
+    var showFilterSheet by remember { mutableStateOf(false) }
     var createError by remember { mutableStateOf<String?>(null) }
     var isCreating by remember { mutableStateOf(false) }
     var isSearchVisible by remember { mutableStateOf(false) }
 
+    val snackbarHostState = remember { SnackbarHostState() }
+    val coroutineScope = rememberCoroutineScope()
+
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
-            Column(modifier = Modifier.background(MaterialTheme.colorScheme.background)) {
-                // 1. Top App Bar
+            Column(
+                modifier = Modifier
+                    .background(MaterialTheme.colorScheme.surface)
+                    .fillMaxWidth()
+            ) {
                 TopAppBar(
                     title = {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(10.dp)
-                        ) {
-                            Text("Emergency Incidents", fontWeight = FontWeight.Bold)
-                            if (metrics.totalActive > 0) {
-                                Surface(
-                                    shape = CircleShape,
-                                    color = if (metrics.criticalCount > 0) ResQTheme.colors.sos else MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.size(24.dp)
-                                ) {
-                                    Box(contentAlignment = Alignment.Center) {
-                                        Text(
-                                            text = "${metrics.totalActive}",
-                                            style = MaterialTheme.typography.labelSmall.copy(
-                                                fontWeight = FontWeight.Black,
-                                                fontSize = 11.sp
-                                            ),
-                                            color = Color.White
-                                        )
-                                    }
-                                }
-                            }
+                        Column {
+                            Text(
+                                text = "Emergency incidents",
+                                style = MaterialTheme.typography.titleLarge.copy(
+                                    fontSize = 18.sp,
+                                    fontWeight = FontWeight.Bold
+                                ),
+                                modifier = Modifier.semantics { heading() }
+                            )
+                            Text(
+                                text = "See requests and offer help.",
+                                style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
                         }
                     },
                     navigationIcon = {
@@ -109,14 +111,35 @@ fun IncidentListScreen(
                         IconButton(onClick = { isSearchVisible = !isSearchVisible }) {
                             Icon(
                                 imageVector = if (isSearchVisible) Icons.Default.Close else Icons.Outlined.Search,
-                                contentDescription = "Search",
-                                tint = if (searchQuery.isNotEmpty()) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                                contentDescription = "Search"
                             )
                         }
-                    }
+                        BadgedBox(
+                            badge = {
+                                if (appliedFilterCount > 0) {
+                                    Badge { Text("$appliedFilterCount") }
+                                }
+                            }
+                        ) {
+                            IconButton(onClick = { showFilterSheet = true }) {
+                                Icon(Icons.Outlined.FilterList, contentDescription = "Filter")
+                            }
+                        }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = MaterialTheme.colorScheme.surface
+                    )
                 )
 
-                // 2. Expandable Search Bar
+                if (identity.loading || identity.error != null) {
+                    Row(Modifier.fillMaxWidth().padding(horizontal = Spacing.Large), verticalAlignment = Alignment.CenterVertically) {
+                        Text(if (identity.loading) "Checking your identity…" else identity.error.orEmpty(),
+                            modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurface)
+                        if (!identity.loading) TextButton(onClick = viewModel::retryIdentity) { Text("Retry identity") }
+                    }
+                }
+                // Search input
                 AnimatedVisibility(
                     visible = isSearchVisible,
                     enter = expandVertically() + fadeIn(),
@@ -125,12 +148,12 @@ fun IncidentListScreen(
                     OutlinedTextField(
                         value = searchQuery,
                         onValueChange = { viewModel.setSearchQuery(it) },
-                        placeholder = { Text("Search landmark, reporter, or details…") },
-                        leadingIcon = { Icon(Icons.Outlined.Search, contentDescription = null) },
+                        placeholder = { Text("Search title, landmark, reporter, or helper…", fontSize = 13.sp) },
+                        leadingIcon = { Icon(Icons.Outlined.Search, contentDescription = null, modifier = Modifier.size(18.dp)) },
                         trailingIcon = {
                             if (searchQuery.isNotEmpty()) {
                                 IconButton(onClick = { viewModel.setSearchQuery("") }) {
-                                    Icon(Icons.Default.Clear, contentDescription = "Clear")
+                                    Icon(Icons.Default.Clear, contentDescription = "Clear search", modifier = Modifier.size(18.dp))
                                 }
                             }
                         },
@@ -142,134 +165,82 @@ fun IncidentListScreen(
                     )
                 }
 
-                // 3. Primary Segment Switcher (LIVE OPERATIONS vs ARCHIVE)
-                PrimaryTabRow(
-                    selectedTabIndex = currentScope.ordinal,
-                    containerColor = MaterialTheme.colorScheme.surface,
-                    contentColor = MaterialTheme.colorScheme.primary,
-                    divider = {}
-                ) {
-                    Tab(
-                        selected = currentScope == IncidentScope.LIVE_OPERATIONS,
-                        onClick = { viewModel.setScope(IncidentScope.LIVE_OPERATIONS) },
-                        text = {
-                            Text(
-                                "Live Operations (${metrics.totalActive})",
-                                fontSize = 13.sp,
-                                fontWeight = if (currentScope == IncidentScope.LIVE_OPERATIONS) FontWeight.Bold else FontWeight.Normal
-                            )
-                        }
-                    )
-                    Tab(
-                        selected = currentScope == IncidentScope.ARCHIVE,
-                        onClick = { viewModel.setScope(IncidentScope.ARCHIVE) },
-                        text = {
-                            Text(
-                                "Archive / History",
-                                fontSize = 13.sp,
-                                fontWeight = if (currentScope == IncidentScope.ARCHIVE) FontWeight.Bold else FontWeight.Normal
-                            )
-                        }
-                    )
-                }
+                // Primary Destination Segmented Pill Bar (Matching Concept Mockup)
+                val isNight = MaterialTheme.colorScheme.background == TacticalBlack || MaterialTheme.colorScheme.surface == TacticalCarbon
+                val activeTabBg = if (isNight) MaterialTheme.colorScheme.primaryContainer else Color(0xFF264264)
+                val activeTabTextColor = if (isNight) MaterialTheme.colorScheme.onPrimaryContainer else Color.White
 
-                // 4. Smart Triage Pill Bar (Horizontal scroll of essential quick-filters)
-                Row(
+                Surface(
+                    shape = RoundedCornerShape(24.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .horizontalScroll(rememberScrollState())
-                        .padding(horizontal = Spacing.Large, vertical = 8.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                        .padding(horizontal = Spacing.Large, vertical = 6.dp)
                 ) {
-                    val hasActiveFilters = currentTriage != TriageQuickFilter.ALL || selectedTypeFilter != null || searchQuery.isNotEmpty()
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        IncidentDestination.values().forEach { destination ->
+                            val isSelected = currentDestination == destination
+                            val count = when (destination) {
+                                IncidentDestination.ACTIVE -> metrics.totalActive
+                                IncidentDestination.MY_ACTIVITY -> metrics.myActivityCount
+                                IncidentDestination.HISTORY -> metrics.historyCount
+                            }
+                            val label = when (destination) {
+                                IncidentDestination.ACTIVE -> "Active ($count)"
+                                IncidentDestination.MY_ACTIVITY -> "My activity ($count)"
+                                IncidentDestination.HISTORY -> "History ($count)"
+                            }
 
-                    if (hasActiveFilters) {
-                        Surface(
-                            shape = RoundedCornerShape(8.dp),
-                            color = MaterialTheme.colorScheme.surfaceVariant,
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(8.dp))
-                                .clickable { viewModel.clearFilters() }
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            Surface(
+                                shape = RoundedCornerShape(20.dp),
+                                color = if (isSelected) activeTabBg else Color.Transparent,
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clip(RoundedCornerShape(20.dp))
+                                    .clickable { viewModel.setDestination(destination) }
                             ) {
-                                Icon(Icons.Default.Close, contentDescription = null, modifier = Modifier.size(12.dp))
-                                Text("Reset", fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                                Box(
+                                    contentAlignment = Alignment.Center,
+                                    modifier = Modifier.padding(vertical = 8.dp, horizontal = 4.dp)
+                                ) {
+                                    Text(
+                                        text = label,
+                                        style = MaterialTheme.typography.labelMedium.copy(
+                                            fontSize = 12.sp,
+                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+                                        ),
+                                        color = if (isSelected) activeTabTextColor else MaterialTheme.colorScheme.onSurfaceVariant,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
                             }
                         }
                     }
-                    if (!isSearchVisible && searchQuery.isNotEmpty()) {
-                        FilterChip(selected = true, onClick = { isSearchVisible = true },
-                            label = { Text("Search: $searchQuery", maxLines = 1) })
-                    }
+                }
 
-                    // Triage Quick-Filter Pills (Active Operations only)
-                    if (currentScope == IncidentScope.LIVE_OPERATIONS) {
-                        // All Live Pill
-                        FilterChip(
-                            selected = currentTriage == TriageQuickFilter.ALL,
-                            onClick = { viewModel.setTriageFilter(TriageQuickFilter.ALL) },
-                            label = { Text("All (${metrics.totalActive})", fontSize = 12.sp) }
+                // Active filter banner / reset row
+                if (appliedFilterCount > 0 || searchQuery.isNotEmpty()) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = Spacing.Large, vertical = 6.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = if (appliedFilterCount > 0) "$appliedFilterCount filter(s) applied" else "Searching: \"$searchQuery\"",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.primary
                         )
-
-                        // Needs Triage Pill
-                        FilterChip(
-                            selected = currentTriage == TriageQuickFilter.NEEDS_TRIAGE,
-                            onClick = { viewModel.setTriageFilter(TriageQuickFilter.NEEDS_TRIAGE) },
-                            label = { Text("⚠️ Needs Triage (${metrics.needsTriageCount})", fontSize = 12.sp) },
-                            colors = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = ResQTheme.colors.warningContainer,
-                                selectedLabelColor = ResQTheme.colors.onWarningContainer
-                            )
-                        )
-
-                        // Needs Helpers (0 Offers) Pill
-                        FilterChip(
-                            selected = currentTriage == TriageQuickFilter.UNASSISTED_ONLY,
-                            onClick = { viewModel.setTriageFilter(TriageQuickFilter.UNASSISTED_ONLY) },
-                            label = { Text("🤝 Needs Helpers (${metrics.unassistedCount})", fontSize = 12.sp) },
-                            colors = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = ResQTheme.colors.warningContainer,
-                                selectedLabelColor = ResQTheme.colors.onWarningContainer
-                            )
-                        )
-
-                        // Critical Only Pill
-                        FilterChip(
-                            selected = currentTriage == TriageQuickFilter.CRITICAL_ONLY,
-                            onClick = { viewModel.setTriageFilter(TriageQuickFilter.CRITICAL_ONLY) },
-                            label = { Text("🚨 Critical (${metrics.criticalCount})", fontSize = 12.sp) },
-                            colors = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = ResQTheme.colors.sosContainer,
-                                selectedLabelColor = ResQTheme.colors.onSosContainer
-                            )
-                        )
-
-                        // My Tasks Pill
-                        FilterChip(
-                            selected = currentTriage == TriageQuickFilter.MY_TASKS,
-                            onClick = { viewModel.setTriageFilter(TriageQuickFilter.MY_TASKS) },
-                            label = { Text("👤 My Tasks (${metrics.myTasksCount})", fontSize = 12.sp) },
-                            colors = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                                selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer
-                            )
-                        )
-                    }
-
-                    // Emergency Type Filter Chips
-                    val types = listOf("Medical", "Trapped", "Fire", "Injury", "Flood", "Other")
-                    types.forEach { t ->
-                        val isSelected = selectedTypeFilter == t
-                        FilterChip(
-                            selected = isSelected,
-                            onClick = { viewModel.setTypeFilter(t) },
-                            label = { Text(t, fontSize = 12.sp) }
-                        )
+                        TextButton(onClick = { viewModel.clearFilters() }) {
+                            Text("Clear filters")
+                        }
                     }
                 }
             }
@@ -278,8 +249,8 @@ fun IncidentListScreen(
             ExtendedFloatingActionButton(
                 onClick = { showCreateSheet = true },
                 icon = { Icon(Icons.Default.Add, contentDescription = null) },
-                text = { Text("Report Incident", fontWeight = FontWeight.Bold) },
-                containerColor = MaterialTheme.colorScheme.error,
+                text = { Text("Report incident", fontSize = 15.sp, fontWeight = FontWeight.Bold) },
+                containerColor = MaterialTheme.colorScheme.primary,
                 contentColor = Color.White
             )
         }
@@ -288,16 +259,62 @@ fun IncidentListScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
+                .wrapContentWidth(Alignment.CenterHorizontally)
+                .widthIn(max = 680.dp)
         ) {
             if (filteredIncidents.isEmpty()) {
-                IncidentEmptyState(
-                    scope = currentScope,
-                    triageFilter = currentTriage,
-                    searchQuery = searchQuery,
-                    hasTypeFilter = selectedTypeFilter != null,
-                    onReport = { showCreateSheet = true },
-                    onResetFilters = { viewModel.clearFilters() }
-                )
+                val isFiltered = appliedFilterCount > 0 || searchQuery.isNotEmpty()
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(Spacing.Large),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                        modifier = Modifier.padding(Spacing.Large)
+                    ) {
+                        Text(
+                            text = when {
+                                currentDestination == IncidentDestination.MY_ACTIVITY && identity.loading -> "Checking your identity…"
+                                currentDestination == IncidentDestination.MY_ACTIVITY && identity.error != null -> "Identity unavailable"
+                                isFiltered -> "No matching incidents"
+                                currentDestination == IncidentDestination.ACTIVE -> "No active incidents"
+                                currentDestination == IncidentDestination.MY_ACTIVITY -> "No activity yet"
+                                else -> "No emergency history"
+                            },
+                            style = MaterialTheme.typography.titleMedium.copy(
+                                fontSize = 18.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        )
+                        Text(
+                            text = when {
+                                currentDestination == IncidentDestination.MY_ACTIVITY && identity.loading ->
+                                    "Your reports and offers will appear when your identity is ready."
+                                currentDestination == IncidentDestination.MY_ACTIVITY && identity.error != null ->
+                                    "Use Retry identity above to restore access to your activity."
+                                isFiltered -> "No emergency incidents match your search or filters on this phone."
+                                currentDestination == IncidentDestination.ACTIVE -> "No active emergency incidents on this phone."
+                                currentDestination == IncidentDestination.MY_ACTIVITY -> "No emergency reports or offers involving you on this phone."
+                                else -> "Resolved and cancelled emergency requests on this phone will appear here."
+                            },
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                        )
+                        if (isFiltered) {
+                            OutlinedButton(onClick = { viewModel.clearFilters() }) {
+                                Text("Clear filters")
+                            }
+                        } else if (currentDestination == IncidentDestination.ACTIVE) {
+                            Button(onClick = { showCreateSheet = true }) {
+                                Text("Report incident")
+                            }
+                        }
+                    }
+                }
             } else {
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
@@ -305,16 +322,19 @@ fun IncidentListScreen(
                     contentPadding = PaddingValues(
                         start = Spacing.Large,
                         end = Spacing.Large,
-                        top = Spacing.Small,
+                        top = Spacing.Medium,
                         bottom = 100.dp
                     )
                 ) {
                     items(filteredIncidents, key = { it.incidentId }) { incident ->
-                        val isMine = localUser?.userId != null && localUser!!.userId == incident.creatorId
+                        val isMine = IncidentOwnership.isReporter(incident, localUser?.userId, identity.signingKey)
                         val isAssignedToMe = localUser?.userId != null && localUser!!.userId == incident.primaryResponderId
                         val incidentOffers = offersByIncident[incident.incidentId].orEmpty()
                         val activeOffersCount = incidentOffers.count { !it.withdrawn }
                         val hasMyOffer = myOfferedIncidentIds.contains(incident.incidentId)
+                        val confirmedHelperName = incident.primaryResponderName ?: incidentOffers.firstOrNull {
+                            it.offerId == incident.selectionOfferId
+                        }?.helperName
 
                         TacticalIncidentCard(
                             incident = incident,
@@ -322,33 +342,58 @@ fun IncidentListScreen(
                             isAssignedToMe = isAssignedToMe,
                             activeOffersCount = activeOffersCount,
                             hasMyOffer = hasMyOffer,
-                            onClick = { viewModel.selectIncident(incident) },
-                            onAcknowledge = if (incident.workflowVersion == 1) { { viewModel.acknowledge(incident.incidentId) } } else null,
-                            onAssign = if (incident.workflowVersion == 1) { { viewModel.assignToMe(incident.incidentId) } } else null,
-                            onStartResponse = if (incident.workflowVersion == 1) { { viewModel.startResponse(incident.incidentId) } } else null,
-                            onViewLocation = if (incident.latitude != null && incident.longitude != null) {
-                                { lat, lng ->
-                                    onViewLocation(lat, lng, incident.creatorName, incident.description)
-                                }
-                            } else null
+                            confirmedHelperName = confirmedHelperName,
+                            onClick = { viewModel.selectIncident(incident) }
                         )
                     }
                 }
             }
         }
 
-        // Incident Creation Sheet
+        // Filter Sheet
+        if (showFilterSheet) {
+            IncidentFilterSheet(
+                currentFilters = filters,
+                destination = currentDestination,
+                onApply = { viewModel.applyFilters(it) },
+                onDismiss = { showFilterSheet = false }
+            )
+        }
+
+        // Create Incident Form
         if (showCreateSheet) {
             CreateIncidentSheet(
                 onDismiss = { showCreateSheet = false },
                 submissionError = createError,
                 isSubmitting = isCreating,
-                onSubmit = { type, severity, desc, area, lat, lng, time, acc ->
+                onSubmit = { title, type, severity, desc, area, lat, lng, time, acc ->
                     isCreating = true
                     createError = null
-                    viewModel.createIncident(type, severity, desc, area, lat, lng, time, acc,
-                        onSuccess = { isCreating = false; showCreateSheet = false },
-                        onFailure = { isCreating = false; createError = "Could not save request. Your draft is still here." })
+                    viewModel.createIncident(
+                        title = title,
+                        type = type,
+                        severity = severity,
+                        description = desc,
+                        areaDescription = area,
+                        latitude = lat,
+                        longitude = lng,
+                        locationCapturedAt = time,
+                        locationAccuracyMeters = acc,
+                        onSuccess = { created ->
+                            isCreating = false
+                            showCreateSheet = false
+                            viewModel.selectIncident(created)
+                            coroutineScope.launch {
+                                snackbarHostState.showSnackbar(
+                                    "Saved on this phone. Sharing depends on available mesh connections."
+                                )
+                            }
+                        },
+                        onFailure = {
+                            isCreating = false
+                            createError = "Could not save request. Your draft is still here."
+                        }
+                    )
                 }
             )
         }
@@ -364,18 +409,21 @@ fun IncidentListScreen(
                 leadNodeId != null && NodeIdentity.idOf(it.name) == leadNodeId
             }
             val leadReachability = when {
-                isLeadMe -> "Local Device"
+                isLeadMe -> "This phone"
                 leadNode?.kind == NodeKind.DIRECT -> "Direct"
                 leadNode?.kind in setOf(NodeKind.RELAY, NodeKind.HOPPED) -> "Relayed"
                 leadNode?.kind in setOf(NodeKind.UNRESPONSIVE, NodeKind.HANDSHAKING, NodeKind.SYNCING) -> "Checking"
-                else -> "Unreachable"
+                else -> "Unavailable"
             }
+
             IncidentDetailSheet(
                 incident = inc,
                 events = events,
                 localUserId = localUser?.userId,
                 offers = offers,
                 localSigningKey = viewModel.localSigningKey,
+                identityLoading = identity.loading,
+                identityError = identity.error.takeIf { inc.workflowVersion == 2 || identity.user == null },
                 leadReachability = leadReachability,
                 actionBusy = actionBusy,
                 actionMessage = actionMessage,
@@ -389,104 +437,17 @@ fun IncidentListScreen(
                 onAcknowledge = { viewModel.acknowledge(inc.incidentId) },
                 onAssign = { viewModel.assignToMe(inc.incidentId) },
                 onStartResponse = { viewModel.startResponse(inc.incidentId) },
-                onResolve = { if (inc.workflowVersion == 2) viewModel.resolveHelp(inc.incidentId) else viewModel.resolve(inc.incidentId) },
-                onCancel = { if (inc.workflowVersion == 2) viewModel.cancelHelp(inc.incidentId) else viewModel.cancel(inc.incidentId) },
+                onResolve = {
+                    if (inc.workflowVersion == 2) viewModel.resolveHelp(inc.incidentId)
+                    else viewModel.resolve(inc.incidentId)
+                },
+                onCancel = {
+                    if (inc.workflowVersion == 2) viewModel.cancelHelp(inc.incidentId)
+                    else viewModel.cancel(inc.incidentId)
+                },
                 onReleaseAssignment = { viewModel.releaseAssignment(inc.incidentId) },
                 onViewLocation = onViewLocation
             )
-        }
-    }
-}
-
-@Composable
-private fun IncidentEmptyState(
-    scope: IncidentScope,
-    triageFilter: TriageQuickFilter,
-    searchQuery: String,
-    hasTypeFilter: Boolean,
-    onReport: () -> Unit,
-    onResetFilters: () -> Unit
-) {
-    val hasFilters = triageFilter != TriageQuickFilter.ALL || hasTypeFilter || searchQuery.isNotEmpty()
-
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(Spacing.Large),
-        contentAlignment = Alignment.Center
-    ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(Spacing.Medium),
-            modifier = Modifier.fillMaxWidth(0.85f)
-        ) {
-            Surface(
-                shape = CircleShape,
-                color = MaterialTheme.colorScheme.surfaceVariant,
-                modifier = Modifier.size(64.dp)
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Icon(
-                        imageVector = when {
-                            hasFilters -> Icons.Outlined.FilterAltOff
-                            scope == IncidentScope.ARCHIVE -> Icons.Outlined.Inventory2
-                            triageFilter == TriageQuickFilter.NEEDS_TRIAGE -> Icons.Outlined.DoneAll
-                            triageFilter == TriageQuickFilter.UNASSISTED_ONLY -> Icons.Outlined.Handshake
-                            triageFilter == TriageQuickFilter.MY_TASKS -> Icons.Outlined.AssignmentLate
-                            else -> Icons.Outlined.Shield
-                        },
-                        contentDescription = null,
-                        modifier = Modifier.size(32.dp),
-                        tint = MaterialTheme.colorScheme.primary
-                    )
-                }
-            }
-
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(
-                    text = when {
-                        searchQuery.isNotEmpty() -> "No matching incidents"
-                        triageFilter == TriageQuickFilter.UNASSISTED_ONLY -> "All Incidents Have Helpers"
-                        hasFilters -> "No incidents match filters"
-                        scope == IncidentScope.ARCHIVE -> "No Incident History"
-                        triageFilter == TriageQuickFilter.NEEDS_TRIAGE -> "Triage Queue Clear"
-                        triageFilter == TriageQuickFilter.MY_TASKS -> "No Tasks Assigned"
-                        else -> "No Active Incidents Here"
-                    },
-                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    text = when {
-                        searchQuery.isNotEmpty() -> "Try searching for a different landmark, caller, or description."
-                        triageFilter == TriageQuickFilter.UNASSISTED_ONLY -> "Every active emergency currently has at least one volunteer offer recorded."
-                        hasFilters -> "Adjust or reset your active filters to view all emergencies."
-                        scope == IncidentScope.ARCHIVE -> "Resolved and cancelled emergency records will be archived here."
-                        triageFilter == TriageQuickFilter.NEEDS_TRIAGE -> "All reported emergencies have been claimed or responded to."
-                        triageFilter == TriageQuickFilter.MY_TASKS -> "Claim an open emergency from Live Operations to begin response."
-                        else -> "No active incidents recorded on this phone. Tap 'Report Incident' if help is needed."
-                    },
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
-                )
-            }
-
-            if (hasFilters) {
-                OutlinedButton(onClick = onResetFilters) {
-                    Text("Clear Active Filters")
-                }
-            } else if (scope == IncidentScope.LIVE_OPERATIONS) {
-                Button(
-                    onClick = onReport,
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
-                ) {
-                    Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
-                    Spacer(Modifier.width(6.dp))
-                    Text("Report Incident")
-                }
-            }
         }
     }
 }

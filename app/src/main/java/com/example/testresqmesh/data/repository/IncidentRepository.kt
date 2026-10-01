@@ -44,6 +44,15 @@ class IncidentRepository(
         IncidentHelpWorkflow(database, incidentDao, offerDao, domainEventDao, identityManager,
             eventSigning, ::broadcastDomainEvent) else null
     init {
+        helpWorkflow?.let { workflow ->
+            repositoryScope.launch {
+                incidentDao.getAllIncidents().collect { incidents ->
+                    incidents.filter { it.workflowVersion == 2 && it.selectionId != null }.forEach {
+                        workflow.reconcileWithdrawnSelection(it.incidentId)
+                    }
+                }
+            }
+        }
         networkGateway.onDomainEvent = { endpointId, payload ->
             repositoryScope.launch {
                 if (applyIncomingEventJson(payload.text)) {
@@ -98,8 +107,11 @@ class IncidentRepository(
         latitude: Double? = null,
         longitude: Double? = null,
         locationCapturedAt: Long? = null,
-        locationAccuracyMeters: Float? = null
+        locationAccuracyMeters: Float? = null,
+        title: String = ""
     ): IncidentEntity {
+        val cleanTitle = title.trim()
+        require(cleanTitle.length <= 80) { "Incident title cannot exceed 80 characters" }
         val user = identityManager.getOrCreateUser()
         val incidentId = "INC-${UUID.randomUUID().toString().replace("-", "").take(8).uppercase()}"
         val eventId = "EVT-${UUID.randomUUID().toString().replace("-", "").take(8).uppercase()}"
@@ -124,10 +136,14 @@ class IncidentRepository(
             createdAt = now,
             updatedAt = now,
             workflowVersion = if (helpWorkflow != null) 2 else 1,
-            reporterSigningKey = eventSigning?.publicKey
+            reporterSigningKey = eventSigning?.publicKey,
+            title = cleanTitle
         )
 
         val payloadJson = JSONObject().apply {
+            if (cleanTitle.isNotBlank()) {
+                put("title", cleanTitle)
+            }
             put("incidentType", incidentType)
             put("severity", severity)
             put("description", description)
@@ -449,6 +465,22 @@ class IncidentRepository(
                             eventSigning?.verify(event, reporterKey) != true)) {
                         return rejectIncoming(event, "invalid reporter identity")
                     }
+                    val incomingTitle = if (p.has("title")) {
+                        val raw = p.opt("title")
+                        if (raw == null || raw == JSONObject.NULL) {
+                            ""
+                        } else if (raw !is String) {
+                            return rejectIncoming(event, "title must be a text string")
+                        } else {
+                            val trimmed = raw.trim()
+                            if (trimmed.length > 80) {
+                                return rejectIncoming(event, "title cannot exceed 80 characters")
+                            }
+                            trimmed
+                        }
+                    } else {
+                        ""
+                    }
                     val newIncident = IncidentEntity(
                         incidentId = event.entityId,
                         creatorId = event.actorId,
@@ -468,7 +500,8 @@ class IncidentRepository(
                         createdAt = event.timestamp,
                         updatedAt = event.timestamp,
                         workflowVersion = workflowVersion,
-                        reporterSigningKey = reporterKey
+                        reporterSigningKey = reporterKey,
+                        title = incomingTitle
                     )
                     if (workflowVersion == 2 && database != null) {
                         database.withTransaction {
@@ -819,6 +852,7 @@ class IncidentRepository(
 
     private suspend fun replayPendingForIncident(incidentId: String) {
         if (incidentId.isBlank()) return
+        helpWorkflow?.reconcileWithdrawnSelection(incidentId)
         repeat(MAX_SYNC_EVENTS + 1) {
             var progressed = false
             domainEventDao.getUnappliedForIncident(incidentId).forEach { pending ->

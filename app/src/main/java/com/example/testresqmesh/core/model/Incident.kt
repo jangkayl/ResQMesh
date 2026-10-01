@@ -24,7 +24,8 @@ data class IncidentPayload(
     val latitude: Double? = null,
     val longitude: Double? = null,
     val locationCapturedAt: Long? = null,
-    val locationAccuracyMeters: Float? = null
+    val locationAccuracyMeters: Float? = null,
+    val title: String = ""
 )
 
 data class IncidentLocationSnapshot(
@@ -51,5 +52,6 @@ data class Incident(
     val primaryResponderName: String?,
     val version: Long,
     val createdAt: Long,
-    val updatedAt: Long
+    val updatedAt: Long,
+    val title: String = ""
 )

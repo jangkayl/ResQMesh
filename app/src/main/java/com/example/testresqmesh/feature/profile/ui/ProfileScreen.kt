@@ -43,6 +43,7 @@ import com.example.testresqmesh.core.ui.theme.ResQTheme
 import com.example.testresqmesh.core.ui.theme.Spacing
 import com.example.testresqmesh.feature.setup.viewmodel.SetupViewModel
 import com.example.testresqmesh.feature.setup.viewmodel.MeshStartError
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -63,6 +64,8 @@ fun ProfileScreen(
     val isBackgroundMeshEnabled by viewModel.isBackgroundMeshEnabled.collectAsState()
     var showConnectionConfirm by remember { mutableStateOf(false) }
     var connectionError by remember { mutableStateOf<MeshStartError?>(null) }
+    val scope = rememberCoroutineScope()
+    var starting by remember { mutableStateOf(false) }
     var showPinDialog by remember { mutableStateOf(false) }
     var showPrivacyDialog by remember { mutableStateOf(false) }
     var pinInput by remember { mutableStateOf("") }
@@ -137,16 +140,20 @@ fun ProfileScreen(
                         if (state.isOnline) {
                             viewModel.goOffline()
                             showConnectionConfirm = false
-                        } else {
-                            connectionError = viewModel.checkHardwareAndGoOnline(
-                                context = context,
-                                customName = viewModel.getSavedName(context),
-                                nodeTag = "",
-                                teamKey = "PUBLIC"
-                            )
-                            if (connectionError == null) showConnectionConfirm = false
+                        } else if (!starting) scope.launch {
+                            starting = true
+                            try {
+                                connectionError = viewModel.checkHardwareAndGoOnline(
+                                    context = context,
+                                    customName = viewModel.getSavedName(context),
+                                    nodeTag = "",
+                                    teamKey = "PUBLIC"
+                                )
+                                if (connectionError == null) showConnectionConfirm = false
+                            } finally { starting = false }
                         }
                     },
+                    enabled = !starting,
                     modifier = Modifier.fillMaxWidth().height(56.dp),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = if (state.isOnline) ResQTheme.colors.sos else ResQTheme.colors.success,

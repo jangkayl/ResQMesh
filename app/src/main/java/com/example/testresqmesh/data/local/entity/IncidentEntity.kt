@@ -29,5 +29,6 @@ data class IncidentEntity(
     val selectionOfferId: String? = null,
     val selectionOfferRevision: Long? = null,
     val selectedHelperKey: String? = null,
-    val selectionConfirmedAt: Long? = null
+    val selectionConfirmedAt: Long? = null,
+    @ColumnInfo(defaultValue = "''") val title: String = ""
 )

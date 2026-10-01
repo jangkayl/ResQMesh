@@ -1,19 +1,21 @@
 # Current status
 
-Last reviewed: 2026-09-30. Baseline: `6dac8fa`, `feat/peer-comms-onboarding-ux`.
+Last reviewed: 2026-10-01. Baseline: `43bace8`, `feat/mesh-reliability-and-incident-coordination`.
 
 ## Current objective
 
-Validate block recovery and recorded public voice under load, then measure five- and ten-phone operation. Local fixes do not close runtime issues. Existing incident, UI, security, and background work remains in the working tree.
+Validate block recovery and recorded public voice under load, then measure five- and ten-phone operation. Local fixes leave runtime issues open. UI, security, and background work remains in this checkout.
+
+[Phone validation pending](plans/capstone-demo-readiness.md): [incident UX redesign](plans/emergency-incidents-ux-redesign.md), withdrawal cleanup, reporter identity, and selected-offer editing guards.
 
 ## Implemented and locally checked
 
-Earlier delivery checks passed (debug/release, 146 unit tests, Android-test compilation, Lint). Helper-workflow checks also passed; Room instrumentation and physical convergence remain open.
+Delivery and build checks passed (debug/release, unit tests, Android-test compilation, Lint). Helper-workflow, title support, and incident redesign checks passed. Presentation uses display title fallback. Room/UI instrumentation and physical convergence remain open.
 
 - Generation-owned BLE, acknowledged GATT, L2CAP promotion, directed READY-rooted topology, empty withdrawals, three-neighbor admission, and private fail-closed routing.
 - Persistent private outbox with 24-hour expiry, accepted-only delivery timing, pending-key-change refusal, and conditional failure updates.
 - Keystore-derived IDs, backup exclusions, opt-in background service, honest direct/relay/searching UI, restored homepage hierarchy, and incident triage/help UI.
-- Terminal incidents in reconnect summaries; Room 6→7 and 7→8 migrations, signed key-continuity events, reporter selection, helper confirmation, and reporter closure. Legacy records remain readable.
+- Emergency incidents UX: single-page detail, prominent title and 80-char support, Room 6→7, 7→8, 8→9 migrations, signed events, reporter selection, helper confirmation, and closure. Legacy records remain readable.
 - Version 1.0.1/code 2 candidates build locally; signing, phone smoke, large-text/SOS-map review, and first-contact trust validation remain open.
 
 ## Reliability tracking checklist
@@ -53,7 +55,7 @@ Per-transport queue defaults: 128 retained transfers including active; ordinary 
 
 ## Immediate phone card
 
-**Build/devices:** debug 1.0.1/code 2, SHA-256 `DB722F8B5481E9CF1B0997CE499BF7506AE275B2170D560DB29669ADE0B71C7A`. Pre-push delivery checks passed; this APK includes incident/UI changes. Record A/B/C names, models/API, and GATT/L2CAP use. User installs and operates phones. Capture with `scripts/capture_ble_logcat.ps1 -DurationMinutes 10`.
+**Build/devices:** debug 1.0.1/code 2, SHA-256 `1F2B1CA38782DD72097519F81D9B2D84DF42357F298C07E8A7E62C64EFC9AE5F`. Local checks passed; APK includes identity and offer editing guards. Record A/B/C names, models/API, and GATT/L2CAP use. User installs and operates phones. Capture with `scripts/capture_ble_logcat.ps1 -DurationMinutes 10`.
 
 **Setup/steps:** same APK on all three phones; verify actual READY links and public/private text. Block A↔C. Keep B unblocked. Observe 90 seconds; remove/restore B, Refresh A/C, and repeat five times. Unblock only A, then both; restart one app at a time without clearing block preferences. Repeat with five short recorded notes, then simultaneous 5/15/30-second notes from A/C plus public text and test SOS. Test L2CAP and a GATT-only pair/path where available; record an unavailable transport case as untested.
 
@@ -66,5 +68,5 @@ Per-transport queue defaults: 128 retained transfers including active; ordinary 
 1. Run R7 before expanding traffic; identify the installed APK.
 2. Run R8; investigate the exact failure window if it fails.
 3. Advance to R9, then R10 only after the smaller matrix passes.
-4. Run existing migration, helper-convergence, UI, and background cards.
+4. Run incident identity/offer, migration, UI, and background cards.
 5. Choose R11 from measured bottlenecks; keep text/SOS and private fail-closed behavior first.

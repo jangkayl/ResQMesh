@@ -35,8 +35,10 @@ class AppDatabaseMigrationTest {
             val upgraded = AppDatabase.buildDatabase(context, name)
             try {
                 assertEquals("PENDING", upgraded.messageDao().getMessageById("msg")?.deliveredTo)
-                assertEquals("RESOLVED", upgraded.incidentDao().getIncidentById("incident")?.status)
-                assertEquals(1, upgraded.incidentDao().getIncidentById("incident")?.workflowVersion)
+                val migratedIncident = upgraded.incidentDao().getIncidentById("incident")
+                assertEquals("RESOLVED", migratedIncident?.status)
+                assertEquals(1, migratedIncident?.workflowVersion)
+                assertEquals("", migratedIncident?.title)
                 assertEquals(emptyList<Any>(), upgraded.incidentOfferDao().getForIncident("incident"))
                 upgraded.peerNameDao().upsert(PeerNameEntity("5678", "Recipient"))
                 assertEquals("Recipient", upgraded.peerNameDao().observeNames().first().single().fullName)

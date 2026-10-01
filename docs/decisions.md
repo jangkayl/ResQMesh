@@ -82,7 +82,7 @@ Topology uses leased snapshots; empty snapshots withdraw adjacency and old versi
 
 ## D19: Reporter-selected civilian lead helper
 
-New incidents use one active offer per helper with a short reason. Only the reporter selects, revokes, resolves, or cancels; a selected helper confirms or declines. Loss of a direct or relayed route changes the connection label, never the incident decision. Offers remain pending while the reporter is unavailable. No second assignee, vote, open comment thread, automatic failover, verified-responder claim, or guarantee against duplicate physical response is implied. Incident signing keys provide device-key continuity only; first-contact trust and deployment authority remain open.
+Ownership uses stable user ID and signing key; names remain historical snapshots. One offer per helper; selection locks local editing until withdrawal/removal. Reporters select, revoke, resolve, or cancel; helpers confirm, decline, or withdraw. Withdrawal or signed offline edits reopen requests; replacement needs fresh selection. Helper revisions never advance reporter versions; superseded selections consume valid reporter versions. Route loss changes connection labels, never selection. No voting, open comments, automatic failover, verified-responder claim, or duplicate-response guarantee is implied. Signing proves device-key continuity only; first-contact trust and deployment authority remain open.
 
 ## D20: Bound voice pressure without changing the payload protocol
 

@@ -86,10 +86,10 @@ class SetupViewModel(
         }
     }
 
-    fun saveIdentity(context: Context, name: String, tag: String) {
+    suspend fun saveIdentity(context: Context, name: String, tag: String) {
+        identityProvider.getOrCreateUser(name)
         context.getSharedPreferences("resqmesh_prefs", Context.MODE_PRIVATE)
             .edit()
-            .putString("custom_name", name)
             .putString("node_tag", NodeIdentity.optionalTag(tag))
             .apply()
     }
@@ -109,10 +109,13 @@ class SetupViewModel(
     }
 
     /** Returns an actionable preflight error; a null result means startup was requested. */
-    fun checkHardwareAndGoOnline(context: Context, customName: String, nodeTag: String, teamKey: String): MeshStartError? {
-        saveIdentity(context, customName, nodeTag)
-        viewModelScope.launch {
-            identityProvider.getOrCreateUser(customName)
+    suspend fun checkHardwareAndGoOnline(context: Context, customName: String, nodeTag: String, teamKey: String): MeshStartError? {
+        try {
+            saveIdentity(context, customName, nodeTag)
+        } catch (cancelled: kotlinx.coroutines.CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            return startPreflightError("Could not save your identity. Try again before starting the session.")
         }
         fun hasPermission(permission: String): Boolean =
             ContextCompat.checkSelfPermission(context, permission) == PackageManager.PERMISSION_GRANTED

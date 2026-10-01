@@ -3,6 +3,7 @@ package com.example.testresqmesh.data.repository
 import com.example.testresqmesh.core.model.DomainEventEntityFakeDao
 import com.example.testresqmesh.core.model.IncidentEntityFakeDao
 import com.example.testresqmesh.core.model.IncidentState
+import com.example.testresqmesh.core.network.MeshNetworkGateway
 import com.example.testresqmesh.data.local.dao.IncidentOfferDao
 import com.example.testresqmesh.data.local.entity.DomainEventEntity
 import com.example.testresqmesh.data.local.entity.IncidentEntity
@@ -14,12 +15,17 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.test.runCurrent
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import org.json.JSONObject
+import org.json.JSONArray
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
+import org.junit.Assert.assertNull
 import org.junit.Before
 import org.junit.Test
+import java.lang.reflect.Proxy
 
 class IncidentHelpWorkflowTest {
     private val incidentDao = IncidentEntityFakeDao()
@@ -80,17 +86,344 @@ class IncidentHelpWorkflowTest {
     }
 
     @Test
-    fun withdrawalWhileAwaitingConfirmationNeedsReporterRevocation() = runTest {
+    fun withdrawalWhileAwaitingConfirmationClearsSelectionAndAllowsAnotherHelper() = runTest {
         assertTrue(helperB.offerHelp(incidentId, "Nearby"))
         val offer = offerDao.getByHelper(incidentId, "helper-b-key")!!
         assertTrue(reporter.selectLead(incidentId, offer.offerId))
         assertTrue(helperB.withdrawOffer(incidentId))
         val incident = incidentDao.getIncidentById(incidentId)!!
-        assertEquals(IncidentState.AWAITING_HELPER.name, incident.status)
-        assertTrue(incident.selectionId != null)
+        assertCleared(incident)
+        assertEquals(2L, incident.version)
         assertFalse(helperB.confirmLead(incidentId))
+        assertFalse(reporter.revokeLead(incidentId))
+        assertTrue(helperC.offerHelp(incidentId, "Available"))
+        assertTrue(reporter.selectLead(incidentId, offerDao.getByHelper(incidentId, "helper-c-key")!!.offerId))
+        assertEquals("helper-c-key", incidentDao.getIncidentById(incidentId)!!.selectedHelperKey)
+    }
+
+    @Test
+    fun confirmedHelperWithdrawalClearsResponderAndCanOfferAgain() = runTest {
+        assertTrue(helperB.offerHelp(incidentId, "Nearby"))
+        assertTrue(reporter.selectLead(incidentId, offerDao.getByHelper(incidentId, "helper-b-key")!!.offerId))
+        assertTrue(helperB.confirmLead(incidentId))
+        val confirmation = emitted.last()
+        assertTrue(helperB.withdrawOffer(incidentId))
+        val withdrawal = emitted.last()
+        val cleared = incidentDao.getIncidentById(incidentId)!!
+        assertCleared(cleared)
+        assertEquals(2L, cleared.version)
+        assertFalse(helperB.withdrawOffer(incidentId))
+        assertFalse(reporter.apply(withdrawal))
+        val delayed = confirmation.copy(eventId = "late-confirmation", signature = null)
+        assertFalse(reporter.apply(delayed.copy(signature = TestSigner("helper-b-key").sign(delayed))))
+        assertEquals(cleared, incidentDao.getIncidentById(incidentId))
+        assertTrue(helperB.offerHelp(incidentId, "Available again"))
+        val renewed = offerDao.getByHelper(incidentId, "helper-b-key")!!
+        assertEquals(3L, renewed.revision)
+        assertCleared(incidentDao.getIncidentById(incidentId)!!)
+        assertTrue(reporter.selectLead(incidentId, renewed.offerId))
+        assertTrue(helperB.confirmLead(incidentId))
+    }
+
+    @Test
+    fun unselectedWithdrawalLeavesConfirmedLeadUntouched() = runTest {
+        assertTrue(helperB.offerHelp(incidentId, "Nearby"))
+        assertTrue(helperC.offerHelp(incidentId, "Transport"))
+        assertTrue(reporter.selectLead(incidentId, offerDao.getByHelper(incidentId, "helper-b-key")!!.offerId))
+        assertTrue(helperB.confirmLead(incidentId))
+        val confirmed = incidentDao.getIncidentById(incidentId)!!
+        assertTrue(helperC.withdrawOffer(incidentId))
+        assertEquals(confirmed, incidentDao.getIncidentById(incidentId))
+    }
+
+    @Test
+    fun terminalHistoryIsNotReopenedByWithdrawalOrRepair() = runTest {
+        assertTrue(helperB.offerHelp(incidentId, "Nearby"))
+        assertTrue(reporter.selectLead(incidentId, offerDao.getByHelper(incidentId, "helper-b-key")!!.offerId))
+        assertTrue(helperB.confirmLead(incidentId))
+        val active = incidentDao.getIncidentById(incidentId)!!
+        for (status in listOf("RESOLVED", "CANCELLED")) {
+            val terminal = active.copy(status = status)
+            incidentDao.insertOrUpdate(terminal)
+            assertFalse(helperB.withdrawOffer(incidentId))
+            assertFalse(helperB.offerHelp(incidentId, "Cannot edit closed incident"))
+            reporter.reconcileWithdrawnSelection(incidentId)
+            assertEquals(terminal, incidentDao.getIncidentById(incidentId))
+        }
+    }
+
+    @Test
+    fun existingStuckSelectionsAreRepairedIdempotentlyEvenAfterReoffer() = runTest {
+        assertTrue(helperB.offerHelp(incidentId, "Nearby"))
+        assertTrue(reporter.selectLead(incidentId, offerDao.getByHelper(incidentId, "helper-b-key")!!.offerId))
+        assertTrue(helperB.confirmLead(incidentId))
+        val stuck = incidentDao.getIncidentById(incidentId)!!
+        assertTrue(helperB.withdrawOffer(incidentId))
+        assertTrue(helperB.offerHelp(incidentId, "Available again"))
+        incidentDao.insertOrUpdate(stuck)
+        reporter.reconcileWithdrawnSelection(incidentId)
+        val repaired = incidentDao.getIncidentById(incidentId)!!
+        assertCleared(repaired)
+        assertEquals(stuck.version, repaired.version)
+        reporter.reconcileWithdrawnSelection(incidentId)
+        assertEquals(repaired, incidentDao.getIncidentById(incidentId))
+    }
+
+    @Test
+    fun reorderedIndependentReplicasConvergeThroughLegacyRevocationAndNextSelection() = runTest {
+        val replicas = List(3) { replica() }
+        assertTrue(helperB.offerHelp(incidentId, "Nearby"))
+        val offerB = emitted.last()
+        assertTrue(helperC.offerHelp(incidentId, "Transport"))
+        val offerC = emitted.last()
+        assertTrue(reporter.selectLead(incidentId, offerDao.getByHelper(incidentId, "helper-b-key")!!.offerId))
+        val selection = emitted.last()
+        val selected = incidentDao.getIncidentById(incidentId)!!
+        assertTrue(helperB.confirmLead(incidentId))
+        val confirmation = emitted.last()
+        assertTrue(helperB.withdrawOffer(incidentId))
+        val withdrawal = emitted.last()
+        val revocation = signedRevocation(selected)
+        assertTrue(reporter.apply(revocation))
+        assertTrue(reporter.selectLead(incidentId, offerDao.getByHelper(incidentId, "helper-c-key")!!.offerId))
+        val nextSelection = emitted.last()
+        val orders = listOf(
+            listOf(offerB, offerC, selection, confirmation, withdrawal, revocation, nextSelection),
+            listOf(withdrawal, confirmation, nextSelection, revocation, selection, offerC, offerB),
+            listOf(offerB, withdrawal, offerC, revocation, nextSelection, confirmation, selection)
+        )
+        replicas.zip(orders).forEach { (replica, order) ->
+            order.forEach { replica.workflow.apply(it) }
+            replica.replay()
+            val actual = replica.incidents.getIncidentById(incidentId)!!
+            assertEquals(incidentDao.getIncidentById(incidentId), actual)
+            assertEquals(4L, actual.version)
+            assertEquals("helper-c-key", actual.selectedHelperKey)
+            assertEquals(offerDao.getForIncident(incidentId).sortedBy { it.offerId },
+                replica.offers.getForIncident(incidentId).sortedBy { it.offerId })
+            assertTrue(replica.events.getEventById(selection.eventId)!!.applied)
+            assertTrue(replica.events.getEventById(revocation.eventId)!!.applied)
+            assertFalse(replica.workflow.apply(withdrawal))
+        }
+    }
+
+    @Test
+    fun withdrawalBeforeOldSelectionDoesNotRestoreHelperAfterReoffer() = runTest {
+        val replica = replica()
+        assertTrue(helperB.offerHelp(incidentId, "Nearby"))
+        val offer = emitted.last()
+        assertTrue(reporter.selectLead(incidentId, offerDao.getByHelper(incidentId, "helper-b-key")!!.offerId))
+        val selection = emitted.last()
+        assertTrue(helperB.withdrawOffer(incidentId))
+        val withdrawal = emitted.last()
+        assertTrue(helperB.offerHelp(incidentId, "Available again"))
+        val reoffer = emitted.last()
+        listOf(offer, withdrawal, reoffer, selection).forEach { assertTrue(replica.workflow.apply(it)) }
+        assertCleared(replica.incidents.getIncidentById(incidentId)!!)
+        assertEquals(2L, replica.incidents.getIncidentById(incidentId)!!.version)
+    }
+
+    @Test
+    fun reconnectEventPageReplaysWithdrawalBeforeSelectionAndNextReporterDecision() = runTest {
+        val replica = replica()
+        assertTrue(helperB.offerHelp(incidentId, "Nearby"))
+        val offer = emitted.last()
+        assertTrue(reporter.selectLead(incidentId, offerDao.getByHelper(incidentId, "helper-b-key")!!.offerId))
+        val selection = emitted.last()
+        assertTrue(helperB.withdrawOffer(incidentId))
+        val withdrawal = emitted.last()
+        assertTrue(reporter.cancel(incidentId))
+        val cancellation = emitted.last()
+        val repository = IncidentRepository(replica.incidents, replica.events, identity("R"), gateway(),
+            backgroundScope, offerDao = replica.offers, eventSigning = TestSigner("reporter-key"))
+        val page = JSONObject().put("type", "INCIDENT_EVENT_PAGE").put("events", JSONArray().apply {
+            listOf(cancellation, withdrawal, selection, offer).forEach { event ->
+                put(JSONObject().put("eventId", event.eventId).put("entityId", event.entityId)
+                    .put("entityType", event.entityType).put("eventType", event.eventType)
+                    .put("actorId", event.actorId).put("actorName", event.actorName)
+                    .put("logicalVersion", event.logicalVersion).put("timestamp", event.timestamp)
+                    .put("payloadJson", event.payloadJson).put("signature", event.signature))
+            }
+        }).toString()
+        repository.handleSyncResponse("peer", page)
+        assertEquals(incidentDao.getIncidentById(incidentId), replica.incidents.getIncidentById(incidentId))
+        assertEquals("CANCELLED", replica.incidents.getIncidentById(incidentId)!!.status)
+        repository.handleSyncResponse("peer", page)
+        assertEquals(3L, replica.incidents.getIncidentById(incidentId)!!.version)
+    }
+
+    @Test
+    fun revocationNoOpNeedsMatchingSignedHistoryAndDoesNotClearNewSelection() = runTest {
+        assertTrue(helperB.offerHelp(incidentId, "Nearby"))
+        assertTrue(helperC.offerHelp(incidentId, "Transport"))
+        assertTrue(reporter.selectLead(incidentId, offerDao.getByHelper(incidentId, "helper-b-key")!!.offerId))
+        val selected = incidentDao.getIncidentById(incidentId)!!
+        assertTrue(helperB.withdrawOffer(incidentId))
+        val wrongTarget = signedRevocation(selected, selectionId = "unknown")
+        assertFalse(reporter.apply(wrongTarget))
+        val forged = signedRevocation(selected).copy(signature = "forged")
+        assertFalse(reporter.apply(forged))
+        assertTrue(reporter.selectLead(incidentId, offerDao.getByHelper(incidentId, "helper-c-key")!!.offerId))
+        val current = incidentDao.getIncidentById(incidentId)!!
+        assertTrue(reporter.apply(signedRevocation(selected, version = current.version + 1)))
+        assertEquals(current.selectionId, incidentDao.getIncidentById(incidentId)!!.selectionId)
+        assertEquals("helper-c-key", incidentDao.getIncidentById(incidentId)!!.selectedHelperKey)
+    }
+
+    @Test
+    fun forgedWithdrawalCannotClearSelection() = runTest {
+        assertTrue(helperB.offerHelp(incidentId, "Nearby"))
+        val offer = offerDao.getByHelper(incidentId, "helper-b-key")!!
+        assertTrue(reporter.selectLead(incidentId, offer.offerId))
+        val selected = incidentDao.getIncidentById(incidentId)!!
+        val event = DomainEventEntity("forged-withdraw", incidentId, "INCIDENT", "INCIDENT_OFFER_WITHDRAWN",
+            "B", "Helper B", 2, 10, JSONObject().put("offerId", offer.offerId)
+                .put("helperKey", offer.helperKey).put("revision", 2).toString())
+        assertFalse(reporter.apply(event.copy(signature = TestSigner("helper-c-key").sign(event))))
+        assertEquals(selected, incidentDao.getIncidentById(incidentId))
+    }
+
+    private fun assertCleared(incident: IncidentEntity) {
+        assertEquals(IncidentState.OPEN.name, incident.status)
+        assertNull(incident.selectionId)
+        assertNull(incident.selectionOfferId)
+        assertNull(incident.selectionOfferRevision)
+        assertNull(incident.selectedHelperKey)
+        assertNull(incident.selectionConfirmedAt)
+        assertNull(incident.primaryResponderId)
+        assertNull(incident.primaryResponderName)
+    }
+
+    @Test fun selectedOffersRejectLocalEditingUntilRemovedOrWithdrawn() = runTest {
+        assertTrue(helperB.offerHelp(incidentId, "Initial offer"))
+        val offer = offerDao.getByHelper(incidentId, "helper-b-key")!!
+        assertTrue(helperB.offerHelp(incidentId, "Revised before selection"))
+        assertTrue(reporter.selectLead(incidentId, offer.offerId))
+        val selectedOffer = offerDao.getById(offer.offerId)!!
+        assertFalse(helperB.offerHelp(incidentId, "Not allowed while selected"))
+        assertEquals(selectedOffer, offerDao.getById(offer.offerId))
+        assertTrue(helperB.confirmLead(incidentId))
+        assertFalse(helperB.offerHelp(incidentId, "Not allowed after confirmation"))
+        assertEquals(selectedOffer, offerDao.getById(offer.offerId))
         assertTrue(reporter.revokeLead(incidentId))
-        assertEquals(IncidentState.OPEN.name, incidentDao.getIncidentById(incidentId)!!.status)
+        assertTrue(helperB.offerHelp(incidentId, "Can edit after removal"))
+        assertTrue(reporter.selectLead(incidentId, offer.offerId))
+        assertTrue(helperB.withdrawOffer(incidentId))
+        assertTrue(helperB.offerHelp(incidentId, "Fresh offer"))
+        assertTrue(reporter.selectLead(incidentId, offer.offerId))
+    }
+
+    @Test fun signedOfflineEditAndSelectionConvergeInEitherOrder() = runTest {
+        val replicas = List(3) { replica() }
+        assertTrue(helperB.offerHelp(incidentId, "Initial offer"))
+        val initialOffer = emitted.last()
+        assertTrue(reporter.selectLead(incidentId, offerDao.getByHelper(incidentId, "helper-b-key")!!.offerId))
+        val selection = emitted.last()
+        assertTrue(helperB.confirmLead(incidentId))
+        val confirmation = emitted.last()
+        val edit = initialOffer.copy(eventId = "offline-edit", logicalVersion = 2,
+            timestamp = initialOffer.timestamp + 20, payloadJson = JSONObject(initialOffer.payloadJson)
+                .put("revision", 2).put("note", "Edited before receiving selection").toString(), signature = null)
+            .let { it.copy(signature = TestSigner("helper-b-key").sign(it)) }
+        assertTrue(reporter.apply(edit))
+        assertCleared(incidentDao.getIncidentById(incidentId)!!)
+        assertTrue(reporter.selectLead(incidentId, offerDao.getByHelper(incidentId, "helper-b-key")!!.offerId))
+        val nextSelection = emitted.last()
+        val orders = listOf(
+            listOf(initialOffer, selection, confirmation, edit, nextSelection),
+            listOf(initialOffer, edit, selection, confirmation, nextSelection),
+            listOf(nextSelection, confirmation, edit, selection, initialOffer)
+        )
+        replicas.zip(orders).forEach { (replica, order) ->
+            order.forEach { replica.workflow.apply(it) }
+            replica.replay()
+            val actual = replica.incidents.getIncidentById(incidentId)!!
+            assertEquals(incidentDao.getIncidentById(incidentId), actual)
+            assertEquals(3L, actual.version)
+            assertEquals(2L, actual.selectionOfferRevision)
+            assertTrue(replica.events.getEventById(selection.eventId)!!.applied)
+            assertFalse(replica.workflow.apply(edit))
+        }
+    }
+
+    @Test fun renamedReporterKeepsActionsAndSignedHistoryUnchanged() = runTest {
+        val user = MutableStateFlow(UserEntity("R", "NODE-R", "Original name", null, 1))
+        val identity = object : IdentityProvider {
+            override suspend fun getOrCreateUser(displayName: String?): UserEntity {
+                if (displayName != null) user.value = user.value.copy(displayName = displayName)
+                return user.value
+            }
+            override fun observeUser() = user
+            override suspend fun getUserId() = user.value.userId
+            override fun getDeviceId() = "NODE-R"
+        }
+        val renamedReporter = IncidentHelpWorkflow(null, incidentDao, offerDao, eventDao, identity,
+            TestSigner("reporter-key")) { event, _ -> emitted += event }
+        assertTrue(helperB.offerHelp(incidentId, "Nearby"))
+        identity.getOrCreateUser("Renamed before selection")
+        assertTrue(renamedReporter.selectLead(incidentId, offerDao.getByHelper(incidentId, "helper-b-key")!!.offerId))
+        val selectedEvent = emitted.last()
+        identity.getOrCreateUser("Renamed while awaiting")
+        assertTrue(helperB.confirmLead(incidentId))
+        identity.getOrCreateUser("Renamed after confirmation")
+        assertTrue(renamedReporter.resolve(incidentId))
+        assertEquals(selectedEvent, eventDao.getEventById(selectedEvent.eventId))
+        assertEquals("Reporter", incidentDao.getIncidentById(incidentId)!!.creatorName)
+        assertEquals("Renamed after confirmation", emitted.last().actorName)
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun repositoryStartupRepairsPersistedWithdrawnSelection() = runTest {
+        assertTrue(helperB.offerHelp(incidentId, "Nearby"))
+        assertTrue(reporter.selectLead(incidentId, offerDao.getByHelper(incidentId, "helper-b-key")!!.offerId))
+        val stuck = incidentDao.getIncidentById(incidentId)!!
+        assertTrue(helperB.withdrawOffer(incidentId))
+        incidentDao.insertOrUpdate(stuck)
+        IncidentRepository(incidentDao, eventDao, identity("R"), gateway(), backgroundScope,
+            offerDao = offerDao, eventSigning = TestSigner("reporter-key"))
+        runCurrent()
+        assertCleared(incidentDao.getIncidentById(incidentId)!!)
+        assertEquals(stuck.version, incidentDao.getIncidentById(incidentId)!!.version)
+    }
+
+    private fun gateway(): MeshNetworkGateway = Proxy.newProxyInstance(MeshNetworkGateway::class.java.classLoader,
+        arrayOf(MeshNetworkGateway::class.java)) { _, method, _ ->
+        when (method.name) {
+            "getMyDeviceName" -> "Reporter"
+            "getMyNodeId" -> "R"
+            "currentMeshTtl" -> 10
+            "broadcastPriorityPayload", "broadcastPayload" ->
+                com.example.testresqmesh.core.network.BroadcastDispatchResult(emptyMap())
+            else -> null
+        }
+    } as MeshNetworkGateway
+
+    private fun signedRevocation(incident: IncidentEntity, selectionId: String = incident.selectionId!!,
+        version: Long = incident.version + 1): DomainEventEntity {
+        val event = DomainEventEntity("revoke-$selectionId-$version", incidentId, "INCIDENT", "INCIDENT_LEAD_REVOKED",
+            "R", "Reporter", version, System.currentTimeMillis(), JSONObject().put("selectionId", selectionId).toString())
+        return event.copy(signature = TestSigner("reporter-key").sign(event))
+    }
+
+    private suspend fun replica(): Replica = Replica().also {
+        it.incidents.insertOrUpdate(incidentDao.getIncidentById(incidentId)!!)
+    }
+
+    private inner class Replica {
+        val incidents = IncidentEntityFakeDao()
+        val events = DomainEventEntityFakeDao()
+        val offers = FakeOfferDao()
+        val workflow = IncidentHelpWorkflow(null, incidents, offers, events, identity("R"), TestSigner("reporter-key")) { _, _ -> }
+
+        suspend fun replay() {
+            repeat(10) {
+                var progressed = false
+                events.getUnappliedForIncident(incidentId).forEach { if (workflow.apply(it)) progressed = true }
+                if (!progressed) return
+            }
+            error("Replay did not settle")
+        }
     }
 
     @Test
@@ -128,7 +461,7 @@ class IncidentHelpWorkflowTest {
     }
 
     @Test
-    fun offerRevisionIsIndependentAndSelectionMustNameCurrentRevision() = runTest {
+    fun offerRevisionIsIndependentAndSupersededSelectionConsumesReporterVersion() = runTest {
         assertTrue(helperB.offerHelp(incidentId, "Can carry supplies"))
         assertTrue(helperB.offerHelp(incidentId, "Can carry supplies and water"))
         val offer = offerDao.getByHelper(incidentId, "helper-b-key")!!
@@ -140,8 +473,9 @@ class IncidentHelpWorkflowTest {
             JSONObject().put("selectionId", "stale").put("offerId", offer.offerId)
                 .put("offerRevision", 1).put("helperKey", offer.helperKey).toString()
         ).let { it.copy(signature = TestSigner("reporter-key").sign(it)) }
-        assertFalse(reporter.apply(stale))
+        assertTrue(reporter.apply(stale))
         assertEquals(IncidentState.OPEN.name, incidentDao.getIncidentById(incidentId)!!.status)
+        assertEquals(2L, incidentDao.getIncidentById(incidentId)!!.version)
         assertTrue(reporter.selectLead(incidentId, offer.offerId))
     }
 

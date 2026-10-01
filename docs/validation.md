@@ -11,7 +11,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\check_docs.ps1
 git diff --check
 ```
 
-Use checks proportional to the change. Do not repeat broad tests after an unrelated documentation-only edit.
+Use proportional checks; documentation-only edits do not require another broad run.
 
 ## Pull-request CI gate
 
@@ -74,7 +74,7 @@ For A-B-C-D, make A/D indirect, send five private messages each way, then reconn
 
 ### Reporter-selected helper card
 
-Record APK, devices/API, and A-B-C topology. A reports; B and C offer. A selects B. Disconnect B before confirmation: A shows awaiting and unreachable, without reassignment. Restore B, confirm, and disconnect again: A keeps B selected with a separate connection label. A revokes B, selects C, then restores B: B sees revocation and its old confirmation cannot apply. C confirms; A resolves or cancels. Reconnect all phones and add a new phone; compare history and offers. Report missing/duplicate events, stale lead, false delivery, or wrong route labels. Physical validation remains open.
+Record APK hash/version, devices/API, topology, and timestamps. A reports; B/C offer. Rename A before selection, while awaiting, and after confirmation; reporter controls and My activity must persist, with original report name. Selection locks B's editing; withdrawal before/after confirmation removes B and permits selecting C. Reconnect/restart without clearing data; repeat withdrawal offline. Edit B's offer while disconnected before learning selection; reconnect: selection clears and requires fresh approval. Re-offering never restores selection automatically. Disconnection alone preserves selection; closed history stays closed. Report stale controls, rejected actions, duplicates, and convergence times. Capture `IDENTITY`, `INCIDENT_IDENTITY`, `INCIDENT_HELP`, `INCIDENT_REPO`, and `READY`; omit names, notes, and keys. Physical validation remains open.
 
 ### Level 4: release/capstone matrix
 
