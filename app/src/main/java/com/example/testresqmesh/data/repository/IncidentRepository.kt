@@ -855,7 +855,11 @@ class IncidentRepository(
         helpWorkflow?.reconcileWithdrawnSelection(incidentId)
         repeat(MAX_SYNC_EVENTS + 1) {
             var progressed = false
-            domainEventDao.getUnappliedForIncident(incidentId).forEach { pending ->
+            // Helper revision streams do not share the reporter's logical version. Drain
+            // available offer changes before reporter closure, including legacy empty payloads.
+            domainEventDao.getUnappliedForIncident(incidentId)
+                .sortedBy { if (it.eventType in IncidentHelpWorkflow.OFFER_TYPES) 0 else 1 }
+                .forEach { pending ->
                 if (applyIncomingEvent(pending)) {
                     progressed = true
                     broadcastDomainEvent(pending, pending.eventType == EventType.INCIDENT_LEAD_SELECTED.name ||

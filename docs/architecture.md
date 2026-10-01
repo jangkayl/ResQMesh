@@ -1,6 +1,6 @@
 # Architecture
 
-Last reviewed: 2026-09-30. Source and device evidence prevail.
+Last reviewed: 2026-10-01. Source and device evidence prevail.
 
 ## System shape
 
@@ -39,7 +39,7 @@ DISCONNECTED -> CONNECTING -> DISCOVERING -> CONFIGURING -> READY
 
 Client readiness requires discovery/CCCD; server readiness requires subscription. Fallback uses acknowledged indications with generation checks, bounded queues, frame bounds, L2CAP promotion, and one heartbeat per endpoint.
 
-Revoked `BLUETOOTH_CONNECT` operations fail through existing flight/link cleanup without logging payload content.
+Revoked `BLUETOOTH_CONNECT` triggers flight/link cleanup without payload logging.
 
 Client setup uses the reliable 20-byte ATT baseline; `READY` does not wait for MTU negotiation. A server callback for a live outbound endpoint is another view of that ACL, not a second destructive role.
 
@@ -49,7 +49,7 @@ Without identified, unblocked READY neighbors, failed scans retry with jitter; s
 
 The elected client has a five-second connect/discovery/CCCD deadline; bootstrap retries are bounded. Server configuration is an orphan backstop, and provisional identity waiting starts only after `READY`.
 
-Outbound GATT uses `AUTO` for known-good peers. If it connects without an ATT discovery response, that peer retries with `TRANSPORT_LE` in the session. This is a per-peer fallback.
+GATT uses `AUTO` for known-good peers; absent ATT discovery response, retry that peer with `TRANSPORT_LE`.
 
 L2CAP promotion resends complete frames and disarms obsolete GATT flights. Deferred promotion stays queued until capacity returns. Each socket has one bounded writer with FIFO ordinary/control lanes; control may overtake waiting frames. Each transport queue retains at most 128 transfers including active, with eight control slots reserved. Ordinary byte admission is 2 MiB plus 64 KiB control headroom. GATT frames remain non-interruptible. Owned acknowledged GATT chunks and successful L2CAP writes protect progressing transfers from silence retirement; stalled operations retain deadlines.
 
@@ -63,7 +63,7 @@ Stable `NodeIdentity` IDs identify peers across changing BLE endpoints. Private 
 
 Peer names retain `#nodeId`. Setup sends no tag; older saved `[NODE]` defaults are omitted and incoming custom tags remain compatible, unverified labels.
 
-A block relationship is persisted by stable identity, not MAC. A `BLOCK_REQUEST` is encrypted to the target and may traverse direct or relay links; the receiver persists complementary direct-link denial and replies with `BLOCK_ACK` before the initiator tears down direct endpoints. Each device releases only its own record—there is no remote `UNBLOCK` command—so both must unblock locally before direct admission resumes. Relayed text, private messages, SOS, receipts, and live audio are intentionally not filtered. Inbound central MACs may be unknown at ACL setup; a direct SYSTEM identity pulse is therefore gated before the peer is published or ordinary direct traffic is dispatched. This working-tree protocol still requires its physical validation card.
+A block persists by stable identity, not MAC. Encrypted `BLOCK_REQUEST` travels directly or by relay; the receiver persists complementary denial and replies with `BLOCK_ACK` before direct teardown. Each device releases only its own record; both must unblock locally. Relayed text/private/SOS/receipts/live audio remain allowed. Unknown inbound MACs require a gated direct SYSTEM identity pulse before publishing the peer or dispatching ordinary traffic. Physical validation remains open.
 
 Unknown blocked identity pulses retire the captured receiving generation even before name binding. Keep these states distinct:
 
@@ -88,6 +88,8 @@ This is not yet a basis for claiming authenticated end-to-end encryption or forw
 `MeshRepository` joins callbacks, routing, persistence, and UI. Gateway broadcast results report per-neighbor acceptance. Public sends persist pending before dispatch; wholly rejected sends retry, partial acceptance does not rebroadcast, and feedback never implies delivery. A mutex serializes public dispatch/outbox flush. `MeshNetworkGateway` hides Bluetooth types; `MessageStore` hides Room. `PrivateDeliveryPlanner` chooses exact hops. Koin supplies adapters and `AppCoroutineScope` owns background work. UI rules: `docs/ui.md`; evidence: `docs/validation.md`.
 
 Local identity lives in Room; serialized setup/rename preserves user/device IDs and keys and mirrors preferences. Incident ownership uses creator ID and signing key, never names. Report-time names and signed activity stay unchanged. Workflow-v2 offers have independent helper revisions. Selection locks local editing; helpers confirm commitment. Withdrawal or valid offline newer revisions atomically clear selection and reopen requests without advancing reporter versions. Loading/replay repairs stale projections; superseded selections consume reporter versions, and signed historical evidence permits revocation no-ops without clearing newer selections. Only reporters select/resolve/cancel; replacement is never automatic. Workflow-v1 and terminal history remain unchanged. Accepted events/projections share a Room transaction. P-256 signatures prove key continuity, not real-world identity. Reconnect exchanges applied event pages and bounded summaries; physical convergence and durable delivery remain unverified. Location is a snapshot.
+
+Closure signs prerequisite IDs and reconstructs helper history from signed events; confirmation time is event time. Missing dependencies defer closure across pages. Legacy empty closures prioritize available offer changes but cannot identify missing prerequisites. Use matching builds; older apps ignore dependencies.
 
 ## Offline maps and notifications
 

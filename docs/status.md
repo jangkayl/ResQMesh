@@ -4,7 +4,7 @@ Last reviewed: 2026-10-01. Baseline: `43bace8`, `feat/mesh-reliability-and-incid
 
 ## Current objective
 
-Validate block recovery and recorded public voice under load, then measure five- and ten-phone operation. Local fixes leave runtime issues open. UI, security, and background work remains in this checkout.
+Validate block recovery/recorded voice before five/ten-phone measurements. Runtime validation and UI/security/background work remain open.
 
 [Phone validation pending](plans/capstone-demo-readiness.md): [incident UX redesign](plans/emergency-incidents-ux-redesign.md), withdrawal cleanup, reporter identity, and selected-offer editing guards.
 
@@ -40,6 +40,8 @@ Per-transport queue defaults: 128 retained transfers including active; ordinary 
 
 ## Open blockers
 
+Closure replay checks passed: build, 213 tests, Android-test compilation, Lint. Phone/Room validation remains open.
+
 | ID | Priority | Remaining completion evidence |
 | --- | --- | --- |
 | BLE-OWN | P0 | Late same-address server callback ownership and replacement-link phone validation |
@@ -68,5 +70,5 @@ Per-transport queue defaults: 128 retained transfers including active; ordinary 
 1. Run R7 before expanding traffic; identify the installed APK.
 2. Run R8; investigate the exact failure window if it fails.
 3. Advance to R9, then R10 only after the smaller matrix passes.
-4. Run incident identity/offer, migration, UI, and background cards.
+4. Run incident closure, identity/offer, migration, UI, and background cards.
 5. Choose R11 from measured bottlenecks; keep text/SOS and private fail-closed behavior first.

@@ -15,6 +15,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import org.json.JSONObject
@@ -35,6 +36,7 @@ class IncidentHelpWorkflowTest {
     private lateinit var reporter: IncidentHelpWorkflow
     private lateinit var helperB: IncidentHelpWorkflow
     private lateinit var helperC: IncidentHelpWorkflow
+    private lateinit var initialIncident: IncidentEntity
     private val incidentId = "INC-HELP-1"
 
     @Before
@@ -48,6 +50,7 @@ class IncidentHelpWorkflowTest {
             workflowVersion = 2, reporterSigningKey = "reporter-key"
         )
         incidentDao.insertOrUpdate(incident)
+        initialIncident = incident
         fun workflow(userId: String, key: String): IncidentHelpWorkflow = IncidentHelpWorkflow(
             null, incidentDao, offerDao, eventDao, identity(userId), TestSigner(key)
         ) { event, _ -> emitted += event }
@@ -253,6 +256,152 @@ class IncidentHelpWorkflowTest {
     }
 
     @Test
+    fun closureConvergesForEveryEqualTimestampDeliveryOrder() = runTest {
+        val history = withdrawalAndCancellationHistory()
+        val expected = freshReplica()
+        history.forEach { assertTrue(expected.workflow.apply(it)) }
+        for (order in permutations(history)) {
+            val target = freshReplica()
+            repository(target).handleSyncResponse("peer", eventPage(order))
+            assertEquals(expected.incidents.getIncidentById(incidentId), target.incidents.getIncidentById(incidentId))
+            assertEquals(expected.offers.getForIncident(incidentId), target.offers.getForIncident(incidentId))
+            assertTrue(target.events.getUnappliedForIncident(incidentId).isEmpty())
+            repository(target).handleSyncResponse("peer", eventPage(order))
+            assertEquals(expected.incidents.getIncidentById(incidentId), target.incidents.getIncidentById(incidentId))
+        }
+    }
+
+    @Test
+    fun closureWaitsAcrossPagesAndRepositoryRestartDespiteReversedClocks() = runTest {
+        val history = withdrawalAndCancellationHistory().mapIndexed { index, event ->
+            signed(event.copy(timestamp = 100L - index))
+        }
+        val target = freshReplica()
+        val (offer, selection, withdrawal, cancellation) = history
+        repository(target).handleSyncResponse("peer", eventPage(listOf(cancellation, selection, offer)))
+        assertEquals(IncidentState.AWAITING_HELPER.name, target.incidents.getIncidentById(incidentId)!!.status)
+        assertFalse(target.events.getEventById(cancellation.eventId)!!.applied)
+        // A fresh repository uses only persisted events/projections, not an in-memory queue.
+        repository(target).handleSyncResponse("peer", eventPage(listOf(withdrawal)))
+        val actual = target.incidents.getIncidentById(incidentId)!!
+        assertEquals(IncidentState.CANCELLED.name, actual.status)
+        assertNull(actual.selectionId)
+        assertNull(actual.primaryResponderName)
+        assertEquals(3L, actual.version)
+        assertTrue(target.offers.getForIncident(incidentId).single().withdrawn)
+        assertTrue(target.events.getUnappliedForIncident(incidentId).isEmpty())
+    }
+
+    @Test
+    fun forgedWithdrawalCannotSatisfyClosureDependency() = runTest {
+        val (offer, selection, withdrawal, cancellation) = withdrawalAndCancellationHistory()
+        val target = freshReplica()
+        repository(target).handleSyncResponse("peer", eventPage(listOf(offer, selection, cancellation,
+            withdrawal.copy(signature = "forged"))))
+        assertEquals(IncidentState.AWAITING_HELPER.name, target.incidents.getIncidentById(incidentId)!!.status)
+        assertFalse(target.events.getEventById(cancellation.eventId)!!.applied)
+        repository(target).handleSyncResponse("peer", eventPage(listOf(withdrawal)))
+        assertEquals(IncidentState.CANCELLED.name, target.incidents.getIncidentById(incidentId)!!.status)
+    }
+
+    @Test
+    fun legacyClosureDrainsSamePageWithdrawalBeforeCancellation() = runTest {
+        val history = withdrawalAndCancellationHistory().map { event ->
+            if (event.eventType == "INCIDENT_CANCELLED") signed(event.copy(payloadJson = "{}")) else event
+        }
+        val target = freshReplica()
+        repository(target).handleSyncResponse("peer", eventPage(history.reversed()))
+        val actual = target.incidents.getIncidentById(incidentId)!!
+        assertEquals(IncidentState.CANCELLED.name, actual.status)
+        assertNull(actual.selectionId)
+        assertNull(actual.primaryResponderName)
+        assertTrue(target.offers.getForIncident(incidentId).single().withdrawn)
+    }
+
+    @Test
+    fun resolutionWaitsForConfirmationAndRetainsConfirmedHelperHistory() = runTest {
+        assertTrue(helperB.offerHelp(incidentId, "Nearby"))
+        assertTrue(reporter.selectLead(incidentId, offerDao.getByHelper(incidentId, "helper-b-key")!!.offerId))
+        assertTrue(helperB.confirmLead(incidentId))
+        assertTrue(reporter.resolve(incidentId))
+        val (offer, selection, confirmation, resolution) = emitted.toList()
+        val target = freshReplica()
+        repository(target).handleSyncResponse("peer", eventPage(listOf(resolution, selection, offer)))
+        assertEquals(IncidentState.AWAITING_HELPER.name, target.incidents.getIncidentById(incidentId)!!.status)
+        repository(target).handleSyncResponse("peer", eventPage(listOf(confirmation)))
+        assertEquals(incidentDao.getIncidentById(incidentId), target.incidents.getIncidentById(incidentId))
+        assertEquals(IncidentState.RESOLVED.name, target.incidents.getIncidentById(incidentId)!!.status)
+        assertFalse(target.workflow.apply(signed(confirmation.copy(eventId = "late-confirmation"))))
+    }
+
+    @Test
+    fun closureRejectsForeignIncidentDependenciesAndUnknownProtocol() = runTest {
+        val (offer, selection, withdrawal, cancellation) = withdrawalAndCancellationHistory()
+        val target = freshReplica()
+        listOf(offer, selection, withdrawal).forEach { assertTrue(target.workflow.apply(it)) }
+        val foreign = offer.copy(eventId = "foreign", entityId = "another-incident")
+        target.events.insertEvent(foreign)
+        val payload = JSONObject(cancellation.payloadJson).put("closureDependencies", JSONArray(listOf("foreign")))
+        assertFalse(target.workflow.apply(signed(cancellation.copy(payloadJson = payload.toString()))))
+        payload.put("closureProtocol", 2).put("closureDependencies", JSONArray())
+        assertFalse(target.workflow.apply(signed(cancellation.copy(payloadJson = payload.toString()))))
+        assertEquals(IncidentState.OPEN.name, target.incidents.getIncidentById(incidentId)!!.status)
+    }
+
+    @Test
+    fun closureRetainsObservedConfirmedHistoryDespiteNewerOfflineOffer() = runTest {
+        assertTrue(helperB.offerHelp(incidentId, "Nearby"))
+        assertTrue(reporter.selectLead(incidentId, offerDao.getByHelper(incidentId, "helper-b-key")!!.offerId))
+        assertTrue(helperB.confirmLead(incidentId))
+        assertTrue(reporter.cancel(incidentId))
+        val (offer, selection, confirmation, cancellation) = emitted.toList()
+        val target = freshReplica()
+        listOf(offer, selection, confirmation).forEach { assertTrue(target.workflow.apply(it)) }
+        val update = signed(offer.copy(eventId = "offline-edit", logicalVersion = 2,
+            payloadJson = JSONObject(offer.payloadJson).put("revision", 2).put("note", "Edited offline").toString()))
+        assertTrue(target.workflow.apply(update))
+        assertNull(target.incidents.getIncidentById(incidentId)!!.selectionId)
+        assertTrue(target.workflow.apply(cancellation))
+        assertEquals(incidentDao.getIncidentById(incidentId), target.incidents.getIncidentById(incidentId))
+        assertFalse(target.workflow.apply(signed(confirmation.copy(eventId = "late-confirmation"))))
+    }
+
+    private suspend fun withdrawalAndCancellationHistory(): List<DomainEventEntity> {
+        assertTrue(helperB.offerHelp(incidentId, "Nearby"))
+        assertTrue(reporter.selectLead(incidentId, offerDao.getByHelper(incidentId, "helper-b-key")!!.offerId))
+        assertTrue(helperB.withdrawOffer(incidentId))
+        assertTrue(reporter.cancel(incidentId))
+        // Force cancellation to sort before withdrawal; the clock supplies no causal order.
+        val ids = listOf("b-offer", "c-selection", "z-withdrawal", "a-cancellation")
+        val mapping = emitted.mapIndexed { index, event -> event.eventId to ids[index] }.toMap()
+        return emitted.map { event ->
+            val payload = JSONObject(event.payloadJson)
+            payload.optJSONArray("closureDependencies")?.let { refs ->
+                payload.put("closureDependencies", JSONArray((0 until refs.length()).map { mapping.getValue(refs.getString(it)) }))
+            }
+            signed(event.copy(eventId = mapping.getValue(event.eventId), timestamp = 10, payloadJson = payload.toString()))
+        }
+    }
+
+    private fun signed(event: DomainEventEntity): DomainEventEntity {
+        val key = when (event.actorId) { "R" -> "reporter-key"; "B" -> "helper-b-key"; else -> "helper-c-key" }
+        return event.copy(signature = TestSigner(key).sign(event))
+    }
+
+    private fun TestScope.repository(target: Replica) = IncidentRepository(target.incidents, target.events, identity("R"), gateway(),
+        backgroundScope,
+        offerDao = target.offers, eventSigning = TestSigner("reporter-key"))
+
+    private fun eventPage(history: List<DomainEventEntity>) = JSONObject().put("type", "INCIDENT_EVENT_PAGE")
+        .put("events", JSONArray(history.map { event -> JSONObject().put("eventId", event.eventId)
+            .put("entityId", event.entityId).put("entityType", event.entityType).put("eventType", event.eventType)
+            .put("actorId", event.actorId).put("actorName", event.actorName).put("logicalVersion", event.logicalVersion)
+            .put("timestamp", event.timestamp).put("payloadJson", event.payloadJson).put("signature", event.signature) })).toString()
+
+    private fun <T> permutations(items: List<T>): List<List<T>> = if (items.isEmpty()) listOf(emptyList())
+        else items.flatMap { item -> permutations(items - item).map { listOf(item) + it } }
+
+    @Test
     fun revocationNoOpNeedsMatchingSignedHistoryAndDoesNotClearNewSelection() = runTest {
         assertTrue(helperB.offerHelp(incidentId, "Nearby"))
         assertTrue(helperC.offerHelp(incidentId, "Transport"))
@@ -408,6 +557,10 @@ class IncidentHelpWorkflowTest {
 
     private suspend fun replica(): Replica = Replica().also {
         it.incidents.insertOrUpdate(incidentDao.getIncidentById(incidentId)!!)
+    }
+
+    private suspend fun freshReplica(): Replica = Replica().also {
+        it.incidents.insertOrUpdate(initialIncident)
     }
 
     private inner class Replica {

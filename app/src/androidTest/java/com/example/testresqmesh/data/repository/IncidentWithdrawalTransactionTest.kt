@@ -75,6 +75,24 @@ class IncidentWithdrawalTransactionTest {
         assertTrue(delegate.getEventsForEntity(id).none { it.eventType == "INCIDENT_OFFER_WITHDRAWN" })
     }
 
+    @Test fun closurePersistenceFailureRollsBackTerminalProjection() = runBlocking {
+        val reporter = workflow("R", "rk")
+        val helper = workflow("B", "bk")
+        assertTrue(helper.offerHelp(id, "Nearby"))
+        assertTrue(reporter.selectLead(id, database.incidentOfferDao().getByHelper(id, "bk")!!.offerId))
+        val before = database.incidentDao().getIncidentById(id)!!
+        val delegate = database.domainEventDao()
+        val failingEvents = object : DomainEventDao by delegate {
+            override suspend fun insertEvent(event: DomainEventEntity): Long {
+                if (event.eventType == "INCIDENT_CANCELLED") error("Injected closure write failure")
+                return delegate.insertEvent(event)
+            }
+        }
+        assertTrue(runCatching { workflow("R", "rk", failingEvents).cancel(id) }.isFailure)
+        assertEquals(before, database.incidentDao().getIncidentById(id))
+        assertTrue(delegate.getEventsForEntity(id).none { it.eventType == "INCIDENT_CANCELLED" })
+    }
+
     @Test fun offlineEditPersistenceFailureAlsoRollsBackSelectedCommitment() = runBlocking {
         val reporter = workflow("R", "rk")
         val helper = workflow("B", "bk")

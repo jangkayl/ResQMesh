@@ -16,6 +16,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import org.json.JSONObject
+import org.json.JSONArray
 import java.util.UUID
 
 /** Version-2 civilian coordination. Incident decisions have one reporter writer; offers have one helper writer each. */
@@ -116,16 +117,35 @@ class IncidentHelpWorkflow(
             JSONObject().put("selectionId", incident.selectionId))
     }
 
-    suspend fun resolve(incidentId: String): Boolean {
-        val incident = incidents.getIncidentById(incidentId) ?: return false
-        if (!isLocalReporter(incident) || incident.status != IncidentState.RESPONDING.name) return false
-        return emit(incident, EventType.INCIDENT_RESOLVED, incident.version + 1, JSONObject())
-    }
+    suspend fun resolve(incidentId: String): Boolean = close(incidentId, EventType.INCIDENT_RESOLVED)
 
-    suspend fun cancel(incidentId: String): Boolean {
-        val incident = incidents.getIncidentById(incidentId) ?: return false
-        if (!isLocalReporter(incident) || incident.status in TERMINAL) return false
-        return emit(incident, EventType.INCIDENT_CANCELLED, incident.version + 1, JSONObject())
+    suspend fun cancel(incidentId: String): Boolean = close(incidentId, EventType.INCIDENT_CANCELLED)
+
+    private suspend fun close(incidentId: String, type: EventType): Boolean = mutex.withLock {
+        reconcileWithdrawnSelectionLocked(incidentId)
+        val incident = incidents.getIncidentById(incidentId) ?: return@withLock false
+        if (!isLocalReporter(incident) || incident.status in TERMINAL ||
+            (type == EventType.INCIDENT_RESOLVED && incident.status != IncidentState.RESPONDING.name))
+            return@withLock false
+        val history = events.getEventsForEntity(incidentId).filter { it.applied }
+        // Offer revisions are independent of reporter versions. Record each observed helper
+        // frontier, the preceding reporter decision, and the current helper commitment.
+        val offerFrontier = history.filter { it.eventType in OFFER_TYPES }
+            .groupBy { JSONObject(it.payloadJson).optString("offerId") }
+            .values.map { stream -> stream.maxBy { it.logicalVersion } }
+        val reporterDecision = history.filter { it.actorId == incident.creatorId &&
+            it.eventType in REPORTER_TYPES && it.logicalVersion == incident.version }
+        val commitment = history.filter { it.eventType in HELPER_DECISIONS &&
+            it.logicalVersion == incident.version }
+        val dependencies = (offerFrontier + reporterDecision + commitment).map { it.eventId }.distinct().sorted()
+        val payload = JSONObject().put("closureProtocol", 1)
+            .put("closureDependencies", JSONArray(dependencies))
+            .put("closureSelectionId", incident.selectionId ?: "")
+            .put("closureConfirmationId", commitment.firstOrNull {
+                it.eventType == EventType.INCIDENT_LEAD_CONFIRMED.name &&
+                    JSONObject(it.payloadJson).optString("selectionId") == incident.selectionId
+            }?.eventId ?: "")
+        emit(incident, type, incident.version + 1, payload, alreadyLocked = true)
     }
 
     private suspend fun isLocalReporter(incident: IncidentEntity): Boolean =
@@ -259,7 +279,7 @@ class IncidentHelpWorkflow(
                     incident.selectionId != payload.optString("selectionId") ||
                     event.logicalVersion != incident.version || offerForSelectionIsWithdrawn(incident)) return false
                 updatedIncident = if (event.eventType == EventType.INCIDENT_LEAD_CONFIRMED.name)
-                    incident.copy(status = IncidentState.RESPONDING.name, selectionConfirmedAt = System.currentTimeMillis(),
+                    incident.copy(status = IncidentState.RESPONDING.name, selectionConfirmedAt = event.timestamp,
                         primaryResponderId = event.actorId, updatedAt = event.timestamp)
                 else clearedSelection(incident)
             }
@@ -282,14 +302,36 @@ class IncidentHelpWorkflow(
                 }
             }
             EventType.INCIDENT_RESOLVED.name, EventType.INCIDENT_CANCELLED.name -> {
+                if (event.actorId != incident.creatorId) return false
+                var closingIncident = incident
+                if (payload.has("closureProtocol") || payload.has("closureDependencies")) {
+                    if (payload.optInt("closureProtocol") != 1) return false
+                    val dependencies = payload.optJSONArray("closureDependencies") ?: return false
+                    for (i in 0 until dependencies.length()) {
+                        val id = dependencies.opt(i) as? String ?: return false
+                        if (id.isBlank() || id == event.eventId) return false
+                        val prerequisite = events.getEventById(id)
+                        if (prerequisite != null && (prerequisite.entityId != event.entityId ||
+                                prerequisite.entityType != EntityType.INCIDENT.name ||
+                                prerequisite.eventType !in TYPES)) return false
+                        if (prerequisite?.applied != true) {
+                            defer()
+                            AppLogger.d("INCIDENT_HELP", "CLOSURE_WAITING_DEPENDENCIES incident=${event.entityId}")
+                            return false
+                        }
+                    }
+                    // Freeze only the helper history that the reporter observed. A newer
+                    // offline offer revision may already have cleared this replica's selection.
+                    closingIncident = closureProjection(incident, payload) ?: return false
+                }
                 if (event.actorId == incident.creatorId && event.logicalVersion > incident.version + 1) {
                     defer()
                     return false
                 }
                 if (event.actorId != incident.creatorId || event.logicalVersion != incident.version + 1 ||
-                    (event.eventType == EventType.INCIDENT_RESOLVED.name && incident.status != IncidentState.RESPONDING.name))
+                    (event.eventType == EventType.INCIDENT_RESOLVED.name && closingIncident.status != IncidentState.RESPONDING.name))
                     return false
-                updatedIncident = incident.copy(status = if (event.eventType == EventType.INCIDENT_RESOLVED.name)
+                updatedIncident = closingIncident.copy(status = if (event.eventType == EventType.INCIDENT_RESOLVED.name)
                     IncidentState.RESOLVED.name else IncidentState.CANCELLED.name,
                     version = event.logicalVersion, updatedAt = event.timestamp)
             }
@@ -316,6 +358,38 @@ class IncidentHelpWorkflow(
         incident.selectionOfferId?.let { id ->
             offers.getById(id)?.let { it.withdrawn || it.revision != incident.selectionOfferRevision }
         } != false
+
+    private suspend fun closureProjection(incident: IncidentEntity, payload: JSONObject): IncidentEntity? {
+        val selectionId = payload.opt("closureSelectionId") as? String ?: return null
+        val confirmationId = payload.opt("closureConfirmationId") as? String ?: return null
+        if (selectionId.isEmpty()) return if (confirmationId.isEmpty()) clearedSelection(incident) else null
+        val dependencies = payload.getJSONArray("closureDependencies")
+        val ids = (0 until dependencies.length()).map { dependencies.getString(it) }.toSet()
+        val selection = selectionEvent(incident, selectionId) ?: return null
+        if (selection.eventId !in ids || selection.logicalVersion != incident.version) return null
+        val selected = JSONObject(selection.payloadJson)
+        val offerId = selected.optString("offerId")
+        val helperKey = selected.optString("helperKey")
+        val revision = selected.optLong("offerRevision")
+        val history = events.getEventsForEntity(incident.incidentId).filter { it.applied }
+        val offered = history.firstOrNull { it.eventType == EventType.INCIDENT_OFFER_UPDATED.name &&
+            it.logicalVersion == revision && signer.verify(it, helperKey) &&
+            JSONObject(it.payloadJson).let { p -> p.optString("offerId") == offerId && p.optString("helperKey") == helperKey }
+        } ?: return null
+        if (history.any { it.eventId in ids && it.eventType in OFFER_TYPES &&
+                it.logicalVersion > revision && JSONObject(it.payloadJson).optString("offerId") == offerId }) return null
+        val confirmation = if (confirmationId.isEmpty()) null else {
+            events.getEventById(confirmationId)?.takeIf {
+                it.eventId in ids && it.applied && it.entityId == incident.incidentId &&
+                    it.eventType == EventType.INCIDENT_LEAD_CONFIRMED.name && it.logicalVersion == incident.version &&
+                    signer.verify(it, helperKey) && JSONObject(it.payloadJson).optString("selectionId") == selectionId
+            } ?: return null
+        }
+        return incident.copy(status = if (confirmation == null) IncidentState.AWAITING_HELPER.name else IncidentState.RESPONDING.name,
+            selectionId = selectionId, selectionOfferId = offerId, selectionOfferRevision = revision,
+            selectedHelperKey = helperKey, primaryResponderName = offered.actorName,
+            primaryResponderId = confirmation?.actorId, selectionConfirmedAt = confirmation?.timestamp)
+    }
 
     private suspend fun selectionEvent(incident: IncidentEntity, selectionId: String): DomainEventEntity? {
         if (selectionId.isBlank()) return null
@@ -355,6 +429,9 @@ class IncidentHelpWorkflow(
 
     companion object {
         private val TERMINAL = setOf(IncidentState.RESOLVED.name, IncidentState.CANCELLED.name)
+        internal val OFFER_TYPES = setOf(EventType.INCIDENT_OFFER_UPDATED.name, EventType.INCIDENT_OFFER_WITHDRAWN.name)
+        private val HELPER_DECISIONS = setOf(EventType.INCIDENT_LEAD_CONFIRMED.name, EventType.INCIDENT_LEAD_DECLINED.name)
+        private val REPORTER_TYPES = setOf(EventType.INCIDENT_LEAD_SELECTED.name, EventType.INCIDENT_LEAD_REVOKED.name)
         val TYPES = setOf(EventType.INCIDENT_OFFER_UPDATED.name, EventType.INCIDENT_OFFER_WITHDRAWN.name,
             EventType.INCIDENT_LEAD_SELECTED.name, EventType.INCIDENT_LEAD_CONFIRMED.name,
             EventType.INCIDENT_LEAD_DECLINED.name, EventType.INCIDENT_LEAD_REVOKED.name)

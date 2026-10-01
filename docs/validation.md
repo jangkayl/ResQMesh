@@ -1,6 +1,6 @@
 # Validation
 
-Builds and tests do not prove BLE behavior. The user operates phones; Codex prepares steps and analyzes evidence. Check SOS map setup returns to its alert.
+Builds/tests do not prove BLE behavior. The user operates phones; Codex prepares steps/analyzes evidence. SOS map setup must return to its alert.
 
 ## Local checks
 
@@ -52,19 +52,19 @@ Expand to system logs only if app markers are insufficient. Never summarize whol
 
 ### Level 1: two-phone smoke
 
-Connect the same APK on two phones; confirm `READY`, exchange public/private text, verify each appears once, and check Radar status.
+Connect two phones with the same APK; confirm `READY`, public/private text once each, and Radar status.
 
 ### Radio recorded-note card
 
-With the same APK and a ready link, turn Radio Monitor on. Send three notes before the first ends; verify full ordered playback and speaker names. Repeat with two senders sharing a display name. Tap a Messages note during playback; verify manual priority and Radio resumption without overlap. Turn monitoring off mid-note, send while off, then turn it on; verify no backlog. Record APK, devices, order, names, and missing or repeated notes.
+Record APK/devices. With READY and Radio Monitor on, send three overlapping notes; check full ordered playback and speaker names, including equal display names. Play a Messages note: check manual priority and Radio resumption without overlap. Disable monitoring mid-note, send while off, re-enable: expect no backlog. Report missing/repeated notes.
 
 ### First-launch guide card
 
-Record APK identity and device/API. With cleared data, open normally: expect splash, three guide pages, permissions, name setup, then current Home. Check Back, Skip, rotation, both themes, and Settings replay. Reopen without clearing: guide stays hidden. Open an SOS/chat notification during unfinished setup: expect the destination after setup and the guide on the next normal launch. Report any stale screen, lost destination, or unexpected mesh start.
+Record APK/device/API. Clear data and open: expect splash, three guide pages, permissions, name, Home. Check Back, Skip, orientation, themes, Settings replay. Reopen: guide stays hidden. SOS/chat notifications during setup must reach their destination afterward; next normal launch shows the guide. Report stale screens, lost destinations, or unexpected mesh starts.
 
 ### Level 2: lifecycle and recovery
 
-Restart each app separately, toggle Bluetooth on one phone, move out of range and return, repeat reconnect three to five times, send during and immediately after recovery, and confirm stale endpoints/keys do not break the replacement link.
+Restart apps separately, toggle Bluetooth, leave/return to range, reconnect three to five times, send during/after recovery; stale endpoints/keys must not break replacement links.
 
 ### Level 3: three-phone relay
 
@@ -74,7 +74,11 @@ For A-B-C-D, make A/D indirect, send five private messages each way, then reconn
 
 ### Reporter-selected helper card
 
-Record APK hash/version, devices/API, topology, and timestamps. A reports; B/C offer. Rename A before selection, while awaiting, and after confirmation; reporter controls and My activity must persist, with original report name. Selection locks B's editing; withdrawal before/after confirmation removes B and permits selecting C. Reconnect/restart without clearing data; repeat withdrawal offline. Edit B's offer while disconnected before learning selection; reconnect: selection clears and requires fresh approval. Re-offering never restores selection automatically. Disconnection alone preserves selection; closed history stays closed. Report stale controls, rejected actions, duplicates, and convergence times. Capture `IDENTITY`, `INCIDENT_IDENTITY`, `INCIDENT_HELP`, `INCIDENT_REPO`, and `READY`; omit names, notes, and keys. Physical validation remains open.
+Record APK hash/version, devices/API, topology, timestamps. A reports; B/C offer. Rename A before selection, while awaiting, after confirmation: ownership persists with original report name. Selection locks B's editing; withdrawal removes B and permits C. Repeat withdrawal offline and restart without clearing. B edits offline before learning selection; reconnect: clear selection, require fresh approval. Re-offer never restores selection; disconnection preserves it; history stays closed. Report stale controls, rejections, duplicates, convergence. Capture `IDENTITY`, `INCIDENT_IDENTITY`, `INCIDENT_HELP`, `INCIDENT_REPO`, `READY`; omit names/notes/keys. Phone validation remains open.
+
+### Incident closure replay card
+
+Candidate APK SHA-256: `DD8B7A738FA347FB8CF80E6C95F07FD53755C73BF240D019DE1428EED02C957B`. Record devices/API/timestamps. Same build on reporter A/helper B; establish READY. Offer → select → disconnect → B withdraws → reconnect until A sees withdrawal → A cancels → restart B/reconnect. Both must show cancelled history without a helper; repeat five times. Separately confirm/resolve: retain confirmed-helper history; delayed confirmation must not reopen. Report stale selections, duplicates, convergence time. Capture `INCIDENT_HELP`, `CLOSURE_WAITING_DEPENDENCIES`, `WITHDRAWAL_CLEARED_SELECTION`, `SUPERSEDED_SELECTION_SKIPPED`, `INCIDENT_REPO`, READY; omit private content. Ordering uses local tests; Room execution remains open.
 
 ### Level 4: release/capstone matrix
 

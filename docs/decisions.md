@@ -84,6 +84,8 @@ Topology uses leased snapshots; empty snapshots withdraw adjacency and old versi
 
 Ownership uses stable user ID and signing key; names remain historical snapshots. One offer per helper; selection locks local editing until withdrawal/removal. Reporters select, revoke, resolve, or cancel; helpers confirm, decline, or withdraw. Withdrawal or signed offline edits reopen requests; replacement needs fresh selection. Helper revisions never advance reporter versions; superseded selections consume valid reporter versions. Route loss changes connection labels, never selection. No voting, open comments, automatic failover, verified-responder claim, or duplicate-response guarantee is implied. Signing proves device-key continuity only; first-contact trust and deployment authority remain open.
 
+Closure uses signed prerequisites and observed history, never clock ordering.
+
 ## D20: Bound voice pressure without changing the payload protocol
 
 Keep three direct neighbors and whole-frame compatibility. Each GATT/L2CAP queue counts active bytes and reserves control capacity: 128 transfers, 2 MiB ordinary bytes, eight slots/64 KiB headroom. Acknowledged progress delays silence retirement; attempts alone do not. Public broadcasts expose neighbor acceptance, persist before dispatch, and retry wholly rejected sends only. Larger-scale media scheduling depends on the phone matrix in status.
