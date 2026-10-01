@@ -134,21 +134,44 @@ fun TacticalIncidentCard(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    // Avatar Circle with initial
-                    Surface(
-                        shape = CircleShape,
-                        color = MaterialTheme.colorScheme.primaryContainer,
-                        modifier = Modifier.size(38.dp)
-                    ) {
-                        Box(contentAlignment = Alignment.Center) {
-                            Text(
-                                text = incident.creatorName.take(1).uppercase(),
-                                style = MaterialTheme.typography.titleSmall.copy(
-                                    fontSize = 15.sp,
-                                    fontWeight = FontWeight.Bold
-                                ),
-                                color = MaterialTheme.colorScheme.onPrimaryContainer
-                            )
+                    // Avatar Circle with category badge overlay
+                    Box {
+                        Surface(
+                            shape = CircleShape,
+                            color = MaterialTheme.colorScheme.primaryContainer,
+                            modifier = Modifier.size(40.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Text(
+                                    text = incident.creatorName.take(1).uppercase(),
+                                    style = MaterialTheme.typography.titleSmall.copy(
+                                        fontSize = 15.sp,
+                                        fontWeight = FontWeight.Bold
+                                    ),
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                                )
+                            }
+                        }
+                        Surface(
+                            shape = CircleShape,
+                            color = MaterialTheme.colorScheme.surface,
+                            modifier = Modifier
+                                .size(18.dp)
+                                .align(Alignment.BottomEnd)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .background(urgencyColor.copy(alpha = 0.15f)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = incidentCategoryIcon(incident.incidentType),
+                                    contentDescription = null,
+                                    tint = urgencyColor,
+                                    modifier = Modifier.size(11.dp)
+                                )
+                            }
                         }
                     }
 

@@ -95,10 +95,14 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
         handleIntentExtras(intent)
         
         // Let Compose handle window insets (stops bottom nav bar from being pushed up by keyboard)
         androidx.core.view.WindowCompat.setDecorFitsSystemWindows(window, false)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            window.isNavigationBarContrastEnforced = false
+        }
         
 
         lifecycle.addObserver(LifecycleEventObserver { _, event ->

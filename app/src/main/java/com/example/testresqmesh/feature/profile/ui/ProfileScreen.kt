@@ -22,6 +22,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontFamily
@@ -231,31 +232,42 @@ fun ProfileScreen(
             ResQGlassSurface(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(24.dp),
-                contentPadding = PaddingValues(Spacing.Medium),
-                shadowElevation = 8.dp
+                contentPadding = PaddingValues(16.dp),
+                shadowElevation = 4.dp
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Surface(modifier = Modifier.size(52.dp), shape = CircleShape, color = MaterialTheme.colorScheme.primary) {
+                    Surface(
+                        modifier = Modifier.size(56.dp),
+                        shape = CircleShape,
+                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
+                        border = BorderStroke(2.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.4f))
+                    ) {
                         Box(contentAlignment = Alignment.Center) {
                             Text(
-                                state.myNodeName.firstOrNull()?.uppercase() ?: "R",
-                                color = MaterialTheme.colorScheme.onPrimary,
-                                fontWeight = FontWeight.Black,
-                                style = MaterialTheme.typography.titleLarge
+                                text = state.myNodeName.firstOrNull()?.uppercase() ?: "R",
+                                color = MaterialTheme.colorScheme.primary,
+                                fontWeight = FontWeight.ExtraBold,
+                                style = MaterialTheme.typography.headlineSmall
                             )
                         }
                     }
                     Spacer(Modifier.width(Spacing.Medium))
                     Column(modifier = Modifier.weight(1f)) {
-                        Text(state.myNodeName.ifBlank { "ResQMesh Station" }, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Black)
+                        Text(
+                            text = state.myNodeName.ifBlank { "ResQMesh User" },
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Spacer(Modifier.height(2.dp))
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                             Box(
                                 modifier = Modifier
                                     .size(8.dp)
-                                    .background(if (state.isOnline) ResQTheme.colors.success else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f), CircleShape)
+                                    .clip(CircleShape)
+                                    .background(if (state.isOnline) ResQTheme.colors.success else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f))
                             )
                             Text(
-                                if (state.isOnline) "Mesh session active · Check Network for peers" else "Mesh session offline",
+                                text = if (state.isOnline) "Mesh active · Connected to local radio" else "Mesh offline · Tap below to connect",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = if (state.isOnline) ResQTheme.colors.success else MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -266,7 +278,7 @@ fun ProfileScreen(
         }
 
         // Section 1: Appearance
-        item { SettingsLabel("TACTICAL DISPLAY") }
+        item { SettingsLabel("APPEARANCE") }
         item {
             Column(verticalArrangement = Arrangement.spacedBy(Spacing.Small)) {
                 AppearanceChoice(Icons.Default.Brightness4, "Night Operations", "Pitch-black OLED high-contrast display", appearance == AppAppearance.Night) {
@@ -279,7 +291,7 @@ fun ProfileScreen(
         }
 
         // Section 2: Hardware & Radio Control
-        item { SettingsLabel("HARDWARE & RADIO") }
+        item { SettingsLabel("RADIO & CONNECTIONS") }
         item {
             SettingsCard {
                 SettingRow(
@@ -334,8 +346,8 @@ fun ProfileScreen(
             }
         }
 
-        // Section 3: Mission Intel & Support
-        item { SettingsLabel("MISSION INTEL & SUPPORT") }
+        // Section 3: Help & Support
+        item { SettingsLabel("PRIVACY & SUPPORT") }
         item {
             SettingsCard {
                 SettingRow(
@@ -361,7 +373,7 @@ fun ProfileScreen(
             }
         }
 
-        // Section 4: Developer Zone (Conditional / PIN gated)
+        // Section 4: Developer Mode (Conditional / PIN gated)
         item { SettingsLabel("DEVELOPER TOOLS") }
         item {
             SettingsCard {

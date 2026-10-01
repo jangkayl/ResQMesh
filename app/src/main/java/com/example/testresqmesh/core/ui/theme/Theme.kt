@@ -17,49 +17,49 @@ import androidx.compose.ui.graphics.Color
 
 private val NightOperationsColorScheme = darkColorScheme(
     primary = SafetyOrange,
-    onPrimary = TacticalBlack,
-    primaryContainer = TacticalCarbonElevated,
-    onPrimaryContainer = SafetyOrange,
-    secondary = TacticalCarbonElevated,
+    onPrimary = Color.White,
+    primaryContainer = SafetyOrangeContainerDark,
+    onPrimaryContainer = Color(0xFFFFDBC9),
+    secondary = SlateNightElevated,
     onSecondary = TextPrimary,
-    secondaryContainer = TacticalCarbonBorder,
+    secondaryContainer = SlateNightBorder,
     onSecondaryContainer = TextPrimary,
-    background = TacticalBlack,
-    surface = TacticalCarbon,
-    surfaceVariant = TacticalCarbonElevated,
+    background = SlateNightCanvas,
+    surface = SlateNightSurface,
+    surfaceVariant = SlateNightElevated,
     onBackground = TextPrimary,
     onSurface = TextPrimary,
     onSurfaceVariant = TextSecondary,
     error = SignalRed,
-    onError = TacticalBlack,
+    onError = Color.White,
     errorContainer = Color(0xFF4A1C22),
     onErrorContainer = Color(0xFFFFDAD9),
-    outline = TacticalCarbonBorder,
-    outlineVariant = Color(0xFF303339),
+    outline = SlateNightBorder,
+    outlineVariant = Color(0xFF2C2C32),
     surfaceTint = SafetyOrange
 )
 
 private val DaylightOperationsColorScheme = lightColorScheme(
     primary = SafetyOrange,
-    onPrimary = Color(0xFF000000),
-    primaryContainer = Color(0xFFFFEDE4), // Soft Safety Orange Tint
-    onPrimaryContainer = SafetyOrange,
-    secondary = Color(0xFFCBD5E1),
-    onSecondary = Color(0xFF000000),
-    secondaryContainer = Color(0xFFF1F5F9),
-    onSecondaryContainer = Color(0xFF000000),
-    background = Color(0xFFF8FAFC),
+    onPrimary = Color.White,
+    primaryContainer = SafetyOrangeContainerLight,
+    onPrimaryContainer = SafetyOrangeDark,
+    secondary = Color(0xFFEFECE7),
+    onSecondary = Color(0xFF181817),
+    secondaryContainer = Color(0xFFF5F2ED),
+    onSecondaryContainer = Color(0xFF181817),
+    background = Color(0xFFFAF8F5),
     surface = Color(0xFFFFFFFF),
-    surfaceVariant = Color(0xFFF1F5F9),
-    onBackground = Color(0xFF000000),
-    onSurface = Color(0xFF000000),
-    onSurfaceVariant = Color(0xFF334155),
+    surfaceVariant = Color(0xFFF3EFEA),
+    onBackground = Color(0xFF181817),
+    onSurface = Color(0xFF181817),
+    onSurfaceVariant = Color(0xFF6B6864),
     error = SignalRed,
-    onError = Color(0xFFFFFFFF),
+    onError = Color.White,
     errorContainer = Color(0xFFFFD9DE),
     onErrorContainer = Color(0xFF41000C),
-    outline = Color(0xFF94A3B8),
-    outlineVariant = Color(0xFFCBD5E1),
+    outline = Color(0xFFDCD5CE),
+    outlineVariant = Color(0xFFEAE4DC),
     surfaceTint = SafetyOrange
 )
 
@@ -112,49 +112,49 @@ data class ResQExtendedColors(
 )
 
 private val NightOperationsExtendedColors = ResQExtendedColors(
-    success = SignalGreen,
-    onSuccess = TacticalBlack,
-    successContainer = Color(0xFF00331A),
-    onSuccessContainer = Color(0xFF80F3B8),
-    warning = SignalAmber,
-    onWarning = TacticalBlack,
-    warningContainer = Color(0xFF4D3300),
-    onWarningContainer = Color(0xFFFFD580),
-    sos = SignalRed,
-    onSos = TacticalBlack,
-    sosContainer = Color(0xFF4A0000),
-    onSosContainer = Color(0xFFFF8A80),
-    backgroundStart = TacticalBlack,
-    backgroundEnd = TacticalCarbon,
+    success = ModernMint,
+    onSuccess = Color.White,
+    successContainer = Color(0xFF064E3B),
+    onSuccessContainer = Color(0xFFA7F3D0),
+    warning = ModernAmber,
+    onWarning = Color.Black,
+    warningContainer = Color(0xFF78350F),
+    onWarningContainer = Color(0xFFFDE68A),
+    sos = ModernCoral,
+    onSos = Color.White,
+    sosContainer = Color(0xFF7F1D1D),
+    onSosContainer = Color(0xFFFECACA),
+    backgroundStart = SlateNightCanvas,
+    backgroundEnd = SlateNightSurface,
     glowPrimary = SafetyOrange,
-    glowSecondary = SignalRed,
-    glassFill = Color(0xE6121212),
-    glassTint = TacticalCarbonElevated,
-    glassBorder = TacticalCarbonBorder,
-    glassShadow = Color(0xCC000000)
+    glowSecondary = Color(0xFFFF7A29),
+    glassFill = Color(0xEE18181C),
+    glassTint = SlateNightElevated,
+    glassBorder = Color(0x2EFFFFFF),
+    glassShadow = Color(0x66000000)
 )
 
 private val DaylightOperationsExtendedColors = ResQExtendedColors(
-    success = SignalGreen,
-    onSuccess = Color(0xFFFFFFFF),
-    successContainer = Color(0xFFC9F7DD),
-    onSuccessContainer = Color(0xFF00391F),
-    warning = SignalAmber,
-    onWarning = Color(0xFF000000),
-    warningContainer = Color(0xFFFFE5BB),
-    onWarningContainer = Color(0xFF301400),
-    sos = SignalRed,
-    onSos = Color(0xFFFFFFFF),
-    sosContainer = Color(0xFFFFD9DE),
-    onSosContainer = Color(0xFF41000C),
-    backgroundStart = Color(0xFFF8FAFC),
-    backgroundEnd = Color(0xFFE2E8F0),
+    success = ModernMint,
+    onSuccess = Color.White,
+    successContainer = Color(0xFFD1FAE5),
+    onSuccessContainer = Color(0xFF065F46),
+    warning = ModernAmber,
+    onWarning = Color.Black,
+    warningContainer = Color(0xFFFEF3C7),
+    onWarningContainer = Color(0xFF92400E),
+    sos = ModernCoral,
+    onSos = Color.White,
+    sosContainer = Color(0xFFFEE2E2),
+    onSosContainer = Color(0xFF991B1B),
+    backgroundStart = Color(0xFFFAF8F5),
+    backgroundEnd = Color(0xFFF5EFE9),
     glowPrimary = SafetyOrange,
-    glowSecondary = SignalRed,
-    glassFill = Color(0xFDFEFFFF),
-    glassTint = Color(0xFFF1F5F9),
-    glassBorder = Color(0xFFCBD5E1),
-    glassShadow = Color(0x1A0F172A)
+    glowSecondary = Color(0xFFFF8B4D),
+    glassFill = Color(0xF2FFFFFF),
+    glassTint = Color(0xFFF3EFEA),
+    glassBorder = Color(0x26000000),
+    glassShadow = Color(0x18000000)
 )
 
 val LocalResQExtendedColors = staticCompositionLocalOf { NightOperationsExtendedColors }
@@ -180,8 +180,11 @@ fun TestResQMeshTheme(
     val view = LocalView.current
     if (!view.isInEditMode) {
         val window = (view.context as Activity).window
-        window.statusBarColor = colorScheme.background.toArgb()
-        window.navigationBarColor = colorScheme.surface.toArgb()
+        window.statusBarColor = android.graphics.Color.TRANSPARENT
+        window.navigationBarColor = android.graphics.Color.TRANSPARENT
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+            window.isNavigationBarContrastEnforced = false
+        }
         WindowCompat.getInsetsController(window, view).apply {
             isAppearanceLightStatusBars = !isNight
             isAppearanceLightNavigationBars = !isNight

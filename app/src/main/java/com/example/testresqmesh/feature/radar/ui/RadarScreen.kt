@@ -400,7 +400,7 @@ fun RadarScreenContent(
                 }
 
                 if (relayNodesList.isNotEmpty()) {
-                    Text("REACHABLE VIA RELAY", style = MaterialTheme.typography.labelSmall, color = Color(0xFF38BDF8), modifier = Modifier.padding(top = Spacing.Small))
+                    Text("REACHABLE VIA RELAY", style = MaterialTheme.typography.labelSmall, color = Color(0xFFFF9500), modifier = Modifier.padding(top = Spacing.Small))
                     relayNodesList.forEach { node ->
                         NearbyNodeItem(node, onDisconnect, onForceConnect, onBlock, onUnblock)
                     }
@@ -505,7 +505,7 @@ fun NearbyNodeItem(
                             .clip(CircleShape)
                             .background(InboxAccentBlue)
                             .align(Alignment.TopEnd)
-                            .border(2.dp, Color(0xFF1E293B), CircleShape)
+                            .border(2.dp, MaterialTheme.colorScheme.surface, CircleShape)
                     ) {
                         Icon(Icons.Default.Wifi, contentDescription = null, tint = Color.White, modifier = Modifier.padding(2.dp))
                     }

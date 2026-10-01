@@ -347,6 +347,7 @@ fun MainContainerScreen(
                             ResQDestination.Mission -> HomeScreen(
                                 setupViewModel = setupViewModel,
                                 radarViewModel = radarViewModel,
+                                commsViewModel = commsViewModel,
                                 locationStatus = locationStatus,
                                 onMessagesClick = { currentDestination = ResQDestination.Messages },
                                 onNetworkClick = {
@@ -354,12 +355,18 @@ fun MainContainerScreen(
                                     showNetworkDetails = true
                                 },
                                 onPeerClick = { peerName ->
-                                    selectedNetworkPeerKey = com.example.testresqmesh.core.model.NodeIdentity.idOf(peerName)
-                                    showNetworkDetails = true
+                                    activeChatNode = peerName
                                 },
                                 onProfileClick = { showProfile = true },
                                 onVoiceClick = { currentDestination = ResQDestination.Voice },
                                 onIncidentsClick = { showIncidents = true },
+                                onChatSelected = { peerName ->
+                                    activeChatNode = peerName
+                                },
+                                onCommunityClick = {
+                                    isCommunityConversationOpen = true
+                                    currentDestination = ResQDestination.Messages
+                                },
                                 activeIncidentCount = incidentMetrics.totalActive,
                                 criticalIncidentCount = incidentMetrics.criticalCount
                             )
@@ -368,6 +375,7 @@ fun MainContainerScreen(
                                 mediaHelper = mediaHelper, 
                                 onChatSelected = { activeChatNode = it },
                                 onCommunityConversationChanged = { isCommunityConversationOpen = it },
+                                initialOpenCommunity = isCommunityConversationOpen,
                                 onViewMap = { lat, lng, sender, text ->
                                     mapSosAlert = com.example.testresqmesh.core.model.ChatMessage(
                                         id = "view_map_${System.currentTimeMillis()}",

@@ -1218,8 +1218,8 @@ internal fun createMyLocationMarkerBitmap(context: Context): Bitmap {
 
     val paint = Paint(Paint.ANTI_ALIAS_FLAG)
 
-    // Outer soft pulsing halo (Cyan #00E5FF, 25% alpha)
-    paint.color = AndroidColor.parseColor("#4000E5FF")
+    // Outer soft pulsing halo (Safety Orange, 25% alpha)
+    paint.color = AndroidColor.parseColor("#40FF5A00")
     paint.style = Paint.Style.FILL
     canvas.drawCircle(center, center, center - (2 * density), paint)
 
@@ -1228,8 +1228,8 @@ internal fun createMyLocationMarkerBitmap(context: Context): Bitmap {
     paint.style = Paint.Style.FILL
     canvas.drawCircle(center, center, 12 * density, paint)
 
-    // Tactical Electric Marine Blue core disc
-    paint.color = AndroidColor.parseColor("#0091EA")
+    // Safety Orange core disc
+    paint.color = AndroidColor.parseColor("#FF5A00")
     canvas.drawCircle(center, center, 9 * density, paint)
 
     // Pinpoint white center dot

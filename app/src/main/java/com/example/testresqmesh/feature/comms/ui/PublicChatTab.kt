@@ -4,6 +4,8 @@ import android.Manifest
 import android.content.pm.PackageManager
 import com.example.testresqmesh.core.model.ChatMessage
 import com.example.testresqmesh.core.model.NodeIdentity
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -20,10 +22,12 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.Campaign
+import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
@@ -254,11 +258,15 @@ internal fun CommunityHeader(
     onChannelSelected: (String) -> Unit
 ) {
     var expanded by remember { mutableStateOf(false) }
-    Surface(color = MaterialTheme.colorScheme.surface) {
+    Surface(
+        color = MaterialTheme.colorScheme.surface,
+        shadowElevation = 2.dp,
+        border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f))
+    ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = Spacing.Small, vertical = Spacing.Small),
+                .padding(horizontal = 8.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             IconButton(onClick = onBack) {
@@ -268,37 +276,58 @@ internal fun CommunityHeader(
                 )
             }
             Surface(
-                modifier = Modifier.size(44.dp),
-                shape = RoundedCornerShape(15.dp),
-                color = MaterialTheme.colorScheme.primaryContainer
+                modifier = Modifier.size(42.dp),
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.3f))
             ) {
                 Box(contentAlignment = Alignment.Center) {
                     Icon(
                         imageVector = Icons.Outlined.Campaign,
                         contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(22.dp)
                     )
                 }
             }
-            Spacer(Modifier.width(Spacing.Small))
+            Spacer(Modifier.width(10.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = stringResource(R.string.community_title),
-                    style = MaterialTheme.typography.titleLarge,
+                    style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold
                 )
                 Text(
-                    text = stringResource(R.string.community_description),
-                    style = MaterialTheme.typography.labelMedium,
+                    text = "Public broadcast · Channel $channelId",
+                    style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
             Box {
-                TextButton(onClick = { expanded = true }) {
-                    Text(
-                        text = stringResource(R.string.messages_channel_short, channelId),
-                        fontWeight = FontWeight.Bold
-                    )
+                Surface(
+                    shape = RoundedCornerShape(18.dp),
+                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)),
+                    onClick = { expanded = true }
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "CH $channelId",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Spacer(Modifier.width(4.dp))
+                        Icon(
+                            imageVector = Icons.Outlined.Tune,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(14.dp)
+                        )
+                    }
                 }
                 DropdownMenu(
                     expanded = expanded,

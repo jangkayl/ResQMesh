@@ -167,8 +167,8 @@ fun IncidentListScreen(
 
                 // Primary Destination Segmented Pill Bar (Matching Concept Mockup)
                 val isNight = MaterialTheme.colorScheme.background == TacticalBlack || MaterialTheme.colorScheme.surface == TacticalCarbon
-                val activeTabBg = if (isNight) MaterialTheme.colorScheme.primaryContainer else Color(0xFF264264)
-                val activeTabTextColor = if (isNight) MaterialTheme.colorScheme.onPrimaryContainer else Color.White
+                val activeTabBg = if (isNight) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.primary
+                val activeTabTextColor = if (isNight) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onPrimary
 
                 Surface(
                     shape = RoundedCornerShape(24.dp),

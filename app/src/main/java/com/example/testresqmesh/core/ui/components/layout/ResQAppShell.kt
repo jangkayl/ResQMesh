@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -23,7 +24,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.ChatBubbleOutline
 import androidx.compose.material.icons.outlined.GraphicEq
-import androidx.compose.material.icons.outlined.MyLocation
+import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.WarningAmber
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -40,7 +41,6 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -54,7 +54,7 @@ enum class ResQDestination(
     @StringRes val labelRes: Int,
     val icon: ImageVector
 ) {
-    Mission(R.string.nav_mission, Icons.Outlined.MyLocation),
+    Mission(R.string.nav_mission, Icons.Outlined.Home),
     Messages(R.string.nav_messages, Icons.Outlined.ChatBubbleOutline),
     Voice(R.string.nav_voice, Icons.Outlined.GraphicEq)
 }
@@ -83,7 +83,14 @@ fun ResQAppShell(
                     )
                 }
             },
-            content = content
+            content = { scaffoldPadding ->
+                content(
+                    PaddingValues(
+                        top = scaffoldPadding.calculateTopPadding(),
+                        bottom = 0.dp
+                    )
+                )
+            }
         )
     }
 }
@@ -98,7 +105,8 @@ private fun ResQFloatingIslandNavBar(
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 14.dp),
+            .navigationBarsPadding()
+            .padding(horizontal = 16.dp, vertical = 12.dp),
         contentAlignment = Alignment.Center
     ) {
         // Floating Translucent Glass Island
@@ -251,8 +259,7 @@ private fun ResQStaticSosButton(
                     text = "SOS",
                     style = MaterialTheme.typography.labelSmall.copy(
                         fontSize = 10.sp,
-                        fontFamily = FontFamily.Monospace,
-                        letterSpacing = 1.sp
+                        letterSpacing = 0.8.sp
                     ),
                     fontWeight = FontWeight.Black
                 )

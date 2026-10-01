@@ -128,7 +128,7 @@ class NotificationHelper(private val context: Context) {
             .setCategory(NotificationCompat.CATEGORY_MESSAGE)
             .setAutoCancel(true)
             .setContentIntent(pendingIntent)
-            .setColor(0xFF00E5FF.toInt()) // Cyan accent
+            .setColor(0xFFFF5A00.toInt()) // Safety Orange accent
             .setOnlyAlertOnce(false)
 
         try {

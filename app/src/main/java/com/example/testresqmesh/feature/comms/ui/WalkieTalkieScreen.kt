@@ -40,9 +40,6 @@ import com.example.testresqmesh.core.ui.theme.ResQTheme
 import com.example.testresqmesh.core.ui.components.layout.ResQGlassSurface
 import com.example.testresqmesh.feature.comms.viewmodel.CommunicationViewModel
 import com.example.testresqmesh.feature.comms.viewmodel.WalkieTalkieViewModel
-import kotlin.math.cos
-import kotlin.math.sin
-
 import androidx.compose.ui.graphics.luminance
 
 @Composable
@@ -56,7 +53,6 @@ fun WalkieTalkieScreen(
     val channel by walkieTalkieViewModel.currentChannelId.collectAsState()
     val speaker by walkieTalkieViewModel.currentSpeaker.collectAsState()
     var recording by remember { mutableStateOf(false) }
-    var liveAudio by remember { mutableStateOf(false) }
     var channelsOpen by remember { mutableStateOf(false) }
     val haptics = LocalHapticFeedback.current
 
@@ -127,20 +123,21 @@ fun WalkieTalkieScreen(
         ) {
             Column(Modifier.weight(1f)) {
                 Text(
-                    text = "Tactical Voice",
-                    style = MaterialTheme.typography.displaySmall,
-                    fontWeight = FontWeight.Black
+                    text = "Mesh Walkie-Talkie",
+                    style = MaterialTheme.typography.headlineMedium,
+                    fontWeight = FontWeight.Bold
                 )
                 Text(
-                    text = "Channel $channel PTT Broadcast",
+                    text = "Channel $channel · Live audio broadcast",
+                    style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
             Box {
                 Surface(
-                    shape = RoundedCornerShape(14.dp),
-                    color = MaterialTheme.colorScheme.surfaceVariant,
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                    shape = RoundedCornerShape(18.dp),
+                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.35f)),
                     onClick = { channelsOpen = true }
                 ) {
                     Row(
@@ -154,7 +151,11 @@ fun WalkieTalkieScreen(
                             modifier = Modifier.size(18.dp)
                         )
                         Spacer(Modifier.width(6.dp))
-                        Text("CH $channel", fontWeight = FontWeight.Black)
+                        Text(
+                            text = "CH $channel",
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
                     }
                 }
                 DropdownMenu(expanded = channelsOpen, onDismissRequest = { channelsOpen = false }) {
@@ -173,100 +174,102 @@ fun WalkieTalkieScreen(
 
         Spacer(Modifier.height(Spacing.Medium))
 
-        // Voice Receiver Status Panel
+        // Voice Receiver / Radio Monitor Panel
         ResQGlassSurface(
             modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(24.dp),
-            contentPadding = PaddingValues(Spacing.Medium),
-            shadowElevation = 8.dp
+            shape = RoundedCornerShape(22.dp),
+            contentPadding = PaddingValues(16.dp),
+            shadowElevation = 4.dp
         ) {
-            Column {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Surface(
-                        modifier = Modifier.size(42.dp),
-                        shape = RoundedCornerShape(12.dp),
-                        color = if (receiverOn) ResQTheme.colors.success.copy(alpha = 0.15f) else MaterialTheme.colorScheme.surfaceVariant
-                    ) {
-                        Box(contentAlignment = Alignment.Center) {
-                            Icon(
-                                Icons.Outlined.GraphicEq,
-                                contentDescription = null,
-                                tint = if (receiverOn) ResQTheme.colors.success else MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.size(22.dp)
-                            )
-                        }
-                    }
-                    Spacer(Modifier.width(12.dp))
-                    Column(Modifier.weight(1f)) {
-                        Text("Radio Monitor", fontWeight = FontWeight.Black, style = MaterialTheme.typography.titleMedium)
-                        Text(
-                            if (receiverOn) "Active listener on CH $channel" else "Standby (Radio Muted)",
-                            color = if (receiverOn) ResQTheme.colors.success else MaterialTheme.colorScheme.onSurfaceVariant,
-                            style = MaterialTheme.typography.bodySmall
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Surface(
+                    modifier = Modifier.size(44.dp),
+                    shape = CircleShape,
+                    color = if (receiverOn) ResQTheme.colors.success.copy(alpha = 0.15f) else MaterialTheme.colorScheme.surfaceVariant
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            Icons.Outlined.GraphicEq,
+                            contentDescription = null,
+                            tint = if (receiverOn) ResQTheme.colors.success else MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(22.dp)
                         )
                     }
-                    Switch(checked = receiverOn, onCheckedChange = { walkieTalkieViewModel.toggleWalkieTalkieMode() })
                 }
-                if (speaker != null && receiverOn) {
-                    Spacer(Modifier.height(8.dp))
-                    Surface(
-                        shape = RoundedCornerShape(8.dp),
-                        color = ResQTheme.colors.success.copy(alpha = 0.12f),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(8.dp)
-                                    .clip(CircleShape)
-                                    .background(ResQTheme.colors.success)
-                            )
-                            Spacer(Modifier.width(8.dp))
-                            Text(
-                                text = "NOW PLAYING: $speaker",
-                                fontWeight = FontWeight.ExtraBold,
-                                color = ResQTheme.colors.success,
-                                style = MaterialTheme.typography.labelSmall
-                            )
-                        }
-                    }
+                Spacer(Modifier.width(12.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        text = "Channel Monitor",
+                        fontWeight = FontWeight.Bold,
+                        style = MaterialTheme.typography.titleMedium
+                    )
+                    Text(
+                        text = if (receiverOn) "Listening for incoming audio on CH $channel" else "Muted · Tap switch to listen",
+                        color = if (receiverOn) ResQTheme.colors.success else MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.bodySmall
+                    )
                 }
+                Switch(
+                    checked = receiverOn,
+                    onCheckedChange = { walkieTalkieViewModel.toggleWalkieTalkieMode() },
+                    colors = SwitchDefaults.colors(
+                        checkedThumbColor = ResQTheme.colors.success,
+                        checkedTrackColor = ResQTheme.colors.success.copy(alpha = 0.35f)
+                    )
+                )
             }
         }
 
-        Spacer(Modifier.height(Spacing.Small))
+        Spacer(Modifier.height(Spacing.Medium))
 
-        // Mode Selector
+        // Active Speaker / Channel Status Card (Who's Talking)
         Surface(
-            shape = RoundedCornerShape(16.dp),
-            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+            shape = RoundedCornerShape(20.dp),
+            color = if (speaker != null && receiverOn) ResQTheme.colors.success.copy(alpha = 0.12f) else MaterialTheme.colorScheme.surface,
+            border = BorderStroke(
+                1.dp,
+                if (speaker != null && receiverOn) ResQTheme.colors.success.copy(alpha = 0.35f) else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)
+            ),
+            shadowElevation = 1.dp
         ) {
             Row(
-                modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp),
-                verticalAlignment = Alignment.CenterVertically
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Text(
-                    text = "Burst Note",
-                    style = MaterialTheme.typography.labelMedium,
-                    fontWeight = FontWeight.Black,
-                    color = MaterialTheme.colorScheme.primary
-                )
-                Switch(
-                    checked = false,
-                    onCheckedChange = { /* Disabled: Planned feature */ },
-                    enabled = false,
-                    modifier = Modifier.padding(horizontal = 8.dp).scale(0.85f)
-                )
-                Text(
-                    text = "Live Stream (Planned)",
-                    style = MaterialTheme.typography.labelMedium,
-                    fontWeight = FontWeight.Normal,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
-                )
+                if (speaker != null && receiverOn) {
+                    Box(
+                        modifier = Modifier
+                            .size(10.dp)
+                            .clip(CircleShape)
+                            .background(ResQTheme.colors.success)
+                    )
+                    Icon(
+                        imageVector = Icons.Outlined.GraphicEq,
+                        contentDescription = null,
+                        tint = ResQTheme.colors.success,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Text(
+                        text = "Speaking: $speaker",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = ResQTheme.colors.success
+                    )
+                } else {
+                    Box(
+                        modifier = Modifier
+                            .size(8.dp)
+                            .clip(CircleShape)
+                            .background(if (receiverOn) ResQTheme.colors.success.copy(alpha = 0.6f) else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f))
+                    )
+                    Text(
+                        text = if (receiverOn) "Channel $channel is clear · Listening" else "Monitor muted · Channel $channel",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
         }
 
@@ -274,13 +277,13 @@ fun WalkieTalkieScreen(
 
         // Active Status & Equalizer Display
         Box(
-            modifier = Modifier.height(36.dp),
+            modifier = Modifier.height(40.dp),
             contentAlignment = Alignment.Center
         ) {
             if (recording) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     Box(
                         modifier = Modifier
@@ -288,19 +291,18 @@ fun WalkieTalkieScreen(
                             .clip(CircleShape)
                             .background(ResQTheme.colors.sos)
                     )
-                    Spacer(Modifier.width(4.dp))
                     Text(
-                        text = "TX · TRANSMITTING LIVE",
+                        text = "TRANSMITTING LIVE",
                         color = ResQTheme.colors.sos,
-                        fontWeight = FontWeight.Black,
+                        fontWeight = FontWeight.Bold,
                         style = MaterialTheme.typography.labelLarge
                     )
-                    Spacer(Modifier.width(12.dp))
+                    Spacer(Modifier.width(8.dp))
                     // Bouncing audio bars
                     listOf(bar1, bar2, bar3, bar4, bar5).forEach { barHeight ->
                         Box(
                             modifier = Modifier
-                                .width(3.dp)
+                                .width(3.5.dp)
                                 .height(barHeight.dp)
                                 .clip(RoundedCornerShape(2.dp))
                                 .background(ResQTheme.colors.sos)
@@ -309,7 +311,7 @@ fun WalkieTalkieScreen(
                 }
             } else {
                 Text(
-                    text = if (receiverOn) "CH $channel STANDBY · PUSH TO TALK" else "CH $channel · HOLD TRIGGER TO TRANSMIT",
+                    text = if (receiverOn) "READY · HOLD BUTTON TO TALK" else "CHANNEL $channel STANDBY",
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     style = MaterialTheme.typography.labelMedium,
                     fontWeight = FontWeight.Bold
@@ -319,167 +321,121 @@ fun WalkieTalkieScreen(
 
         Spacer(Modifier.height(16.dp))
 
-        // Center Rugged Tactical PTT Walkie-Talkie Button
+        // Center Modern Push-To-Talk Button with Gradient & Concentric Glow Ripples
         Box(
             contentAlignment = Alignment.Center,
             modifier = Modifier.size(240.dp)
         ) {
-            // Outward Sonic Waves when transmitting
+            // Outward Glowing Concentric Ripples when transmitting
             if (recording) {
                 Box(
                     modifier = Modifier
-                        .size(210.dp)
+                        .size(200.dp)
                         .scale(waveScale1)
                         .clip(CircleShape)
-                        .background(ResQTheme.colors.sos.copy(alpha = waveAlpha * 0.4f))
+                        .background(ResQTheme.colors.sos.copy(alpha = waveAlpha * 0.35f))
                 )
                 Box(
                     modifier = Modifier
-                        .size(210.dp)
+                        .size(200.dp)
                         .scale(waveScale2)
                         .clip(CircleShape)
-                        .background(ResQTheme.colors.sos.copy(alpha = waveAlpha * 0.25f))
+                        .background(ResQTheme.colors.sos.copy(alpha = waveAlpha * 0.2f))
+                )
+            } else {
+                // Subtle Ambient Pulse Ring in idle
+                Box(
+                    modifier = Modifier
+                        .size(210.dp)
+                        .clip(CircleShape)
+                        .border(
+                            width = 2.dp,
+                            color = MaterialTheme.colorScheme.primary.copy(alpha = idlePulse * 0.4f),
+                            shape = CircleShape
+                        )
                 )
             }
 
-            // Outer Rubberized Industrial Bezel with hex bolt markers
+            // Modern Floating Audio Hub Circle Button
+            val primaryColor = MaterialTheme.colorScheme.primary
+            val activeColor = ResQTheme.colors.sos
+            val buttonGradient = remember(recording, primaryColor, activeColor) {
+                if (recording) {
+                    Brush.radialGradient(
+                        colors = listOf(activeColor, Color(0xFFD32F2F))
+                    )
+                } else {
+                    Brush.linearGradient(
+                        colors = listOf(primaryColor, Color(0xFFFF7A29))
+                    )
+                }
+            }
+
             Surface(
                 modifier = Modifier
-                    .size(216.dp)
+                    .size(180.dp)
                     .graphicsLayer {
                         scaleX = pressScale
                         scaleY = pressScale
                     }
                     .shadow(
-                        elevation = if (recording) 24.dp else 14.dp,
+                        elevation = if (recording) 28.dp else 16.dp,
                         shape = CircleShape,
-                        ambientColor = if (recording) ResQTheme.colors.sos else MaterialTheme.colorScheme.primary.copy(alpha = 0.4f),
-                        spotColor = if (recording) ResQTheme.colors.sos else MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
-                    ),
-                shape = CircleShape,
-                color = if (isLight) Color(0xFFE2E8F0) else Color(0xFF161A20),
-                border = BorderStroke(
-                    width = 2.dp,
-                    color = if (recording) ResQTheme.colors.sos
-                    else MaterialTheme.colorScheme.primary.copy(alpha = if (isLight) idlePulse * 0.85f else idlePulse * 0.65f)
-                )
-            ) {
-                Canvas(Modifier.fillMaxSize()) {
-                    val radius = size.minDimension / 2f
-                    val center = Offset(size.width / 2f, size.height / 2f)
-
-                    // Draw 8 hex bolt accents around the industrial perimeter
-                    for (i in 0 until 8) {
-                        val angle = Math.toRadians((i * 45).toDouble())
-                        val boltDist = radius - 10.dp.toPx()
-                        val bx = center.x + boltDist * cos(angle).toFloat()
-                        val by = center.y + boltDist * sin(angle).toFloat()
-                        drawCircle(
-                            color = if (isLight) Color(0xFFCBD5E1) else Color(0xFF2C323B),
-                            radius = 3.5.dp.toPx(),
-                            center = Offset(bx, by)
-                        )
-                        drawCircle(
-                            color = if (isLight) Color(0xFF94A3B8) else Color(0xFF0F1215),
-                            radius = 2.dp.toPx(),
-                            center = Offset(bx, by)
-                        )
-                    }
-                }
-            }
-
-            // Inner Tactical PTT Trigger Button (Push-to-Talk Faceplate)
-            Surface(
-                modifier = Modifier
-                    .size(174.dp)
-                    .graphicsLayer {
-                        scaleX = pressScale
-                        scaleY = pressScale
-                    }
+                        ambientColor = if (recording) ResQTheme.colors.sos else primaryColor.copy(alpha = 0.5f),
+                        spotColor = if (recording) ResQTheme.colors.sos else primaryColor.copy(alpha = 0.7f)
+                    )
                     .clip(CircleShape)
                     .semantics {
-                        contentDescription = if (liveAudio) "Push to talk live audio" else "Hold to record voice note"
+                        contentDescription = "Hold to record voice note"
                     }
-                    .pointerInput(liveAudio) {
+                    .pointerInput(Unit) {
                         detectTapGestures(
                             onPress = {
                                 haptics.performHapticFeedback(HapticFeedbackType.LongPress)
                                 recording = true
-                                if (liveAudio) walkieTalkieViewModel.startLiveAudio() else mediaHelper.startRecording()
+                                mediaHelper.startRecording()
                                 try {
                                     tryAwaitRelease()
                                 } finally {
                                     haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                     recording = false
-                                    if (liveAudio) {
-                                        walkieTalkieViewModel.stopLiveAudio()
-                                    } else {
-                                        mediaHelper.stopRecording()?.let { audio ->
-                                            commsViewModel.sendPublicMessage("Voice message", null, audio)
-                                        }
+                                    mediaHelper.stopRecording()?.let { audio ->
+                                        commsViewModel.sendPublicMessage("Voice message", null, audio)
                                     }
                                 }
                             }
                         )
                     },
                 shape = CircleShape,
-                color = if (recording) (if (isLight) Color(0xFFFFD9DE) else Color(0xFF900C3F))
-                        else (if (isLight) Color(0xFFFFFFFF) else Color(0xFF1E242C)),
-                shadowElevation = if (recording) 2.dp else (if (isLight) 4.dp else 8.dp)
+                color = Color.Transparent
             ) {
                 Box(
-                    contentAlignment = Alignment.Center,
-                    modifier = Modifier.fillMaxSize()
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(buttonGradient)
+                        .border(
+                            width = 3.dp,
+                            color = Color.White.copy(alpha = if (recording) 0.5f else 0.25f),
+                            shape = CircleShape
+                        ),
+                    contentAlignment = Alignment.Center
                 ) {
-                    // Knurled grip lines across the faceplate
-                    Canvas(Modifier.fillMaxSize()) {
-                        val center = Offset(size.width / 2f, size.height / 2f)
-                        val lineCount = 5
-                        val lineSpacing = 16.dp.toPx()
-                        for (i in -lineCount..lineCount) {
-                            val y = center.y + (i * lineSpacing)
-                            drawLine(
-                                color = if (isLight) Color.Black.copy(alpha = 0.05f) else Color.White.copy(alpha = 0.04f),
-                                start = Offset(center.x - 45.dp.toPx(), y),
-                                end = Offset(center.x + 45.dp.toPx(), y),
-                                strokeWidth = 2.dp.toPx()
-                            )
-                        }
-                    }
-
-                    // Tactical PTT Button Labeling & Mic Icon
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.Center
                     ) {
-                        Text(
-                            text = "PTT",
-                            style = MaterialTheme.typography.labelSmall.copy(letterSpacing = 2.sp),
-                            fontWeight = FontWeight.Black,
-                            color = if (recording) (if (isLight) ResQTheme.colors.sos else Color.White) else MaterialTheme.colorScheme.primary.copy(alpha = 0.9f)
+                        Icon(
+                            imageVector = Icons.Default.Mic,
+                            contentDescription = null,
+                            tint = Color.White,
+                            modifier = Modifier.size(46.dp)
                         )
-                        Spacer(Modifier.height(6.dp))
-                        Surface(
-                            shape = CircleShape,
-                            color = if (recording) ResQTheme.colors.sos else MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(54.dp),
-                            shadowElevation = 6.dp
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Icon(
-                                    imageVector = Icons.Default.Mic,
-                                    contentDescription = null,
-                                    tint = Color.White,
-                                    modifier = Modifier.size(30.dp)
-                                )
-                            }
-                        }
-                        Spacer(Modifier.height(6.dp))
+                        Spacer(Modifier.height(8.dp))
                         Text(
-                            text = if (recording) "ON AIR" else "TRANSMIT",
-                            style = MaterialTheme.typography.labelSmall.copy(letterSpacing = 1.5.sp),
+                            text = if (recording) "RECORDING" else "HOLD TO TALK",
+                            style = MaterialTheme.typography.labelMedium.copy(letterSpacing = 1.2.sp),
                             fontWeight = FontWeight.ExtraBold,
-                            color = if (recording) (if (isLight) Color(0xFFB71C1C) else Color(0xFFFFD166)) else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
+                            color = Color.White
                         )
                     }
                 }
@@ -489,19 +445,18 @@ fun WalkieTalkieScreen(
         Spacer(Modifier.weight(1f))
 
         Text(
-            text = if (recording) "RELEASE TO SEND AUDIO" else "PUSH AND HOLD TO TRANSMIT",
+            text = if (recording) "Release button to broadcast voice" else "Push and hold to transmit voice",
             style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Black,
+            fontWeight = FontWeight.Bold,
             color = if (recording) ResQTheme.colors.sos else MaterialTheme.colorScheme.onSurface
         )
         Spacer(Modifier.height(4.dp))
         Text(
-            text = if (liveAudio) "Audio is broadcast live to mesh nodes on Channel $channel."
-            else "Voice note packet is compressed and sent to Channel $channel.",
+            text = "Voice note will be compressed and broadcast to Channel $channel.",
             textAlign = TextAlign.Center,
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
-        Spacer(Modifier.height(Spacing.Large))
+        Spacer(Modifier.height(110.dp))
     }
 }

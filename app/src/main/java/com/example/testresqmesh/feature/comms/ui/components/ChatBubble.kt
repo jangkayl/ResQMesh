@@ -79,9 +79,9 @@ fun ChatBubble(
         else -> MaterialTheme.colorScheme.onSurface
     }
     val shape = if (mine) {
-        RoundedCornerShape(10.dp, 10.dp, 3.dp, 10.dp)
+        RoundedCornerShape(18.dp, 18.dp, 4.dp, 18.dp)
     } else {
-        RoundedCornerShape(10.dp, 10.dp, 10.dp, 3.dp)
+        RoundedCornerShape(18.dp, 18.dp, 18.dp, 4.dp)
     }
     val sender = remember(message.senderName) { NodeIdentity.displayNameOf(message.senderName).ifBlank { message.senderName } }
     var showUserMenu by remember { mutableStateOf(false) }

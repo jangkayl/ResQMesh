@@ -101,7 +101,7 @@ fun SOSBroadcastScreen(
                 code = "GEN",
                 title = "GENERAL",
                 subtitle = "Critical danger & rescue request",
-                color = Color(0xFF00E5FF),
+                color = Color(0xFF8B5CF6),
                 icon = Icons.Default.Warning
             )
         )
@@ -634,9 +634,9 @@ private fun SlideToBroadcastSlider(
         label = "chevronAlpha"
     )
 
-    val trackBgColor = if (isLight) Color.White else Color(0xFF141722)
-    val trackBorderColor = if (isLight) (if (dragProgress > 0.1f) accentColor.copy(alpha = 0.6f) else Color(0xFFCBD5E1)) else Color(0xFF262D3D)
-    val trackLabelColor = if (isLight) Color(0xFF1E293B) else Color.White
+    val trackBgColor = if (isLight) Color.White else Color(0xFF19191C)
+    val trackBorderColor = if (isLight) (if (dragProgress > 0.1f) accentColor.copy(alpha = 0.6f) else Color(0xFFDCD5CE)) else Color(0xFF303036)
+    val trackLabelColor = if (isLight) Color(0xFF181817) else Color.White
 
     Box(
         modifier = Modifier

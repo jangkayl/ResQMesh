@@ -5,8 +5,10 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -314,7 +316,10 @@ internal fun PrivateChatHeader(
     onBack: () -> Unit,
     onDelete: () -> Unit
 ) {
-    Surface(color = MaterialTheme.colorScheme.surface) {
+    Surface(
+        color = MaterialTheme.colorScheme.surface,
+        shadowElevation = 2.dp
+    ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -328,34 +333,43 @@ internal fun PrivateChatHeader(
                 )
             }
             Surface(
-                modifier = Modifier.size(44.dp),
+                modifier = Modifier.size(46.dp),
                 shape = CircleShape,
-                color = MaterialTheme.colorScheme.secondaryContainer
+                color = MaterialTheme.colorScheme.primaryContainer,
+                border = BorderStroke(1.5.dp, availability.color().copy(alpha = 0.6f))
             ) {
                 Box(contentAlignment = Alignment.Center) {
                     Text(
                         text = name.firstOrNull()?.uppercase() ?: "?",
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSecondaryContainer
+                        color = MaterialTheme.colorScheme.primary
                     )
                 }
             }
-            Spacer(Modifier.width(Spacing.Small))
+            Spacer(Modifier.width(10.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = name,
-                    style = MaterialTheme.typography.titleLarge,
+                    style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
-                Text(
-                    text = availability.label(),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = availability.color(),
-                    fontWeight = FontWeight.SemiBold
-                )
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                    Box(
+                        modifier = Modifier
+                            .size(7.dp)
+                            .clip(CircleShape)
+                            .background(availability.color())
+                    )
+                    Text(
+                        text = availability.label(),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = availability.color(),
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
             }
             IconButton(onClick = onDelete) {
                 Icon(
@@ -379,9 +393,9 @@ private fun PrivateMessageBubble(
     val bubbleColor = if (mine) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface
     val contentColor = if (mine) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
     val shape = if (mine) {
-        RoundedCornerShape(10.dp, 10.dp, 3.dp, 10.dp)
+        RoundedCornerShape(18.dp, 18.dp, 4.dp, 18.dp)
     } else {
-        RoundedCornerShape(10.dp, 10.dp, 10.dp, 3.dp)
+        RoundedCornerShape(18.dp, 18.dp, 18.dp, 4.dp)
     }
 
     var fullScreenImage by remember { mutableStateOf<String?>(null) }
