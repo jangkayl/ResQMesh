@@ -6,7 +6,8 @@ Install the same upgraded APK on A, B, and C; mixed versions cannot relay the ne
 
 - APK: `app/build/outputs/apk/debug/app-debug.apk`
 - Version: 1.0.1, code 2; Room schema 11; built 2026-10-02.
-- SHA-256: `0EC7CBFA165F8995858AD9D49CB680A4D884C54DD4A4B7A6C56311FC6D5F0EE8`
+- Earlier SOS instrumentation APK SHA-256: `0EC7CBFA165F8995858AD9D49CB680A4D884C54DD4A4B7A6C56311FC6D5F0EE8`.
+- For the current recovery/SOS UI build, use the identity in the [Bluetooth recovery card](bluetooth-recovery-test-card.md). Earlier emulator results do not validate the latest floating-header/card changes.
 
 ## Local evidence and reproduction
 
@@ -38,6 +39,7 @@ Establish actual READY A–B and B–C links, avoiding a direct A–C link. Veri
 7. Repeat steps 2–5 during five recorded notes and simultaneous recordings. Test available GATT-only and L2CAP paths separately. Urgent events may overtake queued notes; an active GATT frame is non-interruptible. Record delay rather than assuming immediate delivery.
 8. Review Night/Daylight, largest text, landscape, TalkBack, IME, and Back/map return. With A's SOS active, visit Mission, Messages, Voice, Community, private chat, and Radio history/thread. Main screens reserve the capsule above navigation; conversations reserve a top strip even with the keyboard open. Tap it to reopen A's thread; no message/composer may be covered. In short/large-text SOS threads, use “SOS controls” to reach Map, Activity, and End/Silence. Ended badges must say “ENDED”, not imply rescue completion. Mesh off/searching/checking/connected labels must follow actual state; a queued SOS cannot claim remote confirmation. Earlier unscoped history stays hidden without removing current channel/SOS history. At large text, scroll Voice and cancel a hold by dragging/leaving the screen: no partial note may be sent. A normal hold/release still sends to the channel captured at press time.
 9. Test background enabled/disabled and locked-screen notification permission/full-screen fallback separately. A paused/offline mesh cannot receive until it resumes.
+10. From the SOS hub, begin creating an alert and cancel or press Back before sending. Expect the hub and no new alert. Send a test SOS; inspect category, active/silenced/ended state, transmission, time, location accuracy, and History in both appearances. Invalid timestamps must not display epoch time; cached coordinates and header time do not prove a fresh GPS fix. Exchange enough replies to scroll beneath the floating header, open/close the keyboard, and change orientation/text size. The header must not cover replies or the composer; latest replies remain visible and ended history stays read-only. Record this scenario as PASS/FAIL/UNTESTED.
 
 ## Failure indicators and report
 

@@ -35,6 +35,10 @@ class MeshSessionController(
         stopForegroundAnchor()
     }
 
+    fun onActivityResumed() {
+        if (repository.isOnline.value) repository.reconcileTransport()
+    }
+
     fun setBackgroundMeshEnabled(enabled: Boolean) {
         if (_backgroundMeshEnabled.value == enabled) return
         preferences.edit().putBoolean(KEY_BACKGROUND_MESH_ENABLED, enabled).apply()

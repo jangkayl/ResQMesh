@@ -15,7 +15,7 @@ Use Jetpack Compose and Material 3; inspect source.
 - **Network & Topology** uses cards and a 2D route map.
 - First-launch guide: three skippable animated pages, progress dots, no in-page Back; Settings replay.
 - Setup has no tag input. Names omit technical tags; peer details show ID. Headers resolve current names.
-- Controls use semantic shapes, pressed/disabled feedback, and textual status.
+- Controls use semantic shapes and textual status.
 - Keep business, routing, and transport decisions out of composables. ViewModels/use cases expose UI state and user actions.
 - Routes collect state; stateless UI lives in `ui/components`.
 
@@ -46,15 +46,16 @@ Public queue rejection/partial acceptance uses feedback; acceptance never implie
 - Inbox rows do not mark private messages seen; visible chat bubbles do. Keep Unread selectable at zero and use filter-specific empty states.
 - SOS threads isolate simultaneous alerts, replies, unread counts, and drafts. Show queued/link-sent/neighbor-confirmed state separately. Cancellation names its alert; local silence never cancels it.
 - Incidents show historical reporter names and owner badges. Identity loading/errors explain unavailable controls. Selection locks offer editing; withdrawal removes selection. Route loss never reassigns. Details use one page, docked actions, and verified connection labels.
-- SOS creation keeps the deliberate slide; early release resets. Sender Back keeps SOS active; its banner reopens the thread. End my SOS requires confirmation. Receiver Back silences locally. Ended threads retain read-only history.
+- SOS creation keeps the deliberate slide; early release resets. Cancel/Back returns to the hub. Sender thread Back keeps SOS active; its banner reopens it. Ending requires confirmation. Receiver Back silences locally; ended threads retain read-only history.
 - Voice separates channels from Community; hide unscoped SOS/voice history. Save received channels; autoplay only new selected-channel Radio notes. Tuning/Off clears bounded queue. Private audio stays manual; cancelled holds discard notes. SOS pauses Radio; manual playback takes priority.
-- Preserve Antigravity cards/icons. Reserve the active-SOS capsule above navigation, or a top strip in conversations with IME open. Short/large-text SOS threads expose scrollable controls via “SOS controls”. Badges wrap with readable theme text; activity describes retained events/latest-state sync.
+- Preserve Antigravity cards/icons, status/transmission badges, location accuracy, time, and history. Header fallback time never proves GPS freshness. Reserve SOS reminders outside content. Short/large-text threads expose scrollable “SOS controls”; badges wrap; activity describes retained events/latest-state sync.
 - Never render debug plaintext, keys, ciphertext previews, or sensitive location in the debug UI.
 
 ## Background mesh status
 
-- Device settings provides opt-in **Keep mesh active in background**. Service-active does not imply peer-ready.
-- Its silent notification offers **Open ResQMesh** and **Go offline** using coarse repository state. Disabling only removes the background anchor; **Go offline** stops transport.
+- Background mesh remains opt-in; service-active does not imply peer-ready.
+- Home/notification distinguish Bluetooth off, permission needed, starting, searching, and connected. OFF clears readiness and explains recovery.
+- Go offline cancels recovery; disabling background removes its anchor.
 
 ## Diagnostic terminal
 
@@ -70,13 +71,13 @@ Public queue rejection/partial acceptance uses feedback; acceptance never implie
 
 ## Accessibility and interaction
 
-- Provide contrast, accessible targets/labels, and textual status.
+- Provide contrast and accessible targets/labels.
 - Startup errors offer recovery; map setup returns to its SOS.
 - Preserve user drafts when a recoverable send fails.
-- Conversations anchor latest messages above the IME and follow new messages. Community reader circles require recorded `seenBy` receipts.
+- Conversations reserve measured floating-header space, reverse the list, and follow latest messages above the IME. Radio uses a solid background. Community reader circles require `seenBy` receipts.
 - Avoid flicker; transitions follow repository/link evidence, not scan churn.
 - Home peer chips open the matching Network details by stable ID. Blocked peers remain in "Blocked Devices (Direct Link Denied)" with relay messaging when a route exists.
-- Verify both appearances using theme tokens.
+- Verify both appearances.
 
 ## Validation
 

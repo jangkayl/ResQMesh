@@ -9,6 +9,8 @@ import android.bluetooth.le.ScanCallback
 import android.bluetooth.le.ScanFilter
 import android.bluetooth.le.ScanResult
 import android.bluetooth.le.ScanSettings
+import android.bluetooth.le.BluetoothLeScanner
+import android.bluetooth.le.BluetoothLeAdvertiser
 import android.content.Context
 import android.os.Handler
 import android.os.Looper
@@ -35,7 +37,8 @@ class BleRadioController(
     private val serviceUuid: UUID,
     private val isNodeActive: () -> Boolean,
     private val hasReadyConnection: () -> Boolean,
-    private val onAdvertisement: (BleAdvertisement) -> Unit
+    private val onAdvertisement: (BleAdvertisement) -> Unit,
+    private val onAdvertisingFailure: () -> Unit = {}
 ) {
     private val adapter =
         (context.getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager).adapter
@@ -45,63 +48,60 @@ class BleRadioController(
     private var lastScanStartAt = 0L
     private var lastValidAdvertisementAt = 0L
     private var recoveryAttempts = 0
+    private var nextScanAttemptAt = 0L
     private var staleScanThresholdMs = nextStaleScanThreshold()
 
     private val scanRecoveryRunnable = Runnable { runScanRecoveryCheck() }
 
-    val isSupported: Boolean
-        get() = adapter?.bluetoothLeAdvertiser != null && adapter.bluetoothLeScanner != null
+    private var scanGeneration = 0L
+    private var advertiseGeneration = 0L
+    private var scannerOwner: BluetoothLeScanner? = null
+    private var advertiserOwner: BluetoothLeAdvertiser? = null
+    private var scanCallback: ScanCallback? = null
+    private var advertiseCallback: AdvertiseCallback? = null
+    private val scanBudget = BleScanStartBudget()
 
-    private val advertiseCallback = object : AdvertiseCallback() {}
-    private val scanCallback = object : ScanCallback() {
-        override fun onScanFailed(errorCode: Int) {
-            scanActive.set(false)
-            AppLogger.d("BLE_MESH", "Scanner failed with errorCode=$errorCode")
-            scheduleFailedScanRetry()
-        }
-
-        override fun onScanResult(callbackType: Int, result: ScanResult) {
-            val bytes = result.scanRecord?.getManufacturerSpecificData(MANUFACTURER_ID) ?: return
-            val encoded = String(bytes, Charsets.UTF_8).replace("\u0000", "").trim()
-            val parts = encoded.split("|")
-            val score: String
-            val connections: Int
-            val displayName: String
-            val nodeId: String
-            when {
-                parts.size >= 4 -> {
-                    score = parts[0]
-                    connections = parts[1].toIntOrNull() ?: -1
-                    nodeId = parts[2].trim().uppercase()
-                    displayName = parts.drop(3).joinToString("|")
-                }
-                parts.size == 3 -> {
-                    score = parts[0]
-                    connections = parts[1].toIntOrNull() ?: -1
-                    displayName = parts[2]
-                    nodeId = NodeIdentity.idOf(displayName).orEmpty()
-                }
-                else -> {
-                    AppLogger.d(
-                        "BLE_MESH",
-                        "Scanner: Ignored alien device ${result.device.address}. Invalid signature: $encoded"
-                    )
-                    return
-                }
+    private fun parseAdvertisement(result: ScanResult) {
+        val bytes = result.scanRecord?.getManufacturerSpecificData(MANUFACTURER_ID) ?: return
+        val encoded = String(bytes, Charsets.UTF_8).replace("\u0000", "").trim()
+        val parts = encoded.split("|")
+        val score: String
+        val connections: Int
+        val displayName: String
+        val nodeId: String
+        when {
+            parts.size >= 4 -> {
+                score = parts[0]
+                connections = parts[1].toIntOrNull() ?: -1
+                nodeId = parts[2].trim().uppercase()
+                displayName = parts.drop(3).joinToString("|")
             }
-            val peerName = if (nodeId.isNotEmpty()) {
-                NodeIdentity.compose(displayName, nodeId)
-            } else {
-                displayName.trim()
+            parts.size == 3 -> {
+                score = parts[0]
+                connections = parts[1].toIntOrNull() ?: -1
+                displayName = parts[2]
+                nodeId = NodeIdentity.idOf(displayName).orEmpty()
             }
-            if (peerName.isEmpty()) return
-            lastValidAdvertisementAt = System.currentTimeMillis()
-            recoveryAttempts = 0
-            scheduleRecoveryCheck()
-            onAdvertisement(
-                BleAdvertisement(result.device.address, peerName, nodeId, score, connections)
-            )
+            else -> {
+                AppLogger.d(
+                    "BLE_MESH",
+                    "Scanner: Ignored alien device ${result.device.address}. Invalid signature: $encoded"
+                )
+                return
+            }
         }
+        val peerName = if (nodeId.isNotEmpty()) {
+            NodeIdentity.compose(displayName, nodeId)
+        } else {
+            displayName.trim()
+        }
+        if (peerName.isEmpty()) return
+        lastValidAdvertisementAt = System.currentTimeMillis()
+        recoveryAttempts = 0
+        scheduleRecoveryCheck()
+        onAdvertisement(
+            BleAdvertisement(result.device.address, peerName, nodeId, score, connections)
+        )
     }
 
     fun startAdvertising(
@@ -110,7 +110,29 @@ class BleRadioController(
         deviceName: String,
         fallbackNodeId: String
     ) {
-        val advertiser = adapter?.bluetoothLeAdvertiser ?: return
+        if (!isNodeActive()) return
+        stopAdvertising()
+        val advertiser = try { adapter?.bluetoothLeAdvertiser } catch (_: SecurityException) { null }
+            ?: run { onAdvertisingFailure(); return }
+        val generation = ++advertiseGeneration
+        val callback = object : AdvertiseCallback() {
+            override fun onStartSuccess(settingsInEffect: AdvertiseSettings) {
+                handler.post {
+                    if (generation == advertiseGeneration && isNodeActive()) {
+                        AppLogger.d("BLE_RECOVERY", "Advertising started")
+                    }
+                }
+            }
+            override fun onStartFailure(errorCode: Int) {
+                handler.post {
+                    if (generation != advertiseGeneration || !isNodeActive()) return@post
+                    AppLogger.d("BLE_RECOVERY", "Advertising failed code=$errorCode")
+                    onAdvertisingFailure()
+                }
+            }
+        }
+        advertiserOwner = advertiser
+        advertiseCallback = callback
         val nodeId = NodeIdentity.idOf(deviceName) ?: fallbackNodeId
         val prefix = "$electionScore|$directConnections|$nodeId|"
         val remainingBytes = (MAX_ADVERT_PAYLOAD_BYTES - prefix.toByteArray().size).coerceAtLeast(0)
@@ -133,18 +155,47 @@ class BleRadioController(
             .setIncludeDeviceName(false)
             .addManufacturerData(MANUFACTURER_ID, manufacturerData)
             .build()
-        advertiser.startAdvertising(settings, data, scanResponse, advertiseCallback)
+        try { advertiser.startAdvertising(settings, data, scanResponse, callback) }
+        catch (_: Exception) { onAdvertisingFailure() }
     }
 
     fun startScanning() {
         if (!isNodeActive()) return
         scheduleRecoveryCheck()
-        val scanner = adapter?.bluetoothLeScanner ?: return
-        if (handshakeGate.isActive() || !scanActive.compareAndSet(false, true)) return
+        val retryWait = nextScanAttemptAt - android.os.SystemClock.elapsedRealtime()
+        if (retryWait > 0L) { scheduleRecoveryCheck(retryWait); return }
+        val scanner = try { adapter?.bluetoothLeScanner } catch (_: SecurityException) { null } ?: return
+        if (handshakeGate.isActive() || scanActive.get()) return
+        val waitMs = scanBudget.delayUntilAllowed(android.os.SystemClock.elapsedRealtime())
+        if (waitMs > 0) { scheduleRecoveryCheck(waitMs); return }
+        if (!scanActive.compareAndSet(false, true)) return
+        val generation = ++scanGeneration
+        val callback = object : ScanCallback() {
+            override fun onScanFailed(errorCode: Int) {
+                handler.post {
+                    if (generation != scanGeneration || !isNodeActive()) return@post
+                    scanActive.set(false)
+                    AppLogger.d("BLE_RECOVERY", "Scanner failed code=$errorCode")
+                    scheduleFailedScanRetry()
+                }
+            }
+            override fun onScanResult(callbackType: Int, result: ScanResult) {
+                handler.post {
+                    if (generation == scanGeneration && scanActive.get() && isNodeActive()) {
+                        try { parseAdvertisement(result) } catch (_: SecurityException) {
+                            AppLogger.d("BLE_RECOVERY", "Scan result ignored after Bluetooth access changed")
+                        }
+                    }
+                }
+            }
+        }
+        scannerOwner = scanner
+        scanCallback = callback
         val filters = listOf(ScanFilter.Builder().setServiceUuid(ParcelUuid(serviceUuid)).build())
         val settings = ScanSettings.Builder().setScanMode(ScanSettings.SCAN_MODE_BALANCED).build()
         try {
-            scanner.startScan(filters, settings, scanCallback)
+            scanBudget.recordStart(android.os.SystemClock.elapsedRealtime())
+            scanner.startScan(filters, settings, callback)
             lastScanStartAt = System.currentTimeMillis()
             staleScanThresholdMs = nextStaleScanThreshold()
         } catch (error: Exception) {
@@ -186,9 +237,10 @@ class BleRadioController(
 
     fun stop() {
         handler.removeCallbacks(scanRecoveryRunnable)
-        try { adapter?.bluetoothLeAdvertiser?.stopAdvertising(advertiseCallback) } catch (_: Exception) {}
+        stopAdvertising()
         stopScanning()
         handshakeGate.clear()
+        nextScanAttemptAt = 0L
         lastScanStartAt = 0L
         lastValidAdvertisementAt = 0L
         recoveryAttempts = 0
@@ -198,7 +250,7 @@ class BleRadioController(
         if (!isNodeActive()) return
         if (hasReadyConnection()) {
             recoveryAttempts = 0
-            scheduleRecoveryCheck()
+            if (!scanActive.get() && !handshakeGate.isActive()) startScanning() else scheduleRecoveryCheck()
             return
         }
         if (handshakeGate.isActive()) {
@@ -237,6 +289,7 @@ class BleRadioController(
         recoveryAttempts++
         val delay = BleScanRecoveryPolicy.retryDelay(recoveryAttempts) +
             Random.nextLong(BleScanRecoveryPolicy.RETRY_JITTER_MS + 1L)
+        nextScanAttemptAt = android.os.SystemClock.elapsedRealtime() + delay
         scheduleRecoveryCheck(delay)
     }
 
@@ -249,8 +302,20 @@ class BleRadioController(
         Random.nextLong(BleScanRecoveryPolicy.RETRY_JITTER_MS + 1L)
 
     private fun stopScanning() {
-        if (!scanActive.compareAndSet(true, false)) return
-        try { adapter?.bluetoothLeScanner?.stopScan(scanCallback) } catch (_: Exception) {}
+        scanGeneration++
+        scanActive.set(false)
+        val callback = scanCallback
+        scanCallback = null
+        try { if (callback != null) scannerOwner?.stopScan(callback) } catch (_: Exception) {}
+        scannerOwner = null
+    }
+
+    private fun stopAdvertising() {
+        advertiseGeneration++
+        val callback = advertiseCallback
+        advertiseCallback = null
+        try { if (callback != null) advertiserOwner?.stopAdvertising(callback) } catch (_: Exception) {}
+        advertiserOwner = null
     }
 
     private fun truncateToBytes(value: String, maxBytes: Int): String {

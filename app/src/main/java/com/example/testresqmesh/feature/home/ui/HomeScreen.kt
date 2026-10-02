@@ -118,6 +118,7 @@ fun HomeScreen(
 
     HomeScreenContent(
         isNodeActive = connectionState.isOnline,
+        connectionStatus = connectionState.connectionStatus,
         summary = summary,
         radarState = radarState,
         nodes = nodes,
@@ -160,7 +161,8 @@ fun HomeScreenContent(
     activeIncidentCount: Int = 0,
     criticalIncidentCount: Int = 0,
     modifier: Modifier = Modifier,
-    nodes: List<NodeItemData> = emptyList()
+    nodes: List<NodeItemData> = emptyList(),
+    connectionStatus: String = if (isNodeActive) "Searching for nearby devices" else "Mesh is offline"
 ) {
     Column(
         modifier = modifier
@@ -174,6 +176,7 @@ fun HomeScreenContent(
             myDeviceName = myDeviceName,
             isNodeActive = isNodeActive,
             summary = summary,
+            connectionStatus = connectionStatus,
             onProfileClick = onProfileClick
         )
 
@@ -182,6 +185,7 @@ fun HomeScreenContent(
             nodes = if (nodes.isNotEmpty()) nodes else classifyRadarNodes(radarState),
             directNodeNames = directNodeNames,
             isNodeActive = isNodeActive,
+            connectionStatus = connectionStatus,
             onPeerClick = { peerName ->
                 onChatSelected?.invoke(peerName) ?: onPeerClick(peerName)
             },
@@ -225,6 +229,7 @@ private fun ModernUserHeader(
     myDeviceName: String,
     isNodeActive: Boolean,
     summary: HomeNetworkSummary,
+    connectionStatus: String,
     onProfileClick: () -> Unit
 ) {
     val displayName = NodeIdentity.displayNameOf(myDeviceName)
@@ -233,9 +238,15 @@ private fun ModernUserHeader(
     }
     val initial = displayName.firstOrNull()?.uppercase() ?: "U"
 
-    val readinessTitle = stringResource(
-        if (isNodeActive) R.string.home_ready_title else R.string.home_setup_title
-    )
+    val defaultTitle = stringResource(if (isNodeActive) R.string.home_ready_title else R.string.home_setup_title)
+    val readinessTitle = when (connectionStatus) {
+        com.example.testresqmesh.core.network.bluetooth.MeshTransportState.BLUETOOTH_OFF.status -> "Bluetooth off"
+        com.example.testresqmesh.core.network.bluetooth.MeshTransportState.PERMISSION_REQUIRED.status -> "Permission needed"
+        com.example.testresqmesh.core.network.bluetooth.MeshTransportState.STARTING.status -> "Starting mesh"
+        com.example.testresqmesh.core.network.bluetooth.MeshTransportState.SEARCHING.status -> "Searching"
+        com.example.testresqmesh.core.network.bluetooth.MeshTransportState.ERROR.status -> "Recovery pending"
+        else -> defaultTitle
+    }
     val meshStatusColor = if (isNodeActive) {
         if (summary.directPeers > 0) ResQTheme.colors.success else ModernSky
     } else {
@@ -370,6 +381,7 @@ private fun NearbyMeshStoriesBar(
     nodes: List<NodeItemData>,
     directNodeNames: List<String> = emptyList(),
     isNodeActive: Boolean,
+    connectionStatus: String,
     onPeerClick: (String) -> Unit,
     onNetworkClick: () -> Unit
 ) {
@@ -460,13 +472,13 @@ private fun NearbyMeshStoriesBar(
                     }
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            text = if (isNodeActive) "Discovering nearby phones..." else "Mesh is offline",
+                            text = connectionStatus,
                             style = MaterialTheme.typography.bodyMedium,
                             fontWeight = FontWeight.SemiBold,
                             color = MaterialTheme.colorScheme.onSurface
                         )
                         Text(
-                            text = if (isNodeActive) "Bluetooth mesh scanning is running in the background." else "Tap to check mesh permissions & status.",
+                            text = if (isNodeActive) "Recovery runs automatically when Bluetooth and permissions are available." else "Tap to check mesh permissions & status.",
                             style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp),
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )

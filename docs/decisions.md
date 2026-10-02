@@ -49,9 +49,9 @@ Pull requests repeat the debug build, unit tests, canonical-document checks, and
 
 Block requests reach the peer directly or through a relay; acknowledgement precedes direct teardown. Both phones persist denial by stable identity and must explicitly unblock locally. Text/private/SOS/receipts/audio remain routable through other peers. Restart persistence, identity admission, and acknowledgement/retry require phone validation. This is a routing-debug policy, not authenticated security.
 
-## D12: Direct links may bootstrap recovery, but do not replace healthy routes by default
+## D12: Recover sessions and bridge unreachable clusters conservatively
 
-Discovery retains a healthy routed path instead of forming a redundant direct ACL for every nearby peer. Once no payload-ready direct neighbor remains, an unblocked nearby routed peer may proceed through the normal election, cooldown, and capacity checks to restore direct reachability. An explicit user request uses those same checks and cannot override direct-link block denial or capacity. Device validation must confirm recovery without churn.
+Bluetooth OFF suspends an active session; ON rebuilds transport. Go offline ends recovery; background remains opt-in. Preserve healthy routes, but permit a free third link to bridge an unreachable cluster. Full-capacity reclamation requires idle transport and recent directed alternate paths preserving reachability, uses owned retirement, and has a 60-second cooldown. Otherwise defer. Block/duplicate/capacity guards remain. Physical evidence gates reliability claims.
 
 ## D21: Incident synchronization uses history and projection digests
 

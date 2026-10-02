@@ -12,6 +12,7 @@ import com.example.testresqmesh.core.utils.AppLogger
 import java.io.DataInputStream
 import java.io.DataOutputStream
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicInteger
 
 /** Owns one endpoint's L2CAP socket lifecycle without deciding GATT admission or payload policy. */
 class L2capTransport(
@@ -25,6 +26,9 @@ class L2capTransport(
     private val onConnected: () -> Unit
 ) {
     private val writers = ConcurrentHashMap<String, BoundedPayloadWriter>()
+    private val inboundFrames = ConcurrentHashMap<String, AtomicInteger>()
+    fun isIdle(endpoint: String): Boolean = writers[endpoint]?.isIdle() != false &&
+        (inboundFrames[endpoint]?.get() ?: 0) == 0
 
     @Synchronized fun attach(endpoint: String, socket: BluetoothSocket) {
         val existing = store.activeL2capSockets[endpoint]
@@ -32,6 +36,8 @@ class L2capTransport(
         val inherited = writers[endpoint]?.close().orEmpty()
         disconnect(endpoint)
         store.activeL2capSockets[endpoint] = socket
+        val incoming = AtomicInteger()
+        inboundFrames[endpoint] = incoming
         val gattOwners = BleLinkRole.entries.mapNotNull { store.links.current(endpoint, it) }
         fun isOwned() = store.isNodeActive.get() && store.activeL2capSockets[endpoint] === socket &&
             hasLiveGattRole(endpoint) && store.links.ownsEndpoint(endpoint, gattOwners)
@@ -40,6 +46,7 @@ class L2capTransport(
                 if (!store.activeL2capSockets.remove(endpoint, socket)) return
                 writers.remove(endpoint)?.close()
                 store.l2capOutboundProgressTimes.remove(endpoint)
+                inboundFrames.remove(endpoint, incoming)
                 close(socket)
             }
             handler.post {
@@ -59,7 +66,7 @@ class L2capTransport(
                     val count = minOf(IO_CHUNK_BYTES, payload.size - offset)
                     output.write(payload, offset, count)
                     offset += count
-                    if (isOwned()) store.l2capOutboundProgressTimes[endpoint] = System.currentTimeMillis()
+                    handler.post { if (isOwned()) store.l2capOutboundProgressTimes[endpoint] = System.currentTimeMillis() }
                 }
                 output.flush()
                 AppLogger.d("BLE_MESH", "L2CAP Sent ${payload.size} bytes directly to $endpoint")
@@ -79,7 +86,7 @@ class L2capTransport(
             }
         }
         AppLogger.updateLinkTransport(endpoint, "GATT+L2CAP")
-        handler.post { onPromoteGattWork(endpoint) }
+        handler.post { if (isOwned()) onPromoteGattWork(endpoint) }
         onConnected()
         Thread {
             try {
@@ -91,17 +98,19 @@ class L2capTransport(
                         break
                     }
                     val payload = ByteArray(length)
+                    incoming.incrementAndGet()
                     var offset = 0
                     while (offset < length) {
                         val count = input.read(payload, offset, minOf(IO_CHUNK_BYTES, length - offset))
                         if (count < 0) throw java.io.EOFException()
                         if (!isOwned()) return@Thread
                         offset += count
-                        store.connectionInteractionTimes[endpoint] = System.currentTimeMillis()
+                        handler.post { if (isOwned()) store.connectionInteractionTimes[endpoint] = System.currentTimeMillis() }
                     }
                     AppLogger.d("BLE_MESH", "L2CAP Received $length bytes from $endpoint")
-                    if (isOwned()) {
-                        onPayload(endpoint, payload)
+                    handler.post {
+                        try { if (isOwned()) onPayload(endpoint, payload) }
+                        finally { incoming.decrementAndGet() }
                     }
                 }
             } catch (error: Exception) {
@@ -130,6 +139,7 @@ class L2capTransport(
         writers.remove(endpoint)?.close()
         store.activeL2capSockets.remove(endpoint)?.let(::close)
         store.l2capOutboundProgressTimes.remove(endpoint)
+        inboundFrames.remove(endpoint)
     }
 
     fun stop() { (writers.keys + store.activeL2capSockets.keys).toSet().forEach(::disconnect) }

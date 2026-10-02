@@ -57,6 +57,7 @@ class BleLinkRegistry {
     @Synchronized fun isCurrent(link: BleLink): Boolean = links[link.endpoint to link.role] === link
 
     @Synchronized fun current(endpoint: String, role: BleLinkRole): BleLink? = links[endpoint to role]
+    @Synchronized fun snapshot(): List<BleLink> = links.values.toList()
 
     @Synchronized fun ownsEndpoint(endpoint: String, captured: List<BleLink>): Boolean =
         captured.isNotEmpty() && BleLinkRole.entries.mapNotNull { current(endpoint, it) } == captured

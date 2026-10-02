@@ -50,6 +50,9 @@ class BlePeerAdmissionControllerTest {
         val decisions = mutableListOf<BleAdmissionDecision>()
         val connectCalls = mutableListOf<Pair<String, String>>()
         val blockedPeers = mutableSetOf<String>()
+        val redundant = mutableSetOf<String>()
+        val retired = mutableListOf<String>()
+        var idle = true
 
         val controller = BlePeerAdmissionController(
             store = store,
@@ -75,7 +78,10 @@ class BlePeerAdmissionControllerTest {
             distinctReadyPeerCount = { readyPeers },
             clock = { clockTime },
             jitterMs = { min, _ -> min },
-            onDecision = { decisions.add(it) }
+            onDecision = { decisions.add(it) },
+            canRetireForBridge = { it in redundant },
+            isTransportIdle = { idle },
+            disconnectEndpoint = { retired.add(it); directLinks-- }
         )
     }
 
@@ -137,24 +143,14 @@ class BlePeerAdmissionControllerTest {
     }
 
     @Test
-    fun twoDirectLinksPeerAdvertisesOneExplicitTwoLinkPolicyDenialIsRecorded() {
+    fun spareThirdSlotBridgesAnUnreachableConnectedCluster() {
         val f = TestFixture(directLinks = 2, localScoreStr = "900AA")
-        val ad = BleAdvertisement(
-            endpointId = "11:22:33:44:55:66",
-            peerName = "Dave#D4",
-            nodeId = "D4",
-            electionScore = "800DD",
-            directConnections = 1
-        )
-
-        f.controller.handle(ad)
-
-        assertEquals(1, f.decisions.size)
-        val decision = f.decisions[0]
-        assertEquals(BleAdmissionReason.TWO_LINK_PEER_CONNECTED, decision.reason)
-        assertEquals(BleConnectStartResult.REJECTED, decision.result)
-        assertEquals(1, decision.peerAdvertisedConnections)
-        assertTrue(f.connectCalls.isEmpty())
+        f.controller.handle(BleAdvertisement("11:22:33:44:55:66", "Dave#D4", "D4", "800DD", 1))
+        assertEquals(BleAdmissionReason.QUEUED_INITIATOR, f.decisions.last().reason)
+        f.clockTime += 500L
+        f.scheduler.runAll()
+        assertEquals(1, f.connectCalls.size)
+        assertEquals(BleAdmissionReason.DRAIN_STARTED, f.decisions.last().reason)
     }
 
     @Test
@@ -628,4 +624,96 @@ class BlePeerAdmissionControllerTest {
         assertFalse(f.store.connectedEndpointNames.containsKey(oldCentralMac))
         assertFalse(f.store.connectedEndpointIds.contains(oldCentralMac))
     }
+    @Test
+    fun suspensionCancelsDelayedCandidatesEvenIfANewSessionIsActive() {
+        val f = TestFixture()
+        f.controller.handle(BleAdvertisement("11:22:33:44:55:66", "Bob#B2", "B2", "800BB", 0))
+        f.controller.stop()
+        f.clockTime += 1_000L
+        f.scheduler.runAll()
+        f.controller.recover()
+        assertTrue(f.connectCalls.isEmpty())
+    }
+
+    @Test
+    fun staleAdvertisementsCannotDriveEndlessConnectionAttempts() {
+        val f = TestFixture()
+        f.controller.handle(BleAdvertisement("11:22:33:44:55:66", "Bob#B2", "B2", "800BB", 0))
+        f.clockTime += BlePeerAdmissionController.CANDIDATE_FRESH_MS + 1L
+        f.scheduler.runAll()
+        assertTrue(f.connectCalls.isEmpty())
+    }
+
+    @Test
+    fun losingLastReadyPeerReconsidersRetainedRoutedAdvertisement() {
+        val f = TestFixture(indirectRoute = true, payloadReadyDirect = true)
+        f.controller.handle(BleAdvertisement("11:22:33:44:55:66", "Bob#B2", "B2", "800BB", 1))
+        assertEquals(BleAdmissionReason.ROUTE_PRESERVED, f.decisions.last().reason)
+        f.payloadReadyDirect = false
+        f.controller.recover()
+        f.clockTime += 500L
+        f.scheduler.runAll()
+        assertEquals(1, f.connectCalls.size)
+    }
+
+    @Test
+    fun fullCapacityDoesNotBlindlyEvictHealthyConnections() {
+        val f = TestFixture(directLinks = 3)
+        val ad = BleAdvertisement("11:22:33:44:55:66", "Bob#B2", "B2", "800BB", 0)
+        f.controller.handle(ad)
+        f.clockTime += 6_000L
+        f.controller.handle(ad)
+        f.scheduler.runAll()
+        assertTrue(f.connectCalls.isEmpty())
+    }
+
+    @Test
+    fun capacityReclaimUsesRetirementOnlyForIdleRedundantLinkAndHonorsCooldown() {
+        val f = TestFixture(directLinks = 3)
+        val endpoint = "AA:BB:CC:DD:EE:FF"
+        val link = f.store.links.begin(endpoint,
+            com.example.testresqmesh.core.network.bluetooth.state.BleLinkRole.CLIENT, "EE",
+            java.util.concurrent.ConcurrentLinkedDeque(), java.util.concurrent.atomic.AtomicBoolean(false))
+        val states = com.example.testresqmesh.core.network.bluetooth.state.BleLinkState.entries
+        f.store.links.transition(link, states.first { it.name == "DISCOVERING" })
+        f.store.links.transition(link, states.first { it.name == "CONFIGURING" })
+        f.store.links.transition(link, states.first { it.name == "READY" })
+        f.store.connectionInteractionTimes[endpoint] = f.clockTime
+        f.redundant.add(endpoint)
+        f.idle = false
+        val ad = BleAdvertisement("11:22:33:44:55:66", "Bob#B2", "B2", "800BB", 0)
+        f.controller.handle(ad)
+        f.clockTime += 6_000L
+        f.controller.handle(ad)
+        assertTrue(f.retired.isEmpty())
+        f.idle = true
+        f.controller.handle(ad)
+        assertEquals(listOf(endpoint), f.retired)
+        f.scheduler.runAll()
+        f.clockTime += 500L
+        f.scheduler.runAll()
+        assertTrue(f.connectCalls.isNotEmpty())
+        f.directLinks = 3
+        f.controller.handle(BleAdvertisement("22:22:33:44:55:66", "Carl#C3", "C3", "800CC", 0))
+        f.clockTime += 6_000L
+        f.controller.handle(BleAdvertisement("22:22:33:44:55:66", "Carl#C3", "C3", "800CC", 0))
+        assertEquals(1, f.retired.size)
+    }
+
+    @Test
+    fun equalScoresUseStableIdentityToElectExactlyOneClusterBridgeInitiator() {
+        val higher = TestFixture(localNameStr = "Bob#B2", localScoreStr = "900AA", directLinks = 1, readyPeers = 1)
+        val lower = TestFixture(localNameStr = "Alice#A1", localScoreStr = "900AA", directLinks = 1, readyPeers = 1)
+        higher.controller.handle(BleAdvertisement("11:22:33:44:55:66", "Alice#A1", "A1", "900AA", 1))
+        lower.controller.handle(BleAdvertisement("22:22:33:44:55:66", "Bob#B2", "B2", "900AA", 1))
+        higher.clockTime += 500L
+        lower.clockTime += 500L
+        higher.scheduler.runAll()
+        lower.scheduler.runAll()
+        assertEquals(1, higher.connectCalls.size)
+        assertTrue(lower.connectCalls.isEmpty())
+        assertEquals("local", higher.decisions.last().electionWinner)
+        assertEquals("peer", lower.decisions.last().electionWinner)
+    }
+
 }

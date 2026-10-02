@@ -152,11 +152,13 @@ class CommunicationViewModel(
         viewModelScope.launch {
             try {
                 val cached = locationClient.getLastKnownLocation()
-                val id = sosRepository.create(sosType, cached?.latitude, cached?.longitude, cached?.accuracy, cached?.time)
+                val validCachedTime = cached?.time?.takeIf { it > 0 && (System.currentTimeMillis() - it) < 15 * 60 * 1000L }
+                val id = sosRepository.create(sosType, cached?.latitude, cached?.longitude, cached?.accuracy, validCachedTime)
                 onCreated(id)
                 locationClient.requestPinpointLocation { location ->
                     if (generation == sosLocationGeneration && location != null) viewModelScope.launch {
-                        sosRepository.updateLocation(id, location.latitude, location.longitude, location.accuracy, location.time)
+                        val validTime = location.time.takeIf { it > 0 } ?: System.currentTimeMillis()
+                        sosRepository.updateLocation(id, location.latitude, location.longitude, location.accuracy, validTime)
                     }
                 }
             } catch (e: Exception) {

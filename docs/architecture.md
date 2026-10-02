@@ -6,7 +6,7 @@ Last reviewed: 2026-10-02. Source and device evidence prevail.
 
 ResQMesh is a Kotlin Android app (SDK 24–36). Compose provides UI, Room stores state, Kotlin serialization encodes `MeshPayload`, Koin supplies dependencies, and coroutines connect events to repositories and ViewModels.
 
-Native BLE advertising/scanning, GATT, and optional L2CAP carry traffic. GATT owns setup, readiness, heartbeat, and fallback. Direct dispatch reports acceptance or an exact rejection; only a receipt proves delivery. Nearby Connections and Wi-Fi Direct are not implemented.
+Native BLE, GATT, and optional L2CAP carry traffic. GATT owns setup, readiness, heartbeat, and fallback. Direct dispatch reports acceptance or an exact rejection; only a receipt proves delivery. Nearby Connections and Wi-Fi Direct are not implemented.
 
 ## Data path
 
@@ -39,23 +39,17 @@ DISCONNECTED -> CONNECTING -> DISCOVERING -> CONFIGURING -> READY
 
 Client readiness requires discovery/CCCD; server readiness requires subscription. Fallback uses acknowledged indications with generation checks, bounded queues, frame bounds, L2CAP promotion, and one heartbeat per endpoint.
 
-Revoked `BLUETOOTH_CONNECT` triggers flight/link cleanup without payload logging.
+`BleSessionLifecycle` separates requested sessions from running transport. Adapter broadcasts and reconciliation detect radio/permission changes. OFF suspends transport; ON rebuilds GATT, waits for service registration, and starts advertising/scanning. Go offline cancels recovery; background remains opt-in.
 
-Client setup uses the reliable 20-byte ATT baseline; `READY` does not wait for MTU negotiation. A server callback for a live outbound endpoint is another view of that ACL, not a second destructive role.
+Generations invalidate callbacks before cleanup. GATT callbacks use the main handler; radio registrations and L2CAP listeners capture ownership. Cleanup includes pending clients, locks, queues, listeners, and repository readiness; durable outboxes, identity, keys, and blocks remain. Startup/advertising failures retry with jitter. Scans retain a four-starts-per-30-seconds budget across restarts, plus bounded failure backoff.
 
-A generation-owned gate pauses scanning during setup. Retirement releases its owner before forgetting the link; Refresh removes orphan owners and drains candidates without disturbing live handshakes. Higher election score initiates; busy candidates remain queued by stable ID, with one outbound `connectGatt` at a time.
+Setup uses 20-byte ATT before MTU. A server callback for an outbound ACL does not create a duplicate role. Score/ID election selects an initiator, with isolated fallback. One outbound setup runs; candidates wait. Generation-owned handshake gates pause scans; retirement releases owners before forgetting links. Refresh reconciles orphan owners.
 
-Without identified, unblocked READY neighbors, failed scans retry with jitter; scans without valid advertisements for 15 seconds restart. Recovery pauses during live handshakes and stops with the session.
+Client connect/handshake deadlines are five seconds. Server timeouts catch orphans; identity waits until READY. Isolated failed scans retry; scans without advertisements for 15 seconds restart. AUTO remains default; absent ATT discovery response, that peer retries with explicit LE.
 
-The elected client has a five-second connect/discovery/CCCD deadline; bootstrap retries are bounded. Server configuration is an orphan backstop, and provisional identity waiting starts only after `READY`.
+L2CAP promotion resends complete frames, disarms obsolete GATT flights, and retains deferred work. Sockets have one FIFO ordinary/control writer. Each transport retains 128 transfers, eight reserved control slots, 2 MiB ordinary bytes, and 64 KiB headroom. Control overtakes waiting frames; GATT frames remain non-interruptible. Acknowledged progress protects busy links; stalls retain deadlines.
 
-GATT uses `AUTO` for known-good peers; absent ATT discovery response, retry that peer with `TRANSPORT_LE`.
-
-L2CAP promotion resends complete frames and disarms obsolete GATT flights. Deferred promotion stays queued until capacity returns. Each socket has one bounded writer with FIFO ordinary/control lanes; control may overtake waiting frames. Each transport queue retains at most 128 transfers including active, with eight control slots reserved. Ordinary byte admission is 2 MiB plus 64 KiB control headroom. GATT frames remain non-interruptible. Owned acknowledged GATT chunks and successful L2CAP writes protect progressing transfers from silence retirement; stalled operations retain deadlines.
-
-Each phone admits at most three direct GATT neighbors; unidentified endpoints occupy separate slots, while routed nodes do not count. Stable capacity needs multi-phone measurement.
-
-Discovery preserves healthy routes instead of creating redundant ACLs. After the last usable neighbor disappears, nearby unblocked peers may bootstrap through normal election/capacity admission. **Connect Directly** retains block, duplicate, and three-neighbor guards.
+Limit: three direct neighbors; unknown endpoints occupy separate slots. Last-neighbor loss reconsiders fresh advertisements and resumes discovery. Keep 32 candidates; unobserved advertisements expire after eight seconds. Preserve healthy routes; permit a free third link to bridge unreachable clusters. Full-capacity reclamation requires idle GATT/L2CAP and recent directed alternate paths preserving reachability and a responsive first hop, with a 60-second cooldown. Use owned retirement; otherwise defer. Connect Directly retains block/duplicate/capacity guards. Five/ten-phone validation remains open.
 
 ## Identity, routing, and presence
 
@@ -77,7 +71,7 @@ Stable-ID topology uses authoritative directed per-origin snapshots: empty lists
 
 ## Private messaging
 
-CryptoManager uses an Android Keystore RSA key pair and per-message AES-GCM content encryption. The local node ID is deterministically derived from the SHA-256 hash of the hardware public key (CryptoManager.getMyNodeId()). Preferences holding node identity and peer public keys are excluded from Android Auto/Cloud Backup. The working tree refuses private sends without a payload-ready local link, stable directed route, and usable recipient key. Private forwarding and return receipts use only the planned exact stable-ID hop; an unavailable or rejected hop is never converted into broadcast. Locally originated messages are persisted before dispatch, remain pending when transport does not accept them, and retry when route/key/readiness state changes; pending rows explicitly expire after 24 hours. A 15-second delivery timeout starts only after immediate transport acceptance. Public keys learned in SYSTEM pulses are persisted by stable node ID using trust on first use: a changed key is held pending rather than silently replacing the pinned key, and pending change alerts can be explicitly dismissed without clobbering keys. Public keys are public metadata, not secret material.
+CryptoManager uses Keystore RSA keys and per-message AES-GCM; the node ID derives from the hardware public-key hash. Identity/key preferences are excluded from backup. Private sends require a payload-ready local link, directed route, and usable recipient key. Forwarding/receipts use exact stable-ID hops; rejection never becomes broadcast. Messages persist before dispatch, retry on route/key/readiness changes, and expire after 24 hours. The 15-second timeout starts after transport acceptance. SYSTEM keys use stable-ID trust on first use; changed keys stay pending. Dismissing an alert does not replace the pinned key. Public keys are public metadata.
 
 Pending key changes pause private sends and retries. Conditional Room updates protect receipts.
 
@@ -87,9 +81,13 @@ This is not yet a basis for claiming authenticated end-to-end encryption or forw
 
 `MeshRepository` joins callbacks, routing, persistence, and UI. Gateway broadcast results report per-neighbor acceptance. Public sends persist pending before dispatch; wholly rejected sends retry, partial acceptance does not rebroadcast, and feedback never implies delivery. A mutex serializes public dispatch/outbox flush. `MeshNetworkGateway` hides Bluetooth types; `MessageStore` hides Room. `PrivateDeliveryPlanner` chooses exact hops. Koin supplies adapters and `AppCoroutineScope` owns background work. UI rules: `docs/ui.md`; evidence: `docs/validation.md`.
 
+Callbacks bind once in repository `init` and survive start/stop and radio suspension. Transport-state events clear readiness/rooted routes; `checkRouteExists` uses actual paths. `canRetireForBridge` checks responsive unblocked READY first hops; `onDirectPeerLost` retains alternate routes.
+
 Local identity setup/rename preserves IDs and keys. Incidents retain reporter-selected helper semantics, signed prerequisites, and transactional projections. Withdrawal or offline helper edits reopen selection without advancing reporter versions. IncidentSyncCoordinator reconciles history/state hashes on READY, changes, and a 30-second backstop; incomplete dependencies prevent completion. Room 9→10 separates validation/application. Physical convergence remains open.
 
 Community, Radio channels, and SOS threads use explicit persisted conversation metadata. Radio stores off-channel messages silently; monitoring plays only newly received selected-channel Radio notes. Public retries retain their original destination. Room 10→11 isolates historical SOS and unidentified public audio without guessing channels.
+
+SOS creation accepts cached capture times only when positive and under 15 minutes old; cached coordinates may remain. Fresh callbacks normalize missing times. Header time fallback does not establish GPS freshness. Cancelling creation returns to the hub; thread Back preserves the active SOS.
 
 SosRepository owns signed, revisioned snapshots and terminal records. Alert IDs include a signing-key namespace; updates/end require that key. Events and projection commit atomically. SOS ignores radio tuning. Creation/end relay urgently with TTL/hop bounds; rejected origin sends remain pending. SosSyncCoordinator exchanges latest signed snapshots, including terminal records, on READY/changes and every 30 seconds with jitter. Pages/retries are bounded and tied to link generations; confirmation proves only the named neighbor's matching snapshot. Signatures establish key continuity, not personal identity. Receiver silence is local. SosAlertController owns independent 30-second siren timers and per-alert notifications; Back never ends the sender's SOS. Matching upgraded APKs are required. GATT frames remain non-interruptible; phone validation remains open.
 
@@ -104,6 +102,7 @@ Background mesh is opt-in. `MeshSessionController` owns start/stop; `MeshForegro
 | Area | Primary paths |
 | --- | --- |
 | BLE orchestration | `core/network/NativeBleManager.kt`, `core/network/bluetooth/BleRadioController.kt`, `BlePeerAdmissionController.kt`, `GattTransferExecutor.kt`, `L2capTransport.kt`, `BleLifecycleSupervisor.kt` |
+| Session recovery | `core/network/bluetooth/BleSessionLifecycle.kt`, `BleScanStartBudget.kt` |
 | GATT callbacks | `core/network/bluetooth/gatt/` |
 | Link ownership and liveness | `core/network/bluetooth/state/` |
 | Payload schema and dispatch | `core/network/MeshPayload.kt`, `PayloadDispatcher.kt`, `dispatch/` |
@@ -114,5 +113,3 @@ Background mesh is opt-in. `MeshSessionController` owns start/stop; `MeshForegro
 | UI state | `ui/state/UiStates.kt` |
 | MapLibre / Offline Maps | `core/map/`, `feature/sos/ui/SosMapScreen.kt` |
 | Background session | `core/service/MeshSessionController.kt`, `MeshForegroundService.kt` |
-
-Source and device traces prevail.

@@ -136,4 +136,45 @@ class MeshRouterStableIdentityTest {
         val deliveryPath = router.findShortestPath(me, target, directRelay)
         assertEquals(deliveryPath, router.knownNodes.value.single { !it.isDirect }.route)
     }
+    @Test fun bridgeReclaimRequiresAnAlternateDirectedPathForEveryReachableNode() {
+        val router = MeshRouter()
+        val me = "Me#AAAA"
+        val b = ConnectedDevice("b", "B#BBBB", nodeId = "BBBB", isPayloadReady = true)
+        val c = ConnectedDevice("c", "C#CCCC", nodeId = "CCCC", isPayloadReady = true)
+        assertFalse(router.canRetireForBridge(me, "b", listOf(b, c)))
+        router.updateTopology(c.name, "CCCC", listOf(b.name), listOf("BBBB"), me, 1L)
+        assertTrue(router.canRetireForBridge(me, "b", listOf(b, c)))
+        router.updateTopology(b.name, "BBBB", listOf("D#DDDD"), listOf("DDDD"), me, 1L)
+        assertTrue(router.canRetireForBridge(me, "b", listOf(b, c)))
+        router.updateTopology(c.name, "CCCC", emptyList(), emptyList(), me, 2L)
+        assertFalse(router.canRetireForBridge(me, "b", listOf(b, c)))
+        assertFalse(router.canRetireForBridge(me, "b", listOf(b)))
+    }
+
+    @Test fun staleOrUnresponsiveAlternatePathCannotJustifyCapacityReclaim() {
+        val router = MeshRouter()
+        val me = "Me#AAAA"
+        val b = ConnectedDevice("b", "B#BBBB", nodeId = "BBBB", isPayloadReady = true)
+        val c = ConnectedDevice("c", "C#CCCC", nodeId = "CCCC", isPayloadReady = true)
+        router.updateTopology(c.name, "CCCC", listOf(b.name), listOf("BBBB"), me, 1L)
+        assertFalse(router.canRetireForBridge(me, "b", listOf(b, c.copy(isPeerResponsive = false))))
+        assertFalse(router.canRetireForBridge(me, "b", listOf(b, c), now = System.currentTimeMillis() + 31_000L))
+    }
+
+    @Test fun reclaimingDirectEdgeKeepsTheAlternateRouteAfterDisconnectCleanup() {
+        val router = MeshRouter()
+        val me = "Me#AAAA"
+        val b = ConnectedDevice("b", "B#BBBB", nodeId = "BBBB", isPayloadReady = true)
+        val c = ConnectedDevice("c", "C#CCCC", nodeId = "CCCC", isPayloadReady = true)
+        val target = "D#DDDD"
+        router.updateTopology(c.name, "CCCC", listOf(b.name), listOf("BBBB"), me, 1L)
+        router.updateTopology(b.name, "BBBB", listOf(target), listOf("DDDD"), me, 1L)
+        assertTrue(router.canRetireForBridge(me, "b", listOf(b, c)))
+        router.onDirectPeerLost(me, b.name, listOf(c))
+        assertEquals(listOf(me, c.name, b.name, target), router.findShortestPath(me, target, listOf(c)))
+        router.onDirectPeerLost(me, c.name, emptyList())
+        assertTrue(router.findShortestPath(me, target, emptyList()).isEmpty())
+        assertTrue(router.knownNodes.value.isEmpty())
+    }
+
 }

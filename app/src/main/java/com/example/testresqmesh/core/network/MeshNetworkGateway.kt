@@ -2,6 +2,7 @@ package com.example.testresqmesh.core.network
 
 import com.example.testresqmesh.core.model.ConnectedDevice
 import com.example.testresqmesh.core.model.ScanEvent
+import com.example.testresqmesh.core.network.bluetooth.MeshTransportState
 
 typealias MessageReceivedCallback = (
     String, String, String, String, Boolean, Boolean, String?, String?, Double?, Double?, String, List<String>, String
@@ -30,6 +31,12 @@ interface MeshNetworkGateway {
     var onRoutingTableReceived: ((String, String, List<String>, List<String>, Long) -> Unit)?
     var onSosCancelled: (() -> Unit)?
     var onStatusChanged: ((String) -> Unit)?
+    var onTransportStateChanged: ((MeshTransportState) -> Unit)?
+        get() = null
+        set(@Suppress("UNUSED_PARAMETER") value) {}
+    var canRetireForBridge: ((String) -> Boolean)?
+        get() = null
+        set(@Suppress("UNUSED_PARAMETER") value) {}
     var onDeviceBlocked: ((String) -> Unit)?
     var onDeviceUnblocked: ((String) -> Unit)?
     var onBlockRequest: ((String, MeshPayload, BlockControlEnvelope) -> Unit)?
@@ -72,6 +79,7 @@ interface MeshNetworkGateway {
     )
     fun forceConnectToDevice(endpointId: String, endpointName: String)
     fun rescan()
+    fun reconcileTransport() {}
 }
 
 /** Keeps NativeBleManager available to Android entry points while repositories depend on the contract. */
@@ -97,6 +105,8 @@ class NativeBleGateway(private val manager: NativeBleManager) : MeshNetworkGatew
     override var onRoutingTableReceived by manager::onRoutingTableReceived
     override var onSosCancelled by manager::onSosCancelled
     override var onStatusChanged by manager::onStatusChanged
+    override var onTransportStateChanged by manager::onTransportStateChanged
+    override var canRetireForBridge by manager::canRetireForBridge
     override var onDeviceBlocked by manager::onDeviceBlocked
     override var onDeviceUnblocked by manager::onDeviceUnblocked
     override var onBlockRequest by manager::onBlockRequest
@@ -140,4 +150,5 @@ class NativeBleGateway(private val manager: NativeBleManager) : MeshNetworkGatew
     override fun forceConnectToDevice(endpointId: String, endpointName: String) =
         manager.forceConnectToDevice(endpointId, endpointName)
     override fun rescan() = manager.rescan()
+    override fun reconcileTransport() = manager.reconcileTransport()
 }

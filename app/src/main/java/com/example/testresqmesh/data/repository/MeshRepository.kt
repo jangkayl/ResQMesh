@@ -48,6 +48,9 @@ class MeshRepository(
 
     private val _connectionStatus = MutableStateFlow("Ready to deploy Mesh Node.")
     val connectionStatus = _connectionStatus.asStateFlow()
+    private val _transportState = MutableStateFlow(com.example.testresqmesh.core.network.bluetooth.MeshTransportState.OFFLINE)
+    val transportState = _transportState.asStateFlow()
+    fun reconcileTransport() = networkManager.reconcileTransport()
 
     private val _currentChannelId = MutableStateFlow("1")
     val currentChannelId: StateFlow<String> = _currentChannelId.asStateFlow()
@@ -148,6 +151,19 @@ class MeshRepository(
 
     private fun setupCallbacks() {        networkManager.onStatusChanged = { status ->
             _connectionStatus.value = status
+        }
+
+        networkManager.onTransportStateChanged = { state ->
+            _transportState.value = state
+            if (state == com.example.testresqmesh.core.network.bluetooth.MeshTransportState.OFFLINE ||
+                state == com.example.testresqmesh.core.network.bluetooth.MeshTransportState.BLUETOOTH_OFF ||
+                state == com.example.testresqmesh.core.network.bluetooth.MeshTransportState.PERMISSION_REQUIRED ||
+                state == com.example.testresqmesh.core.network.bluetooth.MeshTransportState.ERROR) {
+                _connectedDevices.value = emptyList()
+                _scannedDevices.value = emptyList()
+                readyPeerEvents.update(emptyList())
+                meshRouter.recalculateKnownNodes(myNodeName, emptyList())
+            }
         }
 
         networkManager.onDeviceConnected = { device ->
@@ -262,7 +278,7 @@ class MeshRepository(
                 it.endpointId != endpointId || peerStillReady && networkManager.hasLiveSocket(endpointId)
             }
             if (disconnectedDevice != null && !peerStillReady) {
-                meshRouter.removeNode(disconnectedDevice.name)
+                meshRouter.onDirectPeerLost(myNodeName, disconnectedDevice.name, readyConnectedDevices())
             }
             meshRouter.recalculateKnownNodes(myNodeName, readyConnectedDevices())
             readyPeerEvents.update(readyConnectedDevices().filterNot { networkManager.isDeviceBlocked(it.name) })
@@ -321,7 +337,12 @@ class MeshRepository(
         }
 
         networkManager.checkRouteExists = { targetName ->
-            meshRouter.knownNodes.value.any { NodeIdentity.matches(it.name, targetName) }
+            meshRouter.findShortestPath(myNodeName, targetName, readyConnectedDevices()).isNotEmpty()
+        }
+        networkManager.canRetireForBridge = { endpoint ->
+            meshRouter.canRetireForBridge(myNodeName, endpoint, readyConnectedDevices().filter {
+                it.isPeerResponsive && !networkManager.isDeviceBlocked(it.name) && networkManager.hasReadyEndpoint(it.endpointId)
+            })
         }
 
         networkManager.onDeviceScanned = { event ->

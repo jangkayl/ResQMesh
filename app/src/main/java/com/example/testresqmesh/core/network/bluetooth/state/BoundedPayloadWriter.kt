@@ -18,6 +18,7 @@ class BoundedPayloadWriter(
     private var retainedBytes = 0L
     private var closed = false
     private var active: ByteArray? = null
+    fun isIdle(): Boolean = synchronized(monitor) { !closed && active == null && retainedCount == 0 }
 
     init { startWorker { runWriter() } }
 

@@ -126,7 +126,14 @@ class MeshForegroundService : Service() {
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
         val statusText = when {
-            status.contains("error", ignoreCase = true) || status.contains("unsupported", ignoreCase = true) ->
+            status == com.example.testresqmesh.core.network.bluetooth.MeshTransportState.BLUETOOTH_OFF.status ->
+                "Bluetooth off · waiting to reconnect"
+            status == com.example.testresqmesh.core.network.bluetooth.MeshTransportState.PERMISSION_REQUIRED.status ->
+                "Mesh needs permission"
+            status == com.example.testresqmesh.core.network.bluetooth.MeshTransportState.STARTING.status ->
+                "Starting Bluetooth mesh"
+            status == com.example.testresqmesh.core.network.bluetooth.MeshTransportState.ERROR.status ||
+                status.contains("error", ignoreCase = true) || status.contains("unsupported", ignoreCase = true) ->
                 "Mesh needs attention"
             readyPeerCount == 0 -> "Listening for nearby mesh devices"
             readyPeerCount == 1 -> "1 direct peer ready"

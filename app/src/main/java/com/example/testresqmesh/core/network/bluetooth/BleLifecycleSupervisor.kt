@@ -77,7 +77,10 @@ class BleLifecycleSupervisor(
         }
     }
 
-    fun start() = handler.post(runnable)
+    fun start() {
+        handler.removeCallbacks(runnable)
+        handler.post(runnable)
+    }
     fun stop() = handler.removeCallbacks(runnable)
 
     private companion object {

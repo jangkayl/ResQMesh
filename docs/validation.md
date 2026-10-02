@@ -62,9 +62,9 @@ Record APK/devices. With READY and Radio Monitor on, send three overlapping note
 
 Record APK/device/API. Clear data and open: expect splash, three guide pages, permissions, name, Home. Check Back, Skip, orientation, themes, Settings replay. Reopen: guide stays hidden. SOS/chat notifications during setup must reach their destination afterward; next normal launch shows the guide. Report stale screens, lost destinations, or unexpected mesh starts.
 
-### Level 2: lifecycle and recovery
+### Level 2: reconnect
 
-Restart apps separately, toggle Bluetooth, leave/return to range, reconnect three to five times, send during/after recovery; stale endpoints/keys must not break replacement links.
+Use the [Bluetooth recovery card](testing/bluetooth-recovery-test-card.md) for toggles, isolation, cluster bridges, and background recovery. Record timings, receipts, and captures.
 
 ### Level 3: three-phone relay
 

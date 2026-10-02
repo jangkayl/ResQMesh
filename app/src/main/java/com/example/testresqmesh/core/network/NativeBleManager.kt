@@ -3,6 +3,16 @@ package com.example.testresqmesh.core.network
 import android.annotation.SuppressLint
 import android.bluetooth.*
 import android.content.Context
+import android.content.BroadcastReceiver
+import android.content.Intent
+import android.content.IntentFilter
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
+import androidx.core.content.ContextCompat
+import com.example.testresqmesh.core.network.bluetooth.BleAvailability
+import com.example.testresqmesh.core.network.bluetooth.BleSessionLifecycle
+import com.example.testresqmesh.core.network.bluetooth.MeshTransportState
 import android.os.Handler
 import android.os.Looper
 import com.example.testresqmesh.core.model.ConnectedDevice
@@ -48,6 +58,8 @@ class NativeBleManager(val context: Context) {
     var onRoutingTableReceived: ((String, String, List<String>, List<String>, Long) -> Unit)? = null
     var onSosCancelled: (() -> Unit)? = null
     var onStatusChanged: ((String) -> Unit)? = null
+    var onTransportStateChanged: ((MeshTransportState) -> Unit)? = null
+    var canRetireForBridge: ((String) -> Boolean)? = null
     var onDeviceBlocked: ((String) -> Unit)? = null
     var onDeviceUnblocked: ((String) -> Unit)? = null
     var onBlockRequest: ((String, MeshPayload, BlockControlEnvelope) -> Unit)? = null
@@ -85,7 +97,8 @@ class NativeBleManager(val context: Context) {
         serviceUuid = SERVICE_UUID,
         isNodeActive = { store.isNodeActive.get() },
         hasReadyConnection = ::hasPayloadReadyDirectLink,
-        onAdvertisement = ::handleAdvertisement
+        onAdvertisement = ::handleAdvertisement,
+        onAdvertisingFailure = ::retryAdvertising
     )
 
     var gattServer: BluetoothGattServer? = null
@@ -258,23 +271,152 @@ class NativeBleManager(val context: Context) {
         { endpoint -> onDeviceDisconnected?.invoke(endpoint) }, ::sendSystemPulse,
         { radioController.activeHandshakeInfo() },
         distinctReadyPeerCount = ::distinctReadyLinkCount,
-        disconnectEndpoint = ::disconnectFromEndpoint
+        disconnectEndpoint = ::disconnectFromEndpoint,
+        isNodeActive = { store.isNodeActive.get() },
+        canRetireForBridge = { endpoint -> canRetireForBridge?.invoke(endpoint) == true },
+        isTransportIdle = l2capTransport::isIdle
     )
 
-    fun startMeshNode(teamKey: String) {
-        currentTeamKey = teamKey
-        isCloaked = false
-        if (!radioController.isSupported) {
-            onStatusChanged?.invoke("Hardware not fully supported")
-            return
+    private val sessionLifecycle = BleSessionLifecycle(
+        startTransport = ::startTransport,
+        stopTransport = ::stopTransport,
+        publishState = { state ->
+            AppLogger.d("BLE_RECOVERY", "transport=${state.name} generation=$transportGeneration")
+            onTransportStateChanged?.invoke(state)
+            onStatusChanged?.invoke(state.status)
         }
-        store.isNodeActive.set(true)
+    )
+    val transportGeneration: Long get() = sessionLifecycle.generation
+    fun isTransportGenerationCurrent(generation: Long) = sessionLifecycle.owns(generation)
+    private var receiverRegistered = false
+    private var serviceReady = false
+    private var restartAttempts = 0
+    private var advertisingAttempts = 0
+    private val pendingL2capSockets = mutableSetOf<BluetoothSocket>()
+    fun trackPendingL2capSocket(socket: BluetoothSocket, generation: Long): Boolean {
+        if (!isTransportGenerationCurrent(generation)) {
+            try { socket.close() } catch (_: Exception) {}
+            return false
+        }
+        pendingL2capSockets.add(socket)
+        return true
+    }
+    fun finishPendingL2capSocket(socket: BluetoothSocket) { pendingL2capSockets.remove(socket) }
+    private val advertisingRetry = Runnable {
+        if (store.isNodeActive.get() && serviceReady) startAdvertising(currentTeamKey)
+    }
+    private fun retryAdvertising() {
+        advertisingAttempts++
+        handler.removeCallbacks(advertisingRetry)
+        handler.postDelayed(advertisingRetry,
+            com.example.testresqmesh.core.network.bluetooth.BleScanRecoveryPolicy.retryDelay(advertisingAttempts) +
+                kotlin.random.Random.nextLong(2_001L))
+    }
+    private val startupTimeout = Runnable { failTransport(transportGeneration) }
+    private val recoveryCheck = object : Runnable {
+        override fun run() {
+            if (!sessionLifecycle.requested) return
+            val availability = bluetoothAvailability()
+            sessionLifecycle.reconcile(availability)
+            if (sessionLifecycle.state == MeshTransportState.ERROR && availability == BleAvailability.AVAILABLE) return
+            if (serviceReady && sessionLifecycle.running) {
+                sessionLifecycle.peers(distinctReadyLinkCount())
+                radioController.reconcileHandshakeOwners(store.links::isSetupOwner)
+                radioController.startScanning()
+                peerAdmissionController.recover()
+            }
+            handler.removeCallbacks(this)
+            handler.postDelayed(this, 5_000L)
+        }
+    }
+    private val bluetoothStateReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            if (intent.action != BluetoothAdapter.ACTION_STATE_CHANGED) return
+            handler.post {
+                if (!sessionLifecycle.requested) return@post
+                val state = intent.getIntExtra(BluetoothAdapter.EXTRA_STATE, BluetoothAdapter.ERROR)
+                if (state != BluetoothAdapter.ERROR) {
+                    // Read actual state: an old OFF broadcast may arrive after a rapid ON.
+                    reconcileTransport()
+                }
+            }
+        }
+    }
 
-        startGattServer()
-        startAdvertising(teamKey)
+    private fun bluetoothAvailability(): BleAvailability {
+        fun allowed(permission: String) = ContextCompat.checkSelfPermission(context, permission) == PackageManager.PERMISSION_GRANTED
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
+            (!allowed(Manifest.permission.BLUETOOTH_CONNECT) || !allowed(Manifest.permission.BLUETOOTH_SCAN) ||
+                !allowed(Manifest.permission.BLUETOOTH_ADVERTISE))) return BleAvailability.PERMISSION_REQUIRED
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S && !allowed(Manifest.permission.ACCESS_FINE_LOCATION)) {
+            return BleAvailability.PERMISSION_REQUIRED
+        }
+        return try {
+            when {
+                bluetoothAdapter == null -> BleAvailability.UNSUPPORTED
+                !bluetoothAdapter.isEnabled -> BleAvailability.BLUETOOTH_OFF
+                else -> BleAvailability.AVAILABLE
+            }
+        } catch (_: SecurityException) { BleAvailability.PERMISSION_REQUIRED }
+    }
+
+    fun reconcileTransport() {
+        handler.post {
+            if (!sessionLifecycle.requested) return@post
+            handler.removeCallbacks(recoveryCheck)
+            recoveryCheck.run()
+        }
+    }
+
+    fun startMeshNode(teamKey: String) {
+        handler.post {
+            currentTeamKey = teamKey
+            isCloaked = false
+            if (!receiverRegistered) {
+                ContextCompat.registerReceiver(context.applicationContext, bluetoothStateReceiver,
+                    IntentFilter(BluetoothAdapter.ACTION_STATE_CHANGED), ContextCompat.RECEIVER_EXPORTED)
+                receiverRegistered = true
+            }
+            sessionLifecycle.start(bluetoothAvailability())
+            if (sessionLifecycle.state != MeshTransportState.ERROR) {
+                handler.removeCallbacks(recoveryCheck)
+                handler.postDelayed(recoveryCheck, 5_000L)
+            }
+        }
+    }
+
+    private fun startTransport(generation: Long) {
+        store.isNodeActive.set(true)
+        serviceReady = false
+        lastSystemPulseHash = 0
+        lastSystemPulseTime = 0L
+        handler.removeCallbacks(startupTimeout)
+        handler.postDelayed(startupTimeout, 5_000L)
+        try {
+            startGattServer()
+        } catch (_: Exception) { failTransport(generation) }
+    }
+
+    fun onGattServerReady(generation: Long) {
+        if (!isTransportGenerationCurrent(generation) || serviceReady) return
+        handler.removeCallbacks(startupTimeout)
+        serviceReady = true
+        restartAttempts = 0
+        advertisingAttempts = 0
+        sessionLifecycle.ready(generation)
+        startAdvertising(currentTeamKey)
         startScanning()
         lifecycleSupervisor.start()
-        onStatusChanged?.invoke("Mesh Active [Persistent GATT/Protobuf]. Seeking peers...")
+    }
+
+    fun failTransport(generation: Long) {
+        if (!isTransportGenerationCurrent(generation)) return
+        sessionLifecycle.failed(generation)
+        restartAttempts++
+        handler.removeCallbacks(recoveryCheck)
+        val delay = com.example.testresqmesh.core.network.bluetooth.BleScanRecoveryPolicy.retryDelay(restartAttempts) +
+            kotlin.random.Random.nextLong(2_001L)
+        handler.postDelayed(recoveryCheck, delay)
     }
     
     private var lastSystemPulseHash: Int = 0
@@ -285,6 +427,7 @@ class NativeBleManager(val context: Context) {
 
     fun sendSystemPulse(forceFull: Boolean = false) {
         if (!store.isNodeActive.get()) return
+        sessionLifecycle.peers(distinctReadyLinkCount())
         try {
             // Build and sort identity pairs together. Independently sorting names and IDs can bind
             // one peer's display name to another peer's stable identity.
@@ -348,31 +491,49 @@ class NativeBleManager(val context: Context) {
     }
 
     fun stopMeshNode() {
+        handler.post {
+            handler.removeCallbacks(recoveryCheck)
+            sessionLifecycle.stop()
+            if (receiverRegistered) {
+                context.applicationContext.unregisterReceiver(bluetoothStateReceiver)
+                receiverRegistered = false
+            }
+        }
+    }
+
+    private fun stopTransport() {
         store.isNodeActive.set(false)
+        serviceReady = false
+        handler.removeCallbacks(startupTimeout)
+        handler.removeCallbacks(advertisingRetry)
+        pendingL2capSockets.forEach { try { it.close() } catch (_: Exception) {} }
+        pendingL2capSockets.clear()
+        peerAdmissionController.stop()
+        val retiringLinks = store.links.snapshot()
+        val endpoints = (store.activeConnections.keys + store.activeServerConnections.keys + store.connectedEndpointIds +
+            retiringLinks.map { it.endpoint }).toSet()
         AppLogger.clearLinks()
         radioController.stop()
         
-        try {
-            val goodbyePayload = MeshPayload(
-                id = java.util.UUID.randomUUID().toString(),
-                type = "GOODBYE",
-                senderName = myDeviceName
-            )
-            val bytes = kotlinx.serialization.protobuf.ProtoBuf.encodeToByteArray(goodbyePayload)
-            broadcastPayload(bytes)
-        } catch (e: Exception) {}
         store.links.clear()
         
-        store.activeServerConnections.values.forEach { gattServer?.cancelConnection(it) }
+        store.activeServerConnections.values.forEach { try { gattServer?.cancelConnection(it) } catch (_: Exception) {} }
         store.activeServerConnections.clear()
-        gattServer?.close()
+        try { gattServer?.close() } catch (_: Exception) {}
+        gattServer = null
         
         try {
             l2capServerSocket?.close()
             l2capAcceptThread?.interrupt()
         } catch (e: Exception) {}
+        l2capServerSocket = null
+        l2capAcceptThread = null
+        myL2capPsm = 0
         
-        store.activeConnections.values.forEach { it.disconnect(); it.close() }
+        (store.activeConnections.values + retiringLinks.mapNotNull { it.gatt }).distinct().forEach {
+            try { it.disconnect() } catch (_: Exception) {}
+            try { it.close() } catch (_: Exception) {}
+        }
         store.activeConnections.clear()
         l2capTransport.stop()
         store.pendingQueues.clear()
@@ -387,7 +548,19 @@ class NativeBleManager(val context: Context) {
         store.endpointLastSeen.clear()
         store.endpointFirstSeen.clear()
         store.endpointNodeIds.clear()
-        onStatusChanged?.invoke("Offline")
+        store.endpointLastScore.clear()
+        store.connectionEstablishTime.clear()
+        store.connectionInteractionTimes.clear()
+        store.l2capOutboundProgressTimes.clear()
+        store.chunkBuffers.clear()
+        store.connectionMtu.clear()
+        store.writeFailureCount.clear()
+        store.orphanDetectionTime.clear()
+        releaseConnectLock(null, "transport suspended", force = true)
+        endpoints.forEach { endpoint ->
+            onDeviceDisconnected?.invoke(endpoint)
+            onDeviceScanRemoved?.invoke(endpoint)
+        }
     }
 
     fun getElectionScore(): String {
@@ -424,6 +597,7 @@ class NativeBleManager(val context: Context) {
     }
 
     fun startAdvertising(teamKey: String) {
+        if (!store.isNodeActive.get() || !serviceReady) return
         lastAdvertisedConnections = distinctLinkCount()
         radioController.startAdvertising(
             electionScore = getElectionScore(),
@@ -456,6 +630,7 @@ class NativeBleManager(val context: Context) {
     }
 
     private fun handleAdvertisement(advertisement: BleAdvertisement) {
+        if (!store.isNodeActive.get() || !serviceReady) return
         peerAdmissionController.handle(advertisement)
     }
 
@@ -525,6 +700,13 @@ class NativeBleManager(val context: Context) {
         store.connectionInteractionTimes.remove(endpointId)
         AppLogger.d("BLE_MESH", "Retired unowned endpoint transport $endpointId")
         scheduleAdvertisingUpdate()
+        handler.post {
+            if (!store.isNodeActive.get()) return@post
+            sessionLifecycle.peers(distinctReadyLinkCount())
+            radioController.reconcileHandshakeOwners(store.links::isSetupOwner)
+            radioController.startScanning()
+            peerAdmissionController.recover()
+        }
     }
 
     fun hasReadyLinkToIdentity(peerName: String): Boolean {
@@ -632,7 +814,9 @@ class NativeBleManager(val context: Context) {
         l2capTransport.attach(macAddress, socket)
 
     fun processBinaryPayload(endpointId: String, payloadBytes: ByteArray) {
-        if (!hasLiveSocket(endpointId)) {
+        val capturedGeneration = transportGeneration
+        val receivingLinks = BleLinkRole.entries.mapNotNull { store.links.current(endpointId, it) }
+        if (!isTransportGenerationCurrent(capturedGeneration) || !hasLiveSocket(endpointId)) {
             AppLogger.d("BLE_MESH", "Dropping payload from unowned endpoint $endpointId")
             return
         }
@@ -649,6 +833,7 @@ class NativeBleManager(val context: Context) {
                 AppLogger.d("BLE_MESH", "Identity gate rejected direct blocked peer ${payload.senderName} on $endpointId")
                 val rejectedLinks = BleLinkRole.entries.mapNotNull { store.links.current(endpointId, it) }
                 handler.post {
+                    if (!isTransportGenerationCurrent(capturedGeneration)) return@post
                     // The receiving socket can still be Unknown Node. Retire it by captured ownership,
                     // never by the unbound name, and never retire a replacement on the same endpoint.
                     if (store.links.ownsEndpoint(endpointId, rejectedLinks)) disconnectFromEndpoint(endpointId)
@@ -675,7 +860,8 @@ class NativeBleManager(val context: Context) {
                         }
                     }
                     handler.post {
-                        if (!hasLiveSocket(endpointId)) return@post
+                        if (!isTransportGenerationCurrent(capturedGeneration) ||
+                            !store.links.ownsEndpoint(endpointId, receivingLinks)) return@post
                         val isDirectlyConnected = store.activeConnections.containsKey(endpointId) || store.activeServerConnections.containsKey(endpointId)
                         onDeviceConnected?.invoke(
                             com.example.testresqmesh.core.model.ConnectedDevice(
@@ -969,6 +1155,13 @@ class NativeBleManager(val context: Context) {
             }
         }
         scheduleAdvertisingUpdate()
+        handler.post {
+            if (store.isNodeActive.get()) {
+                sessionLifecycle.peers(distinctReadyLinkCount())
+                radioController.startScanning()
+                peerAdmissionController.recover()
+            }
+        }
     }
     
     /** Installs direct-link denial by stable identity without tearing down a live control path. */
@@ -1022,6 +1215,9 @@ class NativeBleManager(val context: Context) {
     
     fun rescan() {
         handler.post {
+            if (!sessionLifecycle.requested) return@post
+            sessionLifecycle.reconcile(bluetoothAvailability())
+            if (!serviceReady) return@post
             radioController.reconcileHandshakeOwners(store.links::isSetupOwner)
             peerAdmissionController.drainCandidates()
             radioController.rescan()

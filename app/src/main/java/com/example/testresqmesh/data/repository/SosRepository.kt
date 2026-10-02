@@ -68,7 +68,7 @@ class SosRepository(
         val user = identity.getOrCreateUser()
         val id = SosProtocol.prefix(signing.publicKey) + UUID.randomUUID()
         val e = SosEvent(UUID.randomUUID().toString(), id, identity.getDeviceId(), user.displayName,
-            signing.publicKey, type, 1, false, now(), now(), lat, lng, accuracy, captured)
+            signing.publicKey, type, 1, false, now(), now(), lat, lng, accuracy, captured?.takeIf { it > 0 })
         val signed = e.copy(signature = signing.sign(e.signingEvent()))
         check(apply(signed, pending = true) == SosIngestion.APPLIED)
         changes.tryEmit(Unit)

@@ -67,4 +67,20 @@ class BoundedPayloadWriterTest {
         assertFalse(writer.offer(byteArrayOf(2), true))
         assertEquals(128, writer.close().size)
     }
+    @Test fun idleCheckProtectsBothQueuedAndActiveFramesDuringBridgeReclaim() {
+        lateinit var run: () -> Unit
+        lateinit var writer: BoundedPayloadWriter
+        writer = BoundedPayloadWriter({ true }, {
+            assertFalse(writer.isIdle())
+        }, { fail("unexpected failure") }, { run = it }, {
+            assertTrue(writer.isIdle())
+            writer.close()
+        })
+        assertTrue(writer.isIdle())
+        writer.offer(byteArrayOf(1))
+        assertFalse(writer.isIdle())
+        run()
+        assertFalse(writer.isIdle())
+    }
+
 }

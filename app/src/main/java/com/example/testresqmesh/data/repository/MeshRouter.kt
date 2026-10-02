@@ -92,6 +92,12 @@ class MeshRouter {
         lastSeenMap[nodeName] = System.currentTimeMillis()
     }
 
+    /** A lost direct edge does not erase an origin still reachable through another ready peer. */
+    fun onDirectPeerLost(myNodeName: String, peerName: String, remaining: List<ConnectedDevice>) {
+        if (findShortestPath(myNodeName, peerName, remaining).isEmpty()) removeNode(peerName)
+        recalculateKnownNodes(myNodeName, remaining)
+    }
+
     @Synchronized
     fun removeNode(nodeName: String) {
         networkGraph.remove(nodeName)
@@ -138,7 +144,9 @@ class MeshRouter {
 
     private fun rootedStablePaths(
         myNodeName: String,
-        connectedDevices: List<ConnectedDevice>
+        connectedDevices: List<ConnectedDevice>,
+        maxTopologyAgeMs: Long = Long.MAX_VALUE,
+        now: Long = System.currentTimeMillis()
     ): Map<String, List<String>> {
         val myNodeId = NodeIdentity.idOf(myNodeName) ?: return emptyMap()
         stableNames[myNodeId] = myNodeName
@@ -156,6 +164,8 @@ class MeshRouter {
 
         while (queue.isNotEmpty()) {
             val current = queue.removeFirst()
+            if (maxTopologyAgeMs != Long.MAX_VALUE &&
+                now - (stableLastSeenMap[current] ?: 0L) > maxTopologyAgeMs) continue
             stableRouteGraph[current].orEmpty().forEach { neighbor ->
                 if (neighbor != myNodeId && !paths.containsKey(neighbor)) {
                     paths[neighbor] = paths.getValue(current) + neighbor
@@ -164,6 +174,22 @@ class MeshRouter {
             }
         }
         return paths
+    }
+
+    /** Reclaim only a redundant edge, using recent directed snapshots and responsive first hops. */
+    fun canRetireForBridge(
+        myNodeName: String,
+        endpoint: String,
+        connectedDevices: List<ConnectedDevice>,
+        now: Long = System.currentTimeMillis()
+    ): Boolean {
+        val ready = connectedDevices.filter { it.isPayloadReady && !it.isProvisional && it.isPeerResponsive }
+        val retiring = ready.firstOrNull { it.endpointId == endpoint } ?: return false
+        val remaining = ready.filterNot { NodeIdentity.matches(it.name, retiring.name) }
+        if (remaining.isEmpty()) return false
+        val before = rootedStablePaths(myNodeName, connectedDevices).keys
+        val after = rootedStablePaths(myNodeName, remaining, maxTopologyAgeMs = 30_000L, now = now).keys
+        return before.isNotEmpty() && after.containsAll(before)
     }
 
     /**

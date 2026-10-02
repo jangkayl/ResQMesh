@@ -48,6 +48,9 @@ class GattClientManager(
             return BleConnectStartResult.REJECTED
         }
         with(manager) {
+        if (!store.isNodeActive.get()) return BleConnectStartResult.REJECTED
+        val epoch = transportGeneration
+        if (distinctLinkCount() >= MAX_TOTAL_CONNECTIONS) return BleConnectStartResult.REJECTED
         if (isDeviceBlocked(peerName)) {
             AppLogger.d("BLE_MESH", "Skipping GATT connect to blocked peer $peerName")
             return BleConnectStartResult.REJECTED
@@ -73,6 +76,7 @@ class GattClientManager(
         }
 
         handler.post {
+            if (!isTransportGenerationCurrent(epoch)) return@post
             // Force UI update to show SYNCING...
             notifyScanState(macAddress, peerName, isConnecting = true)
         }
@@ -139,7 +143,7 @@ class GattClientManager(
         try {
             val callback = object : BluetoothGattCallback() {
                 fun owns(gatt: BluetoothGatt, event: String): Boolean {
-                    if (!store.links.isCurrent(link) || (link.gatt != null && link.gatt !== gatt)) {
+                    if (!isTransportGenerationCurrent(epoch) || !store.links.isCurrent(link) || (link.gatt != null && link.gatt !== gatt)) {
                         AppLogger.d("BLE_MESH", "Ignoring $event from stale CLIENT link ${link.generation} on $macAddress")
                         return false
                     }
@@ -148,315 +152,377 @@ class GattClientManager(
                 }
 
                 override fun onConnectionStateChange(gatt: BluetoothGatt, status: Int, newState: Int) {
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
-                        ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED
-                    ) {
-                        AppLogger.d("BLE_MESH", "Ignoring CLIENT connection callback for $peerName: BLUETOOTH_CONNECT was revoked")
-                        finishConnectPhase("Bluetooth permission revoked")
-                        store.links.transition(link, BleLinkState.DISCONNECTING)
-                        store.links.forget(link)
-                        return
-                    }
-                    if (!owns(gatt, "connection state $newState/$status")) {
-                        if (newState == BluetoothProfile.STATE_DISCONNECTED) {
-                            try {
-                                gatt.close()
-                            } catch (e: SecurityException) {
-                                AppLogger.d("BLE_MESH", "Could not close stale CLIENT link: BLUETOOTH_CONNECT was revoked")
-                            }
-                        }
-                        return
-                    }
-                    if (newState == BluetoothProfile.STATE_CONNECTED) {
-                        if (!store.links.transition(link, BleLinkState.DISCOVERING)) return
-                        AppLogger.d("BLE_MESH", "Link ${link.generation} CLIENT $macAddress: DISCOVERING radioStatus=$status")
-                        AppLogger.updateLink(macAddress, peerName, "CLIENT", link.generation, "DISCOVERING")
-                        AppLogger.d("BLE_MESH", "GATT Socket locked with ${peerName}. Starting service discovery with default MTU.")
-                        store.activeConnections[macAddress] = gatt
-                        manager.scheduleAdvertisingUpdate()
-                        store.connectedEndpointNames[macAddress] = peerName
-                        NodeIdentity.idOf(peerName)?.let { store.endpointNodeIds[macAddress] = it }
-                        store.pendingQueues.putIfAbsent(macAddress, ConcurrentLinkedDeque())
-                        store.isWriting.putIfAbsent(macAddress, AtomicBoolean(false))
-                        store.chunkBuffers.putIfAbsent(macAddress, ByteArray(0))
-                        store.connectionInteractionTimes.putIfAbsent(macAddress, System.currentTimeMillis())
-                        store.connectionEstablishTime[macAddress] = System.currentTimeMillis()
-
-                        // The connect timeout is swapped for a handshake watchdog that always fires,
-                        // so a dropped OEM discovery/descriptor callback cannot strand the lock.
-                        timeoutHandler.removeCallbacks(connectTimeoutRunnable)
-                        timeoutHandler.postDelayed({
-                            if (store.links.isCurrent(link) && link.state != BleLinkState.READY) {
-                                if (link.state == BleLinkState.DISCOVERING && stablePeerId != null &&
-                                    store.explicitLeTransportPeers.add(stablePeerId)) {
-                                    AppLogger.d(
-                                        "BLE_MESH",
-                                        "AUTO transport received no ATT discovery response from $peerName; next attempt will force LE"
-                                    )
-                                }
-                                AppLogger.d("BLE_MESH", "Handshake watchdog fired for CLIENT link ${link.generation} $peerName in ${link.state}. Disconnecting.")
-                                finishConnectPhase("handshake watchdog")
-                                forceGattDisconnect(macAddress, gatt)
-                            }
-                        }, HANDSHAKE_WATCHDOG_MS)
-
-                        handler.post {
-                            onDeviceConnected?.invoke(
-                                ConnectedDevice(
-                                    endpointId = macAddress,
-                                    name = peerName,
-                                    isClassicConnected = true,
-                                    isProvisional = false,
-                                    nodeId = NodeIdentity.idOf(peerName) ?: store.endpointNodeIds[macAddress].orEmpty(),
-                                    isPayloadReady = false
-                                )
-                            )
-                        }
-                        try {
-                            gatt.requestConnectionPriority(BluetoothGatt.CONNECTION_PRIORITY_HIGH)
-                        } catch (e: SecurityException) {
-                            AppLogger.d("BLE_MESH", "CLIENT connection priority skipped: BLUETOOTH_CONNECT was revoked")
-                            finishConnectPhase("Bluetooth permission revoked")
-                            store.links.transition(link, BleLinkState.DISCONNECTING)
-                            store.links.forget(link)
-                            return
-                        }
-                        // Default ATT payload size is reliable on every supported Android version.
-                        // Negotiate no larger MTU until the link is READY and the setup queue is idle.
-                        store.connectionMtu[macAddress] = 20
-                        link.mtu = 20
-                        requestServicesOnce(gatt)
-                    } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
-                        val stateBeforeDisconnect = link.state
-                        if (useExplicitLeTransport && stateBeforeDisconnect == BleLinkState.CONNECTING &&
-                            store.explicitLeTransportPeers.remove(stablePeerId)) {
-                            AppLogger.d(
-                                "BLE_MESH",
-                                "Explicit LE disconnected before setup for $peerName; restoring AUTO transport"
-                            )
-                        }
-                        store.links.transition(link, BleLinkState.DISCONNECTING)
-                        AppLogger.d("BLE_MESH", "GATT Socket disconnected from ${peerName}.")
-                        AppLogger.removeLink(macAddress, "CLIENT", link.generation)
-                        finishConnectPhase("disconnected")
-                        store.activeConnections.remove(macAddress, gatt)
-                        cleanupEndpointIfUnowned(macAddress)
-                        if (!store.activeServerConnections.containsKey(macAddress)) {
-                            store.connectionEstablishTime.remove(macAddress)
-                        }
-                        if (!store.activeServerConnections.containsKey(macAddress)) {
-                            store.connectedEndpointIds.remove(macAddress)
-                            store.connectedEndpointNames.remove(macAddress)
-                        }
-                        
-                        handler.post {
-                            onDeviceDisconnected?.invoke(macAddress)
-                            sendSystemPulse()
-                        }
-                        try {
-                            gatt.close()
-                        } catch (e: SecurityException) {
-                            AppLogger.d("BLE_MESH", "Could not close CLIENT link: BLUETOOTH_CONNECT was revoked")
-                        }
-                        store.links.forget(link)
-                    }
-                }
-    
-                override fun onMtuChanged(gatt: BluetoothGatt, mtu: Int, status: Int) {
-                    if (!owns(gatt, "MTU $status")) return
-                    val mac = gatt.device.address
-                    if (status == BluetoothGatt.GATT_SUCCESS) {
-                        AppLogger.d("BLE_MESH", "MTU Expanded to $mtu.")
-                        store.connectionMtu[mac] = mtu - 3
-                        link.mtu = mtu - 3
-                    } else {
-                        AppLogger.d("BLE_MESH", "MTU Expansion failed. Samsung Fallback to 23 bytes.")
-                        store.connectionMtu[mac] = 20
-                        link.mtu = 20
-                    }
-                    requestServicesOnce(gatt)
-                }
-    
-                override fun onServicesDiscovered(gatt: BluetoothGatt, status: Int) {
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
-                        ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED
-                    ) {
-                        AppLogger.d("BLE_MESH", "Ignoring CLIENT service callback for $peerName: BLUETOOTH_CONNECT was revoked")
-                        finishConnectPhase("Bluetooth permission revoked")
-                        store.links.transition(link, BleLinkState.DISCONNECTING)
-                        store.links.forget(link)
-                        return
-                    }
-                    if (!owns(gatt, "services $status")) return
-                    link.currentOperation = null
-                    if (status == BluetoothGatt.GATT_SUCCESS) {
-                        if (!store.links.transition(link, BleLinkState.CONFIGURING)) return
-                        AppLogger.d("BLE_MESH", "Link ${link.generation} CLIENT $macAddress: CONFIGURING serviceStatus=$status")
-                        AppLogger.updateLink(macAddress, peerName, "CLIENT", link.generation, "CONFIGURING")
-                        AppLogger.d("BLE_MESH", "GATT Services discovered for ${macAddress}. Ready to transmit.")
-                        
-                        val service = gatt.getService(SERVICE_UUID)
-                        val txChar = service?.getCharacteristic(TX_CHARACTERISTIC_UUID)
-                        var descriptorWritePending = false
-                        if (txChar != null) {
-                            try {
-                                gatt.setCharacteristicNotification(txChar, true)
-                            } catch (e: SecurityException) {
-                                AppLogger.d("BLE_MESH", "CLIENT notification setup skipped: BLUETOOTH_CONNECT was revoked")
+                    handler.post {
+                        if (!isTransportGenerationCurrent(epoch)) return@post
+                        fun handleCallback() {
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
+                                ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED
+                            ) {
+                                AppLogger.d("BLE_MESH", "Ignoring CLIENT connection callback for $peerName: BLUETOOTH_CONNECT was revoked")
                                 finishConnectPhase("Bluetooth permission revoked")
                                 store.links.transition(link, BleLinkState.DISCONNECTING)
                                 store.links.forget(link)
                                 return
                             }
-                            val descriptor = txChar.getDescriptor(CCC_DESCRIPTOR_UUID)
-                            if (descriptor != null) {
-                                descriptorWritePending = true
-                                link.currentOperation = "WRITE_CCCD"
-                                try {
-                                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
-                                        gatt.writeDescriptor(descriptor, BluetoothGattDescriptor.ENABLE_INDICATION_VALUE)
-                                    } else {
-                                        descriptor.value = BluetoothGattDescriptor.ENABLE_INDICATION_VALUE
-                                        gatt.writeDescriptor(descriptor)
+                            if (!owns(gatt, "connection state $newState/$status")) {
+                                if (newState == BluetoothProfile.STATE_DISCONNECTED) {
+                                    try {
+                                        gatt.close()
+                                    } catch (e: SecurityException) {
+                                        AppLogger.d("BLE_MESH", "Could not close stale CLIENT link: BLUETOOTH_CONNECT was revoked")
                                     }
+                                }
+                                return
+                            }
+                            if (newState == BluetoothProfile.STATE_CONNECTED) {
+                                if (!store.links.transition(link, BleLinkState.DISCOVERING)) return
+                                AppLogger.d("BLE_MESH", "Link ${link.generation} CLIENT $macAddress: DISCOVERING radioStatus=$status")
+                                AppLogger.updateLink(macAddress, peerName, "CLIENT", link.generation, "DISCOVERING")
+                                AppLogger.d("BLE_MESH", "GATT Socket locked with ${peerName}. Starting service discovery with default MTU.")
+                                store.activeConnections[macAddress] = gatt
+                                manager.scheduleAdvertisingUpdate()
+                                store.connectedEndpointNames[macAddress] = peerName
+                                NodeIdentity.idOf(peerName)?.let { store.endpointNodeIds[macAddress] = it }
+                                store.pendingQueues.putIfAbsent(macAddress, ConcurrentLinkedDeque())
+                                store.isWriting.putIfAbsent(macAddress, AtomicBoolean(false))
+                                store.chunkBuffers.putIfAbsent(macAddress, ByteArray(0))
+                                store.connectionInteractionTimes.putIfAbsent(macAddress, System.currentTimeMillis())
+                                store.connectionEstablishTime[macAddress] = System.currentTimeMillis()
+
+                                // The connect timeout is swapped for a handshake watchdog that always fires,
+                                // so a dropped OEM discovery/descriptor callback cannot strand the lock.
+                                timeoutHandler.removeCallbacks(connectTimeoutRunnable)
+                                timeoutHandler.postDelayed({
+                                    if (store.links.isCurrent(link) && link.state != BleLinkState.READY) {
+                                        if (link.state == BleLinkState.DISCOVERING && stablePeerId != null &&
+                                            store.explicitLeTransportPeers.add(stablePeerId)) {
+                                            AppLogger.d(
+                                                "BLE_MESH",
+                                                "AUTO transport received no ATT discovery response from $peerName; next attempt will force LE"
+                                            )
+                                        }
+                                        AppLogger.d("BLE_MESH", "Handshake watchdog fired for CLIENT link ${link.generation} $peerName in ${link.state}. Disconnecting.")
+                                        finishConnectPhase("handshake watchdog")
+                                        forceGattDisconnect(macAddress, gatt)
+                                    }
+                                }, HANDSHAKE_WATCHDOG_MS)
+
+                                handler.post {
+                                    if (!isTransportGenerationCurrent(epoch)) return@post
+                                    onDeviceConnected?.invoke(
+                                        ConnectedDevice(
+                                            endpointId = macAddress,
+                                            name = peerName,
+                                            isClassicConnected = true,
+                                            isProvisional = false,
+                                            nodeId = NodeIdentity.idOf(peerName) ?: store.endpointNodeIds[macAddress].orEmpty(),
+                                            isPayloadReady = false
+                                        )
+                                    )
+                                }
+                                try {
+                                    gatt.requestConnectionPriority(BluetoothGatt.CONNECTION_PRIORITY_HIGH)
                                 } catch (e: SecurityException) {
-                                    AppLogger.d("BLE_MESH", "CLIENT descriptor setup skipped: BLUETOOTH_CONNECT was revoked")
+                                    AppLogger.d("BLE_MESH", "CLIENT connection priority skipped: BLUETOOTH_CONNECT was revoked")
                                     finishConnectPhase("Bluetooth permission revoked")
                                     store.links.transition(link, BleLinkState.DISCONNECTING)
                                     store.links.forget(link)
                                     return
                                 }
+                                // Default ATT payload size is reliable on every supported Android version.
+                                // Negotiate no larger MTU until the link is READY and the setup queue is idle.
+                                store.connectionMtu[macAddress] = 20
+                                link.mtu = 20
+                                requestServicesOnce(gatt)
+                            } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
+                                val stateBeforeDisconnect = link.state
+                                if (useExplicitLeTransport && stateBeforeDisconnect == BleLinkState.CONNECTING &&
+                                    store.explicitLeTransportPeers.remove(stablePeerId)) {
+                                    AppLogger.d(
+                                        "BLE_MESH",
+                                        "Explicit LE disconnected before setup for $peerName; restoring AUTO transport"
+                                    )
+                                }
+                                store.links.transition(link, BleLinkState.DISCONNECTING)
+                                AppLogger.d("BLE_MESH", "GATT Socket disconnected from ${peerName}.")
+                                AppLogger.removeLink(macAddress, "CLIENT", link.generation)
+                                finishConnectPhase("disconnected")
+                                store.activeConnections.remove(macAddress, gatt)
+                                cleanupEndpointIfUnowned(macAddress)
+                                if (!store.activeServerConnections.containsKey(macAddress)) {
+                                    store.connectionEstablishTime.remove(macAddress)
+                                }
+                                if (!store.activeServerConnections.containsKey(macAddress)) {
+                                    store.connectedEndpointIds.remove(macAddress)
+                                    store.connectedEndpointNames.remove(macAddress)
+                                }
+
+                                handler.post {
+                                    if (!isTransportGenerationCurrent(epoch)) return@post
+                                    onDeviceDisconnected?.invoke(macAddress)
+                                    sendSystemPulse()
+                                }
+                                try {
+                                    gatt.close()
+                                } catch (e: SecurityException) {
+                                    AppLogger.d("BLE_MESH", "Could not close CLIENT link: BLUETOOTH_CONNECT was revoked")
+                                }
+                                store.links.forget(link)
                             }
+
                         }
-                        
-                        if (!descriptorWritePending) {
-                            AppLogger.d("BLE_MESH", "Failed to setup TX Char/Descriptor (GATT Cache issue). Clearing Cache & Disconnecting.")
-                            try {
-                                val localMethod = gatt.javaClass.getMethod("refresh")
-                                localMethod.invoke(gatt)
-                            } catch (e: Exception) {}
-                            finishConnectPhase("tx characteristic missing")
-                            forceGattDisconnect(macAddress, gatt)
-                        }
-                    } else {
-                        AppLogger.d("BLE_MESH", "GATT services discovery failed for ${macAddress}. Status: ${status}. Forcing UI disconnect.")
-                        finishConnectPhase("service discovery failed")
-                        forceGattDisconnect(macAddress, gatt)
+                        handleCallback()
                     }
                 }
-    
-                override fun onDescriptorWrite(gatt: BluetoothGatt, descriptor: BluetoothGattDescriptor, status: Int) {
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
-                        ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED
-                    ) {
-                        AppLogger.d("BLE_MESH", "Ignoring CLIENT descriptor callback for $peerName: BLUETOOTH_CONNECT was revoked")
-                        finishConnectPhase("Bluetooth permission revoked")
-                        store.links.transition(link, BleLinkState.DISCONNECTING)
-                        store.links.forget(link)
-                        return
-                    }
-                    if (!owns(gatt, "descriptor $status")) return
-                    link.currentOperation = null
-                    if (status == BluetoothGatt.GATT_SUCCESS) {
-                        if (!store.links.transition(link, BleLinkState.READY)) return
-                        AppLogger.d("BLE_MESH", "Link ${link.generation} CLIENT $macAddress: READY descriptorStatus=$status")
-                        AppLogger.updateLink(macAddress, peerName, "CLIENT", link.generation, "READY")
-                        AppLogger.d("BLE_MESH", "GATT descriptor written successfully for ${macAddress}.")
-                        handler.post {
-                            if (store.links.isCurrent(link) && link.state == BleLinkState.READY) {
-                                onDeviceConnected?.invoke(ConnectedDevice(
-                                    endpointId = macAddress,
-                                    name = store.connectedEndpointNames[macAddress] ?: peerName,
-                                    isClassicConnected = true,
-                                    nodeId = link.peerNodeId.orEmpty(),
-                                    isPayloadReady = true
-                                ))
+
+                override fun onMtuChanged(gatt: BluetoothGatt, mtu: Int, status: Int) {
+                    handler.post {
+                        if (!isTransportGenerationCurrent(epoch)) return@post
+                        fun handleCallback() {
+                            if (!owns(gatt, "MTU $status")) return
+                            val mac = gatt.device.address
+                            if (status == BluetoothGatt.GATT_SUCCESS) {
+                                AppLogger.d("BLE_MESH", "MTU Expanded to $mtu.")
+                                store.connectionMtu[mac] = mtu - 3
+                                link.mtu = mtu - 3
+                            } else {
+                                AppLogger.d("BLE_MESH", "MTU Expansion failed. Samsung Fallback to 23 bytes.")
+                                store.connectionMtu[mac] = 20
+                                link.mtu = 20
                             }
+                            requestServicesOnce(gatt)
+
                         }
-                        
-                        // Proceed to read the L2CAP PSM port
-                        val psmChar = gatt.getService(SERVICE_UUID)?.getCharacteristic(L2CAP_PSM_CHARACTERISTIC_UUID)
-                        if (psmChar != null) {
-                            try {
-                                gatt.readCharacteristic(psmChar)
-                            } catch (e: SecurityException) {
-                                AppLogger.d("BLE_MESH", "CLIENT L2CAP PSM read skipped: BLUETOOTH_CONNECT was revoked")
+                        handleCallback()
+                    }
+                }
+
+                override fun onServicesDiscovered(gatt: BluetoothGatt, status: Int) {
+                    handler.post {
+                        if (!isTransportGenerationCurrent(epoch)) return@post
+                        fun handleCallback() {
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
+                                ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED
+                            ) {
+                                AppLogger.d("BLE_MESH", "Ignoring CLIENT service callback for $peerName: BLUETOOTH_CONNECT was revoked")
                                 finishConnectPhase("Bluetooth permission revoked")
                                 store.links.transition(link, BleLinkState.DISCONNECTING)
                                 store.links.forget(link)
                                 return
                             }
+                            if (!owns(gatt, "services $status")) return
+                            link.currentOperation = null
+                            if (status == BluetoothGatt.GATT_SUCCESS) {
+                                if (!store.links.transition(link, BleLinkState.CONFIGURING)) return
+                                AppLogger.d("BLE_MESH", "Link ${link.generation} CLIENT $macAddress: CONFIGURING serviceStatus=$status")
+                                AppLogger.updateLink(macAddress, peerName, "CLIENT", link.generation, "CONFIGURING")
+                                AppLogger.d("BLE_MESH", "GATT Services discovered for ${macAddress}. Ready to transmit.")
+
+                                val service = gatt.getService(SERVICE_UUID)
+                                val txChar = service?.getCharacteristic(TX_CHARACTERISTIC_UUID)
+                                var descriptorWritePending = false
+                                if (txChar != null) {
+                                    try {
+                                        gatt.setCharacteristicNotification(txChar, true)
+                                    } catch (e: SecurityException) {
+                                        AppLogger.d("BLE_MESH", "CLIENT notification setup skipped: BLUETOOTH_CONNECT was revoked")
+                                        finishConnectPhase("Bluetooth permission revoked")
+                                        store.links.transition(link, BleLinkState.DISCONNECTING)
+                                        store.links.forget(link)
+                                        return
+                                    }
+                                    val descriptor = txChar.getDescriptor(CCC_DESCRIPTOR_UUID)
+                                    if (descriptor != null) {
+                                        descriptorWritePending = true
+                                        link.currentOperation = "WRITE_CCCD"
+                                        try {
+                                            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+                                                gatt.writeDescriptor(descriptor, BluetoothGattDescriptor.ENABLE_INDICATION_VALUE)
+                                            } else {
+                                                descriptor.value = BluetoothGattDescriptor.ENABLE_INDICATION_VALUE
+                                                gatt.writeDescriptor(descriptor)
+                                            }
+                                        } catch (e: SecurityException) {
+                                            AppLogger.d("BLE_MESH", "CLIENT descriptor setup skipped: BLUETOOTH_CONNECT was revoked")
+                                            finishConnectPhase("Bluetooth permission revoked")
+                                            store.links.transition(link, BleLinkState.DISCONNECTING)
+                                            store.links.forget(link)
+                                            return
+                                        }
+                                    }
+                                }
+
+                                if (!descriptorWritePending) {
+                                    AppLogger.d("BLE_MESH", "Failed to setup TX Char/Descriptor (GATT Cache issue). Clearing Cache & Disconnecting.")
+                                    try {
+                                        val localMethod = gatt.javaClass.getMethod("refresh")
+                                        localMethod.invoke(gatt)
+                                    } catch (e: Exception) {}
+                                    finishConnectPhase("tx characteristic missing")
+                                    forceGattDisconnect(macAddress, gatt)
+                                }
+                            } else {
+                                AppLogger.d("BLE_MESH", "GATT services discovery failed for ${macAddress}. Status: ${status}. Forcing UI disconnect.")
+                                finishConnectPhase("service discovery failed")
+                                forceGattDisconnect(macAddress, gatt)
+                            }
+
                         }
-                        
-                        finishConnectPhase("descriptor written")
-                        sendSystemPulse()
-                        processNextPayload(macAddress)
-                    } else {
-                        AppLogger.d("BLE_MESH", "GATT descriptor write failed for ${macAddress}. Status: ${status}. Forcing UI disconnect.")
-                        finishConnectPhase("descriptor write failed")
-                        forceGattDisconnect(macAddress, gatt)
+                        handleCallback()
                     }
                 }
-    
+
+                override fun onDescriptorWrite(gatt: BluetoothGatt, descriptor: BluetoothGattDescriptor, status: Int) {
+                    handler.post {
+                        if (!isTransportGenerationCurrent(epoch)) return@post
+                        fun handleCallback() {
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
+                                ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED
+                            ) {
+                                AppLogger.d("BLE_MESH", "Ignoring CLIENT descriptor callback for $peerName: BLUETOOTH_CONNECT was revoked")
+                                finishConnectPhase("Bluetooth permission revoked")
+                                store.links.transition(link, BleLinkState.DISCONNECTING)
+                                store.links.forget(link)
+                                return
+                            }
+                            if (!owns(gatt, "descriptor $status")) return
+                            link.currentOperation = null
+                            if (status == BluetoothGatt.GATT_SUCCESS) {
+                                if (!store.links.transition(link, BleLinkState.READY)) return
+                                AppLogger.d("BLE_MESH", "Link ${link.generation} CLIENT $macAddress: READY descriptorStatus=$status")
+                                AppLogger.updateLink(macAddress, peerName, "CLIENT", link.generation, "READY")
+                                AppLogger.d("BLE_MESH", "GATT descriptor written successfully for ${macAddress}.")
+                                handler.post {
+                                    if (!isTransportGenerationCurrent(epoch)) return@post
+                                    if (store.links.isCurrent(link) && link.state == BleLinkState.READY) {
+                                        onDeviceConnected?.invoke(ConnectedDevice(
+                                            endpointId = macAddress,
+                                            name = store.connectedEndpointNames[macAddress] ?: peerName,
+                                            isClassicConnected = true,
+                                            nodeId = link.peerNodeId.orEmpty(),
+                                            isPayloadReady = true
+                                        ))
+                                    }
+                                }
+
+                                // Proceed to read the L2CAP PSM port
+                                val psmChar = gatt.getService(SERVICE_UUID)?.getCharacteristic(L2CAP_PSM_CHARACTERISTIC_UUID)
+                                if (psmChar != null) {
+                                    try {
+                                        gatt.readCharacteristic(psmChar)
+                                    } catch (e: SecurityException) {
+                                        AppLogger.d("BLE_MESH", "CLIENT L2CAP PSM read skipped: BLUETOOTH_CONNECT was revoked")
+                                        finishConnectPhase("Bluetooth permission revoked")
+                                        store.links.transition(link, BleLinkState.DISCONNECTING)
+                                        store.links.forget(link)
+                                        return
+                                    }
+                                }
+
+                                finishConnectPhase("descriptor written")
+                                sendSystemPulse()
+                                processNextPayload(macAddress)
+                            } else {
+                                AppLogger.d("BLE_MESH", "GATT descriptor write failed for ${macAddress}. Status: ${status}. Forcing UI disconnect.")
+                                finishConnectPhase("descriptor write failed")
+                                forceGattDisconnect(macAddress, gatt)
+                            }
+
+                        }
+                        handleCallback()
+                    }
+                }
+
                 override fun onCharacteristicRead(
                     gatt: BluetoothGatt,
                     characteristic: BluetoothGattCharacteristic,
                     status: Int
                 ) {
-                    if (!owns(gatt, "characteristic read $status")) return
-                    if (status == BluetoothGatt.GATT_SUCCESS && characteristic.uuid == L2CAP_PSM_CHARACTERISTIC_UUID) {
-                        val psmBytes = characteristic.value
-                        if (psmBytes != null && psmBytes.size == 4) {
-                            val psm = java.nio.ByteBuffer.wrap(psmBytes).int
-                            if (psm > 0 && android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
-                                AppLogger.d("BLE_MESH", "Discovered Peer PSM: $psm for $macAddress. Opening L2CAP Socket...")
-                                Thread {
-                                    try {
-                                        val l2capSocket = gatt.device.createInsecureL2capChannel(psm)
-                                        l2capSocket.connect()
-                                        AppLogger.d("BLE_MESH", "Successfully connected L2CAP to $macAddress!")
-                                        handleL2capConnection(macAddress, l2capSocket)
-                                    } catch (e: Exception) {
-                                        AppLogger.d("BLE_MESH", "L2CAP Connection failed to $macAddress: ${e.message}")
+                    val capturedValue = characteristic.value?.copyOf()
+                    handler.post {
+                        if (!isTransportGenerationCurrent(epoch)) return@post
+                        fun handleCallback() {
+                            if (!owns(gatt, "characteristic read $status")) return
+                            if (status == BluetoothGatt.GATT_SUCCESS && characteristic.uuid == L2CAP_PSM_CHARACTERISTIC_UUID) {
+                                val psmBytes = capturedValue
+                                if (psmBytes != null && psmBytes.size == 4) {
+                                    val psm = java.nio.ByteBuffer.wrap(psmBytes).int
+                                    if (psm > 0 && android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+                                        AppLogger.d("BLE_MESH", "Discovered Peer PSM: $psm for $macAddress. Opening L2CAP Socket...")
+                                        val l2capSocket = try { gatt.device.createInsecureL2capChannel(psm) }
+                                            catch (_: Exception) { return }
+                                        if (!trackPendingL2capSocket(l2capSocket, epoch)) return
+                                        Thread {
+                                            try {
+                                                l2capSocket.connect()
+                                                handler.post {
+                                                    finishPendingL2capSocket(l2capSocket)
+                                                    if (isTransportGenerationCurrent(epoch) && store.links.isCurrent(link)) {
+                                                        handleL2capConnection(macAddress, l2capSocket)
+                                                    } else try { l2capSocket.close() } catch (_: Exception) {}
+                                                }
+                                            } catch (_: Exception) {
+                                                try { l2capSocket.close() } catch (_: Exception) {}
+                                                handler.post { finishPendingL2capSocket(l2capSocket) }
+                                                AppLogger.d("BLE_MESH", "L2CAP connection failed; retaining GATT fallback")
+                                            }
+                                        }.start()
                                     }
-                                }.start()
+                                }
                             }
+
                         }
+                        handleCallback()
                     }
                 }
 
                 override fun onCharacteristicChanged(gatt: BluetoothGatt, characteristic: BluetoothGattCharacteristic) {
-                    if (!owns(gatt, "notification")) return
-                    val value = characteristic.value ?: return
-                    val now = System.currentTimeMillis()
-                    val lastInteraction = store.connectionInteractionTimes[macAddress] ?: 0L
-                    if (now - lastInteraction > 5000 && (store.chunkBuffers[macAddress]?.size ?: 0) > 0) {
-                        AppLogger.d("BLE_MESH", "Client Buffer timeout! Clearing corrupted chunk buffer for $macAddress")
-                        store.chunkBuffers[macAddress] = ByteArray(0)
-                    }
-                    store.connectionInteractionTimes[macAddress] = now
-                    link.lastInteractionAt = now
-                    
-                    when (val result = MeshFrameCodec.append(store.chunkBuffers[macAddress] ?: ByteArray(0), value)) {
-                        is MeshFrameCodec.AppendResult.Accepted -> {
-                            result.payloads.forEach { processBinaryPayload(macAddress, it) }
-                            store.chunkBuffers[macAddress] = result.remainder
+                    val capturedValue = characteristic.value?.copyOf()
+                    handler.post {
+                        if (!isTransportGenerationCurrent(epoch)) return@post
+                        fun handleCallback() {
+                            if (!owns(gatt, "notification")) return
+                            val value = capturedValue ?: return
+                            val now = System.currentTimeMillis()
+                            val lastInteraction = store.connectionInteractionTimes[macAddress] ?: 0L
+                            if (now - lastInteraction > 5000 && (store.chunkBuffers[macAddress]?.size ?: 0) > 0) {
+                                AppLogger.d("BLE_MESH", "Client Buffer timeout! Clearing corrupted chunk buffer for $macAddress")
+                                store.chunkBuffers[macAddress] = ByteArray(0)
+                            }
+                            store.connectionInteractionTimes[macAddress] = now
+                            link.lastInteractionAt = now
+
+                            when (val result = MeshFrameCodec.append(store.chunkBuffers[macAddress] ?: ByteArray(0), value)) {
+                                is MeshFrameCodec.AppendResult.Accepted -> {
+                                    result.payloads.forEach { processBinaryPayload(macAddress, it) }
+                                    store.chunkBuffers[macAddress] = result.remainder
+                                }
+                                is MeshFrameCodec.AppendResult.Rejected -> {
+                                    AppLogger.d("BLE_MESH", "Rejected malformed CLIENT frame from $macAddress: ${result.reason}")
+                                    store.chunkBuffers[macAddress] = ByteArray(0)
+                                }
+                            }
+
                         }
-                        is MeshFrameCodec.AppendResult.Rejected -> {
-                            AppLogger.d("BLE_MESH", "Rejected malformed CLIENT frame from $macAddress: ${result.reason}")
-                            store.chunkBuffers[macAddress] = ByteArray(0)
-                        }
+                        handleCallback()
                     }
                 }
-    
+
                 override fun onCharacteristicWrite(gatt: BluetoothGatt, char: BluetoothGattCharacteristic, status: Int) {
-                    if (!owns(gatt, "characteristic write $status")) return
-                    completeGattChunk(macAddress, BleLinkRole.CLIENT, status, gatt)
+                    handler.post {
+                        if (!isTransportGenerationCurrent(epoch)) return@post
+                        fun handleCallback() {
+                            if (!owns(gatt, "characteristic write $status")) return
+                            completeGattChunk(macAddress, BleLinkRole.CLIENT, status, gatt)
+
+                        }
+                        handleCallback()
+                    }
                 }
             }
-            
+
             timeoutHandler.postDelayed(connectTimeoutRunnable, CONNECT_TIMEOUT_MS)
-            
+
             // AUTO remains the compatibility default because explicit LE caused immediate
             // disconnects on older OEM pairs. A peer-specific retry switches to LE only after
             // AUTO connected but failed at ATT primary-service discovery.

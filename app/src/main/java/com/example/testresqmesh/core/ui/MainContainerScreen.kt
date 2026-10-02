@@ -204,18 +204,23 @@ fun MainContainerScreen(
                     BackHandler { mapSosAlert = null }
                 }
                 isSOSActive -> {
+                    val cancelSosBroadcast = {
+                        isSOSActive = false
+                        showSosHub = true
+                    }
                     SOSBroadcastScreen(
-                        onCancel = { isSOSActive = false },
+                        onCancel = cancelSosBroadcast,
                         onSosTriggered = { type ->
                             commsViewModel.sendEmergencySOS(type) { id -> sosThreadId = id; showSosHub = false }
                             isSOSActive = false
                         }
                     )
-                    BackHandler { isSOSActive = false }
+                    BackHandler(onBack = cancelSosBroadcast)
                 }
                 showSosHub -> {
                     com.example.testresqmesh.feature.comms.ui.SosHubScreen(commsViewModel, mediaHelper,
-                        onBack = { showSosHub = false }, onCreate = { isSOSActive = true; showSosHub = false },
+                        onBack = { showSosHub = false },
+                        onCreate = { isSOSActive = true; showSosHub = true },
                         onOpen = { sosThreadId = it })
                 }
                 showRadioHistory -> {

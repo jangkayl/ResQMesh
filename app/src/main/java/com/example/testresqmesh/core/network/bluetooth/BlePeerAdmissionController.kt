@@ -50,7 +50,10 @@ class BlePeerAdmissionController(
     private val clock: () -> Long = { System.currentTimeMillis() },
     private val jitterMs: (Long, Long) -> Long = { min, max -> (min..max).random() },
     private val onDecision: ((BleAdmissionDecision) -> Unit)? = null,
-    private val disconnectEndpoint: (String) -> Unit = {}
+    private val disconnectEndpoint: (String) -> Unit = {},
+    private val isNodeActive: () -> Boolean = { true },
+    private val canRetireForBridge: (String) -> Boolean = { false },
+    private val isTransportIdle: (String) -> Boolean = { true }
 ) {
     constructor(
         store: BleStateStore,
@@ -80,7 +83,10 @@ class BlePeerAdmissionController(
                 .toSet()
                 .size
         },
-        disconnectEndpoint: (String) -> Unit = {}
+        disconnectEndpoint: (String) -> Unit = {},
+        isNodeActive: () -> Boolean = { true },
+        canRetireForBridge: (String) -> Boolean = { false },
+        isTransportIdle: (String) -> Boolean = { true }
     ) : this(
         store = store,
         scheduler = HandlerAdmissionScheduler(handler),
@@ -100,7 +106,10 @@ class BlePeerAdmissionController(
         onPulse = onPulse,
         handshakeInfo = handshakeInfo,
         distinctReadyPeerCount = distinctReadyPeerCount,
-        disconnectEndpoint = disconnectEndpoint
+        disconnectEndpoint = disconnectEndpoint,
+        isNodeActive = isNodeActive,
+        canRetireForBridge = canRetireForBridge,
+        isTransportIdle = isTransportIdle
     )
 
     private data class BootstrapCandidate(
@@ -115,8 +124,37 @@ class BlePeerAdmissionController(
 
     private val candidates = linkedMapOf<String, BootstrapCandidate>()
     private var drainScheduled = false
+    private var generation = 0L
+    private var lastBridgeAt = Long.MIN_VALUE
+    private val advertisements = linkedMapOf<String, Pair<BleAdvertisement, Long>>()
 
-    fun handle(advertisement: BleAdvertisement) {
+    fun stop() {
+        generation++
+        candidates.clear()
+        advertisements.clear()
+        drainScheduled = false
+        lastBridgeAt = Long.MIN_VALUE
+    }
+
+    private fun later(delay: Long = 0L, action: () -> Unit) {
+        val captured = generation
+        scheduler.postDelayed(delay) {
+            if (captured == generation && isNodeActive()) action()
+        }
+    }
+
+    fun recover() {
+        if (!isNodeActive()) return
+        val now = clock()
+        advertisements.entries.removeAll { now - it.value.second > CANDIDATE_FRESH_MS }
+        advertisements.values.toList().forEach { (ad, _) -> handle(ad, observed = false) }
+        drainCandidates()
+    }
+
+    fun handle(advertisement: BleAdvertisement) = handle(advertisement, observed = true)
+
+    private fun handle(advertisement: BleAdvertisement, observed: Boolean) {
+        if (!isNodeActive()) return
         val peerName = advertisement.peerName
         val endpoint = advertisement.endpointId
         val now = clock()
@@ -139,14 +177,18 @@ class BlePeerAdmissionController(
             return
         }
 
+        if (observed) {
+            advertisements[candidateIdentity(peerName, endpoint)] = advertisement to now
+            while (advertisements.size > MAX_CANDIDATES) advertisements.remove(advertisements.keys.first())
+        }
         evictRotatedGhost(peerName, endpoint)
-        store.endpointLastSeen[endpoint] = now
+        if (observed) store.endpointLastSeen[endpoint] = now
         store.endpointLastScore[endpoint] = advertisement.electionScore
         if (advertisement.nodeId.isNotEmpty()) store.endpointNodeIds[endpoint] = advertisement.nodeId
         store.endpointFirstSeen.putIfAbsent(endpoint, now)
         if (store.connectedEndpointIds.add(endpoint)) {
             store.connectedEndpointNames[endpoint] = peerName
-            scheduler.post {
+            later {
                 onScanned(
                     ScanEvent(
                         endpointId = endpoint,
@@ -191,7 +233,7 @@ class BlePeerAdmissionController(
                 store.connectedEndpointNames.remove(existingEndpoint)
                 store.endpointLastSeen.remove(existingEndpoint)
                 store.endpointNodeIds.remove(existingEndpoint)
-                scheduler.post { onDisconnected(existingEndpoint) }
+                later { onDisconnected(existingEndpoint) }
             }
         }
 
@@ -252,17 +294,13 @@ class BlePeerAdmissionController(
         store.connectedEndpointNames.remove(oldEndpoint)
         store.endpointLastSeen.remove(oldEndpoint)
         store.endpointNodeIds.remove(oldEndpoint)
-        scheduler.post { onDisconnected(oldEndpoint) }
+        later { onDisconnected(oldEndpoint) }
     }
 
     private fun admitOrElect(endpoint: String, peerName: String, advertisement: BleAdvertisement, now: Long) {
         val directLinks = directLinkCount()
-        if (directLinks >= maxDirectLinks() || (directLinks >= 2 && advertisement.directConnections > 0)) {
-            val reason = if (directLinks >= maxDirectLinks()) {
-                BleAdmissionReason.CAPACITY_LIMIT
-            } else {
-                BleAdmissionReason.TWO_LINK_PEER_CONNECTED
-            }
+        if (directLinks >= maxDirectLinks()) {
+            val reason = BleAdmissionReason.CAPACITY_LIMIT
             recordDecision(
                 peerName = peerName,
                 endpoint = endpoint,
@@ -281,7 +319,10 @@ class BlePeerAdmissionController(
         val localScore = electionScore()
         val isIsolated = distinctReadyPeerCount() == 0
         when {
-            advertisement.electionScore.isNotEmpty() && localScore > advertisement.electionScore -> {
+            advertisement.electionScore.isNotEmpty() &&
+                (localScore > advertisement.electionScore ||
+                    (localScore == advertisement.electionScore &&
+                        NodeIdentity.idOf(localName()).orEmpty() > NodeIdentity.idOf(peerName).orEmpty())) -> {
                 AppLogger.d("BLE_MESH", "Battery Master Election: $localScore > ${advertisement.electionScore}. Queuing bootstrap connection.")
                 val candidate = enqueueCandidate(endpoint, peerName, advertisement.directConnections, now)
                 recordDecision(
@@ -360,6 +401,7 @@ class BlePeerAdmissionController(
         val candidate = candidates[identity]
         val delay = initialDelayMs ?: jitterMs(MIN_CONNECTION_JITTER_MS, MAX_CONNECTION_JITTER_MS)
         val result = if (candidate == null) {
+            if (candidates.size >= MAX_CANDIDATES) candidates.remove(candidates.keys.first())
             val created = BootstrapCandidate(
                 identity = identity,
                 endpoint = endpoint,
@@ -384,7 +426,7 @@ class BlePeerAdmissionController(
     private fun scheduleDrain(delayMs: Long = 0L) {
         if (drainScheduled) return
         drainScheduled = true
-        scheduler.postDelayed(delayMs) {
+        later(delayMs) {
             drainScheduled = false
             drainCandidates()
         }
@@ -392,9 +434,11 @@ class BlePeerAdmissionController(
 
     @VisibleForTesting
     internal fun drainCandidates() {
+        if (!isNodeActive()) return
         val now = clock()
         val staleCandidates = candidates.values.filter { candidate ->
-            isBlocked(candidate.peerName) ||
+            now - (store.endpointLastSeen[candidate.endpoint] ?: 0L) > CANDIDATE_FRESH_MS ||
+                isBlocked(candidate.peerName) ||
                 hasReadyLinkToIdentity(candidate.peerName) ||
                 (hasIndirectRoute(candidate.peerName) && hasPayloadReadyDirectLink())
         }
@@ -446,14 +490,9 @@ class BlePeerAdmissionController(
             return
         }
         val directLinks = directLinkCount()
-        if (directLinks >= maxDirectLinks() ||
-            (directLinks >= 2 && candidate.peerConnections > 0)) {
+        if (directLinks >= maxDirectLinks()) {
             candidates.remove(candidate.identity)
-            val limitReason = if (directLinks >= maxDirectLinks()) {
-                BleAdmissionReason.CAPACITY_LIMIT
-            } else {
-                BleAdmissionReason.TWO_LINK_PEER_CONNECTED
-            }
+            val limitReason = BleAdmissionReason.CAPACITY_LIMIT
             recordDecision(
                 peerName = candidate.peerName,
                 endpoint = candidate.endpoint,
@@ -539,7 +578,8 @@ class BlePeerAdmissionController(
         NodeIdentity.idOf(peerName)?.let { "node:$it" } ?: "endpoint:${NodeIdentity.key(peerName).ifEmpty { endpoint }}"
 
     private fun rescueOrphan(endpoint: String, peerName: String, peerConnections: Int, directLinks: Int, now: Long) {
-        if (hasIndirectRoute(peerName) || directLinks < maxDirectLinks()) {
+        if (!isNodeActive() || isBlocked(peerName) || hasIndirectRoute(peerName) || directLinks < maxDirectLinks() ||
+            now - (store.endpointLastSeen[endpoint] ?: 0L) > CANDIDATE_FRESH_MS) {
             store.orphanDetectionTime.remove(endpoint)
             return
         }
@@ -549,7 +589,7 @@ class BlePeerAdmissionController(
         }
         if (wasAbsent) {
             val delay = (targetRescueTime - now).coerceAtLeast(0L)
-            scheduler.postDelayed(delay) {
+            later(delay) {
                 rescueOrphan(endpoint, peerName, peerConnections, directLinkCount(), clock())
             }
         }
@@ -574,25 +614,21 @@ class BlePeerAdmissionController(
             store.orphanDetectionTime.remove(endpoint)
             return
         }
-        AppLogger.d("BLE_MESH", "Partition/Orphan Preemption: Found unrouted peer $peerName (peerConnections=$peerConnections). Dropping weakest link to bridge.")
-        val lruEndpoint = store.connectionInteractionTimes
-            .filterKeys { store.activeConnections.containsKey(it) }
-            .filterKeys { store.pendingQueues[it]?.isEmpty() != false }
+        if (lastBridgeAt != Long.MIN_VALUE && now - lastBridgeAt < BRIDGE_COOLDOWN_MS) return
+        val redundantEndpoint = store.connectionInteractionTimes
+            .filterKeys { store.links.isReady(it) && store.pendingQueues[it]?.isEmpty() != false }
+            .filterKeys { store.gattFlights[it]?.writing?.get() != true && store.isWriting[it]?.get() != true }
+            .filterKeys { isTransportIdle(it) }
+            .filterKeys { canRetireForBridge(it) }
             .minByOrNull { it.value }?.key ?: return
-        try {
-            store.activeConnections[lruEndpoint]?.disconnect()
-            store.activeConnections[lruEndpoint]?.close()
-        } catch (e: SecurityException) {
-            AppLogger.d("BLE_MESH", "Preemption could not close $lruEndpoint: BLUETOOTH_CONNECT was revoked")
-        }
-        store.activeConnections.remove(lruEndpoint)
-        store.pendingQueues.remove(lruEndpoint)
-        store.isWriting.remove(lruEndpoint)
-        store.chunkBuffers.remove(lruEndpoint)
-        store.connectionInteractionTimes.remove(lruEndpoint)
-        scheduler.post { onDisconnected(lruEndpoint) }
+        lastBridgeAt = now
+        AppLogger.d("BLE_ADMISSION", "Reclaiming a redundant GATT link for an unreachable peer")
+        disconnectEndpoint(redundantEndpoint)
         store.orphanDetectionTime.remove(endpoint)
-        connect(endpoint, peerName)
+        // Run through the same serialized candidate/election lane after retirement.
+        advertisements[candidateIdentity(peerName, endpoint)]?.first?.let { ad ->
+            later { admitOrElect(endpoint, peerName, ad, clock()) }
+        }
     }
 
     private fun recordDecision(
@@ -617,7 +653,11 @@ class BlePeerAdmissionController(
             peerScore.isNotEmpty() && localScore.isNotEmpty() -> when {
                 localScore > peerScore -> "local"
                 localScore < peerScore -> "peer"
-                else -> "tie"
+                else -> when {
+                    NodeIdentity.idOf(localName()).orEmpty() > NodeIdentity.idOf(peerName).orEmpty() -> "local"
+                    NodeIdentity.idOf(localName()).orEmpty() < NodeIdentity.idOf(peerName).orEmpty() -> "peer"
+                    else -> "tie"
+                }
             }
             peerScore.isEmpty() && localName().isNotEmpty() -> when {
                 localName() > peerName -> "local"
@@ -673,6 +713,9 @@ class BlePeerAdmissionController(
     }
 
     companion object {
+        const val CANDIDATE_FRESH_MS = 8_000L
+        const val MAX_CANDIDATES = 32
+        const val BRIDGE_COOLDOWN_MS = 60_000L
         const val ORPHAN_RESCUE_DELAY_MS = 5_000L
         const val MIN_CONNECTION_JITTER_MS = 100L
         const val MAX_CONNECTION_JITTER_MS = 1_000L

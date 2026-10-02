@@ -8,6 +8,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import com.example.testresqmesh.feature.comms.model.SosMeshState
 import com.example.testresqmesh.feature.comms.model.sosTransmissionLabel
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -95,7 +96,10 @@ fun RadioHistoryScreen(vm: CommunicationViewModel, media: MediaHelper, onBack: (
         return
     }
 
-    ResQAuroraBackground(Modifier.fillMaxSize()) {
+    Surface(
+        modifier = Modifier.fillMaxSize(),
+        color = MaterialTheme.colorScheme.background
+    ) {
         Column(
             Modifier
                 .fillMaxSize()
@@ -253,7 +257,10 @@ fun SosHubScreen(
     val endedAlerts = remember(alerts) { alerts.filter { it.ended }.sortedByDescending { it.createdAt } }
     val isLight = MaterialTheme.colorScheme.background.luminance() > 0.5f
 
-    ResQAuroraBackground(Modifier.fillMaxSize()) {
+    Surface(
+        modifier = Modifier.fillMaxSize(),
+        color = MaterialTheme.colorScheme.background
+    ) {
         LazyColumn(
             Modifier
                 .fillMaxSize()
@@ -414,24 +421,83 @@ fun SosHubScreen(
 
             // Section 1: Active Emergencies
             item {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.padding(vertical = 4.dp)
+                Surface(
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                    shape = RoundedCornerShape(10.dp),
+                    color = if (activeAlerts.isNotEmpty()) {
+                        if (isLight) Color(0xFFFEE2E2) else Color(0xFF450A0A)
+                    } else {
+                        if (isLight) Color(0xFFECFDF5) else Color(0xFF062D24)
+                    },
+                    border = BorderStroke(
+                        1.dp,
+                        if (activeAlerts.isNotEmpty()) Color(0xFFEF4444).copy(alpha = 0.5f)
+                        else Color(0xFF10B981).copy(alpha = 0.35f)
+                    )
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .size(8.dp)
-                            .clip(CircleShape)
-                            .background(if (activeAlerts.isNotEmpty()) ResQTheme.colors.sos else MaterialTheme.colorScheme.onSurfaceVariant)
-                    )
-                    Spacer(Modifier.width(8.dp))
-                    Text(
-                        text = "ACTIVE EMERGENCIES (${activeAlerts.size})",
-                        style = MaterialTheme.typography.labelLarge,
-                        fontWeight = FontWeight.Black,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        letterSpacing = 1.sp
-                    )
+                    Row(
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(10.dp)
+                                .clip(CircleShape)
+                                .background(if (activeAlerts.isNotEmpty()) Color(0xFFDC2626) else Color(0xFF10B981))
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            text = "ACTIVE EMERGENCIES (${activeAlerts.size})",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Black,
+                            color = if (activeAlerts.isNotEmpty()) {
+                                if (isLight) Color(0xFF991B1B) else Color(0xFFFCA5A5)
+                            } else {
+                                if (isLight) Color(0xFF065F46) else Color(0xFFA7F3D0)
+                            },
+                            letterSpacing = 1.sp,
+                            modifier = Modifier.weight(1f)
+                        )
+                        if (activeAlerts.isNotEmpty()) {
+                            Surface(
+                                shape = RoundedCornerShape(6.dp),
+                                color = Color(0xFFDC2626)
+                            ) {
+                                Text(
+                                    text = "LIVE DISTRESS",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.Black,
+                                    color = Color.White,
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                )
+                            }
+                        } else {
+                            Surface(
+                                shape = RoundedCornerShape(6.dp),
+                                color = if (isLight) Color(0xFFD1FAE5) else Color(0xFF064E3B),
+                                border = BorderStroke(1.dp, if (isLight) Color(0xFF6EE7B7) else Color(0xFF047857))
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.CheckCircle,
+                                        contentDescription = null,
+                                        tint = if (isLight) Color(0xFF065F46) else Color(0xFFA7F3D0),
+                                        modifier = Modifier.size(12.dp)
+                                    )
+                                    Spacer(Modifier.width(4.dp))
+                                    Text(
+                                        text = "ALL CLEAR",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = FontWeight.Black,
+                                        color = if (isLight) Color(0xFF065F46) else Color(0xFFA7F3D0)
+                                    )
+                                }
+                            }
+                        }
+                    }
                 }
             }
 
@@ -440,9 +506,12 @@ fun SosHubScreen(
                     Surface(
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(16.dp),
-                        color = if (isLight) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
-                        border = BorderStroke(1.dp, if (isLight) MaterialTheme.colorScheme.outlineVariant else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)),
-                        shadowElevation = if (isLight) 1.dp else 0.dp
+                        color = if (isLight) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
+                        border = BorderStroke(
+                            1.2.dp,
+                            if (isLight) Color(0xFF10B981).copy(alpha = 0.35f) else Color(0xFF10B981).copy(alpha = 0.25f)
+                        ),
+                        shadowElevation = if (isLight) 1.dp else 2.dp
                     ) {
                         Column(
                             modifier = Modifier
@@ -451,32 +520,59 @@ fun SosHubScreen(
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
                             Surface(
-                                modifier = Modifier.size(48.dp),
+                                modifier = Modifier.size(54.dp),
                                 shape = CircleShape,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.15f)
+                                color = if (isLight) Color(0xFFD1FAE5) else Color(0xFF064E3B)
                             ) {
                                 Box(contentAlignment = Alignment.Center) {
                                     Icon(
-                                        imageVector = Icons.Default.Sensors,
-                                        contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        modifier = Modifier.size(28.dp)
+                                        imageVector = Icons.Default.CheckCircle,
+                                        contentDescription = "All Clear",
+                                        tint = if (isLight) Color(0xFF059669) else Color(0xFF34D399),
+                                        modifier = Modifier.size(30.dp)
                                     )
                                 }
                             }
-                            Spacer(Modifier.height(10.dp))
+                            Spacer(Modifier.height(12.dp))
                             Text(
-                                text = "No active SOS alerts on this phone",
-                                fontWeight = FontWeight.Bold,
-                                style = MaterialTheme.typography.titleMedium
+                                text = "All Clear · No Active Distress",
+                                fontWeight = FontWeight.Black,
+                                style = MaterialTheme.typography.titleMedium,
+                                color = MaterialTheme.colorScheme.onSurface
                             )
-                            Spacer(Modifier.height(4.dp))
+                            Spacer(Modifier.height(6.dp))
                             Text(
-                                text = "Only SOS alerts received on this phone appear here. ${meshStatus.label}.",
+                                text = "Your phone is actively listening on offline mesh radio frequencies. Any emergency SOS alert broadcast in your area will appear here immediately.",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                textAlign = TextAlign.Center
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier.padding(horizontal = 8.dp)
                             )
+                            Spacer(Modifier.height(14.dp))
+                            Surface(
+                                shape = RoundedCornerShape(20.dp),
+                                color = if (isLight) Color(0xFFECFDF5) else Color(0xFF062D24),
+                                border = BorderStroke(1.dp, if (isLight) Color(0xFFA7F3D0) else Color(0xFF047857))
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Sensors,
+                                        contentDescription = null,
+                                        tint = if (isLight) Color(0xFF059669) else Color(0xFF34D399),
+                                        modifier = Modifier.size(14.dp)
+                                    )
+                                    Spacer(Modifier.width(6.dp))
+                                    Text(
+                                        text = "Mesh Monitor Active · ${meshStatus.label}",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (isLight) Color(0xFF065F46) else Color(0xFFA7F3D0)
+                                    )
+                                }
+                            }
                         }
                     }
                 }
@@ -492,16 +588,20 @@ fun SosHubScreen(
                         onClick = { onOpen(alert.sosId) },
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(16.dp),
-                        color = MaterialTheme.colorScheme.surface,
-                        border = BorderStroke(1.5.dp, accentColor.copy(alpha = 0.65f)),
-                        shadowElevation = if (isLight) 1.dp else 3.dp
+                        color = if (isLight) Color(0xFFFFF8F8) else Color(0xFF201416),
+                        border = BorderStroke(
+                            2.dp,
+                            if (alert.locallySilenced) Color(0xFFD97706) else accentColor
+                        ),
+                        shadowElevation = if (isLight) 3.dp else 5.dp
                     ) {
                         Column(Modifier.padding(16.dp)) {
-                            FlowRow(
+                            // Row 1: Category on Left, High-Visibility Status Pill on Right
+                            Row(
                                 modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                verticalArrangement = Arrangement.spacedBy(8.dp)
-                                ) {
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
                                 Surface(
                                     shape = RoundedCornerShape(8.dp),
                                     color = accentColor.copy(alpha = 0.15f),
@@ -527,20 +627,28 @@ fun SosHubScreen(
                                     }
                                 }
 
-                                Spacer(Modifier.width(4.dp))
-
                                 Surface(
-                                    shape = RoundedCornerShape(8.dp),
-                                    color = if (alert.locallySilenced) Color(0xFFFFB300).copy(alpha = 0.15f)
-                                    else ResQTheme.colors.sos.copy(alpha = 0.15f)
+                                    shape = RoundedCornerShape(6.dp),
+                                    color = if (alert.locallySilenced) Color(0xFFD97706) else Color(0xFFDC2626)
                                 ) {
-                                    Text(
-                                        text = if (alert.locallySilenced) "SILENCED LOCALLY" else "ACTIVE SOS",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        fontWeight = FontWeight.Black,
-                                        color = MaterialTheme.colorScheme.onSurface,
-                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                                    )
+                                    Row(
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(6.dp)
+                                                .clip(CircleShape)
+                                                .background(Color.White)
+                                        )
+                                        Spacer(Modifier.width(5.dp))
+                                        Text(
+                                            text = if (alert.locallySilenced) "SILENCED" else "ACTIVE SOS",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            fontWeight = FontWeight.Black,
+                                            color = Color.White
+                                        )
+                                    }
                                 }
                             }
 
@@ -558,7 +666,7 @@ fun SosHubScreen(
                                 Icon(
                                     imageVector = Icons.Default.LocationOn,
                                     contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    tint = if (alert.latitude != null) ResQTheme.colors.success else MaterialTheme.colorScheme.onSurfaceVariant,
                                     modifier = Modifier.size(15.dp)
                                 )
                                 Spacer(Modifier.width(4.dp))
@@ -893,6 +1001,17 @@ fun SosThreadScreen(
     )
 }
 
+internal fun formatSosHeaderTime(timestamp: Long): String {
+    if (timestamp < 1_000_000_000_000L) {
+        return java.text.DateFormat.getTimeInstance(java.text.DateFormat.SHORT)
+            .format(java.util.Date(System.currentTimeMillis()))
+    }
+    return runCatching {
+        java.text.DateFormat.getTimeInstance(java.text.DateFormat.SHORT)
+            .format(java.util.Date(timestamp))
+    }.getOrDefault("Just now")
+}
+
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun ExpandedSosHeader(
@@ -906,122 +1025,204 @@ private fun ExpandedSosHeader(
     isOwner: Boolean
 ) {
     val isLight = MaterialTheme.colorScheme.background.luminance() > 0.5f
+    val statusTimestamp = when {
+        alert.ended -> alert.updatedAt.takeIf { it > 1_000_000_000_000L } ?: alert.createdAt
+        alert.updatedAt > 1_000_000_000_000L -> alert.updatedAt
+        alert.createdAt > 1_000_000_000_000L -> alert.createdAt
+        else -> System.currentTimeMillis()
+    }
     Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(bottom = 12.dp),
+            .padding(top = 8.dp, bottom = 8.dp),
         shape = RoundedCornerShape(18.dp),
         color = MaterialTheme.colorScheme.surface,
         border = BorderStroke(
-            1.2.dp,
+            1.5.dp,
             if (alert.ended) MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
-            else categoryColor.copy(alpha = 0.6f)
+            else categoryColor.copy(alpha = 0.7f)
         ),
-        shadowElevation = if (isLight) 1.dp else 3.dp
+        shadowElevation = if (isLight) 3.dp else 6.dp
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
-            // Row 1: Category & Live Status Badges
-            FlowRow(
+            // Row 1: Left: Badges; Right: Audit History Action (Balances the card header)
+            Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
+                // Category & Status Badges
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = categoryColor.copy(alpha = 0.15f),
+                        border = BorderStroke(1.dp, categoryColor.copy(alpha = 0.4f))
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = categoryIcon,
+                                contentDescription = null,
+                                tint = categoryColor,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(Modifier.width(6.dp))
+                            Text(
+                                text = alert.emergencyType,
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Black,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+                    }
+
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = when {
+                            alert.ended -> MaterialTheme.colorScheme.surfaceVariant
+                            alert.locallySilenced -> Color(0xFFFFB300).copy(alpha = 0.15f)
+                            else -> Color(0xFFDC2626).copy(alpha = 0.15f)
+                        },
+                        border = BorderStroke(
+                            1.dp,
+                            when {
+                                alert.ended -> MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                                alert.locallySilenced -> Color(0xFFFFB300).copy(alpha = 0.4f)
+                                else -> Color(0xFFDC2626).copy(alpha = 0.4f)
+                            }
+                        )
+                    ) {
+                        Text(
+                            text = when {
+                                alert.ended -> "ENDED"
+                                alert.locallySilenced -> "SILENCED LOCALLY"
+                                else -> "ACTIVE SOS"
+                            },
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Black,
+                            color = when {
+                                alert.ended -> MaterialTheme.colorScheme.onSurfaceVariant
+                                alert.locallySilenced -> if (isLight) Color(0xFFB45309) else Color(0xFFFDE68A)
+                                else -> if (isLight) Color(0xFFDC2626) else Color(0xFFFCA5A5)
+                            },
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                        )
+                    }
+                }
+
+                // History button in top-right corner to balance header
                 Surface(
+                    onClick = onActivity,
                     shape = RoundedCornerShape(8.dp),
-                    color = categoryColor.copy(alpha = 0.15f),
-                    border = BorderStroke(1.dp, categoryColor.copy(alpha = 0.4f))
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)),
+                    modifier = Modifier.testTag("sos_activity")
                 ) {
                     Row(
                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Icon(
-                            imageVector = categoryIcon,
-                            contentDescription = null,
-                            tint = categoryColor,
-                            modifier = Modifier.size(16.dp)
+                            imageVector = Icons.Default.History,
+                            contentDescription = "Activity history",
+                            modifier = Modifier.size(14.dp),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
                         )
-                        Spacer(Modifier.width(6.dp))
+                        Spacer(Modifier.width(4.dp))
                         Text(
-                            text = alert.emergencyType,
+                            text = "History",
                             style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.Black,
-                            color = MaterialTheme.colorScheme.onSurface
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
-                }
-
-                Spacer(Modifier.width(4.dp))
-
-                Surface(
-                    shape = RoundedCornerShape(8.dp),
-                    color = when {
-                        alert.ended -> MaterialTheme.colorScheme.surfaceVariant
-                        alert.locallySilenced -> Color(0xFFFFB300).copy(alpha = 0.15f)
-                        else -> ResQTheme.colors.sos.copy(alpha = 0.15f)
-                    }
-                ) {
-                    Text(
-                        text = when {
-                            alert.ended -> "ENDED"
-                            alert.locallySilenced -> "SILENCED LOCALLY"
-                            else -> "ACTIVE SOS"
-                        },
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.Black,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                    )
                 }
             }
 
             Spacer(Modifier.height(10.dp))
 
-            // Row 2: Transmission & Mesh State
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    imageVector = Icons.Default.Sensors,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(16.dp)
-                )
-                Spacer(Modifier.width(6.dp))
-                Text(
-                    text = sosTransmissionLabel(alert.transmission),
-                    style = MaterialTheme.typography.bodySmall,
-                    fontWeight = FontWeight.SemiBold
-                )
-            }
+            // Telemetry Box (Tactical HUD, spans 100% of card width)
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = if (isLight) 0.35f else 0.25f)
+            ) {
+                Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
+                    // Row 1: Transmission status (Left) + Timestamp (Right)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = if (alert.ended) Icons.Default.CheckCircle else Icons.Default.Sensors,
+                                contentDescription = null,
+                                tint = if (alert.ended) ResQTheme.colors.success else MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(15.dp)
+                            )
+                            Spacer(Modifier.width(6.dp))
+                            Text(
+                                text = if (alert.ended) "Emergency ended" else sosTransmissionLabel(alert.transmission),
+                                style = MaterialTheme.typography.bodySmall,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
 
-            // Row 3: Location Telemetry
-            Spacer(Modifier.height(4.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    imageVector = Icons.Default.LocationOn,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(16.dp)
-                )
-                Spacer(Modifier.width(6.dp))
-                Text(
-                    text = if (alert.latitude == null) "Location unavailable"
-                    else "Captured ${java.text.DateFormat.getTimeInstance().format(java.util.Date(alert.locationCapturedAt ?: alert.updatedAt))} · ±${alert.accuracyMeters?.toInt() ?: "?"}m",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                        Text(
+                            text = formatSosHeaderTime(statusTimestamp),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+
+                    Spacer(Modifier.height(4.dp))
+
+                    // Row 2: Location telemetry (Spans full width)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.LocationOn,
+                            contentDescription = null,
+                            tint = if (alert.latitude != null) ResQTheme.colors.success else MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(15.dp)
+                        )
+                        Spacer(Modifier.width(6.dp))
+                        Text(
+                            text = when {
+                                alert.latitude != null -> "Pinned (${String.format(java.util.Locale.US, "%.4f, %.4f", alert.latitude, alert.longitude)}) · ±${alert.accuracyMeters?.toInt() ?: "?"}m"
+                                alert.ended -> "Location telemetry unavailable"
+                                else -> "Acquiring GPS location..."
+                            },
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
             }
 
             Spacer(Modifier.height(12.dp))
 
-            // Row 4: Tactical Action Controls
-            FlowRow(
+            // Action Buttons: Symmetrically distributed across 100% width!
+            Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                verticalAlignment = Alignment.CenterVertically
             ) {
                 OutlinedButton(
                     onClick = onMap,
-                    modifier = Modifier.heightIn(min = 48.dp),
+                    modifier = Modifier
+                        .weight(1f)
+                        .heightIn(min = 44.dp),
                     contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp),
                     shape = RoundedCornerShape(12.dp)
                 ) {
@@ -1031,13 +1232,16 @@ private fun ExpandedSosHeader(
                         modifier = Modifier.size(16.dp)
                     )
                     Spacer(Modifier.width(6.dp))
-                    Text("Map", style = MaterialTheme.typography.labelMedium)
+                    Text("Map", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
                 }
 
                 if (!alert.ended && isOwner) {
                     Button(
                         onClick = onEnd,
-                        modifier = Modifier.heightIn(min = 48.dp).testTag("sos_end"),
+                        modifier = Modifier
+                            .weight(1.4f)
+                            .heightIn(min = 44.dp)
+                            .testTag("sos_end"),
                         contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp),
                         shape = RoundedCornerShape(12.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFB42318))
@@ -1053,7 +1257,9 @@ private fun ExpandedSosHeader(
                 } else if (!alert.ended) {
                     OutlinedButton(
                         onClick = onSilence,
-                        modifier = Modifier.heightIn(min = 48.dp),
+                        modifier = Modifier
+                            .weight(1.4f)
+                            .heightIn(min = 44.dp),
                         contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp),
                         shape = RoundedCornerShape(12.dp)
                     ) {
@@ -1066,20 +1272,12 @@ private fun ExpandedSosHeader(
                         Text(
                             if (alert.locallySilenced) "Silenced on this phone" else "Silence on this phone",
                             style = MaterialTheme.typography.labelMedium,
-                            modifier = Modifier.testTag("sos_silence")
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.testTag("sos_silence"),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                     }
-                }
-
-                IconButton(
-                    onClick = onActivity,
-                    modifier = Modifier.size(48.dp).testTag("sos_activity")
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.History,
-                        contentDescription = "Activity history",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
                 }
             }
         }
@@ -1101,15 +1299,15 @@ private fun CompactSosHeader(
     Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(bottom = 6.dp),
+            .padding(top = 6.dp, bottom = 6.dp),
         shape = RoundedCornerShape(12.dp),
         color = MaterialTheme.colorScheme.surface,
         border = BorderStroke(
             1.dp,
             if (alert.ended) MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
-            else categoryColor.copy(alpha = 0.6f)
+            else categoryColor.copy(alpha = 0.65f)
         ),
-        shadowElevation = if (isLight) 1.dp else 2.dp
+        shadowElevation = if (isLight) 2.dp else 4.dp
     ) {
         Row(
             modifier = Modifier
@@ -1182,7 +1380,7 @@ private fun CompactSosHeader(
                 )
                 Spacer(Modifier.width(2.dp))
                 Text(
-                    text = if (alert.latitude != null) "±${alert.accuracyMeters?.toInt() ?: "?"}m" else "No GPS",
+                    text = if (alert.latitude != null) "±${alert.accuracyMeters?.toInt() ?: "?"}m" else if (alert.ended) "No GPS" else "Acquiring...",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
@@ -1295,145 +1493,205 @@ fun PublicConversationScreen(
         }
     }
 
-    ResQAuroraBackground(Modifier.fillMaxSize()) {
-        BoxWithConstraints(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().imePadding()) {
+    @Composable
+    fun ConversationContainer(content: @Composable () -> Unit) {
+        if (kind == "RADIO") {
+            Surface(
+                modifier = Modifier.fillMaxSize(),
+                color = MaterialTheme.colorScheme.background,
+                content = content
+            )
+        } else {
+            ResQAuroraBackground(Modifier.fillMaxSize()) {
+                content()
+            }
+        }
+    }
+
+    ConversationContainer {
+        BoxWithConstraints(Modifier.fillMaxSize().navigationBarsPadding().imePadding()) {
         val compactLayout = maxHeight < 520.dp || LocalDensity.current.fontScale > 1.3f
         val compactControls = kind == "SOS" && compactLayout
-        Column(Modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 8.dp)) {
-            // Screen Top Bar
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                IconButton(onClick = onBack, modifier = Modifier.testTag("conversation_back")) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = "Back"
-                    )
-                }
-                Spacer(Modifier.width(4.dp))
-                Column(Modifier.weight(1f)) {
-                    Text(
-                        text = title,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    Text(
-                        text = when (kind) {
-                            "RADIO" -> "Channel $channel Broadcast"
-                            "SOS" -> "Emergency Distress Thread"
-                            else -> "Broadcast Conversation"
-                        },
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
+        val density = LocalDensity.current
+        val isLight = MaterialTheme.colorScheme.background.luminance() > 0.5f
+        var headerHeightDp by remember { mutableStateOf(160.dp) }
 
-            // Header slot (e.g. Incident Command Card)
-            header(compactControls)
-
-            // Message Stream
-            LazyColumn(
+        Column(Modifier.fillMaxSize()) {
+            // Content Area: Full-height message stream with floating header overlay
+            Box(
                 modifier = Modifier
                     .weight(1f)
-                    .fillMaxWidth(),
-                state = listState,
-                reverseLayout = true,
-                verticalArrangement = Arrangement.spacedBy(8.dp, Alignment.Bottom)
+                    .fillMaxWidth()
             ) {
-                items(displayMessages, key = { it.id }) { message ->
-                    ChatBubble(message, media)
+                // Layer 1: Message Stream (Scrolls underneath floating header)
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = 16.dp),
+                    state = listState,
+                    reverseLayout = true,
+                    contentPadding = PaddingValues(
+                        top = headerHeightDp + 8.dp,
+                        bottom = 8.dp
+                    ),
+                    verticalArrangement = Arrangement.spacedBy(8.dp, Alignment.Bottom)
+                ) {
+                    items(displayMessages, key = { it.id }) { message ->
+                        ChatBubble(message, media)
+                    }
+                    if (messages.isEmpty()) {
+                        item {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 32.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = if (kind == "SOS") "No replies yet." else "No Radio notes yet.",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    textAlign = TextAlign.Center
+                                )
+                            }
+                        }
+                    }
                 }
-                if (messages.isEmpty()) {
-                    item {
-                        Box(
+
+                // Layer 2: Floating Header (Solid Top Bar Mask + Solid Details Card)
+                Column(
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .fillMaxWidth()
+                        .onGloballyPositioned { coordinates ->
+                            val heightInDp = with(density) { coordinates.size.height.toDp() }
+                            if (headerHeightDp != heightInDp) {
+                                headerHeightDp = heightInDp
+                            }
+                        }
+                ) {
+                    // Solid Top Bar Mask (Non-transparent, anchors title, back button, and status bar)
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        color = MaterialTheme.colorScheme.surface,
+                        shadowElevation = if (isLight) 1.5.dp else 2.5.dp
+                    ) {
+                        Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(vertical = 32.dp),
-                            contentAlignment = Alignment.Center
+                                .statusBarsPadding()
+                                .padding(horizontal = 16.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text(
-                                text = if (kind == "SOS") "No replies yet." else "No Radio notes yet.",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                textAlign = TextAlign.Center
-                            )
+                            IconButton(onClick = onBack, modifier = Modifier.testTag("conversation_back")) {
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                    contentDescription = "Back"
+                                )
+                            }
+                            Spacer(Modifier.width(4.dp))
+                            Column(Modifier.weight(1f)) {
+                                Text(
+                                    text = title,
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                Text(
+                                    text = when (kind) {
+                                        "RADIO" -> "Channel $channel Broadcast"
+                                        "SOS" -> "Emergency Distress Thread"
+                                        else -> "Broadcast Conversation"
+                                    },
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
                         }
+                    }
+
+                    // Floating Details Card Slot (Solid card with outer margin for floating effect)
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp)
+                    ) {
+                        header(compactControls)
                     }
                 }
             }
 
-            Spacer(Modifier.height(8.dp))
-
             // Bottom Composer / Status Banner
-            if (readOnly) {
-                Surface(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 8.dp),
-                    shape = RoundedCornerShape(12.dp),
-                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-                ) {
-                    Text(
-                        text = if (kind == "SOS") "Read-only history · This emergency conversation has ended." else "Read-only history",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(14.dp).testTag("conversation_read_only"),
-                        textAlign = TextAlign.Center
-                    )
-                }
-            } else {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    OutlinedTextField(
-                        value = input,
-                        onValueChange = {
-                            input = it
-                            restored = true
-                            vm.draft(key, it)
-                        },
-                        placeholder = {
-                            Text(if (kind == "RADIO") "Message this Radio channel…" else "Reply to this SOS…")
-                        },
-                        modifier = Modifier.weight(1f).testTag("conversation_input"),
-                        maxLines = if (compactLayout) 2 else 4,
-                        shape = RoundedCornerShape(24.dp),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = MaterialTheme.colorScheme.primary,
-                            unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant
-                        )
-                    )
-
-                    FilledIconButton(
-                        onClick = {
-                            if (input.isNotBlank()) {
-                                vm.sendConversation(kind, channel, sosId, input.trim())
-                                input = ""
-                            }
-                        },
-                        enabled = input.isNotBlank(),
-                        modifier = Modifier.size(50.dp).testTag("conversation_send"),
-                        shape = CircleShape,
-                        colors = IconButtonDefaults.filledIconButtonColors(
-                            containerColor = MaterialTheme.colorScheme.primary,
-                            contentColor = MaterialTheme.colorScheme.onPrimary
-                        )
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 4.dp)
+            ) {
+                if (readOnly) {
+                    Surface(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
                     ) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.Send,
-                            contentDescription = "Send Message",
-                            modifier = Modifier.size(20.dp)
+                        Text(
+                            text = if (kind == "SOS") "Read-only history · This emergency conversation has ended." else "Read-only history",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(14.dp).testTag("conversation_read_only"),
+                            textAlign = TextAlign.Center
                         )
+                    }
+                } else {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        OutlinedTextField(
+                            value = input,
+                            onValueChange = {
+                                input = it
+                                restored = true
+                                vm.draft(key, it)
+                            },
+                            placeholder = {
+                                Text(if (kind == "RADIO") "Message this Radio channel…" else "Reply to this SOS…")
+                            },
+                            modifier = Modifier.weight(1f).testTag("conversation_input"),
+                            maxLines = if (compactLayout) 2 else 4,
+                            shape = RoundedCornerShape(24.dp),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = MaterialTheme.colorScheme.primary,
+                                unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant
+                            )
+                        )
+
+                        FilledIconButton(
+                            onClick = {
+                                if (input.isNotBlank()) {
+                                    vm.sendConversation(kind, channel, sosId, input.trim())
+                                    input = ""
+                                }
+                            },
+                            enabled = input.isNotBlank(),
+                            modifier = Modifier.size(50.dp).testTag("conversation_send"),
+                            shape = CircleShape,
+                            colors = IconButtonDefaults.filledIconButtonColors(
+                                containerColor = MaterialTheme.colorScheme.primary,
+                                contentColor = MaterialTheme.colorScheme.onPrimary
+                            )
+                        ) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.Send,
+                                contentDescription = "Send Message",
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
                     }
                 }
             }
