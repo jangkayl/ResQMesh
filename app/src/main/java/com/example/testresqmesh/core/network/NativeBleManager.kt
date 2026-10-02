@@ -29,6 +29,8 @@ import kotlinx.serialization.protobuf.ProtoBuf
 
 @SuppressLint("MissingPermission")
 class NativeBleManager(val context: Context) {
+    var onConversationMessage: ((String, MeshPayload) -> Unit)? = null
+    var onSosPacket: ((String, MeshPayload) -> Unit)? = null
     val gattServerManager = com.example.testresqmesh.core.network.bluetooth.gatt.GattServerManager(context, this)
     val gattClientManager = com.example.testresqmesh.core.network.bluetooth.gatt.GattClientManager(context, this)
     val store = com.example.testresqmesh.core.network.bluetooth.state.BleStateStore()
@@ -128,6 +130,12 @@ class NativeBleManager(val context: Context) {
     val DUPLICATE_LINK_GRACE_MS = 5_000L
 
     val payloadDispatcherCallback = object : PayloadDispatcherCallback {
+        override fun onConversationMessage(endpointId: String, payload: MeshPayload) {
+            this@NativeBleManager.onConversationMessage?.invoke(endpointId, payload)
+        }
+        override fun onSosPacket(endpointId: String, payload: MeshPayload) {
+            this@NativeBleManager.onSosPacket?.invoke(endpointId, payload)
+        }
         override fun getMyDeviceName() = myDeviceName
         override fun getMyNodeId() = myNodeId
         override fun getSeenMessageIds() = store.seenMessageIds

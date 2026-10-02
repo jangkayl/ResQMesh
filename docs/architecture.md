@@ -1,6 +1,6 @@
 # Architecture
 
-Last reviewed: 2026-10-01. Source and device evidence prevail.
+Last reviewed: 2026-10-02. Source and device evidence prevail.
 
 ## System shape
 
@@ -87,9 +87,11 @@ This is not yet a basis for claiming authenticated end-to-end encryption or forw
 
 `MeshRepository` joins callbacks, routing, persistence, and UI. Gateway broadcast results report per-neighbor acceptance. Public sends persist pending before dispatch; wholly rejected sends retry, partial acceptance does not rebroadcast, and feedback never implies delivery. A mutex serializes public dispatch/outbox flush. `MeshNetworkGateway` hides Bluetooth types; `MessageStore` hides Room. `PrivateDeliveryPlanner` chooses exact hops. Koin supplies adapters and `AppCoroutineScope` owns background work. UI rules: `docs/ui.md`; evidence: `docs/validation.md`.
 
-Local identity lives in Room; serialized setup/rename preserves user/device IDs and keys and mirrors preferences. Incident ownership uses creator ID and signing key, never names. Report-time names and signed activity stay unchanged. Workflow-v2 offers have independent helper revisions. Selection locks local editing; helpers confirm commitment. Withdrawal or valid offline newer revisions atomically clear selection and reopen requests without advancing reporter versions. Loading/replay repairs stale projections; superseded selections consume reporter versions, and signed historical evidence permits revocation no-ops without clearing newer selections. Only reporters select/resolve/cancel; replacement is never automatic. Workflow-v1 and terminal history remain unchanged. Accepted events/projections share a Room transaction. P-256 signatures prove key continuity, not real-world identity. IncidentSyncCoordinator compares SHA-256 history/state digests after READY/changes and every 30 seconds, repairs missing events in bounded pages, and verifies peer/snapshot completion. Room 9 to 10 separates validation from application. Legacy fallback is limited; physical convergence remains open. Location is a snapshot.
+Local identity setup/rename preserves IDs and keys. Incidents retain reporter-selected helper semantics, signed prerequisites, and transactional projections. Withdrawal or offline helper edits reopen selection without advancing reporter versions. IncidentSyncCoordinator reconciles history/state hashes on READY, changes, and a 30-second backstop; incomplete dependencies prevent completion. Room 9→10 separates validation/application. Physical convergence remains open.
 
-Closure signs prerequisite IDs and reconstructs helper history from signed events; confirmation time is event time. Missing dependencies defer closure across pages. Legacy empty closures prioritize available offer changes but cannot identify missing prerequisites. Use matching builds; older apps ignore dependencies.
+Community, Radio channels, and SOS threads use explicit persisted conversation metadata. Radio stores off-channel messages silently; monitoring plays only newly received selected-channel Radio notes. Public retries retain their original destination. Room 10→11 isolates historical SOS and unidentified public audio without guessing channels.
+
+SosRepository owns signed, revisioned snapshots and terminal records. Alert IDs include a signing-key namespace; updates/end require that key. Events and projection commit atomically. SOS ignores radio tuning. Creation/end relay urgently with TTL/hop bounds; rejected origin sends remain pending. SosSyncCoordinator exchanges latest signed snapshots, including terminal records, on READY/changes and every 30 seconds with jitter. Pages/retries are bounded and tied to link generations; confirmation proves only the named neighbor's matching snapshot. Signatures establish key continuity, not personal identity. Receiver silence is local. SosAlertController owns independent 30-second siren timers and per-alert notifications; Back never ends the sender's SOS. Matching upgraded APKs are required. GATT frames remain non-interruptible; phone validation remains open.
 
 ## Offline maps and notifications
 

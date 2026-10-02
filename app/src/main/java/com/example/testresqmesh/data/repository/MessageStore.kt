@@ -10,8 +10,10 @@ import kotlinx.coroutines.flow.map
 
 interface MessageStore {
     val publicMessages: Flow<List<ChatMessage>>
+    val allPublicMessages: Flow<List<ChatMessage>> get() = publicMessages
     val privateMessages: Flow<Map<String, List<ChatMessage>>>
     suspend fun save(message: ChatMessage, targetName: String?)
+    suspend fun contains(id: String): Boolean = false
     suspend fun markDelivered(messageId: String, readerName: String)
     suspend fun markSeen(messageId: String, readerName: String)
     suspend fun markFailed(messageId: String)
@@ -23,6 +25,8 @@ interface MessageStore {
 }
 
 class RoomMessageStore(private val dao: MessageDao) : MessageStore {
+    override suspend fun contains(id: String) = dao.getMessageById(id) != null
+    override val allPublicMessages = dao.getAllPublicMessages().map { rows -> rows.map { it.toChatMessage() } }
     override val publicMessages: Flow<List<ChatMessage>> = dao.getPublicMessages().map { messages ->
         messages.map { it.toChatMessage() }
     }

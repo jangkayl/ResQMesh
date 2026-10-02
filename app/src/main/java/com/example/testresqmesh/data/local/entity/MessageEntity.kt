@@ -18,7 +18,11 @@ data class MessageEntity(
     val isMine: Boolean,
     val deliveredTo: String, // Comma-separated
     val seenBy: String,      // Comma-separated
-    val outboundRoute: String // Comma-separated
+    val outboundRoute: String, // Comma-separated
+    @androidx.room.ColumnInfo(defaultValue = "'COMMUNITY'") val conversationKind: String = "COMMUNITY",
+    @androidx.room.ColumnInfo(defaultValue = "''") val channelId: String = "",
+    @androidx.room.ColumnInfo(defaultValue = "''") val sosId: String = "",
+    @androidx.room.ColumnInfo(defaultValue = "''") val senderNodeId: String = ""
 ) {
     fun toChatMessage(): com.example.testresqmesh.core.model.ChatMessage {
         return com.example.testresqmesh.core.model.ChatMessage(
@@ -36,7 +40,11 @@ data class MessageEntity(
             deliveredTo = if (deliveredTo.isEmpty()) emptyList() else deliveredTo.split(","),
             seenBy = if (seenBy.isEmpty()) emptyList() else seenBy.split(","),
             outboundRoute = if (outboundRoute.isEmpty()) emptyList() else outboundRoute.split(","),
-            isSOS = isSOS
+            isSOS = isSOS,
+            conversationKind = conversationKind,
+            channelId = channelId,
+            sosId = sosId,
+            senderNodeId = senderNodeId
         )
     }
 }
@@ -56,6 +64,10 @@ fun com.example.testresqmesh.core.model.ChatMessage.toMessageEntity(targetName: 
         isMine = this.isMine,
         deliveredTo = this.deliveredTo.joinToString(","),
         seenBy = this.seenBy.joinToString(","),
-        outboundRoute = this.outboundRoute.joinToString(",")
+        outboundRoute = this.outboundRoute.joinToString(","),
+        conversationKind = this.conversationKind,
+        channelId = this.channelId,
+        sosId = this.sosId,
+        senderNodeId = this.senderNodeId
     )
 }

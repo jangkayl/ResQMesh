@@ -67,6 +67,7 @@ fun ResQAppShell(
     modifier: Modifier = Modifier,
     sosEnabled: Boolean = true,
     showNavigation: Boolean = true,
+    navigationReminder: (@Composable () -> Unit)? = null,
     content: @Composable (PaddingValues) -> Unit
 ) {
     Box(modifier = modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
@@ -75,12 +76,19 @@ fun ResQAppShell(
             containerColor = Color.Transparent,
             bottomBar = {
                 if (showNavigation) {
+                    Column {
+                    navigationReminder?.let { reminder ->
+                        Box(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), contentAlignment = Alignment.Center) {
+                            reminder()
+                        }
+                    }
                     ResQFloatingIslandNavBar(
                         selectedDestination = selectedDestination,
                         onDestinationSelected = onDestinationSelected,
                         onSosActivated = onSosActivated,
                         sosEnabled = sosEnabled
                     )
+                    }
                 }
             },
             content = { scaffoldPadding ->

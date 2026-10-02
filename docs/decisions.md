@@ -1,6 +1,6 @@
 # Engineering decisions
 
-This page records durable choices. New ideas remain in the Codex task until accepted, rejected, or deferred. Source and device evidence can revise decisions.
+Durable choices. New ideas remain in the Codex task until accepted, rejected, or deferred. Source/device evidence prevails.
 
 ## D1: Reliability before transport expansion
 
@@ -83,10 +83,12 @@ Topology uses leased snapshots; empty snapshots withdraw adjacency and old versi
 
 ## D19: Reporter-selected civilian lead helper
 
-Ownership uses stable user ID and signing key; names remain historical snapshots. One offer per helper; selection locks local editing until withdrawal/removal. Reporters select, revoke, resolve, or cancel; helpers confirm, decline, or withdraw. Withdrawal or signed offline edits reopen requests; replacement needs fresh selection. Helper revisions never advance reporter versions; superseded selections consume valid reporter versions. Route loss changes connection labels, never selection. No voting, open comments, automatic failover, verified-responder claim, or duplicate-response guarantee is implied. Signing proves device-key continuity only; first-contact trust and deployment authority remain open.
-
-Closure uses signed prerequisites and observed history, never clock ordering.
+Ownership uses stable user ID/signing key, preserving historical names. Reporters select/revoke/close; helpers confirm/decline/withdraw. Selection locks offer editing. Withdrawal/offline changes reopen requests; replacements require fresh selection. Helper versions never advance reporter versions. Route loss never reassigns. Signed closure prerequisites order events. Signing proves key continuity only; deployment authority remains open.
 
 ## D20: Bound voice pressure without changing the payload protocol
 
 Keep three direct neighbors and whole-frame compatibility. Each GATT/L2CAP queue counts active bytes and reserves control capacity: 128 transfers, 2 MiB ordinary bytes, eight slots/64 KiB headroom. Acknowledged progress delays silence retirement; attempts alone do not. Public broadcasts expose neighbor acceptance, persist before dispatch, and retry wholly rejected sends only. Larger-scale media scheduling depends on the phone matrix in status.
+
+## D22: Conversations and SOS state have independent ownership
+
+Community, Radio, and SOS separate history/unread/drafts. Save off-channel Radio silently. Hide unscoped SOS/voice history; retain migration classification. SOS ignores tuning; Back preserves it, receiver silence stays local, and signed origin-key cancellation ends it. Retain terminal records; reconcile on reconnect. Require matching builds; ignore unscoped cancellation. Acceptance isn't delivery. Sirens have 30-second limits; GATT frames remain non-interruptible.

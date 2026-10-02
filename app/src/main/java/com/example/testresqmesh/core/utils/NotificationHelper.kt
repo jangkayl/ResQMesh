@@ -143,17 +143,19 @@ class NotificationHelper(private val context: Context) {
     /**
      * Shows a high-priority Heads-Up Emergency SOS alert notification.
      */
-    fun showSosEmergencyNotification(senderName: String, messageText: String) {
+    fun showSosEmergencyNotification(senderName: String, messageText: String, sosId: String = "legacy") {
+        if (!NotificationManagerCompat.from(context).areNotificationsEnabled()) return
         // Deep link into SOS alarm / map
         val mainAlarmIntent = Intent(context, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
             putExtra("EXTRA_TRIGGER_SOS", true)
             putExtra("EXTRA_SOS_SENDER", senderName)
             putExtra("EXTRA_SOS_TEXT", messageText)
+            putExtra("EXTRA_SOS_ID", sosId)
         }
         val mainPendingIntent = PendingIntent.getActivity(
             context,
-            2001,
+            ("sos_open_$sosId").hashCode(),
             mainAlarmIntent,
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
@@ -164,10 +166,11 @@ class NotificationHelper(private val context: Context) {
             putExtra("EXTRA_VIEW_SOS_MAP", true)
             putExtra("EXTRA_SOS_SENDER", senderName)
             putExtra("EXTRA_SOS_TEXT", messageText)
+            putExtra("EXTRA_SOS_ID", sosId)
         }
         val viewMapPendingIntent = PendingIntent.getActivity(
             context,
-            2002,
+            ("sos_map_$sosId").hashCode(),
             viewMapIntent,
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
@@ -198,14 +201,19 @@ class NotificationHelper(private val context: Context) {
             )
 
         try {
+            val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            if (Build.VERSION.SDK_INT < 34 || manager.canUseFullScreenIntent()) {
+                builder.setFullScreenIntent(mainPendingIntent, true)
+            }
             with(NotificationManagerCompat.from(context)) {
-                // Fixed ID for SOS to update/alert rather than duplicating
-                notify(99999, builder.build())
+                notify("sos_$sosId", 1, builder.build())
             }
         } catch (e: SecurityException) {
             e.printStackTrace()
         }
     }
+
+    fun clearSos(id: String) { NotificationManagerCompat.from(context).cancel("sos_$id", 1) }
 
     /**
      * Clears cached notification history and removes notification when the user opens the chat.

@@ -17,7 +17,11 @@ data class ChatMessage(
     val seenBy: List<String> = emptyList(),
     val outboundRoute: List<String> = emptyList(),
     val returnRoute: List<String> = emptyList(),
-    val isSOS: Boolean = false
+    val isSOS: Boolean = false,
+    val conversationKind: String = if (isPrivate) "PRIVATE" else "COMMUNITY",
+    val channelId: String = "",
+    val sosId: String = "",
+    val senderNodeId: String = ""
 )
 
 data class ConnectedDevice(

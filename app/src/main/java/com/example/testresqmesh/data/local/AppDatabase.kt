@@ -29,9 +29,12 @@ import com.example.testresqmesh.data.local.entity.UserEntity
         IncidentEntity::class,
         DomainEventEntity::class,
         PeerNameEntity::class,
-        IncidentOfferEntity::class
+        IncidentOfferEntity::class,
+        com.example.testresqmesh.data.local.entity.SosAlertEntity::class,
+        com.example.testresqmesh.data.local.entity.SosEventEntity::class,
+        com.example.testresqmesh.data.local.entity.ConversationStateEntity::class
     ],
-    version = 10,
+    version = 11,
     exportSchema = true
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -42,8 +45,22 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun incidentDao(): IncidentDao
     abstract fun incidentOfferDao(): IncidentOfferDao
     abstract fun domainEventDao(): DomainEventDao
+    abstract fun sosDao(): com.example.testresqmesh.data.local.dao.SosDao
+    abstract fun conversationStateDao(): com.example.testresqmesh.data.local.dao.ConversationStateDao
 
     companion object {
+        internal val MIGRATION_10_11 = object : Migration(10, 11) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE messages ADD COLUMN conversationKind TEXT NOT NULL DEFAULT 'COMMUNITY'")
+                db.execSQL("ALTER TABLE messages ADD COLUMN channelId TEXT NOT NULL DEFAULT ''")
+                db.execSQL("ALTER TABLE messages ADD COLUMN sosId TEXT NOT NULL DEFAULT ''")
+                db.execSQL("ALTER TABLE messages ADD COLUMN senderNodeId TEXT NOT NULL DEFAULT ''")
+                db.execSQL("UPDATE messages SET conversationKind = CASE WHEN targetName IS NOT NULL THEN 'PRIVATE' WHEN isSOS = 1 THEN 'LEGACY_SOS' WHEN audioBase64 IS NOT NULL THEN 'LEGACY_RADIO' ELSE 'COMMUNITY' END")
+                db.execSQL("CREATE TABLE IF NOT EXISTS sos_alerts (sosId TEXT NOT NULL PRIMARY KEY, originNodeId TEXT NOT NULL, originName TEXT NOT NULL, signingKey TEXT NOT NULL, emergencyType TEXT NOT NULL, revision INTEGER NOT NULL, ended INTEGER NOT NULL, createdAt INTEGER NOT NULL, updatedAt INTEGER NOT NULL, latitude REAL, longitude REAL, accuracyMeters REAL, locationCapturedAt INTEGER, locallySilenced INTEGER NOT NULL, eventJson TEXT NOT NULL, transmission TEXT NOT NULL)")
+                db.execSQL("CREATE TABLE IF NOT EXISTS sos_events (eventId TEXT NOT NULL PRIMARY KEY, sosId TEXT NOT NULL, revision INTEGER NOT NULL, eventJson TEXT NOT NULL, pending INTEGER NOT NULL)")
+                db.execSQL("CREATE TABLE IF NOT EXISTS conversation_state (conversationId TEXT NOT NULL PRIMARY KEY, draft TEXT NOT NULL, lastReadAt INTEGER NOT NULL)")
+            }
+        }
         @Volatile
         private var INSTANCE: AppDatabase? = null
 
@@ -139,7 +156,7 @@ abstract class AppDatabase : RoomDatabase() {
         internal fun buildDatabase(context: Context, name: String): AppDatabase =
             Room.databaseBuilder(context.applicationContext, AppDatabase::class.java, name)
                 .addMigrations(MIGRATION_1_4, MIGRATION_2_4, MIGRATION_3_4,
-                    MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10)
+                    MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11)
                 .build()
     }
 }

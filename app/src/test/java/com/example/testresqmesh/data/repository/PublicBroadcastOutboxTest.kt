@@ -38,9 +38,13 @@ class PublicBroadcastOutboxTest {
         val store = Store()
         var result = BroadcastDispatchResult(mapOf("B" to TransportDispatchResult.REJECTED_QUEUE_FULL))
         var broadcasts = 0
-        val network = Proxy.newProxyInstance(MeshNetworkGateway::class.java.classLoader, arrayOf(MeshNetworkGateway::class.java)) { _, method, _ ->
+        val payloads = mutableListOf<com.example.testresqmesh.core.network.MeshPayload>()
+        val network = Proxy.newProxyInstance(MeshNetworkGateway::class.java.classLoader, arrayOf(MeshNetworkGateway::class.java)) { _, method, args ->
             when (method.name) {
+                "currentMeshTtl" -> 10
+                "getMyNodeId" -> "A1"
                 "broadcastPayload", "broadcastPriorityPayload" -> {
+                    payloads += kotlinx.serialization.protobuf.ProtoBuf.decodeFromByteArray(com.example.testresqmesh.core.network.MeshPayload.serializer(), args!![0] as ByteArray)
                     assertEquals("Persistence must precede dispatch", 1, store.rows.size)
                     broadcasts++
                     result
@@ -61,6 +65,18 @@ class PublicBroadcastOutboxTest {
             val peers = field.get(repo) as MutableStateFlow<List<ConnectedDevice>>
             peers.value = listOf(ConnectedDevice("B", "Bob#B1", isPayloadReady = true, nodeId = "B1"))
         }
+    }
+
+    @Test fun queuedRadioDestinationAndIdentitySurviveTuningChange() = runTest {
+        val f = Fixture(backgroundScope)
+        val id = f.repo.sendPublicMessage("Radio reply", null, null, conversationKind = "RADIO", channelId = "1")
+        runCurrent()
+        f.repo.setChannel("2")
+        f.result = BroadcastDispatchResult(mapOf("B" to TransportDispatchResult.ACCEPTED))
+        advanceTimeBy(3000); runCurrent()
+        assertEquals(2, f.payloads.size)
+        assertTrue(f.payloads.all { it.channelId == "1" && it.conversationKind == "RADIO" && it.senderNodeId == "A1" })
+        assertEquals("1", f.store.rows[id]!!.channelId)
     }
 
     @Test fun fullRejectionPersistsPendingThenRetriesOnlyUntilAccepted() = runTest {

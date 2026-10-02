@@ -11,4 +11,5 @@ interface LocationClient {
     fun stopTracking()
     fun getLastKnownLocation(): Location?
     fun requestPinpointLocation(onResult: (Location?) -> Unit)
+    fun cancelPinpointLocation() {}
 }

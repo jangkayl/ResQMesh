@@ -65,9 +65,11 @@ class MainActivity : ComponentActivity() {
     private val pendingViewMap = mutableStateOf(false)
     private val pendingSosSender = mutableStateOf<String?>(null)
     private val pendingSosText = mutableStateOf<String?>(null)
+    private val pendingSosId = mutableStateOf<String?>(null)
 
     private fun handleIntentExtras(intent: android.content.Intent?) {
         if (intent == null) return
+        pendingSosId.value = intent.getStringExtra("EXTRA_SOS_ID")
         if (intent.getBooleanExtra("EXTRA_TRIGGER_SOS", false)) {
             sosDeepLinkTriggered.value = true
             pendingSosSender.value = intent.getStringExtra("EXTRA_SOS_SENDER")
@@ -233,10 +235,12 @@ class MainActivity : ComponentActivity() {
                                 initialViewMap = pendingViewMap.value,
                                 initialSosSender = pendingSosSender.value,
                                 initialSosText = pendingSosText.value,
+                                initialSosId = pendingSosId.value,
                                 onClearInitialViewMap = {
                                     pendingViewMap.value = false
                                     pendingSosSender.value = null
                                     pendingSosText.value = null
+                                    pendingSosId.value = null
                                 }
                             )
                         }

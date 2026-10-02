@@ -166,7 +166,7 @@ fun HomeScreenContent(
         modifier = modifier
             .verticalScroll(rememberScrollState())
             .padding(horizontal = Spacing.Large)
-            .padding(top = Spacing.Large, bottom = 120.dp),
+            .padding(top = Spacing.Large, bottom = Spacing.Large),
         verticalArrangement = Arrangement.spacedBy(Spacing.Large)
     ) {
         // 1. Modern Social Header (Avatar, Greeting, Live Mesh Presence Pill)

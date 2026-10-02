@@ -22,7 +22,7 @@ internal class RadioVoiceQueue {
     }
 
     fun enqueue(note: Note): Boolean {
-        if (!monitoring || !seenIds.add(note.id)) return false
+        if (!monitoring || pending.size + (if (current == null) 0 else 1) >= 32 || !seenIds.add(note.id)) return false
         if (seenIds.size > 128) seenIds.remove(seenIds.first())
         pending.addLast(note)
         return true

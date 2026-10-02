@@ -105,7 +105,7 @@ class MediaHelper(private val context: Context) {
     }
 
     private fun playNextRadioNote() {
-        if (!radioMonitoring || manualAudio != null || mediaPlayer != null) return
+        if (isSirenPlaying || !radioMonitoring || manualAudio != null || mediaPlayer != null) return
         val note = radioQueue.currentOrNext() ?: return
         playAudio(note.audio, isRadio = true)
     }
@@ -192,6 +192,10 @@ class MediaHelper(private val context: Context) {
     fun playEmergencySiren() {
         if (isSirenPlaying) return
         isSirenPlaying = true
+        if (radioQueue.current != null && manualAudio == null) {
+            radioResumePositionMs = mediaPlayer?.currentPosition ?: radioResumePositionMs
+            releasePlayer()
+        }
 
         sirenThread = Thread {
             val toneGenerator = android.media.ToneGenerator(android.media.AudioManager.STREAM_ALARM, 100)
@@ -216,5 +220,6 @@ class MediaHelper(private val context: Context) {
         isSirenPlaying = false
         sirenThread?.interrupt()
         sirenThread = null
+        playNextRadioNote()
     }
 }

@@ -77,6 +77,7 @@ dependencies {
     implementation("com.google.android.gms:play-services-location:21.3.0") // Fused Location for indoor accuracy
     implementation("org.maplibre.gl:android-sdk:11.8.0") // Local vector map rendering with native PMTiles support
     implementation(libs.kotlinx.serialization.protobuf)
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.8.0")
 
     val roomVersion = "2.6.1"
     implementation("androidx.room:room-runtime:$roomVersion")

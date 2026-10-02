@@ -2,6 +2,9 @@ package com.example.testresqmesh.feature.comms.ui
 
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -11,12 +14,14 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.outlined.ChevronRight
 import androidx.compose.material.icons.outlined.GraphicEq
 import androidx.compose.material.icons.outlined.Radio
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import com.example.testresqmesh.core.model.ConversationPolicy
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
@@ -46,15 +51,30 @@ import androidx.compose.ui.graphics.luminance
 fun WalkieTalkieScreen(
     commsViewModel: CommunicationViewModel,
     walkieTalkieViewModel: WalkieTalkieViewModel,
-    mediaHelper: MediaHelper
+    mediaHelper: MediaHelper,
+    onHistory: () -> Unit = {}
 ) {
     val isLight = MaterialTheme.colorScheme.background.luminance() > 0.5f
     val receiverOn by walkieTalkieViewModel.isWalkieTalkieMode.collectAsState()
     val channel by walkieTalkieViewModel.currentChannelId.collectAsState()
     val speaker by walkieTalkieViewModel.currentSpeaker.collectAsState()
+    val latestChannel by androidx.compose.runtime.rememberUpdatedState(channel)
     var recording by remember { mutableStateOf(false) }
+    var recordingDestination by remember { mutableStateOf(channel) }
     var channelsOpen by remember { mutableStateOf(false) }
     val haptics = LocalHapticFeedback.current
+
+    val allPublicMessages by commsViewModel.allPublicMessages.collectAsState()
+    val conversationStates by commsViewModel.conversationStates.collectAsState()
+    val totalRadioUnread = remember(allPublicMessages, conversationStates) {
+        (1..5).sumOf { chNum ->
+            val ch = chNum.toString()
+            val messages = ConversationPolicy.messages(allPublicMessages, "RADIO", ch)
+            val key = ConversationPolicy.key("RADIO", ch)
+            val read = conversationStates.firstOrNull { it.conversationId == key }?.lastReadAt ?: 0L
+            messages.count { !it.isMine && it.timestamp > read }
+        }
+    }
 
     // Animations for idle and active states
     val infiniteTransition = rememberInfiniteTransition(label = "walkie talkie fx")
@@ -108,9 +128,12 @@ fun WalkieTalkieScreen(
         label = "ptt scale"
     )
 
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+    val compact = maxHeight < 640.dp || LocalDensity.current.fontScale > 1.3f
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .then(if (compact) Modifier.verticalScroll(rememberScrollState()) else Modifier)
             .padding(horizontal = Spacing.Medium),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
@@ -128,7 +151,7 @@ fun WalkieTalkieScreen(
                     fontWeight = FontWeight.Bold
                 )
                 Text(
-                    text = "Channel $channel · Live audio broadcast",
+                    text = "Channel $channel · Recorded voice notes",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -174,7 +197,15 @@ fun WalkieTalkieScreen(
 
         Spacer(Modifier.height(Spacing.Medium))
 
-        // Voice Receiver / Radio Monitor Panel
+        TacticalChannelHistoryButton(
+            unreadCount = totalRadioUnread,
+            onClick = onHistory,
+            isLight = isLight
+        )
+
+        Spacer(Modifier.height(Spacing.Medium))
+
+    // Voice Receiver / Radio Monitor Panel
         ResQGlassSurface(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(22.dp),
@@ -204,8 +235,8 @@ fun WalkieTalkieScreen(
                         style = MaterialTheme.typography.titleMedium
                     )
                     Text(
-                        text = if (receiverOn) "Listening for incoming audio on CH $channel" else "Muted · Tap switch to listen",
-                        color = if (receiverOn) ResQTheme.colors.success else MaterialTheme.colorScheme.onSurfaceVariant,
+                        text = if (receiverOn) "New CH $channel notes autoplay" else "Muted · Tap switch to listen",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         style = MaterialTheme.typography.bodySmall
                     )
                 }
@@ -251,10 +282,10 @@ fun WalkieTalkieScreen(
                         modifier = Modifier.size(18.dp)
                     )
                     Text(
-                        text = "Speaking: $speaker",
+                        text = "Playing: $speaker",
                         style = MaterialTheme.typography.labelMedium,
                         fontWeight = FontWeight.Bold,
-                        color = ResQTheme.colors.success
+                        color = MaterialTheme.colorScheme.onSurface
                     )
                 } else {
                     Box(
@@ -264,7 +295,7 @@ fun WalkieTalkieScreen(
                             .background(if (receiverOn) ResQTheme.colors.success.copy(alpha = 0.6f) else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f))
                     )
                     Text(
-                        text = if (receiverOn) "Channel $channel is clear · Listening" else "Monitor muted · Channel $channel",
+                        text = if (receiverOn) "Monitoring CH $channel · New notes autoplay" else "Monitor muted · Channel $channel",
                         style = MaterialTheme.typography.labelMedium,
                         fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -392,15 +423,20 @@ fun WalkieTalkieScreen(
                         detectTapGestures(
                             onPress = {
                                 haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                                val recordingChannel = latestChannel
+                                recordingDestination = recordingChannel
                                 recording = true
                                 mediaHelper.startRecording()
+                                var releasedNormally = false
                                 try {
-                                    tryAwaitRelease()
+                                    releasedNormally = tryAwaitRelease()
                                 } finally {
                                     haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                     recording = false
-                                    mediaHelper.stopRecording()?.let { audio ->
-                                        commsViewModel.sendPublicMessage("Voice message", null, audio)
+                                    val audio = mediaHelper.stopRecording()
+                                    // Scrolling or leaving the screen cancels the press; it must not send a partial note.
+                                    if (releasedNormally && audio != null) {
+                                        commsViewModel.sendConversation("RADIO", channel = recordingChannel, text = "Voice message", audio = audio)
                                     }
                                 }
                             }
@@ -452,11 +488,93 @@ fun WalkieTalkieScreen(
         )
         Spacer(Modifier.height(4.dp))
         Text(
-            text = "Voice note will be compressed and broadcast to Channel $channel.",
+            text = "Voice note will be sent to Channel ${if (recording) recordingDestination else channel}.",
             textAlign = TextAlign.Center,
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
-        Spacer(Modifier.height(110.dp))
+        Spacer(Modifier.height(96.dp))
+    }
+}
+
+}
+
+@Composable
+private fun TacticalChannelHistoryButton(
+    unreadCount: Int,
+    onClick: () -> Unit,
+    isLight: Boolean,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        onClick = onClick,
+        modifier = modifier
+            .fillMaxWidth()
+            .semantics { contentDescription = "Open channel conversations and history" },
+        shape = RoundedCornerShape(18.dp),
+        color = if (isLight) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
+        border = BorderStroke(1.dp, if (isLight) MaterialTheme.colorScheme.outlineVariant else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f)),
+        shadowElevation = if (isLight) 1.dp else 2.dp
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 14.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Surface(
+                modifier = Modifier.size(38.dp),
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = Icons.Outlined.GraphicEq,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+            }
+
+            Spacer(Modifier.width(12.dp))
+
+            Column(Modifier.weight(1f)) {
+                Text(
+                    text = "Channel History & Notes",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    text = "Recorded audio & chatter on CH 1–5",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            if (unreadCount > 0) {
+                Surface(
+                    shape = RoundedCornerShape(10.dp),
+                    color = ResQTheme.colors.sos
+                ) {
+                    Text(
+                        text = "$unreadCount new",
+                        color = Color.White,
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                    )
+                }
+                Spacer(Modifier.width(6.dp))
+            }
+
+            Icon(
+                imageVector = Icons.Outlined.ChevronRight,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                modifier = Modifier.size(20.dp)
+            )
+        }
     }
 }

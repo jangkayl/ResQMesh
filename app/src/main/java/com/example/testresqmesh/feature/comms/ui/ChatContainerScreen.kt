@@ -81,23 +81,19 @@ fun ChatContainerScreen(
     viewModel: CommunicationViewModel,
     mediaHelper: MediaHelper,
     onChatSelected: (String) -> Unit,
-    onCommunityConversationChanged: (Boolean) -> Unit,
+    onCommunityClick: () -> Unit = {},
+    onCommunityConversationChanged: (Boolean) -> Unit = {},
     onViewMap: (Double, Double, String, String) -> Unit = { _, _, _, _ -> },
     initialOpenCommunity: Boolean = false
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val savedConversationStates by viewModel.conversationStates.collectAsState()
     val currentChannel by viewModel.currentChannelId.collectAsState()
     val conversations = remember(uiState) { conversationPreviews(uiState) }
     val communityPreview = remember(uiState.publicMessages) {
         uiState.publicMessages.maxByOrNull { it.timestamp }
     }
     var showNewMessageModal by remember { mutableStateOf(false) }
-    var showCommunityConversation by remember { mutableStateOf(initialOpenCommunity) }
-
-    DisposableEffect(showCommunityConversation) {
-        onCommunityConversationChanged(showCommunityConversation)
-        onDispose { onCommunityConversationChanged(false) }
-    }
 
     if (showNewMessageModal) {
         ModalBottomSheet(
@@ -117,26 +113,13 @@ fun ChatContainerScreen(
         }
     }
 
-    if (showCommunityConversation) {
-        PublicChatTab(
-            viewModel = viewModel,
-            mediaHelper = mediaHelper,
-            onBack = { showCommunityConversation = false },
-            onChatSelected = { user ->
-                showCommunityConversation = false
-                onChatSelected(user)
-            },
-            onViewMap = onViewMap
-        )
-        return
-    }
-
     MessagesInboxContent(
         channelId = currentChannel,
         communityPreview = communityPreview,
+        communityUnread = uiState.publicMessages.count { !it.isMine && it.timestamp > (savedConversationStates.firstOrNull { state -> state.conversationId == "COMMUNITY" }?.lastReadAt ?: 0L) },
         conversations = conversations,
         onNewMessageClick = { showNewMessageModal = true },
-        onCommunityClick = { showCommunityConversation = true },
+        onCommunityClick = onCommunityClick,
         onChannelSelected = viewModel::setChannel,
         onConversationClick = onChatSelected
     )
@@ -158,7 +141,8 @@ internal fun MessagesInboxContent(
     onNewMessageClick: () -> Unit,
     onCommunityClick: () -> Unit,
     onChannelSelected: (String) -> Unit,
-    onConversationClick: (String) -> Unit
+    onConversationClick: (String) -> Unit,
+    communityUnread: Int = 0
 ) {
     var selectedFilter by remember { mutableStateOf(CommsFilter.ALL) }
 
@@ -178,7 +162,7 @@ internal fun MessagesInboxContent(
                 start = Spacing.Large,
                 top = Spacing.Large,
                 end = Spacing.Large,
-                bottom = 120.dp
+                bottom = 100.dp
             ),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
@@ -193,6 +177,7 @@ internal fun MessagesInboxContent(
                 GlobalBroadcastCommandCard(
                     channelId = channelId,
                     preview = communityPreview,
+                    unreadCount = communityUnread,
                     onClick = onCommunityClick,
                     onChannelSelected = onChannelSelected
                 )
@@ -370,9 +355,9 @@ internal fun GlobalBroadcastCommandCard(
     channelId: String,
     preview: ChatMessage?,
     onClick: () -> Unit,
-    onChannelSelected: (String) -> Unit
+    onChannelSelected: (String) -> Unit,
+    unreadCount: Int = 0
 ) {
-    var channelPickerExpanded by remember { mutableStateOf(false) }
     val openCommunityDesc = stringResource(R.string.messages_open_community)
 
     Surface(
@@ -441,49 +426,7 @@ internal fun GlobalBroadcastCommandCard(
                     }
                 }
 
-                // Channel Switcher Pill
-                Box {
-                    Surface(
-                        shape = RoundedCornerShape(10.dp),
-                        color = MaterialTheme.colorScheme.surfaceVariant,
-                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
-                        onClick = { channelPickerExpanded = true }
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 9.dp, vertical = 5.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = stringResource(R.string.messages_channel_short, channelId),
-                                style = MaterialTheme.typography.labelSmall,
-                                fontWeight = FontWeight.SemiBold,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            Spacer(Modifier.width(2.dp))
-                            Icon(
-                                imageVector = Icons.Outlined.ChevronRight,
-                                contentDescription = null,
-                                modifier = Modifier.size(14.dp),
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
-
-                    DropdownMenu(
-                        expanded = channelPickerExpanded,
-                        onDismissRequest = { channelPickerExpanded = false }
-                    ) {
-                        (1..5).forEach { channel ->
-                            DropdownMenuItem(
-                                text = { Text(stringResource(R.string.messages_channel_option, channel)) },
-                                onClick = {
-                                    onChannelSelected(channel.toString())
-                                    channelPickerExpanded = false
-                                }
-                            )
-                        }
-                    }
-                }
+                Text("$unreadCount unread", style = MaterialTheme.typography.labelMedium)
             }
 
             // Message Preview Strip
@@ -498,7 +441,7 @@ internal fun GlobalBroadcastCommandCard(
                 ) {
                     Text(
                         text = preview?.text?.ifBlank { stringResource(R.string.messages_attachment_preview) }
-                            ?: stringResource(R.string.messages_global_desc, channelId),
+                            ?: "Ordinary public messages across the reachable mesh",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,

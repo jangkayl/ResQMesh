@@ -11,11 +11,18 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.SharingStarted
+import com.example.testresqmesh.data.repository.asMessage
 import kotlinx.coroutines.launch
 
 class CommunicationViewModel(
     private val useCases: com.example.testresqmesh.core.domain.usecase.MeshUseCases,
-    private val locationClient: com.example.testresqmesh.core.location.LocationClient
+    private val locationClient: com.example.testresqmesh.core.location.LocationClient,
+    val sosRepository: com.example.testresqmesh.data.repository.SosRepository,
+    private val conversationDao: com.example.testresqmesh.data.local.dao.ConversationStateDao
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ChatUiState())
@@ -25,26 +32,60 @@ class CommunicationViewModel(
     private val _pendingKeyVerification = MutableSharedFlow<String>(extraBufferCapacity = 1)
     val pendingKeyVerification: SharedFlow<String> = _pendingKeyVerification
     private val _privateDrafts = MutableStateFlow<Map<String, String>>(emptyMap())
+    private val sosErrors = MutableSharedFlow<String>(extraBufferCapacity = 8)
     val privateDrafts: StateFlow<Map<String, String>> = _privateDrafts.asStateFlow()
     
-    private val _activeSosMessageId = MutableStateFlow<String?>(null)
-    val activeSosMessageId: StateFlow<String?> = _activeSosMessageId.asStateFlow()
+    val activeSosMessageId = sosRepository.ownActive.map { it?.sosId }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, null)
+    val sosAlerts = sosRepository.alerts
+    val allPublicMessages = useCases.observePublicMessages.allMessages
+    val conversationStates = conversationDao.observe().stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+    val sosMeshStatus = combine(useCases.observeIsOnline(), useCases.observeConnectedDevices(),
+        useCases.observeBlockedDeviceNames()) { active, devices, blocked ->
+        com.example.testresqmesh.feature.comms.model.sosMeshStatus(active, devices, blocked)
+    }.stateIn(viewModelScope, SharingStarted.Eagerly,
+        com.example.testresqmesh.feature.comms.model.SosMeshStatus(com.example.testresqmesh.feature.comms.model.SosMeshState.OFF))
+    private var sosLocationGeneration = 0L
+    private var creatingSos = false
 
     private val _isAcquiringLocation = MutableStateFlow(false)
     val isAcquiringLocation: StateFlow<Boolean> = _isAcquiringLocation.asStateFlow()
 
     val locationStatus: StateFlow<com.example.testresqmesh.core.location.LocationStatus> = locationClient.locationStatus
     
-    val incomingSosAlert = useCases.observeIncomingSosAlert()
+    val incomingSosAlert = sosRepository.incoming.map { it?.asMessage() }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, null)
     
     fun clearSosAlert() {
-        useCases.clearSosAlert()
+        incomingSosAlert.value?.sosId?.let { silenceSos(it) }
     }
     
     val currentChannelId: StateFlow<String> = useCases.observeCurrentChannelId()
     
     fun setChannel(channelId: String) {
         useCases.setChannel(channelId)
+    }
+
+    fun draft(key: String, text: String) { viewModelScope.launch { conversationDao.draft(key, text) } }
+    fun read(key: String) { viewModelScope.launch { conversationDao.read(key, System.currentTimeMillis()) } }
+    fun unread(key: String, messages: List<com.example.testresqmesh.core.model.ChatMessage>): Int {
+        val time = conversationStates.value.firstOrNull { it.conversationId == key }?.lastReadAt ?: 0L
+        return messages.count { !it.isMine && it.timestamp > time }
+    }
+    fun sendConversation(kind: String, channel: String = "", sosId: String = "", text: String, audio: String? = null) {
+        useCases.sendPublicMessage.conversation(kind, channel, sosId, text, audio)
+        draft(com.example.testresqmesh.core.model.ConversationPolicy.key(kind, channel, sosId), "")
+    }
+    fun silenceSos(id: String) { viewModelScope.launch { sosRepository.silence(id) } }
+    fun endSos(id: String) {
+        sosLocationGeneration++
+        locationClient.cancelPinpointLocation()
+        viewModelScope.launch {
+            runCatching { sosRepository.end(id) }.onFailure {
+                if (it is kotlinx.coroutines.CancellationException) throw it
+                sosErrors.emit("Could not end SOS. Check its active status and try again.")
+            }
+        }
     }
 
     fun rescan() {
@@ -94,7 +135,7 @@ class CommunicationViewModel(
         useCases.sendPublicMessage(text, imageBase64, audioBase64)
     }
 
-    val publicSendFeedback: SharedFlow<String> = useCases.sendPublicMessage.feedback
+    val publicSendFeedback = kotlinx.coroutines.flow.merge(useCases.sendPublicMessage.feedback, sosErrors)
 
     fun startLocationTracking() {
         locationClient.startTracking(30000L)
@@ -104,37 +145,29 @@ class CommunicationViewModel(
         locationClient.stopTracking()
     }
 
-    fun sendEmergencySOS(sosType: String) {
-        val text = "🚨 CRITICAL SOS: $sosType EMERGENCY!"
-        val cachedLocation = locationClient.getLastKnownLocation()
-        
-        // 1. Instantly dispatch cached location with zero delay
-        if (cachedLocation != null) {
-            val msgId = useCases.sendPublicMessage(text, null, null, cachedLocation.latitude, cachedLocation.longitude, isSOS = true)
-            _activeSosMessageId.value = msgId
-        } else {
-            // Fallback: send without location instantly
-            val msgId = useCases.sendPublicMessage(text, null, null, null, null, isSOS = true)
-            _activeSosMessageId.value = msgId
-        }
-        
-        // 2. Start a background fetch for a high-accuracy pinpoint lock
-        locationClient.requestPinpointLocation { location ->
-            if (location != null) {
-                // Check if the fresh location is significantly better/newer than cache
-                val isBetter = cachedLocation == null || location.accuracy < cachedLocation.accuracy || (location.time - cachedLocation.time > 60000)
-                if (isBetter) {
-                    // Send a follow-up pinpoint update!
-                    useCases.sendPublicMessage("📍 PINPOINT SOS UPDATE: More precise coordinates acquired.", null, null, location.latitude, location.longitude, isSOS = true)
+    fun sendEmergencySOS(sosType: String, onCreated: (String) -> Unit = {}) {
+        if (creatingSos) return
+        creatingSos = true
+        val generation = ++sosLocationGeneration
+        viewModelScope.launch {
+            try {
+                val cached = locationClient.getLastKnownLocation()
+                val id = sosRepository.create(sosType, cached?.latitude, cached?.longitude, cached?.accuracy, cached?.time)
+                onCreated(id)
+                locationClient.requestPinpointLocation { location ->
+                    if (generation == sosLocationGeneration && location != null) viewModelScope.launch {
+                        sosRepository.updateLocation(id, location.latitude, location.longitude, location.accuracy, location.time)
+                    }
                 }
-            }
+            } catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) throw e
+                sosErrors.emit("Could not complete SOS sending. Check SOS alerts before trying again.")
+            } finally { creatingSos = false }
         }
     }
 
     fun cancelEmergencySOS() {
-        _activeSosMessageId.value = null
-        useCases.clearSosAlert()
-        useCases.sendPublicMessage("✅ SOS Cancelled & Resolved", null, null, null, null, isSOS = false, isSOSCancel = true)
+        activeSosMessageId.value?.let(::endSos)
     }
 
     fun deleteConversationWith(peerName: String) {

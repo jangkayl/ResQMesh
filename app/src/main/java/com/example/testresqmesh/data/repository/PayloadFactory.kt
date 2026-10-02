@@ -24,11 +24,18 @@ object PayloadFactory {
         isSOS: Boolean,
         isSOSCancel: Boolean,
         channelId: String,
-        ttl: Int = 0
+        ttl: Int = 0,
+        conversationKind: String = "COMMUNITY",
+        sosId: String = "",
+        senderNodeId: String = ""
     ): ByteArray {
         val payload = MeshPayload(
             id = msgId,
-            type = "MESSAGE",
+            type = "CONVERSATION",
+            conversationKind = conversationKind,
+            sosId = sosId,
+            senderNodeId = senderNodeId,
+            createdAt = timestamp,
             senderName = senderName,
             text = text,
             imageBytes = imageBase64?.let { BinaryCompressor.compress(Base64.decode(it, Base64.DEFAULT)) },

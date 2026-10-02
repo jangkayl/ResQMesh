@@ -55,28 +55,7 @@ import kotlin.math.sin
 fun FullScreenSosAlarm(alertMessage: ChatMessage, onDismiss: () -> Unit, onViewMap: () -> Unit = {}) {
     val context = LocalContext.current
     val media = remember { MediaHelper(context) }
-    DisposableEffect(Unit) {
-        media.playEmergencySiren()
-        val vibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            (context.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as VibratorManager).defaultVibrator
-        } else {
-            @Suppress("DEPRECATION")
-            (context.getSystemService(Context.VIBRATOR_SERVICE) as Vibrator)
-        }
-        if (vibrator.hasVibrator()) {
-            val pattern = longArrayOf(0, 500, 250, 500)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                vibrator.vibrate(VibrationEffect.createWaveform(pattern, 0))
-            } else {
-                @Suppress("DEPRECATION")
-                vibrator.vibrate(pattern, 0)
-            }
-        }
-        onDispose {
-            media.stopEmergencySiren()
-            vibrator.cancel()
-        }
-    }
+    // Sound belongs to SosAlertController, not the lifetime of this screen.
 
     val red = ResQTheme.colors.sos
     val hasLocation = alertMessage.locationLat != null && alertMessage.locationLng != null

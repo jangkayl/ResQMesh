@@ -1,6 +1,6 @@
 # Validation
 
-Builds/tests do not prove BLE behavior. The user operates phones; Codex prepares steps/analyzes evidence. SOS map setup must return to its alert.
+Builds/tests do not prove BLE. Users operate phones; Codex prepares/analyzes cards. Map setup returns to its alert.
 
 ## Local checks
 
@@ -11,19 +11,19 @@ powershell -ExecutionPolicy Bypass -File .\scripts\check_docs.ps1
 git diff --check
 ```
 
-Check proportionally.
+SOS conversation validation: [phone card](testing/sos-conversations-test-card.md). Run migration instrumentation only on an explicitly selected emulator; physical-phone operation stays with the user.
 
 ## Pull-request CI gate
 
 `.github/workflows/lean-qa.yml` runs build, unit tests, Lint, docs, and diff hygiene on pull requests. Failed checks block readiness. CI neither deploys nor validates physical BLE behavior.
 
-Codex reports local checks and waits for explicit approval before creating a pull request or merging.
+PR/merge requires explicit instruction after local checks.
 
 ## Physical-device boundary
 
 Codex may build an APK. The user installs and operates physical phones unless explicitly requesting otherwise.
 
-Record build identity, device models/API, steps, result, and failure time.
+Record APK, models/API, steps, result, failure time.
 
 ## Focused Logcat workflow
 
@@ -33,7 +33,7 @@ Start the existing capture script while the selected ADB devices are connected:
 .\scripts\capture_ble_logcat.ps1 -DurationMinutes 10
 ```
 
-Analyze the reported window and app markers first:
+Analyze focused app markers/time windows:
 
 - Endpoint, stable peer, role, generation, and lifecycle transitions.
 - CCCD/configuration completion and payload `READY`.

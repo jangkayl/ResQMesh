@@ -80,7 +80,14 @@ fun PublicChatTab(
     BackHandler {
         onBack()
     }
+    val conversationStates by viewModel.conversationStates.collectAsState()
     var inputText by remember { mutableStateOf("") }
+    var draftRestored by remember { mutableStateOf(false) }
+    LaunchedEffect(conversationStates) {
+        val saved = conversationStates.firstOrNull { it.conversationId == "COMMUNITY" }
+        if (!draftRestored && saved != null) { if (inputText.isEmpty()) inputText = saved.draft; draftRestored = true }
+    }
+    LaunchedEffect(uiState.publicMessages.lastOrNull()?.id) { viewModel.read("COMMUNITY") }
     var pendingImage by remember { mutableStateOf<String?>(null) }
     var pendingAudio by remember { mutableStateOf<String?>(null) }
     var isRecording by remember { mutableStateOf(false) }
@@ -141,7 +148,7 @@ fun PublicChatTab(
             bottomBar = {
                 ChatInput(
                     inputText = inputText,
-                    onTextChange = { inputText = it },
+                    onTextChange = { inputText = it; draftRestored = true; viewModel.draft("COMMUNITY", it) },
                     pendingImage = pendingImage,
                     onImageSelected = { pendingImage = it },
                     onClearImage = { pendingImage = null },
@@ -183,6 +190,7 @@ fun PublicChatTab(
                         if (finalMessage.isNotBlank() || pendingImage != null || pendingAudio != null) {
                             viewModel.sendPublicMessage(finalMessage, pendingImage, pendingAudio)
                             inputText = ""
+                            viewModel.draft("COMMUNITY", "")
                             pendingImage = null
                             pendingAudio = null
                             replyingToMessage = null
@@ -252,97 +260,15 @@ fun PublicChatTab(
 }
 
 @Composable
-internal fun CommunityHeader(
-    channelId: String,
-    onBack: () -> Unit,
-    onChannelSelected: (String) -> Unit
-) {
-    var expanded by remember { mutableStateOf(false) }
-    Surface(
-        color = MaterialTheme.colorScheme.surface,
-        shadowElevation = 2.dp,
-        border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f))
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 8.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
+internal fun CommunityHeader(channelId: String, onBack: () -> Unit, onChannelSelected: (String) -> Unit) {
+    Surface(color = MaterialTheme.colorScheme.surface, shadowElevation = 2.dp) {
+        Row(Modifier.fillMaxWidth().padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = onBack) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Outlined.ArrowBack,
-                    contentDescription = stringResource(R.string.community_back_action)
-                )
+                Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "Back to messages")
             }
-            Surface(
-                modifier = Modifier.size(42.dp),
-                shape = CircleShape,
-                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.3f))
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Icon(
-                        imageVector = Icons.Outlined.Campaign,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(22.dp)
-                    )
-                }
-            }
-            Spacer(Modifier.width(10.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = stringResource(R.string.community_title),
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold
-                )
-                Text(
-                    text = "Public broadcast · Channel $channelId",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-            Box {
-                Surface(
-                    shape = RoundedCornerShape(18.dp),
-                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)),
-                    onClick = { expanded = true }
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "CH $channelId",
-                            style = MaterialTheme.typography.labelMedium,
-                            fontWeight = FontWeight.ExtraBold,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                        Spacer(Modifier.width(4.dp))
-                        Icon(
-                            imageVector = Icons.Outlined.Tune,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(14.dp)
-                        )
-                    }
-                }
-                DropdownMenu(
-                    expanded = expanded,
-                    onDismissRequest = { expanded = false }
-                ) {
-                    (1..5).forEach { channel ->
-                        DropdownMenuItem(
-                            text = { Text(stringResource(R.string.messages_channel_option, channel)) },
-                            onClick = {
-                                onChannelSelected(channel.toString())
-                                expanded = false
-                            }
-                        )
-                    }
-                }
+            Column {
+                Text(stringResource(R.string.community_title), style = MaterialTheme.typography.titleMedium)
+                Text("Public conversation across the reachable mesh", style = MaterialTheme.typography.labelSmall)
             }
         }
     }

@@ -45,6 +45,16 @@ class PayloadDispatcher(private val callback: PayloadDispatcherCallback) {
             
             // 1. DUPLICATE MESSAGE CHECK (THE BOUNCER)
             if (payload.id.isEmpty()) return
+            // SOS validates signatures before dedup/relay. Conversation storage owns durable
+            // dedup so duplicate retries can still receive receipts after a lost acknowledgement.
+            if (payload.type in setOf("SOS_EVENT", "SOS_SYNC_REQ", "SOS_SYNC_RES")) {
+                callback.onSosPacket(endpointId, payload)
+                return
+            }
+            if (payload.type == "CONVERSATION") {
+                callback.onConversationMessage(endpointId, payload)
+                return
+            }
             val msgId = payload.id
             val seenMessageIds = callback.getSeenMessageIds()
 

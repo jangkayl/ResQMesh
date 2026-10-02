@@ -4,13 +4,13 @@ Last reviewed: 2026-10-02. Branch: `fix/emergency-incident-auto-sync`.
 
 ## Current objective
 
-Validate automatic incident convergence, then block recovery/recorded voice before five/ten-phone measurements. Runtime validation and UI/security/background work remain open.
+Validate separated Community/Radio/SOS ownership/reconnect convergence, alongside pending incident convergence and R7/R8. Physical reliability, security, and background evidence remain open.
 
 [Phone validation pending](plans/capstone-demo-readiness.md): [incident UX redesign](plans/emergency-incidents-ux-redesign.md), withdrawal cleanup, reporter identity, and selected-offer editing guards.
 
 ## Implemented and locally checked
 
-Delivery and build checks passed (debug/release, unit tests, Android-test compilation, Lint). Helper-workflow, title support, and incident redesign checks passed. Presentation uses display title fallback. Room/UI instrumentation and physical convergence remain open.
+Delivery and build checks passed (debug/release, unit tests, Android-test compilation, Lint). Helper-workflow, title support, and incident redesign checks passed. Presentation uses display title fallback. Incident UI instrumentation and physical convergence remain open.
 
 - Generation-owned BLE, acknowledged GATT, L2CAP promotion, directed READY-rooted topology, empty withdrawals, three-neighbor admission, and private fail-closed routing.
 - Persistent private outbox with 24-hour expiry, accepted-only delivery timing, pending-key-change refusal, and conditional failure updates.
@@ -29,7 +29,7 @@ Use the [physical checklist](plans/physical-reliability-tests.md); record the in
 - [x] R3: Acknowledged write progress protects busy links; stalled chunks and unanswered heartbeats retain deadlines.
 - [x] R4: One bounded L2CAP writer per socket; FIFO within traffic classes; control reserve and byte/count bounds on both transports.
 - [x] R5: Public acceptance results, visible pending/partial feedback, persistence before dispatch, serialized outbox retry; no whole-broadcast retry after any acceptance.
-- [x] R6: 171 unit tests, debug APK, Android-test compilation, Lint, docs, and diff checks passed. Instrumentation execution remains open.
+- [x] R6: 248 unit tests, debug APK, Android-test build, Lint, docs, and diff checks passed. Migration/SOS UI instrumentation is recorded below.
 - [ ] R7: A–B–C mutual block, unilateral unblock, restart, relay removal/return, and Refresh phone card below.
 - [ ] R8: Recorded-voice burst and mixed text/SOS tests on three phones, including GATT fallback and L2CAP.
 - [ ] R9: Five-phone matrix: quiet links, one sender, simultaneous senders, relay loss/recovery.
@@ -40,7 +40,7 @@ Per-transport queue defaults: 128 retained transfers including active; ordinary 
 
 ## Open blockers
 
-Protocol-v2 incident sync adds history/state hashes, bounded repair/retries, READY snapshots, and a 30-second backstop. Room 9→10 separates validation/application. 229 tests/build/Lint passed; Room OOM/phone validation pending.
+Protocol-v2 incident sync adds history/state hashes, bounded repair/retries, READY snapshots, and a 30-second backstop. Room 9→10 separates validation/application. Migrations passed on the emulator; incident phone validation remains pending.
 
 | ID | Priority | Remaining completion evidence |
 | --- | --- | --- |
@@ -52,23 +52,20 @@ Protocol-v2 incident sync adds history/state hashes, bounded repair/retries, REA
 | LIMIT-01 | P2 | R9/R10 measured matrix; prior five-device report is not stable-capacity proof |
 | SEC-01 | P1 | Fingerprint verification UI and first-contact trust boundary |
 | SOS-01 | P1 | Concurrent alert/cancellation ownership and load-time priority |
-| INCIDENT-01 | P1 | Room runtime plus reconnect/connected-update and A–B–C convergence on phones |
+| INCIDENT-01 | P1 | Incident UI runtime plus reconnect/connected-update and A–B–C convergence on phones |
 | BG-01 | P1 | Android 12–14+ lock-screen, process-death, and battery measurements |
 
-## Immediate phone card
+## Current SOS validation
 
-**Build/devices:** debug 1.0.1/code 2, SHA-256 `CE385EAD12D75A96E3C147FD068D7CF2C1EB0665A012F08C56F1A868CE0A9E18`. Local checks passed; APK includes identity and offer editing guards. Record A/B/C names, models/API, and GATT/L2CAP use. User installs and operates phones. Capture with `scripts/capture_ble_logcat.ps1 -DurationMinutes 10`.
+Conversation metadata, Room 10→11 migration, per-channel Radio history, per-alert SOS replies, signed lifecycle, terminal persistence, bounded sync, local silence, and Back-preserving navigation are implemented. UX repairs retain Antigravity's cards/icons, reserve SOS reminders outside content, and keep compact controls accessible. Debug build, 248 unit tests, Lint (zero errors; 147 warnings), docs, and diff checks passed. Eleven Medium_Phone/API 37 instrumentation tests passed: three migrations and eight SOS/Radio UX checks. Physical validation remains open.
 
-**Setup/steps:** same APK on all three phones; verify actual READY links and public/private text. Block A↔C. Keep B unblocked. Observe 90 seconds; remove/restore B, Refresh A/C, and repeat five times. Unblock only A, then both; restart one app at a time without clearing block preferences. Repeat with five short recorded notes, then simultaneous 5/15/30-second notes from A/C plus public text and test SOS. Test L2CAP and a GATT-only pair/path where available; record an unavailable transport case as untested.
+Run the [SOS conversation phone card](testing/sos-conversations-test-card.md) using its final APK identity. Use the existing physical checklist for R7/R8; preserve unrelated block/incident evidence.
 
-**Expected:** direct A↔C remains denied until both release their records; A/B and B/C recover without clearing blocks; relay/private receipts work; progressing voice traffic avoids false retirement; rejected sends remain pending or show partial feedback. Transport acceptance is not delivery/playback proof.
-
-**Failure/report:** timestamp any disconnect, false direct/relay label, missing/duplicate note, SOS delay, pending stall, or reconnect requiring unblock. Include `BLE_ADMISSION`, identity rejection, handshake acquire/release, `READY`, heartbeat, queue-full, promotion/fallback, and retirement markers. Report five repetitions and 90-second stability; omit private contents.
+Older unscoped SOS/voice history entries are intentionally hidden. Current Radio channels and identified SOS threads retain history, drafts, and unread counts; migration classification remains intact.
 
 ## Next actions
 
-1. Run the automatic incident-sync card in validation; record APK identity, convergence time, retries, and text/SOS latency.
-2. Run R7/R8 and investigate focused failure windows before expanding traffic.
-3. Advance to R9/R10 only after the smaller matrix passes.
-4. Run closure, identity/offer, UI, and background cards.
-5. Choose R11 from measured bottlenecks; keep text/SOS and private fail-closed behavior first.
+1. Run the SOS phone card with its recorded APK hash: cross-channel A–B–C, simultaneous alerts, receiver silence, sender Back, partition/end/reconnect, and voice pressure.
+2. Run incident convergence and R7/R8 cards; investigate focused failures.
+3. Complete trust, UI/accessibility, and background/lock-screen validation.
+4. Advance to five/ten phones only after smaller matrices pass.

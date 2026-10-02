@@ -9,6 +9,12 @@ typealias MessageReceivedCallback = (
 
 /** Repository-facing transport contract. It deliberately exposes no Android Bluetooth classes. */
 interface MeshNetworkGateway {
+    var onConversationMessage: ((String, MeshPayload) -> Unit)?
+        get() = null
+        set(@Suppress("UNUSED_PARAMETER") value) {}
+    var onSosPacket: ((String, MeshPayload) -> Unit)?
+        get() = null
+        set(@Suppress("UNUSED_PARAMETER") value) {}
     var myDeviceName: String
     var myNodeId: String
     var onDeviceConnected: ((ConnectedDevice) -> Unit)?
@@ -70,6 +76,8 @@ interface MeshNetworkGateway {
 
 /** Keeps NativeBleManager available to Android entry points while repositories depend on the contract. */
 class NativeBleGateway(private val manager: NativeBleManager) : MeshNetworkGateway {
+    override var onConversationMessage by manager::onConversationMessage
+    override var onSosPacket by manager::onSosPacket
     override var myDeviceName: String
         get() = manager.myDeviceName
         set(value) { manager.myDeviceName = value }

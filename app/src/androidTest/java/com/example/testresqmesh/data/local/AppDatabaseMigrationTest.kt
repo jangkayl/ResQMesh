@@ -13,6 +13,62 @@ import org.json.JSONObject
 
 @RunWith(AndroidJUnit4::class)
 class AppDatabaseMigrationTest {
+    @Test fun versionTenToElevenSeparatesHistoryAndPersistsScopedDraftsAndTerminalSos() = runBlocking {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val assets = InstrumentationRegistry.getInstrumentation().context.assets
+        val name = "migration_10_11_test.db"
+        context.deleteDatabase(name)
+        val file = context.getDatabasePath(name)
+        file.parentFile?.mkdirs()
+        SQLiteDatabase.openOrCreateDatabase(file, null).use { old ->
+            val entities = JSONObject(assets.open("com.example.testresqmesh.data.local.AppDatabase/10.json")
+                .bufferedReader().use { it.readText() }).getJSONObject("database").getJSONArray("entities")
+            for (i in 0 until entities.length()) {
+                val e = entities.getJSONObject(i)
+                old.execSQL(e.getString("createSql").replace("\${TABLE_NAME}", e.getString("tableName")))
+                val indexes = e.getJSONArray("indices")
+                for (j in 0 until indexes.length()) old.execSQL(indexes.getJSONObject(j).getString("createSql")
+                    .replace("\${TABLE_NAME}", e.getString("tableName")))
+            }
+            old.execSQL("INSERT INTO messages VALUES ('community', 'Peer', NULL, 'hello', NULL, NULL, NULL, NULL, 1, 0, 0, '', '', '')")
+            old.execSQL("INSERT INTO messages VALUES ('radio', 'Peer', NULL, 'Voice message', NULL, 'audio', NULL, NULL, 2, 0, 0, '', '', '')")
+            old.execSQL("INSERT INTO messages VALUES ('sos', 'Peer', NULL, 'old SOS', NULL, NULL, NULL, NULL, 3, 1, 0, '', '', '')")
+            old.execSQL("INSERT INTO messages VALUES ('private', 'Peer', 'Me', 'private', NULL, 'audio', NULL, NULL, 4, 0, 0, '', '', '')")
+            old.version = 10
+        }
+        try {
+            var db = AppDatabase.buildDatabase(context, name)
+            val dao = db.messageDao()
+            assertEquals("COMMUNITY", dao.getMessageById("community")?.conversationKind)
+            assertEquals("LEGACY_RADIO", dao.getMessageById("radio")?.conversationKind)
+            assertEquals("", dao.getMessageById("radio")?.channelId)
+            assertEquals("LEGACY_SOS", dao.getMessageById("sos")?.conversationKind)
+            assertEquals("PRIVATE", dao.getMessageById("private")?.conversationKind)
+            assertEquals(listOf("community"), dao.getPublicMessages().first().map { it.msgId })
+            assertEquals(4, dao.getAllMessagesOnce().size)
+            assertEquals(emptyList<Any>(), db.sosDao().alerts())
+            val states = db.conversationStateDao()
+            states.draft("RADIO:1", "channel one")
+            states.draft("RADIO:2", "channel two")
+            states.read("RADIO:1", 100)
+            states.draft("SOS:alert", "help")
+            val alert = com.example.testresqmesh.data.local.entity.SosAlertEntity("alert", "A", "A", "key", "Medical",
+                2, true, 1, 2, null, null, null, null, true, "{}", "QUEUED")
+            db.sosDao().putAlert(alert)
+            db.close()
+            db = AppDatabase.buildDatabase(context, name)
+            try {
+                assertEquals(alert, db.sosDao().alert("alert"))
+                val restored = db.conversationStateDao().observe().first().associateBy { it.conversationId }
+                assertEquals("channel one", restored["RADIO:1"]?.draft)
+                assertEquals(100L, restored["RADIO:1"]?.lastReadAt)
+                assertEquals("channel two", restored["RADIO:2"]?.draft)
+                assertEquals(0L, restored["RADIO:2"]?.lastReadAt)
+                assertEquals("help", restored["SOS:alert"]?.draft)
+            } finally { db.close() }
+        } finally { context.deleteDatabase(name) }
+    }
+
     @Test fun versionNineToTenSeparatesValidationFromApplicationWithoutLosingHistory() = runBlocking {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val testContext = InstrumentationRegistry.getInstrumentation().context

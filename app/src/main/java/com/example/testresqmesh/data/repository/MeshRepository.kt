@@ -42,7 +42,8 @@ class MeshRepository(
     private val publicKeys: PeerPublicKeyDirectory,
     private val repositoryScope: CoroutineScope,
     private val readyPeerEvents: MeshReadyPeerEvents,
-    private val peerNameStore: PeerNameStore
+    private val peerNameStore: PeerNameStore,
+    private val sosRepository: SosRepository? = null
 ) {
 
     private val _connectionStatus = MutableStateFlow("Ready to deploy Mesh Node.")
@@ -81,6 +82,8 @@ class MeshRepository(
     val topology = meshRouter.topology
 
     val publicMessages = messageStore.publicMessages
+        .stateIn(repositoryScope, SharingStarted.Eagerly, emptyList())
+    val allPublicMessages = messageStore.allPublicMessages
         .stateIn(repositoryScope, SharingStarted.Eagerly, emptyList())
 
     val privateMessages = messageStore.privateMessages
@@ -374,8 +377,9 @@ class MeshRepository(
             _scannedDevices.value = _scannedDevices.value.filter { it.endpointId != id }
         }
 
-        networkManager.onSosCancelled = {
-            clearSosAlert()
+        networkManager.onSosCancelled = { /* Unscoped legacy cancellation is ignored. */ }
+        networkManager.onConversationMessage = { endpoint, payload ->
+            repositoryScope.launch { receiveConversation(endpoint, payload) }
         }
 
         networkManager.stpNeighborsProvider = {
@@ -412,7 +416,9 @@ class MeshRepository(
                         isHopped = !isDirect,
                         receiveMedium = medium,
                         outboundRoute = routePath,
-                        isSOS = text.contains("🚨 CRITICAL SOS")
+                        isSOS = false,
+                        conversationKind = if (isPrivate) "PRIVATE" else if (audio != null) "LEGACY_RADIO" else "COMMUNITY",
+                        senderNodeId = NodeIdentity.idOf(sender).orEmpty()
                     )
                     if (isPrivate) {
                         repositoryScope.launch {
@@ -435,7 +441,7 @@ class MeshRepository(
                         }
                     }
 
-                    if (message.audioBase64 != null) {
+                    if (message.conversationKind == "RADIO" && message.audioBase64 != null) {
                         incomingVoiceMessage.tryEmit(message)
                     }
                 }
@@ -699,6 +705,11 @@ class MeshRepository(
 
         var retryRejectedDispatch = false
         for ((message, targetName) in pendingMessages) {
+            if (targetName == null && (message.conversationKind.startsWith("LEGACY_") || message.isSOS ||
+                    (message.conversationKind == "SOS" && sosRepository?.canReply(message.sosId) != true))) {
+                messageStore.expirePending(message.id)
+                continue
+            }
             if (now - message.timestamp > OUTBOX_EXPIRY_MS) {
                 messageStore.expirePending(message.id)
                 continue
@@ -758,7 +769,11 @@ class MeshRepository(
                     locationLng = message.locationLng,
                     isSOS = message.isSOS,
                     isSOSCancel = false,
-                    channelId = _currentChannelId.value
+                    channelId = message.channelId,
+                    conversationKind = message.conversationKind,
+                    sosId = message.sosId,
+                    senderNodeId = message.senderNodeId.ifBlank { networkManager.myNodeId },
+                    ttl = networkManager.currentMeshTtl()
                 )
                 val result = if (message.isSOS) {
                     networkManager.broadcastPriorityPayload(payloadBytes)
@@ -823,7 +838,10 @@ class MeshRepository(
         networkManager.rescan()
     }
 
-    fun sendPublicMessage(text: String, imageBase64: String?, audioBase64: String?, locationLat: Double? = null, locationLng: Double? = null, isSOS: Boolean = false, isSOSCancel: Boolean = false): String {
+    fun sendPublicMessage(text: String, imageBase64: String?, audioBase64: String?, locationLat: Double? = null, locationLng: Double? = null, isSOS: Boolean = false, isSOSCancel: Boolean = false,
+        conversationKind: String = "COMMUNITY", channelId: String = "", sosId: String = ""): String {
+        require(!isSOS && !isSOSCancel) { "SOS lifecycle uses signed SosRepository operations" }
+        require(conversationKind in setOf("COMMUNITY", "RADIO", "SOS"))
         val messageId = UUID.randomUUID().toString()
         val timestamp = System.currentTimeMillis()
         
@@ -838,12 +856,21 @@ class MeshRepository(
             locationLng = locationLng,
             isSOS = isSOS,
             isSOSCancel = isSOSCancel,
-            channelId = _currentChannelId.value
+            channelId = channelId,
+            conversationKind = conversationKind,
+            sosId = sosId,
+            senderNodeId = networkManager.myNodeId,
+            ttl = networkManager.currentMeshTtl()
         )
 
-        val message = ChatMessage(messageId, myNodeName, text, imageBase64, audioBase64, locationLat, locationLng, true, false, timestamp, isSOS = isSOS)
+        val message = ChatMessage(messageId, myNodeName, text, imageBase64, audioBase64, locationLat, locationLng, true, false, timestamp,
+            conversationKind = conversationKind, channelId = channelId, sosId = sosId, senderNodeId = networkManager.myNodeId)
         repositoryScope.launch {
             outboxMutex.withLock {
+                if (conversationKind == "SOS" && sosRepository?.canReply(sosId) != true) {
+                    _publicSendFeedback.emit("This SOS has ended. Its conversation is read-only.")
+                    return@withLock
+                }
                 // Persist first, so acceptance and receipts cannot race an absent database row.
                 messageStore.save(message.copy(deliveredTo = listOf("PENDING")), targetName = null)
                 val result = if (readyConnectedDevices().isEmpty()) {
@@ -860,6 +887,43 @@ class MeshRepository(
             }
         }
         return messageId
+    }
+
+    private suspend fun receiveConversation(endpoint: String, p: com.example.testresqmesh.core.network.MeshPayload) {
+        if (p.senderNodeId.isBlank() || p.senderNodeId == networkManager.myNodeId || p.id.length !in 1..100 ||
+            p.senderName.length !in 1..160 || p.text.length > 8192 || p.isPrivate || p.isEncrypted ||
+            p.conversationKind !in setOf("COMMUNITY", "RADIO", "SOS") || p.ttl !in 1..10 || p.relayHopCount !in 0..10) return
+        if (p.conversationKind == "RADIO" && p.channelId !in (1..5).map { it.toString() }) return
+        if (p.conversationKind == "SOS" && (p.audioBytes != null || p.imageBytes != null || sosRepository?.canReply(p.sosId) != true)) return
+        if ((p.audioBytes?.size ?: 0) > 2 * 1024 * 1024 || (p.imageBytes?.size ?: 0) > 2 * 1024 * 1024) return
+        val attachments = runCatching {
+            val audio = p.audioBytes?.let { Base64.encodeToString(com.example.testresqmesh.core.utils.BinaryCompressor.decompress(it, 2 * 1024 * 1024), Base64.NO_WRAP) }
+            val image = p.imageBytes?.let { Base64.encodeToString(com.example.testresqmesh.core.utils.BinaryCompressor.decompress(it, 2 * 1024 * 1024), Base64.NO_WRAP) }
+            audio to image
+        }.getOrElse {
+            AppLogger.d("CONVERSATION", "Rejected invalid attachment")
+            return
+        }
+        var fresh = false
+        var message: ChatMessage? = null
+        outboxMutex.withLock {
+            if (!messageStore.contains(p.id)) {
+                message = ChatMessage(p.id, p.senderName, p.text, attachments.second, attachments.first, p.locationLat, p.locationLng,
+                    false, timestamp = System.currentTimeMillis(), isHopped = p.relayHopCount > 0,
+                    outboundRoute = p.routePath, conversationKind = p.conversationKind, channelId = p.channelId,
+                    sosId = p.sosId, senderNodeId = p.senderNodeId)
+                messageStore.save(message!!, null)
+                fresh = true
+            }
+        }
+        networkManager.broadcastDeliveredReceipt(p.id, isPrivate = false)
+        if (!fresh) return
+        recordPeerName(p.senderName)
+        message?.takeIf { it.conversationKind == "RADIO" && it.audioBase64 != null }?.let { incomingVoiceMessage.tryEmit(it) }
+        if (p.ttl > 1 && p.relayHopCount < 10) {
+            networkManager.broadcastPayload(ProtoBuf.encodeToByteArray(p.copy(ttl = p.ttl - 1,
+                relayHopCount = p.relayHopCount + 1, routePath = p.routePath + myNodeName)), endpoint)
+        }
     }
 
     fun deleteConversationWith(peerName: String) {

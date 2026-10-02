@@ -351,12 +351,8 @@ class StandardMessageHandler : PayloadHandler {
                 AppLogger.d("PayloadDispatcher", "Private relay route unavailable; dropping without broadcast")
             }
         } else {
-            if (payload.isSOSCancel) {
-                callback.onSosCancelled()
-            }
-            if (payload.isSOS && sender != callback.getMyDeviceName()) {
-                callback.showSosEmergencyNotification(sender, text)
-            }
+            // Legacy unscoped SOS cancellation cannot mutate upgraded alerts.
+            if (payload.isSOSCancel || payload.isSOS) return
             
             routePath.add(callback.getMyDeviceName())
             val updatedPayload = payload.copy(routePath = routePath)

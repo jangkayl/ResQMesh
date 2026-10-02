@@ -12,10 +12,19 @@ object BinaryCompressor {
         return bos.toByteArray()
     }
 
-    fun decompress(compressedData: ByteArray): ByteArray {
+    fun decompress(compressedData: ByteArray, maxDecodedBytes: Int = Int.MAX_VALUE): ByteArray {
+        require(maxDecodedBytes >= 0)
         val bis = ByteArrayInputStream(compressedData)
         val bos = ByteArrayOutputStream()
-        GZIPInputStream(bis).use { it.copyTo(bos) }
+        GZIPInputStream(bis).use { input ->
+            val buffer = ByteArray(8192)
+            while (true) {
+                val count = input.read(buffer)
+                if (count < 0) break
+                if (count > maxDecodedBytes - bos.size()) throw java.io.IOException("Decoded attachment exceeds limit")
+                bos.write(buffer, 0, count)
+            }
+        }
         return bos.toByteArray()
     }
 }

@@ -1,6 +1,8 @@
 package com.example.testresqmesh.core.network
 
 interface PayloadDispatcherCallback {
+    fun onConversationMessage(endpointId: String, payload: MeshPayload) {}
+    fun onSosPacket(endpointId: String, payload: MeshPayload) {}
     fun getMyDeviceName(): String
     fun getMyNodeId(): String
     fun getSeenMessageIds(): MutableSet<String>

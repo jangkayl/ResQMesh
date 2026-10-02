@@ -28,6 +28,8 @@ class DefaultLocationClient(
 
     private val client: FusedLocationProviderClient = LocationServices.getFusedLocationProviderClient(context.applicationContext)
     private var cachedLocation: Location? = null
+    private var pinpointCancellation: com.google.android.gms.tasks.CancellationTokenSource? = null
+    override fun cancelPinpointLocation() { pinpointCancellation?.cancel(); pinpointCancellation = null }
     private var locationCallback: LocationCallback? = null
 
     private val _locationStatus = MutableStateFlow(LocationStatus.IDLE)
@@ -100,9 +102,13 @@ class DefaultLocationClient(
 
     @SuppressLint("MissingPermission")
     override fun requestPinpointLocation(onResult: (Location?) -> Unit) {
+        cancelPinpointLocation()
+        val cancellation = com.google.android.gms.tasks.CancellationTokenSource()
+        pinpointCancellation = cancellation
         try {
-            client.getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, null)
+            client.getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, cancellation.token)
                 .addOnSuccessListener { location ->
+                    if (cancellation.token.isCancellationRequested) return@addOnSuccessListener
                     if (location != null) {
                         cachedLocation = location
                         _locationStatus.value = LocationStatus.READY
@@ -110,7 +116,7 @@ class DefaultLocationClient(
                     onResult(location)
                 }
                 .addOnFailureListener {
-                    onResult(null)
+                    if (!cancellation.token.isCancellationRequested) onResult(null)
                 }
         } catch (e: SecurityException) {
             _locationStatus.value = LocationStatus.ERROR_DENIED

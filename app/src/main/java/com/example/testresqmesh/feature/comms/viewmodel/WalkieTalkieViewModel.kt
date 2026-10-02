@@ -38,7 +38,10 @@ class WalkieTalkieViewModel(
     }.stateIn(viewModelScope, SharingStarted.Eagerly, null)
     
     fun setChannel(channelId: String) {
+        // Tuning changes never replay previously received notes.
+        mediaHelper.setRadioMonitoring(false)
         useCases.setChannel(channelId)
+        mediaHelper.setRadioMonitoring(_isWalkieTalkieMode.value)
     }
 
     private val _volumeGain = MutableStateFlow(1.0f)
@@ -52,7 +55,7 @@ class WalkieTalkieViewModel(
     init {
         viewModelScope.launch {
             useCases.observeIncomingVoiceMessage().collect { message ->
-                message.audioBase64?.let { base64 ->
+                if (com.example.testresqmesh.core.model.ConversationPolicy.autoplay(message, currentChannelId.value, _isWalkieTalkieMode.value)) message.audioBase64?.let { base64 ->
                     mediaHelper.enqueueRadioVoice(message.id, base64, message.senderName)
                     if (_isWalkieTalkieMode.value) {
                         useCases.broadcastSeenReceipt(message.id, message.isPrivate, message.senderName)

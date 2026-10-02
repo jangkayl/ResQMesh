@@ -42,7 +42,7 @@ val appModule = module {
     single { PeerPublicKeyDirectory(androidContext()) }
     single(createdAtStart = true) { AppCoroutineScope(Dispatchers.IO) }
     single(createdAtStart = true) { MeshReadyPeerEvents() }
-    single { MeshRepository(get(), get(), get(), get(), get<AppCoroutineScope>().scope, get(), get()) }
+    single { MeshRepository(get(), get(), get(), get(), get<AppCoroutineScope>().scope, get(), get(), get()) }
     single { MeshSessionController(androidContext(), get()) }
     single { MediaHelper(androidContext()) }
     single { com.example.testresqmesh.core.utils.NotificationHelper(androidContext()) }
@@ -107,7 +107,7 @@ val appModule = module {
 
     viewModel { SetupViewModel(get(), get(), get()) }
     viewModel { RadarViewModel(get()) }
-    viewModel { CommunicationViewModel(get(), get()) }
+    viewModel { CommunicationViewModel(get(), get(), get(), get<AppDatabase>().conversationStateDao()) }
     viewModel { WalkieTalkieViewModel(get(), get(), get()) }
     viewModel { com.example.testresqmesh.feature.profile.viewmodel.OfflineMapViewModel(get(), get(), get()) }
     viewModel { com.example.testresqmesh.feature.profile.viewmodel.AboutViewModel() }
@@ -116,6 +116,13 @@ val appModule = module {
     single<IdentityProvider> { get<LocalIdentityManager>() }
     single<com.example.testresqmesh.data.repository.IncidentEventSigning> {
         com.example.testresqmesh.data.repository.KeystoreIncidentEventSigning()
+    }
+    single<com.example.testresqmesh.data.repository.SosStore> { com.example.testresqmesh.data.repository.RoomSosStore(get()) }
+    single<com.example.testresqmesh.data.repository.SosAlertSink> {
+        com.example.testresqmesh.core.utils.SosAlertController(androidContext(), get(), get(), get<AppCoroutineScope>().scope)
+    }
+    single(createdAtStart = true) {
+        com.example.testresqmesh.data.repository.SosRepository(get(), get(), get(), get(), get(), get<AppCoroutineScope>().scope, get())
     }
     single(createdAtStart = true) {
         com.example.testresqmesh.data.repository.IncidentRepository(

@@ -93,6 +93,8 @@ class RescanUseCase(private val repository: MeshRepository) {
 }
 
 class SendPublicMessageUseCase(private val repository: MeshRepository) {
+    fun conversation(kind: String, channel: String, sosId: String, text: String, audio: String? = null): String =
+        repository.sendPublicMessage(text, null, audio, conversationKind = kind, channelId = channel, sosId = sosId)
     val feedback: SharedFlow<String> get() = repository.publicSendFeedback
     operator fun invoke(text: String, imageBase64: String?, audioBase64: String?, locationLat: Double? = null, locationLng: Double? = null, isSOS: Boolean = false, isSOSCancel: Boolean = false): String {
         return repository.sendPublicMessage(text, imageBase64, audioBase64, locationLat, locationLng, isSOS, isSOSCancel)
@@ -181,6 +183,7 @@ class ObserveTopologyUseCase(private val repository: MeshRepository) {
 }
 
 class ObservePublicMessagesUseCase(private val repository: MeshRepository) {
+    val allMessages: StateFlow<List<ChatMessage>> get() = repository.allPublicMessages
     operator fun invoke(): StateFlow<List<ChatMessage>> = repository.publicMessages
 }
 

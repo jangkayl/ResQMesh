@@ -9,8 +9,11 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface MessageDao {
-    @Query("SELECT * FROM messages WHERE targetName IS NULL ORDER BY timestamp ASC")
+    @Query("SELECT * FROM messages WHERE targetName IS NULL AND conversationKind = 'COMMUNITY' ORDER BY timestamp ASC")
     fun getPublicMessages(): Flow<List<MessageEntity>>
+
+    @Query("SELECT * FROM messages WHERE targetName IS NULL ORDER BY timestamp ASC")
+    fun getAllPublicMessages(): Flow<List<MessageEntity>>
 
     @Query("SELECT * FROM messages WHERE targetName = :peerName OR (senderName = :peerName AND targetName IS NOT NULL) ORDER BY timestamp ASC")
     fun getPrivateMessagesWith(peerName: String): Flow<List<MessageEntity>>
