@@ -18,7 +18,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.ChatBubbleOutline
-import androidx.compose.material.icons.outlined.LocationOn
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
@@ -50,10 +49,10 @@ import com.example.testresqmesh.feature.comms.ui.deliveryLabel
 import com.example.testresqmesh.feature.comms.ui.messageTime
 import kotlin.math.absoluteValue
 
-import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.material.icons.automirrored.outlined.Reply
 import androidx.compose.ui.text.font.FontFamily
+import com.example.testresqmesh.core.ui.components.identity.UserAvatar
+import com.example.testresqmesh.core.ui.components.location.TacticalLocationCard
 
 @Composable
 fun ChatBubble(

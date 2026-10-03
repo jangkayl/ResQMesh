@@ -1,10 +1,9 @@
-package com.example.testresqmesh.feature.comms.ui.components
+package com.example.testresqmesh.core.ui.components.identity
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable

@@ -1,6 +1,6 @@
 # Current status
 
-Last reviewed: 2026-10-03. Branch: `fix/ble-voice-transfer-reliability`.
+Last reviewed: 2026-10-04. Branch: `refactor/mvvm-presentation-organization`.
 
 ## Current objective
 
@@ -10,7 +10,9 @@ Validate the BLE voice-burst repair with [matching APKs and the phone card](test
 
 ## Implemented and locally checked
 
-Prior Samsung repair: build, Lint, 280 clean-snapshot tests passed; [card](testing/samsung-send-test-card.md). Latest burst repair serializes setup/handoffs, retains fallback work, adds resumable chunk custody, chooses responsive endpoints, and times private receipts after transfer completion. All 348 clean-snapshot tests, builds, Android-test compilation, and Lint passed; physical results remain UNTESTED. The pre-existing untracked reconnect test still needs API alignment outside the commit scope.
+Prior Samsung repair: build, Lint, 280 clean-snapshot tests passed; [card](testing/samsung-send-test-card.md). Voice repair: 348 clean-snapshot tests, builds, Android-test compilation, and Lint passed; physical results remain UNTESTED. Mixed-workspace unit compilation is blocked by the pre-existing untracked reconnect test.
+
+Presentation organization preserves 217 protected files and Activity/ViewModel bodies. Navigation, feature/shared UI models, conversations, and components have owners. Twenty-four focused presentation tests passed; full-suite validation remains blocked. Run the [organization regression card](testing/structure-organization-test-card.md).
 
 - Generation-owned BLE, acknowledged GATT, L2CAP promotion, directed READY-rooted topology, empty withdrawals, three-neighbor admission, and private fail-closed routing.
 - Persistent private outbox with 24-hour expiry, accepted-only delivery timing, pending-key-change refusal, and conditional failure updates.
@@ -71,5 +73,5 @@ Antigravity: [repository handoff](plans/phase5-repository-antigravity-guide.md) 
 
 1. Run the burst card on two/three phones: hybrid/GATT comparison, overlapping notes, text/SOS latency, relay loss/resume, and foreground/background.
 2. Align the pre-existing reconnect test APIs for the mixed-workspace suite; preserve the validated repair scope.
-3. Run [Bluetooth recovery](testing/bluetooth-recovery-test-card.md), R7, SOS, and incident cards; investigate focused captures.
+3. Run [organization](testing/structure-organization-test-card.md), [Bluetooth recovery](testing/bluetooth-recovery-test-card.md), R7, SOS, and incident cards; investigate focused captures.
 4. Complete trust/background evidence; advance to five/ten phones only after smaller matrices pass.

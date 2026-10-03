@@ -10,8 +10,7 @@ import android.os.Build
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.core.content.ContextCompat
-import com.example.testresqmesh.data.repository.MeshRepository
-import com.example.testresqmesh.ui.state.ConnectionUiState
+import com.example.testresqmesh.feature.setup.model.ConnectionUiState
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow

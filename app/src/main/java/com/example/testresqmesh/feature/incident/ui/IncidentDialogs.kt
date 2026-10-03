@@ -30,7 +30,7 @@ import androidx.compose.ui.window.Dialog
 import com.example.testresqmesh.core.ui.theme.ResQTheme
 import com.example.testresqmesh.core.ui.theme.Spacing
 import com.example.testresqmesh.data.location.DefaultLocationClient
-import com.example.testresqmesh.feature.comms.ui.components.TacticalLocationCard
+import com.example.testresqmesh.core.ui.components.location.TacticalLocationCard
 import com.example.testresqmesh.data.local.entity.DomainEventEntity
 import com.example.testresqmesh.data.local.entity.IncidentEntity
 import java.text.SimpleDateFormat

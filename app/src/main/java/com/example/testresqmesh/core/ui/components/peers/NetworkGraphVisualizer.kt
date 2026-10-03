@@ -1,4 +1,4 @@
-package com.example.testresqmesh.feature.radar.ui
+package com.example.testresqmesh.core.ui.components.peers
 
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
@@ -9,7 +9,6 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -23,8 +22,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.unit.dp
-import com.example.testresqmesh.core.ui.theme.InboxAccentBlue
 import com.example.testresqmesh.core.ui.theme.ResQTheme
+import com.example.testresqmesh.core.ui.model.NodeItemData
+import com.example.testresqmesh.core.ui.model.NodeKind
 
 @Composable
 fun NetworkGraphVisualizer(

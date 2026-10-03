@@ -13,6 +13,8 @@ import com.example.testresqmesh.core.ui.theme.TestResQMeshTheme
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
+import com.example.testresqmesh.feature.comms.model.ConversationPreview
+import com.example.testresqmesh.feature.comms.model.ConversationStatus
 
 class MessagesInboxScreenTest {
 

@@ -1,11 +1,10 @@
-package com.example.testresqmesh.core.ui
+package com.example.testresqmesh.app.navigation
 
 import com.example.testresqmesh.core.ui.components.layout.ActiveSosReminder
 import com.example.testresqmesh.core.ui.components.layout.SosReminderHost
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -18,8 +17,6 @@ import com.example.testresqmesh.feature.radar.ui.NetworkScreen
 import com.example.testresqmesh.feature.radar.ui.ResponderTrackerScreen
 import com.example.testresqmesh.feature.home.ui.HomeScreen
 import com.example.testresqmesh.feature.sos.ui.SOSBroadcastScreen
-import com.example.testresqmesh.feature.sos.ui.FullScreenSosAlarm
-import com.example.testresqmesh.feature.sos.ui.ActiveSOSMonitoringScreen
 import com.example.testresqmesh.feature.sos.ui.SosMapScreen
 import com.example.testresqmesh.feature.profile.ui.ProfileScreen
 import com.example.testresqmesh.feature.profile.ui.AboutScreen
@@ -167,7 +164,7 @@ fun MainContainerScreen(
         SosReminderHost(showTopReminder, openOwnSos) {
             when {
                 currentSosThreadId != null -> {
-                    com.example.testresqmesh.feature.comms.ui.SosThreadScreen(
+                    com.example.testresqmesh.feature.sos.ui.SosThreadScreen(
                         vm = commsViewModel,
                         media = mediaHelper,
                         id = currentSosThreadId,
@@ -218,7 +215,7 @@ fun MainContainerScreen(
                     BackHandler(onBack = cancelSosBroadcast)
                 }
                 showSosHub -> {
-                    com.example.testresqmesh.feature.comms.ui.SosHubScreen(commsViewModel, mediaHelper,
+                    com.example.testresqmesh.feature.sos.ui.SosHubScreen(commsViewModel, mediaHelper,
                         onBack = { showSosHub = false },
                         onCreate = { isSOSActive = true; showSosHub = true },
                         onOpen = { sosThreadId = it })

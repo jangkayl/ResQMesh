@@ -7,7 +7,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import com.example.testresqmesh.core.model.ConnectedDevice
 import com.example.testresqmesh.core.ui.theme.TestResQMeshTheme
-import com.example.testresqmesh.ui.state.ChatUiState
+import com.example.testresqmesh.feature.comms.model.ChatUiState
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test

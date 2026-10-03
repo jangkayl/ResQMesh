@@ -3,9 +3,10 @@ package com.example.testresqmesh.feature.home.ui
 import com.example.testresqmesh.core.model.ConnectedDevice
 import com.example.testresqmesh.core.model.KnownNode
 import com.example.testresqmesh.core.model.ScannedDevice
-import com.example.testresqmesh.ui.state.RadarUiState
+import com.example.testresqmesh.core.ui.model.RadarUiState
 import org.junit.Assert.assertEquals
 import org.junit.Test
+import com.example.testresqmesh.feature.home.model.homeNetworkSummary
 
 class HomeNetworkSummaryTest {
 

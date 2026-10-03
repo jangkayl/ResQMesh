@@ -9,10 +9,11 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import com.example.testresqmesh.core.ui.theme.TestResQMeshTheme
-import com.example.testresqmesh.ui.state.RadarUiState
+import com.example.testresqmesh.core.ui.model.RadarUiState
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
+import com.example.testresqmesh.feature.home.model.HomeNetworkSummary
 
 class HomeScreenTest {
 

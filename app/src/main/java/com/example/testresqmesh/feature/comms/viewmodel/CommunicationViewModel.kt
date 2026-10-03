@@ -2,9 +2,7 @@ package com.example.testresqmesh.feature.comms.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.testresqmesh.core.model.ConnectedDevice
-import com.example.testresqmesh.data.repository.MeshRepository
-import com.example.testresqmesh.ui.state.ChatUiState
+import com.example.testresqmesh.feature.comms.model.ChatUiState
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow

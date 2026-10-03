@@ -2,9 +2,8 @@ package com.example.testresqmesh.feature.radar.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.testresqmesh.data.repository.MeshRepository
 import com.example.testresqmesh.core.model.NodeIdentity
-import com.example.testresqmesh.ui.state.RadarUiState
+import com.example.testresqmesh.core.ui.model.RadarUiState
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow

@@ -1,11 +1,12 @@
 package com.example.testresqmesh.feature.comms.ui
 
-import com.example.testresqmesh.feature.radar.ui.NodeItemData
-import com.example.testresqmesh.feature.radar.ui.NodeKind
+import com.example.testresqmesh.core.ui.model.NodeItemData
+import com.example.testresqmesh.core.ui.model.NodeKind
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import com.example.testresqmesh.feature.comms.model.inboxMeshStatus
 
 class InboxMeshStatusTest {
     @Test

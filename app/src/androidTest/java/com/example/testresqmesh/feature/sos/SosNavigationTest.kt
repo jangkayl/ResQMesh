@@ -20,7 +20,7 @@ import com.example.testresqmesh.core.ui.theme.TestResQMeshTheme
 import com.example.testresqmesh.core.utils.MediaHelper
 import com.example.testresqmesh.data.repository.SosRepository
 import com.example.testresqmesh.feature.comms.viewmodel.CommunicationViewModel
-import com.example.testresqmesh.feature.comms.ui.SosThreadScreen
+import com.example.testresqmesh.feature.sos.ui.SosThreadScreen
 import com.example.testresqmesh.feature.comms.ui.PublicConversationScreen
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking

@@ -3,9 +3,11 @@ package com.example.testresqmesh.feature.comms.ui
 import com.example.testresqmesh.core.model.ChatMessage
 import com.example.testresqmesh.core.model.ConnectedDevice
 import com.example.testresqmesh.core.model.KnownNode
-import com.example.testresqmesh.ui.state.ChatUiState
+import com.example.testresqmesh.feature.comms.model.ChatUiState
 import org.junit.Assert.assertEquals
 import org.junit.Test
+import com.example.testresqmesh.feature.comms.model.ConversationStatus
+import com.example.testresqmesh.feature.comms.model.conversationPreviews
 
 class ConversationPreviewsTest {
 

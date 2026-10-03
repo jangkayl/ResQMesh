@@ -14,17 +14,11 @@ import androidx.compose.material3.Surface
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
-import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
-import androidx.compose.ui.graphics.Color
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
-import androidx.lifecycle.ViewModel
-import androidx.lifecycle.ViewModelProvider
-import androidx.lifecycle.viewmodel.compose.viewModel
 import org.koin.android.ext.android.inject
-import com.example.testresqmesh.data.repository.MeshRepository
-import com.example.testresqmesh.core.ui.MainContainerScreen
+import com.example.testresqmesh.app.navigation.MainContainerScreen
 import com.example.testresqmesh.feature.setup.ui.IdentitySetupScreen
 import com.example.testresqmesh.feature.setup.ui.FirstLaunchGuideScreen
 import com.example.testresqmesh.feature.setup.ui.PermissionsScreen
@@ -42,8 +36,6 @@ import com.example.testresqmesh.core.service.MeshSessionController
 import android.bluetooth.BluetoothManager
 import android.content.Context
 import android.location.LocationManager
-import android.net.wifi.WifiManager
-import android.widget.Toast
 
 
 enum class AppState {

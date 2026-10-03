@@ -1,4 +1,4 @@
-package com.example.testresqmesh.feature.radar.ui
+package com.example.testresqmesh.core.ui.model
 
 /** Explicit classification of a Radar row, so grouping and actions never depend on status text. */
 enum class NodeKind {

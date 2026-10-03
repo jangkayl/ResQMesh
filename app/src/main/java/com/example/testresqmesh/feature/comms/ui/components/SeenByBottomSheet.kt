@@ -22,6 +22,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.testresqmesh.core.model.NodeIdentity
 import com.example.testresqmesh.core.ui.theme.Spacing
+import com.example.testresqmesh.core.ui.components.identity.UserAvatar
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

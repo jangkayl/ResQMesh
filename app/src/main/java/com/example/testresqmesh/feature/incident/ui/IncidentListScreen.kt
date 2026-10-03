@@ -37,9 +37,9 @@ import com.example.testresqmesh.feature.incident.ui.components.TacticalIncidentC
 import com.example.testresqmesh.feature.incident.viewmodel.IncidentDestination
 import com.example.testresqmesh.feature.incident.viewmodel.IncidentViewModel
 import com.example.testresqmesh.data.repository.IncidentOwnership
-import com.example.testresqmesh.feature.radar.ui.NodeKind
-import com.example.testresqmesh.feature.radar.ui.classifyRadarNodes
-import com.example.testresqmesh.ui.state.RadarUiState
+import com.example.testresqmesh.core.ui.model.NodeKind
+import com.example.testresqmesh.core.ui.peers.classifyRadarNodes
+import com.example.testresqmesh.core.ui.model.RadarUiState
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)

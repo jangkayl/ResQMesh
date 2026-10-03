@@ -1,10 +1,10 @@
 # Architecture
 
-Last reviewed: 2026-10-03. Source and device evidence prevail.
+Reviewed: 2026-10-04. Source/device evidence prevails.
 
 ## System shape
 
-ResQMesh uses Kotlin (SDK 24–36), Compose, Room, serialization, Koin, and coroutines.
+Single-module Kotlin/Compose MVVM uses Room, serialization, Koin, coroutines, and existing use cases.
 
 Native BLE uses GATT setup/fallback and optional L2CAP payloads. Acceptance transfers local ownership; recipient receipts prove delivery. Nearby Connections and Wi-Fi Direct are absent.
 
@@ -111,7 +111,8 @@ Background mesh is opt-in. `MeshSessionController` owns start/stop; `MeshForegro
 | Cryptography | `core/network/CryptoManager.kt`, `data/repository/PeerPublicKeyCache.kt` |
 | Repository and routing | `core/network/MeshNetworkGateway.kt`, `data/repository/MeshRepository.kt`, `MessageStore.kt`, `MeshRouter.kt`, `PayloadFactory.kt` |
 | Room | `data/local/` |
-| Compose features | `feature/` and `core/ui/` |
-| UI state | `ui/state/UiStates.kt` |
+| App composition | `app/navigation/MainContainerScreen.kt` |
+| Feature presentation | `feature/*/{ui,viewmodel,model}/` |
+| Shared presentation | `core/ui/{components,model,peers,theme}/` |
 | MapLibre / Offline Maps | `core/map/`, `feature/sos/ui/SosMapScreen.kt` |
 | Background session | `core/service/MeshSessionController.kt`, `MeshForegroundService.kt` |

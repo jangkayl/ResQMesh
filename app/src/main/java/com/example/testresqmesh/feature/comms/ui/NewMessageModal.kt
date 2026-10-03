@@ -56,7 +56,7 @@ import com.example.testresqmesh.core.ui.components.layout.ResQGlassSurface
 import com.example.testresqmesh.core.ui.theme.ResQTheme
 import com.example.testresqmesh.core.ui.theme.Spacing
 import com.example.testresqmesh.core.ui.theme.TestResQMeshTheme
-import com.example.testresqmesh.ui.state.ChatUiState
+import com.example.testresqmesh.feature.comms.model.ChatUiState
 
 @Composable
 fun NewMessageModal(

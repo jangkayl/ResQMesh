@@ -67,6 +67,7 @@ test_resqmesh/
 │   └── src/
 │       ├── main/
 │       │   ├── java/com/example/testresqmesh/
+│       │   │   ├── app/navigation/  # Application composition and navigation
 │       │   │   ├── core/
 │       │   │   │   ├── domain/       # Use cases and domain boundaries
 │       │   │   │   ├── location/     # Location services
@@ -80,11 +81,12 @@ test_resqmesh/
 │       │   │   │   └── repository/   # Mesh state, payload creation, and routing
 │       │   │   ├── feature/
 │       │   │   │   ├── comms/        # Public/private chat and walkie-talkie UI
+│       │   │   │   ├── home/         # Mission presentation
+│       │   │   │   ├── incident/     # Incident coordination presentation
 │       │   │   │   ├── profile/      # Local identity and profile
 │       │   │   │   ├── radar/        # Peer/routing visualization and tracking
 │       │   │   │   ├── setup/        # Splash, identity, and permissions flow
-│       │   │   │   └── sos/          # SOS broadcast, monitoring, and maps
-│       │   │   └── ui/state/          # Shared immutable UI state
+│       │   │   │   └── sos/          # SOS hub, threads, broadcast, and maps
 │       │   └── res/                    # Android resources and ResQMesh branding
 │       └── test/                       # Focused JVM unit tests
 ├── docs/                               # Concise, active project documentation
@@ -94,6 +96,8 @@ test_resqmesh/
 ├── AGENTS.md                           # Codex task and context router
 └── README.md                           # Project landing page
 ```
+
+Features use `ui/`, `ui/components/`, `viewmodel/`, and `model/`. Shared presentation lives in `core/ui/`. MVVM/networking behavior is unchanged. Before editing, capture with `pwsh -File scripts/check_structure.ps1 -Capture`; afterward run without `-Capture`.
 
 ## Technology stack
 
