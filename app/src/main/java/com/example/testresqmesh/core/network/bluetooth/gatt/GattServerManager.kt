@@ -33,18 +33,22 @@ class GattServerManager(
         }
         with(manager) {
         val epoch = transportGeneration
+        val serverEpoch = beginServerRegistration()
+        fun ownsServer() = isTransportGenerationCurrent(epoch) && ownsServerRegistration(serverEpoch)
         val serverCallback = object : BluetoothGattServerCallback() {
             override fun onServiceAdded(status: Int, service: BluetoothGattService) {
                 handler.post {
-                    if (!isTransportGenerationCurrent(epoch)) return@post
+                    if (!ownsServer()) return@post
                     if (status == BluetoothGatt.GATT_SUCCESS) onGattServerReady(epoch) else failTransport(epoch)
                 }
             }
 
 
             override fun onConnectionStateChange(device: BluetoothDevice, status: Int, newState: Int) {
+                    val disconnectOwner = if (newState == BluetoothProfile.STATE_DISCONNECTED)
+                        store.links.current(device.address, BleLinkRole.SERVER) else null
                     handler.post {
-                        if (!isTransportGenerationCurrent(epoch)) return@post
+                        if (!ownsServer()) return@post
                         fun handleCallback() {
                             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
                                 ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED
@@ -64,6 +68,12 @@ class GattServerManager(
                                         "BLE_MESH",
                                         "Server view shares outbound CLIENT link ${ownedClient.generation} on $macAddress; no duplicate SERVER setup"
                                     )
+                                    return
+                                }
+                                if (store.links.current(macAddress, BleLinkRole.SERVER) == null &&
+                                    store.serverIndications.unresolved(macAddress)) {
+                                    AppLogger.d("BLE_MESH", "SERVER_CALLBACK_WAIT rejecting same-address replacement until old indication resolves")
+                                    try { gattServer?.cancelConnection(device) } catch (_: SecurityException) {}
                                     return
                                 }
                                 val peerName = store.connectedEndpointNames[macAddress]
@@ -192,7 +202,7 @@ class GattServerManager(
                                 // Provisional links are surfaced to the UI but kept out of the routing tables.
                                 val isProvisional = NodeIdentity.isPlaceholder(safePeerName)
                                 handler.post {
-                                    if (!isTransportGenerationCurrent(epoch)) return@post
+                                    if (!ownsServer()) return@post
                                     onDeviceConnected?.invoke(
                                         ConnectedDevice(
                                             endpointId = macAddress,
@@ -210,7 +220,7 @@ class GattServerManager(
                                 }
                             } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
                                 val link = store.links.current(macAddress, BleLinkRole.SERVER)
-                                if (link == null || link.serverDevice?.address != device.address) {
+                                if (link == null || link !== disconnectOwner || link.serverDevice?.address != device.address) {
                                     AppLogger.d("BLE_MESH", "Ignoring unowned SERVER disconnect on $macAddress status=$status")
                                     return
                                 }
@@ -231,7 +241,7 @@ class GattServerManager(
                                     store.connectionEstablishTime.remove(macAddress)
                                 }
                                 handler.post {
-                                    if (!isTransportGenerationCurrent(epoch)) return@post
+                                    if (!ownsServer()) return@post
                                     onDeviceDisconnected?.invoke(macAddress)
                                     sendSystemPulse()
                                 }
@@ -244,7 +254,7 @@ class GattServerManager(
 
             override fun onDescriptorWriteRequest(device: BluetoothDevice, requestId: Int, descriptor: BluetoothGattDescriptor, preparedWrite: Boolean, responseNeeded: Boolean, offset: Int, value: ByteArray?) {
                     handler.post {
-                        if (!isTransportGenerationCurrent(epoch)) return@post
+                        if (!ownsServer()) return@post
                         fun handleCallback() {
                             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
                                 ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED
@@ -274,7 +284,7 @@ class GattServerManager(
                                     "READY"
                                 )
                                 handler.post {
-                                    if (!isTransportGenerationCurrent(epoch)) return@post
+                                    if (!ownsServer()) return@post
                                     if (store.links.isCurrent(link) && link.state == BleLinkState.READY) {
                                         val name = store.connectedEndpointNames[device.address] ?: NodeIdentity.UNKNOWN_NAME
                                         onDeviceConnected?.invoke(ConnectedDevice(
@@ -316,7 +326,7 @@ class GattServerManager(
 
             override fun onMtuChanged(device: BluetoothDevice, mtu: Int) {
                     handler.post {
-                        if (!isTransportGenerationCurrent(epoch)) return@post
+                        if (!ownsServer()) return@post
                         fun handleCallback() {
                             AppLogger.d("BLE_MESH", "Server: MTU Expanded to $mtu for ${device.address}.")
                             store.connectionMtu[device.address] = mtu - 3
@@ -328,14 +338,9 @@ class GattServerManager(
                 }
 
             override fun onNotificationSent(device: BluetoothDevice, status: Int) {
-                    handler.post {
-                        if (!isTransportGenerationCurrent(epoch)) return@post
-                        fun handleCallback() {
-                            completeGattChunk(device.address, BleLinkRole.SERVER, status, device = device)
-
-                        }
-                        handleCallback()
-                    }
+                    if (!ownsServer()) return
+                    val ticket = store.serverIndications.take(device.address, serverEpoch) ?: return
+                    completeServerIndication(ticket, status)
                 }
 
             override fun onCharacteristicReadRequest(
@@ -345,7 +350,7 @@ class GattServerManager(
                 characteristic: BluetoothGattCharacteristic
             ) {
                     handler.post {
-                        if (!isTransportGenerationCurrent(epoch)) return@post
+                        if (!ownsServer()) return@post
                         fun handleCallback() {
                             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
                                 ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED
@@ -378,7 +383,7 @@ class GattServerManager(
                 preparedWrite: Boolean, responseNeeded: Boolean, offset: Int, value: ByteArray?
             ) {
                     handler.post {
-                        if (!isTransportGenerationCurrent(epoch)) return@post
+                        if (!ownsServer()) return@post
                         fun handleCallback() {
                             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
                                 ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED
@@ -455,7 +460,7 @@ class GattServerManager(
             failTransport(epoch)
             return
         }
-        startL2capServer()
+        if (l2capServerSocket == null) startL2capServer()
 
         }
     }

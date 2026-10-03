@@ -9,6 +9,7 @@ import com.example.testresqmesh.core.network.bluetooth.state.BleLink
 import com.example.testresqmesh.core.network.bluetooth.state.BleLinkRole
 import com.example.testresqmesh.core.network.bluetooth.state.GattTransferCoordinator
 import com.example.testresqmesh.core.network.bluetooth.state.GattTransferFlight
+import com.example.testresqmesh.core.network.bluetooth.state.ServerIndicationLedger
 import com.example.testresqmesh.core.network.bluetooth.state.BleStateStore
 import com.example.testresqmesh.core.network.bluetooth.state.payloadBytes
 import com.example.testresqmesh.core.utils.AppLogger
@@ -31,7 +32,7 @@ class GattTransferExecutor(
     private val onFlightRemoved: (String) -> Unit,
     private val isCurrentLink: (BleLink) -> Boolean,
     private val disconnectClient: (String, BluetoothGatt?) -> Unit,
-    private val disconnectServer: (BluetoothDevice) -> Unit,
+    private val disconnectServer: (BleLink) -> Unit,
     private val chunkTimeoutMs: Long
 ) {
     fun processNext(endpoint: String) {
@@ -60,8 +61,9 @@ class GattTransferExecutor(
         gatt: BluetoothGatt? = null,
         device: BluetoothDevice? = null
     ) {
+        val flight = store.gattFlights[endpoint] ?: return
         handler.post {
-            val flight = store.gattFlights[endpoint] ?: return@post
+            if (store.gattFlights[endpoint] !== flight) return@post
             if (!coordinator.callbackMatches(flight, role, gatt, device)) return@post
             if (status != BluetoothGatt.GATT_SUCCESS) {
                 fail(flight, "GATT completion failed status=$status")
@@ -78,6 +80,23 @@ class GattTransferExecutor(
         }
     }
 
+    fun completeServer(ticket: ServerIndicationLedger.Ticket, status: Int) {
+        handler.post {
+            val flight = ticket.owner
+            if (store.gattFlights[ticket.endpoint] !== flight || !coordinator.owns(flight) ||
+                flight.operationId != ticket.operation || flight.link.generation != ticket.generation) return@post
+            if (status != BluetoothGatt.GATT_SUCCESS) { fail(flight, "GATT completion failed status=$status"); return@post }
+            when (coordinator.completeChunk(flight)) {
+                GattTransferCoordinator.Completion.MORE -> sendChunk(flight)
+                GattTransferCoordinator.Completion.DONE -> {
+                    flight.transfer.heartbeatId?.let { onHeartbeatSent(ticket.endpoint, flight.link, it) }
+                    processNext(ticket.endpoint)
+                }
+                GattTransferCoordinator.Completion.STALE -> Unit
+            }
+        }
+    }
+
     private fun sendChunk(flight: GattTransferFlight) {
         val endpoint = flight.link.endpoint
         if (!coordinator.owns(flight)) return
@@ -86,6 +105,11 @@ class GattTransferExecutor(
         val mtu = (store.connectionMtu[endpoint] ?: 20).coerceAtLeast(1)
         val chunk = flight.transfer.frame.copyOfRange(flight.offset, flight.offset + minOf(mtu, remaining))
         val operationId = coordinator.beginChunk(flight, chunk.size)
+        val ticket = if (flight.link.role == BleLinkRole.SERVER) store.serverIndications.begin(flight, operationId) else null
+        if (flight.link.role == BleLinkRole.SERVER && ticket == null) {
+            fail(flight, "Previous server indication is unresolved")
+            return
+        }
         val initiated = try {
             if (flight.link.role == BleLinkRole.CLIENT) {
                 val gatt = flight.gatt
@@ -115,11 +139,13 @@ class GattTransferExecutor(
                 }
             }
         } catch (e: SecurityException) {
+            ticket?.let(store.serverIndications::rejected)
             AppLogger.d("BLE_MESH", "Link ${flight.link.generation} $endpoint: GATT initiation skipped because BLUETOOTH_CONNECT was revoked")
             fail(flight, "Bluetooth permission revoked before GATT initiation")
             return
         }
         if (!initiated) {
+            ticket?.let(store.serverIndications::rejected)
             if (coordinator.recordInitiationRejected(flight, MAX_INITIATION_ATTEMPTS)) {
                 fail(flight, "GATT initiation rejected $MAX_INITIATION_ATTEMPTS times")
             } else {
@@ -155,7 +181,7 @@ class GattTransferExecutor(
             return
         }
         if (flight.link.role == BleLinkRole.CLIENT) disconnectClient(endpoint, flight.gatt)
-        else flight.serverDevice?.let(disconnectServer)
+        else disconnectServer(flight.link)
     }
 
     private companion object {

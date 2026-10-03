@@ -14,6 +14,14 @@ interface MessageStore {
     val privateMessages: Flow<Map<String, List<ChatMessage>>>
     suspend fun save(message: ChatMessage, targetName: String?)
     suspend fun contains(id: String): Boolean = false
+    suspend fun incomingPrivateWasSeen(messageId: String): Boolean = false
+    suspend fun recoverUnacknowledgedPrivateSends() {}
+    suspend fun isUnacknowledgedPrivateSend(messageId: String): Boolean = false
+    suspend fun saveIncomingPrivateIfAbsent(message: ChatMessage): PrivateMessageInsert {
+        if (contains(message.id)) return PrivateMessageInsert.DUPLICATE
+        save(message, message.senderName)
+        return PrivateMessageInsert.INSERTED
+    }
     suspend fun markDelivered(messageId: String, readerName: String)
     suspend fun markSeen(messageId: String, readerName: String)
     suspend fun markFailed(messageId: String)
@@ -24,7 +32,20 @@ interface MessageStore {
     suspend fun deleteConversation(peerName: String)
 }
 
+enum class PrivateMessageInsert { INSERTED, DUPLICATE, REJECTED }
+
 class RoomMessageStore(private val dao: MessageDao) : MessageStore {
+    override suspend fun incomingPrivateWasSeen(messageId: String): Boolean =
+        dao.getMessageById(messageId)?.let { !it.isMine && it.targetName != null && it.seenBy.isNotEmpty() } == true
+    override suspend fun recoverUnacknowledgedPrivateSends() { dao.recoverUnacknowledgedPrivateSends() }
+    override suspend fun isUnacknowledgedPrivateSend(messageId: String): Boolean =
+        dao.getMessageById(messageId)?.let { it.isMine && it.targetName != null && it.deliveredTo.isEmpty() && it.seenBy.isEmpty() } == true
+    override suspend fun saveIncomingPrivateIfAbsent(message: ChatMessage): PrivateMessageInsert =
+        when (dao.insertIncomingPrivateIfAbsent(message.toMessageEntity(message.senderName))) {
+            1 -> PrivateMessageInsert.INSERTED
+            0 -> PrivateMessageInsert.DUPLICATE
+            else -> PrivateMessageInsert.REJECTED
+        }
     override suspend fun contains(id: String) = dao.getMessageById(id) != null
     override val allPublicMessages = dao.getAllPublicMessages().map { rows -> rows.map { it.toChatMessage() } }
     override val publicMessages: Flow<List<ChatMessage>> = dao.getPublicMessages().map { messages ->
@@ -61,17 +82,11 @@ class RoomMessageStore(private val dao: MessageDao) : MessageStore {
     }
 
     override suspend fun markPending(messageId: String) {
-        val message = dao.getMessageById(messageId) ?: return
-        if (message.deliveredTo.isNotEmpty() && message.deliveredTo != "PENDING" && message.deliveredTo != "FAILED") return
-        if (message.seenBy.isNotEmpty()) return
-        dao.updateDeliveredTo(messageId, "PENDING")
+        dao.markPendingIfUnacknowledged(messageId)
     }
 
     override suspend fun markSent(messageId: String) {
-        val message = dao.getMessageById(messageId) ?: return
-        if (message.deliveredTo == "PENDING" || message.deliveredTo == "FAILED") {
-            dao.updateDeliveredTo(messageId, "")
-        }
+        dao.markSentIfUnacknowledged(messageId)
     }
 
     override suspend fun getPendingOutbox(): List<Pair<ChatMessage, String?>> {

@@ -66,7 +66,8 @@ object PayloadFactory {
         directedRoute: List<String>,
         targetPubKey: String?,
         channelId: String,
-        ttl: Int = 0
+        ttl: Int = 0,
+        transmissionId: String = msgId
     ): ByteArray {
         require(!targetPubKey.isNullOrBlank()) { "Recipient public key is unavailable" }
         val innerPayloadJson = org.json.JSONObject().apply {
@@ -81,7 +82,8 @@ object PayloadFactory {
             ?: throw IllegalStateException("Private payload encryption failed")
 
         val payload = MeshPayload(
-            id = msgId,
+            id = transmissionId,
+            targetMessageId = msgId,
             type = "MESSAGE",
             senderName = senderName,
             targetName = targetName,

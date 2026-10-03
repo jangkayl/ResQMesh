@@ -122,6 +122,10 @@ class MeshRepository(
     val blockRelationships = blockStore.relationships
     private val blockRetryJobs = mutableMapOf<String, Job>()
     private val outboxMutex = Mutex()
+    private val outboxWake = Channel<Unit>(Channel.CONFLATED)
+    private var outboxRetryJob: Job? = null
+    private val privateAcceptedAttempts = java.util.concurrent.ConcurrentHashMap<String, Int>()
+    private val privateTimeoutOwners = java.util.concurrent.ConcurrentHashMap<String, Any>()
 
     init {
         setupCallbacks()
@@ -137,6 +141,10 @@ class MeshRepository(
             }
         }
         meshRouter.startTopologyCleanup(repositoryScope, { myNodeName }, { readyConnectedDevices() })
+        repositoryScope.launch {
+            outboxMutex.withLock { messageStore.recoverUnacknowledgedPrivateSends() }
+            for (wake in outboxWake) flushOutbox()
+        }
     }
 
     /**
@@ -264,6 +272,7 @@ class MeshRepository(
             meshRouter.recalculateKnownNodes(myNodeName, updatedList.filter { it.isPayloadReady })
             if (device.isPayloadReady) {
                 scheduleOutboxFlush()
+                networkManager.wakePrivateReceipts()
                 readyPeerEvents.publish(device)
             }
         }
@@ -443,14 +452,18 @@ class MeshRepository(
                     )
                     if (isPrivate) {
                         repositoryScope.launch {
-                            messageStore.save(message, targetName = sender)
+                            val inserted = messageStore.saveIncomingPrivateIfAbsent(message)
+                            if (inserted == PrivateMessageInsert.REJECTED) return@launch
+                            AppLogger.d("MeshNetwork_E2EE", "PRIVATE_STORED message=$msgId insertion=$inserted")
+                            val reversedRoute = routePath.reversed().toMutableList()
+                            if (reversedRoute.isEmpty()) reversedRoute.add(sender)
+                            if (!NodeIdentity.matches(reversedRoute.first(), myNodeName)) reversedRoute.add(0, myNodeName)
+                            networkManager.broadcastDeliveredReceipt(msgId, isPrivate = true, targetId = endpointId, directedReturnRoute = reversedRoute)
+                            if (inserted == PrivateMessageInsert.DUPLICATE && messageStore.incomingPrivateWasSeen(msgId)) {
+                                networkManager.broadcastSeenReceipt(msgId, true, endpointId, reversedRoute)
+                            }
+                            if (inserted == PrivateMessageInsert.INSERTED) networkManager.showPrivateMessageNotification(sender, text)
                         }
-                        
-                        val reversedRoute = routePath.reversed().toMutableList()
-                        if (reversedRoute.isNotEmpty() && reversedRoute.first() != myNodeName) {
-                            reversedRoute.add(0, myNodeName)
-                        }
-                        networkManager.broadcastDeliveredReceipt(msgId, isPrivate = true, targetId = endpointId, directedReturnRoute = reversedRoute)
                     } else {
                         repositoryScope.launch {
                             messageStore.save(message, targetName = null)
@@ -476,12 +489,14 @@ class MeshRepository(
 
             repositoryScope.launch {
                 messageStore.markDelivered(msgId, readerName)
+                AppLogger.d("MeshNetwork_E2EE", "PRIVATE_DELIVERED message=$msgId elapsedMs=${android.os.SystemClock.elapsedRealtime()}")
             }
         }
         
         networkManager.onMessageSeen = { msgId, readerName ->
             repositoryScope.launch {
                 messageStore.markSeen(msgId, readerName)
+                AppLogger.d("MeshNetwork_E2EE", "PRIVATE_SEEN message=$msgId elapsedMs=${android.os.SystemClock.elapsedRealtime()}")
             }
         }
     }
@@ -705,14 +720,39 @@ class MeshRepository(
         }
     }
 
-    private var outboxFlushJob: Job? = null
+
+    private fun awaitPrivateReceipt(messageId: String) {
+        privateAcceptedAttempts.merge(messageId, 1, Int::plus)
+        val owner = Any()
+        privateTimeoutOwners[messageId] = owner
+        repositoryScope.launch {
+            delay(PRIVATE_DELIVERY_TIMEOUT_MS)
+            if (!privateTimeoutOwners.remove(messageId, owner)) return@launch
+            if (!messageStore.isUnacknowledgedPrivateSend(messageId)) {
+                privateAcceptedAttempts.remove(messageId)
+                return@launch
+            }
+            if ((privateAcceptedAttempts[messageId] ?: 0) >= 3) {
+                messageStore.markFailed(messageId)
+                privateAcceptedAttempts.remove(messageId)
+            } else {
+                messageStore.markPending(messageId)
+                AppLogger.d("MeshNetwork_E2EE", "PRIVATE_RETRY message=$messageId awaiting recipient receipt")
+                scheduleOutboxFlush()
+            }
+        }
+    }
 
     private fun scheduleOutboxFlush() {
-        outboxFlushJob?.cancel()
-        outboxFlushJob = repositoryScope.launch {
-            // Jitter delay of 1-2.5 seconds to prevent thundering herd collisions
-            delay(1000L + (0..1500).random())
-            flushOutbox()
+        // Conflate wakes without postponing or cancelling the serialized worker.
+        outboxWake.trySend(Unit)
+    }
+
+    private fun scheduleOutboxRetry() {
+        if (outboxRetryJob?.isActive == true) return
+        outboxRetryJob = repositoryScope.launch {
+            delay(OUTBOX_RETRY_BACKOFF_MS)
+            scheduleOutboxFlush()
         }
     }
 
@@ -755,7 +795,8 @@ class MeshRepository(
                         locationLng = message.locationLng,
                         directedRoute = directedRouteList,
                         targetPubKey = targetPubKey,
-                        channelId = _currentChannelId.value
+                        channelId = _currentChannelId.value,
+                        transmissionId = UUID.randomUUID().toString()
                     )
                 }.getOrNull() ?: continue
 
@@ -770,10 +811,7 @@ class MeshRepository(
                 }
                 if (dispatchResult?.accepted == true) {
                     messageStore.markSent(message.id)
-                    repositoryScope.launch {
-                        delay(PRIVATE_DELIVERY_TIMEOUT_MS)
-                        messageStore.markFailed(message.id)
-                    }
+                    awaitPrivateReceipt(message.id)
                 } else if (dispatchResult != null) {
                     retryRejectedDispatch = true
                 }
@@ -811,10 +849,7 @@ class MeshRepository(
             }
         }
         if (retryRejectedDispatch) {
-            repositoryScope.launch {
-                delay(OUTBOX_RETRY_BACKOFF_MS)
-                scheduleOutboxFlush()
-            }
+            scheduleOutboxRetry()
         }
     }
 
@@ -825,7 +860,7 @@ class MeshRepository(
         const val BLOCK_ACK_GRACE_MS = 1_000L
         const val BLOCK_RETRY_MS = 3_000L
         const val PRIVATE_DELIVERY_TIMEOUT_MS = 15_000L
-        const val OUTBOX_RETRY_BACKOFF_MS = 3_000L
+        const val OUTBOX_RETRY_BACKOFF_MS = 5_000L
         const val OUTBOX_EXPIRY_MS = 24 * 60 * 60 * 1000L
     }
 
@@ -902,7 +937,7 @@ class MeshRepository(
                 } else if (result.neighbors.values.any { it == com.example.testresqmesh.core.network.TransportDispatchResult.REJECTED_INVALID_FRAME }) {
                     messageStore.expirePending(messageId)
                 } else {
-                    scheduleOutboxFlush()
+                    scheduleOutboxRetry()
                 }
                 result.feedback()?.let { _publicSendFeedback.emit(it) }
             }
@@ -961,6 +996,7 @@ class MeshRepository(
 
     fun sendPrivateMessage(targetName: String, text: String, imageBase64: String?, audioBase64: String?, locationLat: Double? = null, locationLng: Double? = null): Boolean {
         val msgId = UUID.randomUUID().toString()
+        AppLogger.d("MeshNetwork_E2EE", "PRIVATE_SEND_REQUEST message=$msgId elapsedMs=${android.os.SystemClock.elapsedRealtime()}")
         val timestamp = System.currentTimeMillis()
         val currentTarget = currentPeerName(targetName)
         if (publicKeys.hasPendingChange(currentTarget)) {
@@ -991,6 +1027,7 @@ class MeshRepository(
             repositoryScope.launch {
                 messageStore.save(message, targetName = currentTarget)
                 messageStore.markPending(msgId)
+                scheduleOutboxFlush()
             }
             AppLogger.d("MeshNetwork_E2EE", "Private send queued as Pending for $targetName (no immediate route)")
             return true
@@ -1019,21 +1056,27 @@ class MeshRepository(
         val message = ChatMessage(msgId, myNodeName, text, imageBase64, audioBase64, locationLat, locationLng, true, true, timestamp, isHopped = !isDirect, outboundRoute = directedRouteList)
         
         repositoryScope.launch {
-            // Persist before dispatch so a fast receipt cannot race the local message row.
-            messageStore.save(message, targetName = currentTarget)
-            val dispatchResult = when (delivery) {
-                is PrivateDeliveryPlanner.Target.Endpoint -> {
-                    AppLogger.d("MeshNetwork_E2EE", "Private route selected with ${directedRouteList.size - 1} hop(s)")
-                    networkManager.sendDirectPayload(delivery.endpointId, payloadBytes)
-                }
-                PrivateDeliveryPlanner.Target.Unavailable -> null
-            }
-            if (dispatchResult?.accepted == true) {
-                delay(PRIVATE_DELIVERY_TIMEOUT_MS)
-                messageStore.markFailed(msgId)
-            } else {
+            outboxMutex.withLock {
+                // Persist before dispatch so a fast receipt cannot race the local message row.
+                messageStore.save(message, targetName = currentTarget)
                 messageStore.markPending(msgId)
-                AppLogger.d("MeshNetwork_E2EE", "Private dispatch was not accepted; retained for directed retry")
+                AppLogger.d("MeshNetwork_E2EE", "PRIVATE_PERSISTED message=$msgId elapsedMs=${android.os.SystemClock.elapsedRealtime()}")
+                val dispatchResult = when (delivery) {
+                    is PrivateDeliveryPlanner.Target.Endpoint -> {
+                        AppLogger.d("MeshNetwork_E2EE", "Private route selected with ${directedRouteList.size - 1} hop(s)")
+                        networkManager.sendDirectPayload(delivery.endpointId, payloadBytes)
+                    }
+                    PrivateDeliveryPlanner.Target.Unavailable -> null
+                }
+                AppLogger.d("MeshNetwork_E2EE", "PRIVATE_DISPATCH message=$msgId result=$dispatchResult elapsedMs=${android.os.SystemClock.elapsedRealtime()}")
+                if (dispatchResult?.accepted == true) {
+                    messageStore.markSent(msgId)
+                    awaitPrivateReceipt(msgId)
+                } else {
+                    messageStore.markPending(msgId)
+                    AppLogger.d("MeshNetwork_E2EE", "Private dispatch was not accepted; retained for directed retry")
+                    scheduleOutboxRetry()
+                }
             }
         }
         return true

@@ -13,6 +13,8 @@ git diff --check
 
 SOS conversation validation: [phone card](testing/sos-conversations-test-card.md). Run migration instrumentation only on an explicitly selected emulator; physical-phone operation stays with the user.
 
+Samsung: [GATT/receipt card](testing/samsung-send-test-card.md).
+
 ## Pull-request CI gate
 
 `.github/workflows/lean-qa.yml` runs build, unit tests, Lint, docs, and diff hygiene on pull requests. Failed checks block readiness. CI neither deploys nor validates physical BLE behavior.

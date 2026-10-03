@@ -166,6 +166,7 @@ class NativeBleManager(val context: Context) {
         }
         override fun sendDirectPayload(endpointId: String, payload: ByteArray) = this@NativeBleManager.sendDirectPayload(endpointId, payload)
         override fun sendPriorityPayload(endpointId: String, payload: ByteArray) = this@NativeBleManager.sendPriorityPayload(endpointId, payload)
+        override fun sendPrivateReceipt(payload: MeshPayload) = this@NativeBleManager.queuePrivateReceipt(payload)
         override fun sendGattPayload(endpointId: String, payload: ByteArray) {
             this@NativeBleManager.enqueueGattPayload(endpointId, payload, priority = true)
         }
@@ -220,6 +221,23 @@ class NativeBleManager(val context: Context) {
     
     val payloadDispatcher = PayloadDispatcher(payloadDispatcherCallback)
     val handler = Handler(Looper.getMainLooper())
+    private val privateReceipts = DirectedReceiptQueue(
+        send = { payload ->
+            val ids = payload.directedRouteNodeIds
+            val index = ids.indexOf(myNodeId)
+            val endpoint = if (index >= 0) ids.getOrNull(index + 1)?.let(payloadDispatcherCallback::getConnectedEndpointIdByNodeId) else null
+            if (endpoint == null) TransportDispatchResult.REJECTED_NOT_READY
+            else sendPriorityPayload(endpoint, ProtoBuf.encodeToByteArray(payload))
+        },
+        schedule = { delayMs, action -> handler.postDelayed({ action() }, delayMs) },
+        now = System::currentTimeMillis,
+        log = { AppLogger.d("MeshNetwork_E2EE", it) }
+    )
+    fun queuePrivateReceipt(payload: MeshPayload) {
+        handler.post { if (store.isNodeActive.get()) privateReceipts.offer(payload) }
+    }
+    fun wakePrivateReceipts() { handler.post { if (store.isNodeActive.get()) privateReceipts.wake() } }
+    fun showPrivateMessageNotification(sender: String, text: String) = payloadDispatcherCallback.showNotification(sender, text)
     private val transferCoordinator = GattTransferCoordinator(store)
     private val heartbeatCoordinator = HeartbeatCoordinator()
     private val HEARTBEAT_ACK_TIMEOUT_MS = 8_000L
@@ -240,13 +258,7 @@ class NativeBleManager(val context: Context) {
         onFlightRemoved = { endpoint -> heartbeatCoordinator.remove(endpoint) },
         isCurrentLink = { link -> store.links.isCurrent(link) },
         disconnectClient = ::forceGattDisconnect,
-        disconnectServer = { device ->
-            try {
-                gattServer?.cancelConnection(device)
-            } catch (e: SecurityException) {
-                AppLogger.d("BLE_MESH", "SERVER transfer cleanup skipped: BLUETOOTH_CONNECT was revoked")
-            }
-        },
+        disconnectServer = ::retireServerLink,
         chunkTimeoutMs = GATT_CHUNK_TIMEOUT_MS
     )
     private val l2capTransport = L2capTransport(
@@ -258,7 +270,7 @@ class NativeBleManager(val context: Context) {
         store, handler, heartbeatCoordinator, HEARTBEAT_ACK_TIMEOUT_MS, CONNECT_LOCK_MAX_HOLD_MS,
         { releaseConnectLock(null, "stuck lock backstop", force = true) }, ::startHeartbeatChallenge,
         { endpoint -> store.activeConnections[endpoint]?.let { forceGattDisconnect(endpoint, it) } },
-        { endpoint -> store.activeServerConnections[endpoint]?.let { gattServer?.cancelConnection(it) } },
+        { endpoint -> store.links.current(endpoint, BleLinkRole.SERVER)?.let(::retireServerLink) },
         { endpoint, responsive -> onDeviceLivenessChanged?.invoke(endpoint, responsive) },
         { endpoint -> onDeviceDisconnected?.invoke(endpoint); onDeviceScanRemoved?.invoke(endpoint) },
         ::sendSystemPulse
@@ -287,6 +299,14 @@ class NativeBleManager(val context: Context) {
         }
     )
     val transportGeneration: Long get() = sessionLifecycle.generation
+    @Volatile var serverRegistrationGeneration = 0L
+        private set
+    fun beginServerRegistration(): Long {
+        serverRegistrationGeneration++
+        store.serverIndications.reset(serverRegistrationGeneration)
+        return serverRegistrationGeneration
+    }
+    fun ownsServerRegistration(generation: Long) = serverRegistrationGeneration == generation
     fun isTransportGenerationCurrent(generation: Long) = sessionLifecycle.owns(generation)
     private var receiverRegistered = false
     private var serviceReady = false
@@ -404,6 +424,7 @@ class NativeBleManager(val context: Context) {
         restartAttempts = 0
         advertisingAttempts = 0
         sessionLifecycle.ready(generation)
+        sessionLifecycle.peers(distinctReadyLinkCount())
         startAdvertising(currentTeamKey)
         startScanning()
         lifecycleSupervisor.start()
@@ -503,6 +524,7 @@ class NativeBleManager(val context: Context) {
 
     private fun stopTransport() {
         store.isNodeActive.set(false)
+        privateReceipts.clear()
         serviceReady = false
         handler.removeCallbacks(startupTimeout)
         handler.removeCallbacks(advertisingRetry)
@@ -519,6 +541,8 @@ class NativeBleManager(val context: Context) {
         
         store.activeServerConnections.values.forEach { try { gattServer?.cancelConnection(it) } catch (_: Exception) {} }
         store.activeServerConnections.clear()
+        serverRegistrationGeneration++
+        store.serverIndications.reset(serverRegistrationGeneration)
         try { gattServer?.close() } catch (_: Exception) {}
         gattServer = null
         
@@ -706,7 +730,42 @@ class NativeBleManager(val context: Context) {
             radioController.reconcileHandshakeOwners(store.links::isSetupOwner)
             radioController.startScanning()
             peerAdmissionController.recover()
+            renewIdleGattServerIfNeeded()
         }
+    }
+
+    /** Invalidate local ownership before Android cancellation, even if its callback never arrives. */
+    fun retireServerLink(link: com.example.testresqmesh.core.network.bluetooth.state.BleLink) {
+        if (!store.retireServerOwnership(link) { finishRadioHandshake(it, "server transfer retirement") }) return
+        AppLogger.removeLink(link.endpoint, "SERVER", link.generation)
+        if (!store.links.hasLiveRole(link.endpoint, BleLinkRole.CLIENT)) {
+            link.serverDevice?.let { try { gattServer?.cancelConnection(it) } catch (_: SecurityException) {} }
+        }
+        cleanupEndpointIfUnowned(link.endpoint)
+        if (!hasLiveSocket(link.endpoint)) {
+            store.connectedEndpointIds.remove(link.endpoint)
+            store.connectedEndpointNames.remove(link.endpoint)
+            store.endpointNodeIds.remove(link.endpoint)
+            store.connectionEstablishTime.remove(link.endpoint)
+        }
+        if (!hasReadyEndpoint(link.endpoint)) onDeviceDisconnected?.invoke(link.endpoint)
+        sendSystemPulse()
+        renewIdleGattServerIfNeeded()
+    }
+
+    private fun renewIdleGattServerIfNeeded() {
+        if (!store.isNodeActive.get() || store.activeServerConnections.isNotEmpty() ||
+            !store.serverIndications.hasUnresolved()) return
+        // A missing indication callback cannot safely be attributed to a same-address replacement.
+        // Renew only an idle server registration; CLIENT roles and other peers' sockets survive.
+        AppLogger.d("BLE_MESH", "SERVER_REGISTRATION_RENEW unresolved indication; no server peers")
+        serverRegistrationGeneration++
+        try { gattServer?.close() } catch (_: Exception) {}
+        gattServer = null
+        serviceReady = false
+        handler.removeCallbacks(startupTimeout)
+        handler.postDelayed(startupTimeout, 5_000L)
+        try { startGattServer() } catch (_: Exception) { failTransport(transportGeneration) }
     }
 
     fun hasReadyLinkToIdentity(peerName: String): Boolean {
@@ -806,6 +865,8 @@ class NativeBleManager(val context: Context) {
         gatt: BluetoothGatt? = null,
         device: BluetoothDevice? = null
     ) = gattTransferExecutor.complete(endpoint, role, status, gatt, device)
+    fun completeServerIndication(ticket: com.example.testresqmesh.core.network.bluetooth.state.ServerIndicationLedger.Ticket, status: Int) =
+        gattTransferExecutor.completeServer(ticket, status)
     fun startGattServer() { gattServerManager.startGattServer() }
 
     fun startL2capServer() { gattServerManager.startL2capServer() }
@@ -1258,12 +1319,12 @@ class NativeBleManager(val context: Context) {
         )
         val bytes = ProtoBuf.encodeToByteArray(payload)
         
-        if (targetId != null) {
-            sendDirectPayload(targetId, bytes)
-        } else if (!isPrivate) {
-            broadcastPayload(bytes)
+        if (isPrivate) {
+            queuePrivateReceipt(payload)
+        } else if (targetId != null) {
+            sendPriorityPayload(targetId, bytes)
         } else {
-            AppLogger.d("BLE_MESH", "Private seen receipt has no directed next hop; not broadcasting")
+            broadcastPayload(bytes)
         }
     }
 
@@ -1280,8 +1341,10 @@ class NativeBleManager(val context: Context) {
         )
         val bytes = ProtoBuf.encodeToByteArray(payload)
         
-        if (targetId != null) {
-            sendDirectPayload(targetId, bytes)
+        if (isPrivate) {
+            queuePrivateReceipt(payload)
+        } else if (targetId != null) {
+            sendPriorityPayload(targetId, bytes)
         } else {
             broadcastPayload(bytes)
         }

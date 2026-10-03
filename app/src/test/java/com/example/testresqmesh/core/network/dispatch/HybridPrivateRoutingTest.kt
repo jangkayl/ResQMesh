@@ -18,12 +18,14 @@ class HybridPrivateRoutingTest {
         val myId: String = "B001"
     ) : PayloadDispatcherCallback {
         val directPayloads = mutableListOf<Pair<String, ByteArray>>()
+        val priorityPayloads = mutableListOf<Pair<String, ByteArray>>()
+        val seen = mutableSetOf<String>()
         val broadcastPayloads = mutableListOf<Pair<ByteArray, String?>>()
         val endpointMap = mutableMapOf<String, String>()
 
         override fun getMyDeviceName() = myName
         override fun getMyNodeId() = myId
-        override fun getSeenMessageIds(): MutableSet<String> = mutableSetOf()
+        override fun getSeenMessageIds(): MutableSet<String> = seen
         override fun getEndpointMedium(endpointId: String) = "BLE"
         override fun getConnectedEndpointIdByName(name: String) = endpointMap[name]
         override fun getConnectedEndpointIdByNodeId(nodeId: String) = endpointMap[nodeId]
@@ -32,7 +34,10 @@ class HybridPrivateRoutingTest {
             directPayloads.add(endpointId to payload)
             return TransportDispatchResult.ACCEPTED
         }
-        override fun sendPriorityPayload(endpointId: String, payload: ByteArray) = TransportDispatchResult.ACCEPTED
+        override fun sendPriorityPayload(endpointId: String, payload: ByteArray): TransportDispatchResult {
+            priorityPayloads += endpointId to payload
+            return TransportDispatchResult.ACCEPTED
+        }
         override fun sendGattPayload(endpointId: String, payload: ByteArray) {}
         override fun onHeartbeatAck(endpointId: String, challengeId: String) {}
         override fun broadcastPayload(payload: ByteArray, excludeEndpointId: String?) {
@@ -150,5 +155,31 @@ class HybridPrivateRoutingTest {
 
         assertTrue(callback.directPayloads.isEmpty())
         assertTrue(callback.broadcastPayloads.isEmpty())
+    }
+
+    @Test fun receiptRelayUsesReservedControlPath() {
+        val callback = TestDispatcherCallback(myName = "Relay#B001", myId = "B001")
+        callback.endpointMap["A001"] = "ep-alice"
+        val payload = MeshPayload(id = "receipt", type = "DELIVERED", isPrivate = true,
+            targetMessageId = "logical", reader = "Charlie#C001", directedRouteNodeIds = listOf("C001", "B001", "A001"))
+        ReceiptHandler().handle("ep-charlie", payload, ProtoBuf.encodeToByteArray(MeshPayload.serializer(), payload), callback)
+        assertEquals(listOf("ep-alice"), callback.priorityPayloads.map { it.first })
+        assertTrue(callback.directPayloads.isEmpty()); assertTrue(callback.broadcastPayloads.isEmpty())
+    }
+
+    @Test fun freshTransmissionIdsAllowLogicalMessageRetryAcrossRelay() {
+        val callback = TestDispatcherCallback(myName = "Relay#B001", myId = "B001")
+        callback.endpointMap["C001"] = "ep-charlie"
+        val dispatcher = com.example.testresqmesh.core.network.PayloadDispatcher(callback)
+        val payload = MeshPayload(id = "wire-1", type = "MESSAGE", isPrivate = true, isEncrypted = true,
+            targetMessageId = "logical", senderName = "Alice#A001", targetName = "Charlie#C001", targetNodeId = "C001",
+            directedRouteNodeIds = listOf("A001", "B001", "C001"))
+        dispatcher.dispatch("ep-alice", ProtoBuf.encodeToByteArray(MeshPayload.serializer(), payload))
+        dispatcher.dispatch("ep-alice", ProtoBuf.encodeToByteArray(MeshPayload.serializer(), payload))
+        dispatcher.dispatch("ep-alice", ProtoBuf.encodeToByteArray(MeshPayload.serializer(), payload.copy(id = "wire-2")))
+        assertEquals(2, callback.directPayloads.size)
+        val forwarded = callback.directPayloads.map { ProtoBuf.decodeFromByteArray(MeshPayload.serializer(), it.second) }
+        assertEquals(listOf("wire-1", "wire-2"), forwarded.map { it.id })
+        assertTrue(forwarded.all { it.targetMessageId == "logical" }); assertTrue(callback.broadcastPayloads.isEmpty())
     }
 }

@@ -65,6 +65,8 @@ interface MeshNetworkGateway {
     fun broadcastPriorityPayload(payloadBytes: ByteArray, excludeEndpointId: String? = null): BroadcastDispatchResult
     fun sendDirectPayload(targetEndpointId: String, payloadBytes: ByteArray): TransportDispatchResult
     fun sendPriorityPayload(targetEndpointId: String, payloadBytes: ByteArray): TransportDispatchResult
+    fun showPrivateMessageNotification(sender: String, text: String) {}
+    fun wakePrivateReceipts() {}
     fun broadcastSeenReceipt(
         messageId: String,
         isPrivate: Boolean,
@@ -139,6 +141,8 @@ class NativeBleGateway(private val manager: NativeBleManager) : MeshNetworkGatew
         manager.sendDirectPayload(targetEndpointId, payloadBytes)
     override fun sendPriorityPayload(targetEndpointId: String, payloadBytes: ByteArray) =
         manager.sendPriorityPayload(targetEndpointId, payloadBytes)
+    override fun showPrivateMessageNotification(sender: String, text: String) = manager.showPrivateMessageNotification(sender, text)
+    override fun wakePrivateReceipts() = manager.wakePrivateReceipts()
     override fun broadcastSeenReceipt(messageId: String, isPrivate: Boolean, targetId: String?, directedReturnRoute: List<String>) =
         manager.broadcastSeenReceipt(messageId, isPrivate, targetId, directedReturnRoute)
     override fun broadcastDeliveredReceipt(

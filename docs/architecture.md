@@ -1,10 +1,10 @@
 # Architecture
 
-Last reviewed: 2026-10-02. Source and device evidence prevail.
+Last reviewed: 2026-10-03. Source and device evidence prevail.
 
 ## System shape
 
-ResQMesh is a Kotlin Android app (SDK 24–36). Compose provides UI, Room stores state, Kotlin serialization encodes `MeshPayload`, Koin supplies dependencies, and coroutines connect events to repositories and ViewModels.
+ResQMesh uses Kotlin (SDK 24–36), Compose, Room, Kotlin serialization, Koin, and coroutines.
 
 Native BLE, GATT, and optional L2CAP carry traffic. GATT owns setup, readiness, heartbeat, and fallback. Direct dispatch reports acceptance or an exact rejection; only a receipt proves delivery. Nearby Connections and Wi-Fi Direct are not implemented.
 
@@ -29,7 +29,7 @@ Compose screen
 
 `NativeBleManager` is the facade and policy owner. Collaborators own radio, admission, GATT, L2CAP, liveness, and callbacks. `BleLinkRegistry` stores generation-owned link state and queues.
 
-The intended lifecycle distinguishes radio connection from payload readiness:
+Radio connection and payload readiness differ:
 
 ```text
 DISCONNECTED -> CONNECTING -> DISCOVERING -> CONFIGURING -> READY
@@ -41,7 +41,7 @@ Client readiness requires discovery/CCCD; server readiness requires subscription
 
 `BleSessionLifecycle` separates requested sessions from running transport. Adapter broadcasts and reconciliation detect radio/permission changes. OFF suspends transport; ON rebuilds GATT, waits for service registration, and starts advertising/scanning. Go offline cancels recovery; background remains opt-in.
 
-Generations invalidate callbacks before cleanup. GATT callbacks use the main handler; radio registrations and L2CAP listeners capture ownership. Cleanup includes pending clients, locks, queues, listeners, and repository readiness; durable outboxes, identity, keys, and blocks remain. Startup/advertising failures retry with jitter. Scans retain a four-starts-per-30-seconds budget across restarts, plus bounded failure backoff.
+Generations fence callbacks. Server indications capture the issued flight/operation at callback ingress; device wrappers need not be the same instance. Retirement removes local ownership before Android cancellation. Unresolved indications prevent same-address server reuse until completion; an idle server registration can renew without retiring client peers. Healthy server peers defer renewal. GATT work uses the main handler. Scans retain four starts per 30 seconds and failure backoff.
 
 Setup uses 20-byte ATT before MTU. A server callback for an outbound ACL does not create a duplicate role. Score/ID election selects an initiator, with isolated fallback. One outbound setup runs; candidates wait. Generation-owned handshake gates pause scans; retirement releases owners before forgetting links. Refresh reconciles orphan owners.
 
@@ -71,9 +71,9 @@ Stable-ID topology uses authoritative directed per-origin snapshots: empty lists
 
 ## Private messaging
 
-CryptoManager uses Keystore RSA keys and per-message AES-GCM; the node ID derives from the hardware public-key hash. Identity/key preferences are excluded from backup. Private sends require a payload-ready local link, directed route, and usable recipient key. Forwarding/receipts use exact stable-ID hops; rejection never becomes broadcast. Messages persist before dispatch, retry on route/key/readiness changes, and expire after 24 hours. The 15-second timeout starts after transport acceptance. SYSTEM keys use stable-ID trust on first use; changed keys stay pending. Dismissing an alert does not replace the pinned key. Public keys are public metadata.
+CryptoManager uses Keystore RSA and per-message AES-GCM; node IDs derive from public-key hashes. Identity/key preferences exclude backup. Private sends require READY routes and trusted recipient keys. Directed receipts use reserved control capacity, with immediate first attempts and bounded five-second rejected-send retries. Incoming rows insert atomically before receipt/notification; duplicates replay receipts. Outgoing retries retain logical IDs, use fresh transmission IDs, and expire after 24 hours. A 15-second receipt deadline follows acceptance, with three accepted attempts per process. Restart recovers unacknowledged sends. SYSTEM keys use stable-ID TOFU; changed keys remain pending, and dismissal retains the pinned key.
 
-Pending key changes pause private sends and retries. Conditional Room updates protect receipts.
+Pending key changes pause private sends/retries. One serialized outbox wakes immediately; conditional Room updates protect receipts.
 
 This is not yet a basis for claiming authenticated end-to-end encryption or forward secrecy. TOFU can detect a later substitution but does not authenticate the first observation; out-of-band key verification UI remains an open production concern.
 

@@ -148,12 +148,8 @@ class ReceiptHandler : PayloadHandler {
                 if (myIndex == routeIds.lastIndex) {
                     return
                 }
-                val nextEndpoint = routeIds.getOrNull(myIndex + 1)?.let(callback::getConnectedEndpointIdByNodeId)
-                if (nextEndpoint != null) {
-                    val result = callback.sendDirectPayload(nextEndpoint, ProtoBuf.encodeToByteArray(updatedPayload))
-                    AppLogger.d("PayloadDispatcher", "Private receipt next-hop dispatch: $result")
-                    return
-                }
+                callback.sendPrivateReceipt(updatedPayload)
+                return
             }
             AppLogger.d("PayloadDispatcher", "Private receipt route unavailable; dropping without broadcast")
             return
@@ -263,7 +259,7 @@ class StandardMessageHandler : PayloadHandler {
     
     override fun handle(endpointId: String, payload: MeshPayload, payloadBytes: ByteArray, callback: PayloadDispatcherCallback) {
         val sender = payload.senderName
-        val msgId = payload.id
+        val msgId = if (payload.isPrivate) payload.targetMessageId.ifBlank { payload.id } else payload.id
         val targetName = payload.targetName
         val isPrivate = payload.isPrivate
         val isEncrypted = payload.isEncrypted
@@ -328,7 +324,6 @@ class StandardMessageHandler : PayloadHandler {
 
         if (isPrivate) {
             if (isTarget) {
-                callback.showNotification(sender, text)
                 callback.onMessageReceived(endpointId, msgId, sender, text, isPrivate, false, imageBase64, audioBase64, locationLat, locationLng, medium, routePath, payload.channelId)
             } else {
                 AppLogger.d("PayloadDispatcher", "ROUTE (Relay): Forwarding Private message meant for [$targetName] securely across the mesh.")

@@ -76,7 +76,7 @@ class GattTransferCoordinator(private val store: BleStateStore) {
     ): Boolean =
         flight.link.role == role && store.links.isCurrent(flight.link) &&
             (role != BleLinkRole.CLIENT || flight.gatt === gatt) &&
-            (role != BleLinkRole.SERVER || flight.serverDevice === device)
+            (role != BleLinkRole.SERVER || device != null && flight.serverDevice?.address == device.address)
 
     fun completeChunk(flight: GattTransferFlight, now: Long = System.currentTimeMillis()): Completion {
         val endpoint = flight.link.endpoint

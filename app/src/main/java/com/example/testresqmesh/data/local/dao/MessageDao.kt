@@ -4,6 +4,7 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.Transaction
 import com.example.testresqmesh.data.local.entity.MessageEntity
 import kotlinx.coroutines.flow.Flow
 
@@ -30,6 +31,17 @@ interface MessageDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertMessage(message: MessageEntity): Long
 
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertMessageIfAbsent(message: MessageEntity): Long
+
+    @Transaction
+    suspend fun insertIncomingPrivateIfAbsent(message: MessageEntity): Int {
+        if (insertMessageIfAbsent(message) != -1L) return 1
+        val existing = getMessageById(message.msgId) ?: return -1
+        return if (!existing.isMine && existing.targetName != null &&
+            com.example.testresqmesh.core.model.NodeIdentity.matches(existing.senderName, message.senderName)) 0 else -1
+    }
+
     @Query("UPDATE messages SET deliveredTo = :deliveredTo WHERE msgId = :msgId")
     suspend fun updateDeliveredTo(msgId: String, deliveredTo: String): Int
 
@@ -39,6 +51,15 @@ interface MessageDao {
 
     @Query("UPDATE messages SET deliveredTo = 'FAILED' WHERE msgId = :msgId AND deliveredTo = 'PENDING' AND seenBy = ''")
     suspend fun expirePendingSend(msgId: String): Int
+
+    @Query("UPDATE messages SET deliveredTo = 'PENDING' WHERE isMine = 1 AND targetName IS NOT NULL AND deliveredTo = '' AND seenBy = ''")
+    suspend fun recoverUnacknowledgedPrivateSends(): Int
+
+    @Query("UPDATE messages SET deliveredTo = 'PENDING' WHERE msgId = :msgId AND isMine = 1 AND deliveredTo IN ('', 'PENDING', 'FAILED') AND seenBy = ''")
+    suspend fun markPendingIfUnacknowledged(msgId: String): Int
+
+    @Query("UPDATE messages SET deliveredTo = '' WHERE msgId = :msgId AND isMine = 1 AND deliveredTo IN ('PENDING', 'FAILED') AND seenBy = ''")
+    suspend fun markSentIfUnacknowledged(msgId: String): Int
 
     @Query("UPDATE messages SET seenBy = :seenBy WHERE msgId = :msgId")
     suspend fun updateSeenBy(msgId: String, seenBy: String): Int

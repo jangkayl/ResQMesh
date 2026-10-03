@@ -13,6 +13,13 @@ interface PayloadDispatcherCallback {
 
     fun sendDirectPayload(endpointId: String, payload: ByteArray): TransportDispatchResult
     fun sendPriorityPayload(endpointId: String, payload: ByteArray): TransportDispatchResult
+    fun sendPrivateReceipt(payload: MeshPayload) {
+        val ids = payload.directedRouteNodeIds
+        val index = ids.indexOf(getMyNodeId())
+        val endpoint = if (index >= 0) ids.getOrNull(index + 1)?.let(::getConnectedEndpointIdByNodeId) else null
+        if (endpoint != null) sendPriorityPayload(endpoint,
+            kotlinx.serialization.protobuf.ProtoBuf.encodeToByteArray(MeshPayload.serializer(), payload))
+    }
     fun sendGattPayload(endpointId: String, payload: ByteArray)
     fun onHeartbeatAck(endpointId: String, challengeId: String)
     fun broadcastPayload(payload: ByteArray, excludeEndpointId: String?)

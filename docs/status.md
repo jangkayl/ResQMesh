@@ -1,6 +1,6 @@
 # Current status
 
-Last reviewed: 2026-10-03. Branch: `fix/bluetooth-recovery-cluster-bridging-and-sos-ux`.
+Last reviewed: 2026-10-03. Branch: `fix/samsung-gatt-private-receipts`.
 
 ## Current objective
 
@@ -10,7 +10,7 @@ Validate automatic Bluetooth recovery and cluster reconnection, alongside Commun
 
 ## Implemented and locally checked
 
-Identity build fixed; APK/19 focused tests pass. Full suite blocked by incomplete lifecycle/reconnect tests. Delivery/helper/title/incident checks passed; title fallback remains. Incident instrumentation/physical convergence remain open.
+Samsung GATT/receipt repair: debug build, Lint, and 280 clean-snapshot unit tests passed; [phone card](testing/samsung-send-test-card.md). Mixed-workspace tests require unrelated untracked files excluded. Samsung sending reportedly works; broader device validation and latency remain open.
 
 - Generation-owned BLE, acknowledged GATT, L2CAP promotion, directed READY-rooted topology, empty withdrawals, three-neighbor admission, and private fail-closed routing.
 - Persistent private outbox with 24-hour expiry, accepted-only delivery timing, pending-key-change refusal, and conditional failure updates.
@@ -57,7 +57,7 @@ Protocol-v2 incident sync adds history/state hashes, bounded repair/retries, REA
 
 ## Current SOS validation
 
-Conversation metadata, Room 10→11, per-channel Radio history, per-alert SOS replies, signed lifecycle, terminal persistence, bounded sync, and local silence are implemented. Creation cancellation returns to the hub; header/location timestamps are guarded. Floating conversation headers and compact controls retain Antigravity's cards/icons. Debug build, 248 unit tests, Lint (zero errors; 147 warnings), docs, and diff checks passed. Eleven Medium_Phone/API 37 instrumentation tests passed: three migrations and eight SOS/Radio UX checks. Latest UI phone validation remains open.
+Room 10→11, channel Radio history, identified SOS threads, signed lifecycle, bounded sync, and local silence are implemented. Cancellation returns to the hub; timestamps are guarded. Prior checks: debug build, 248 unit tests, Lint (zero errors; 147 warnings), and eleven Medium_Phone/API 37 instrumentation tests. Latest phone validation remains open.
 
 Run the [SOS conversation phone card](testing/sos-conversations-test-card.md) using its final APK identity. Use the existing physical checklist for R7/R8; preserve unrelated block/incident evidence.
 
@@ -69,7 +69,7 @@ Antigravity: [repository handoff](plans/phase5-repository-antigravity-guide.md) 
 
 ## Next actions
 
-1. Run the [Bluetooth recovery card](testing/bluetooth-recovery-test-card.md) on two/three/five phones; capture toggle latency, cluster convergence, and churn.
+1. Run the Samsung card on two phones, then relay/load: compare arrival/confirmation latency and verify GATT callback recovery. Run the [Bluetooth recovery card](testing/bluetooth-recovery-test-card.md) on two/three/five phones.
 2. Run the SOS phone card with its recorded APK hash: cross-channel A–B–C, simultaneous alerts, receiver silence, sender Back, partition/end/reconnect, and voice pressure.
 3. Run incident convergence and R7/R8 cards; investigate focused failures.
 4. Complete trust, UI/accessibility, and background/lock-screen validation.
