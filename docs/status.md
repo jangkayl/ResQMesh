@@ -1,6 +1,6 @@
 # Current status
 
-Last reviewed: 2026-10-02. Branch: `fix/bluetooth-recovery-cluster-bridging-and-sos-ux`.
+Last reviewed: 2026-10-03. Branch: `fix/bluetooth-recovery-cluster-bridging-and-sos-ux`.
 
 ## Current objective
 
@@ -10,7 +10,7 @@ Validate automatic Bluetooth recovery and cluster reconnection, alongside Commun
 
 ## Implemented and locally checked
 
-Delivery, build, helper, title, and incident redesign checks passed locally. Presentation uses title fallback; incident UI instrumentation and physical convergence remain open.
+Identity build fixed; APK/19 focused tests pass. Full suite blocked by incomplete lifecycle/reconnect tests. Delivery/helper/title/incident checks passed; title fallback remains. Incident instrumentation/physical convergence remain open.
 
 - Generation-owned BLE, acknowledged GATT, L2CAP promotion, directed READY-rooted topology, empty withdrawals, three-neighbor admission, and private fail-closed routing.
 - Persistent private outbox with 24-hour expiry, accepted-only delivery timing, pending-key-change refusal, and conditional failure updates.

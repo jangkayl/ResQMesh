@@ -31,6 +31,8 @@ class BleLink(
     @Volatile var readyAt: Long = 0L
     @Volatile var retryCount: Int = 0
     @Volatile var lastAcknowledgedWriteAt: Long = 0L
+    /** Belongs to this generation and is separate from GATT payload readiness. */
+    @Volatile var identityAdmitted: Boolean = false
 
     val handshakeOwner: String get() = "${role.name.lowercase(java.util.Locale.ROOT)}:$endpoint:$generation"
 }
@@ -105,6 +107,11 @@ class BleLinkRegistry {
     fun isReady(endpoint: String): Boolean =
         links[endpoint to BleLinkRole.CLIENT]?.state == BleLinkState.READY ||
             links[endpoint to BleLinkRole.SERVER]?.state == BleLinkState.READY
+
+    @Synchronized
+    fun isIdentityAdmitted(endpoint: String): Boolean = BleLinkRole.entries.any { role ->
+        links[endpoint to role]?.let { it.state == BleLinkState.READY && it.identityAdmitted } == true
+    }
 
     @Synchronized
     fun forget(link: BleLink): Boolean {

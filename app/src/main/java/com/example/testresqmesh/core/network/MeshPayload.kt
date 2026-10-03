@@ -41,7 +41,10 @@ data class MeshPayload(
     @ProtoNumber(32) val topologySequence: Long = 0L,
     @ProtoNumber(33) val conversationKind: String = "",
     @ProtoNumber(34) val sosId: String = "",
-    @ProtoNumber(35) val createdAt: Long = 0L
+    @ProtoNumber(35) val createdAt: Long = 0L,
+    /** Optional direct-link identity exchange metadata; zero denotes a legacy peer. */
+    @ProtoNumber(36) val identityProtocol: Int = 0,
+    @ProtoNumber(37) val identityExchangeId: String = ""
 ) {
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
