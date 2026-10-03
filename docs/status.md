@@ -1,16 +1,16 @@
 # Current status
 
-Last reviewed: 2026-10-03. Branch: `fix/samsung-gatt-private-receipts`.
+Last reviewed: 2026-10-03. Branch: `fix/ble-voice-transfer-reliability`.
 
 ## Current objective
 
-Validate automatic Bluetooth recovery and cluster reconnection, alongside Community/Radio/SOS, incident convergence, and R7/R8. Physical reliability, security, and background evidence remain open.
+Validate the BLE voice-burst repair with [matching APKs and the phone card](testing/ble-voice-transfer-test-card.md). Connection, relay, background, and delivery evidence remain open.
 
 [Phone validation pending](plans/capstone-demo-readiness.md): [incident UX redesign](plans/emergency-incidents-ux-redesign.md), withdrawal cleanup, reporter identity, and selected-offer editing guards.
 
 ## Implemented and locally checked
 
-Samsung GATT/receipt repair: debug build, Lint, and 280 clean-snapshot unit tests passed; [phone card](testing/samsung-send-test-card.md). Mixed-workspace tests require unrelated untracked files excluded. Samsung sending reportedly works; broader device validation and latency remain open.
+Prior Samsung repair: build, Lint, 280 clean-snapshot tests passed; [card](testing/samsung-send-test-card.md). Latest burst repair serializes setup/handoffs, retains fallback work, adds resumable chunk custody, chooses responsive endpoints, and times private receipts after transfer completion. All 348 clean-snapshot tests, builds, Android-test compilation, and Lint passed; physical results remain UNTESTED. The pre-existing untracked reconnect test still needs API alignment outside the commit scope.
 
 - Generation-owned BLE, acknowledged GATT, L2CAP promotion, directed READY-rooted topology, empty withdrawals, three-neighbor admission, and private fail-closed routing.
 - Persistent private outbox with 24-hour expiry, accepted-only delivery timing, pending-key-change refusal, and conditional failure updates.
@@ -34,9 +34,9 @@ Use the [physical checklist](plans/physical-reliability-tests.md); record the in
 - [ ] R8: Recorded-voice burst and mixed text/SOS tests on three phones, including GATT fallback and L2CAP.
 - [ ] R9: Five-phone matrix: quiet links, one sender, simultaneous senders, relay loss/recovery.
 - [ ] R10: Ten-phone matrix with the same workloads; measure delivery, p95 delay, churn, queue rejection, and recovery.
-- [ ] R11: Based on measurements, select media chunk scheduling and recording limits; audit SOS relay priority and bounded control retries. Keep live-PTT removal separate.
+- [ ] R11: Measure chunk scheduling, recording limits, SOS priority, and control retries. Keep live-PTT removal separate.
 
-Per-transport queue defaults: 128 retained transfers including active; ordinary admission leaves eight control slots. Ordinary bytes: 2 MiB, with 64 KiB control headroom. GATT frames remain non-interruptible; larger notes can delay urgent traffic. These are conservative bounds, not validated device capacity.
+Queue defaults remain 128 frames, eight control slots, 2 MiB ordinary bytes/64 KiB headroom. Upgraded peers use 1 KiB pieces with four outstanding per neighbor. Controls overtake waiting pieces; active frames remain non-interruptible. These bounds are unvalidated device capacity.
 
 ## Open blockers
 
@@ -69,8 +69,7 @@ Antigravity: [repository handoff](plans/phase5-repository-antigravity-guide.md) 
 
 ## Next actions
 
-1. Run the Samsung card on two phones, then relay/load: compare arrival/confirmation latency and verify GATT callback recovery. Run the [Bluetooth recovery card](testing/bluetooth-recovery-test-card.md) on two/three/five phones.
-2. Run the SOS phone card with its recorded APK hash: cross-channel A–B–C, simultaneous alerts, receiver silence, sender Back, partition/end/reconnect, and voice pressure.
-3. Run incident convergence and R7/R8 cards; investigate focused failures.
-4. Complete trust, UI/accessibility, and background/lock-screen validation.
-5. Advance to ten phones only after smaller matrices pass.
+1. Run the burst card on two/three phones: hybrid/GATT comparison, overlapping notes, text/SOS latency, relay loss/resume, and foreground/background.
+2. Align the pre-existing reconnect test APIs for the mixed-workspace suite; preserve the validated repair scope.
+3. Run [Bluetooth recovery](testing/bluetooth-recovery-test-card.md), R7, SOS, and incident cards; investigate focused captures.
+4. Complete trust/background evidence; advance to five/ten phones only after smaller matrices pass.

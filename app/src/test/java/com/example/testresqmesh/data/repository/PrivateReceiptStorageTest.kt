@@ -44,6 +44,7 @@ class PrivateReceiptStorageTest {
         val network = Proxy.newProxyInstance(MeshNetworkGateway::class.java.classLoader, arrayOf(MeshNetworkGateway::class.java)) { _, method, args ->
             when {
                 method.name.startsWith("set") -> { callbacks[method.name.substring(3)] = args!![0]; null }
+                method.name == "getReportsOutboundProgress" -> false
                 method.name.startsWith("get") -> callbacks[method.name.substring(3)]
                 method.returnType == Boolean::class.javaPrimitiveType -> false
                 else -> null
@@ -76,6 +77,7 @@ class PrivateReceiptStorageTest {
         val network = Proxy.newProxyInstance(MeshNetworkGateway::class.java.classLoader, arrayOf(MeshNetworkGateway::class.java)) { _, method, args ->
             when {
                 method.name.startsWith("set") -> { callbacks[method.name.substring(3)] = args!![0]; null }
+                method.name == "getReportsOutboundProgress" -> false
                 method.name.startsWith("get") -> callbacks[method.name.substring(3)]
                 method.name == "broadcastDeliveredReceipt" -> { assertTrue(store.rows.containsKey(args!![0])); receipts++; null }
                 method.name == "broadcastSeenReceipt" -> { assertTrue(store.rows[args!![0]]!!.seenBy.isNotEmpty()); seenReceipts++; null }

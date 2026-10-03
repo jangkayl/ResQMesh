@@ -79,15 +79,15 @@ Node IDs derive from the Keystore public-key hash (`CryptoManager.getMyNodeId()`
 
 ## D18: Leased topology and accepted-only directed private delivery
 
-Topology uses leased snapshots; empty snapshots withdraw adjacency and old versions are ignored. Private traffic uses exact directed IDs, never broadcast fallback. Rejected sends remain retryable; receipt timing starts after acceptance.
+Leased topology accepts empty withdrawals and ignores old versions. Private traffic uses exact directed IDs, never broadcast fallback. Rejected sends remain retryable; native receipt timing follows transfer completion.
 
 ## D19: Reporter-selected civilian lead helper
 
 Ownership uses stable user ID/signing key, preserving historical names. Reporters select/revoke/close; helpers confirm/decline/withdraw. Selection locks offer editing. Withdrawal/offline changes reopen requests; replacements require fresh selection. Helper versions never advance reporter versions. Route loss never reassigns. Signed closure prerequisites order events. Signing proves key continuity only; deployment authority remains open.
 
-## D20: Bound voice pressure without changing the payload protocol
+## D20: Bounded resumable voice transfers with compatible fallback
 
-Keep three direct neighbors and whole-frame compatibility. Each GATT/L2CAP queue counts active bytes and reserves control capacity: 128 transfers, 2 MiB ordinary bytes, eight slots/64 KiB headroom. Acknowledged progress delays silence retirement; attempts alone do not. Public broadcasts expose neighbor acceptance, persist before dispatch, and retry wholly rejected sends only. Larger-scale media scheduling depends on the phone matrix in status.
+Keep three neighbors, GATT setup/fallback, and optional L2CAP. Protocol-1 peers use durable 1 KiB pieces for envelopes over 4 KiB, with four outstanding pieces per neighbor and 24-hour expiry. Older peers keep whole frames. Retain 128-frame/2 MiB bounds and eight slots/64 KiB control reserve; prioritize controls between frames. Serialize setup and finish active GATT frames before promotion. Public retries preserve known-peer custody; acceptance and hop acknowledgement never prove recipient delivery. Phone validation gates reliability claims.
 
 ## D22: Conversations and SOS state have independent ownership
 

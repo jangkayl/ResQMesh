@@ -24,11 +24,17 @@ android {
         targetSdk = 36
         versionCode = 2
         versionName = "1.0.1"
+        buildConfigField("boolean", "BLE_L2CAP_ENABLED", "true")
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     buildTypes {
+        debug {
+            // Diagnostic builds can exercise native GATT fallback on modern phones.
+            val enabled = providers.gradleProperty("bleL2cap").orElse("true").get().toBooleanStrict()
+            buildConfigField("boolean", "BLE_L2CAP_ENABLED", enabled.toString())
+        }
         release {
             isMinifyEnabled = false
             proguardFiles(

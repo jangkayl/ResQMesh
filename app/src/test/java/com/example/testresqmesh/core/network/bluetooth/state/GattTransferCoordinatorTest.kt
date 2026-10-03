@@ -85,7 +85,7 @@ class GattTransferCoordinatorTest {
         assertEquals(listOf(first, second, ordinary), store.pendingQueues["peer"]!!.toList())
     }
 
-    @Test fun promotionReturnsActiveTransferBeforeQueuedTransfersAndReleasesWriter() {
+    @Test fun promotionWaitsForTheActiveFrameThenMovesOnlyCompleteQueuedFrames() {
         val fixture = readyServerFixture()
         val active = GattTransfer(byteArrayOf(1))
         val queued = GattTransfer(byteArrayOf(2))
@@ -93,9 +93,44 @@ class GattTransferCoordinatorTest {
         val flight = fixture.coordinator.claimNext("peer", fixture.link, null, null)!!
         fixture.queue.addLast(queued)
 
-        assertEquals(listOf(active, queued), fixture.coordinator.drainForPromotion("peer"))
-        assertFalse(fixture.writing.get())
-        assertFalse(fixture.coordinator.owns(flight))
+        assertTrue(fixture.coordinator.drainForPromotion("peer").isEmpty())
+        assertTrue(fixture.writing.get())
+        assertTrue(fixture.coordinator.owns(flight))
+        fixture.coordinator.beginChunk(flight, active.frame.size)
+        assertEquals(GattTransferCoordinator.Completion.DONE, fixture.coordinator.completeChunk(flight))
+        assertEquals(listOf(queued), fixture.coordinator.drainForPromotion("peer"))
+    }
+
+    @Test fun unresolvedIndicationDoesNotStartAFallbackFlightOrDrainItsQueue() {
+        val f = readyServerFixture()
+        f.coordinator.enqueue("peer", GattTransfer(byteArrayOf(1)), false)
+        val flight = f.coordinator.claimNext("peer", f.link, null, null)!!
+        val operation = f.coordinator.beginChunk(flight, 1)
+        val ticket = f.store.serverIndications.begin(flight, operation)!!
+        f.coordinator.enqueue("peer", GattTransfer(byteArrayOf(2)), false)
+        assertTrue(f.coordinator.drainForPromotion("peer").isEmpty())
+        assertNull(f.coordinator.claimNext("peer", f.link, null, null))
+        assertSame(ticket, f.store.serverIndications.take("peer", 0))
+        assertEquals(GattTransferCoordinator.Completion.DONE, f.coordinator.completeChunk(flight))
+        assertEquals(1, f.coordinator.drainForPromotion("peer").size)
+    }
+
+    @Test fun controlAndSmallTextGetTurnsWithoutStarvingBulk() {
+        val f = readyServerFixture()
+        val bulk = GattTransfer(ByteArray(4097))
+        f.coordinator.enqueue("peer", bulk, false)
+        repeat(8) { f.coordinator.enqueue("peer", GattTransfer(byteArrayOf(it.toByte())), false) }
+        val control = GattTransfer(byteArrayOf(99))
+        f.coordinator.enqueue("peer", control, true)
+        val sent = mutableListOf<GattTransfer>()
+        repeat(6) {
+            val flight = f.coordinator.claimNext("peer", f.link, null, null)!!
+            sent.add(flight.transfer)
+            f.coordinator.beginChunk(flight, flight.transfer.frame.size)
+            f.coordinator.completeChunk(flight)
+        }
+        assertSame(control, sent.first())
+        assertSame(bulk, sent.last())
     }
 
     private fun readyServerFixture(): Fixture {

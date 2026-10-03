@@ -52,11 +52,15 @@ class BoundedPayloadWriterTest {
     @Test fun obsoleteSocketDoesNotWriteOrReplayOntoReplacement() {
         lateinit var run: () -> Unit
         var owned = true
-        val writer = BoundedPayloadWriter({ owned }, { fail("obsolete write") }, { fail("obsolete replay") }, { run = it })
+        val retired = mutableListOf<List<ByteArray>>()
+        val writer = BoundedPayloadWriter({ owned }, { fail("obsolete write") }, { fail("obsolete replay") }, { run = it },
+            onRetired = { retired += it })
         assertTrue(writer.offer(byteArrayOf(1)))
         owned = false
         run()
         assertFalse(writer.offer(byteArrayOf(2)))
+        assertEquals(listOf(1), retired.single().map { it[0].toInt() })
+        assertTrue(writer.close().isEmpty())
     }
 
     @Test fun countBoundLeavesEightControlSlotsAndNeverStartsExtraWorkers() {

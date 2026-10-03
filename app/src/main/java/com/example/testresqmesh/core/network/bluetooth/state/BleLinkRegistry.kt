@@ -33,6 +33,10 @@ class BleLink(
     @Volatile var lastAcknowledgedWriteAt: Long = 0L
     /** Belongs to this generation and is separate from GATT payload readiness. */
     @Volatile var identityAdmitted: Boolean = false
+    /** A timed-out ATT operation cannot be reused even if the sibling L2CAP channel works. */
+    @Volatile var gattQuarantined: Boolean = false
+    var receiveBuffer: ByteArray = byteArrayOf()
+    var lastGattChunkAt: Long = 0L
 
     val handshakeOwner: String get() = "${role.name.lowercase(java.util.Locale.ROOT)}:$endpoint:$generation"
 }
@@ -63,6 +67,11 @@ class BleLinkRegistry {
 
     @Synchronized fun ownsEndpoint(endpoint: String, captured: List<BleLink>): Boolean =
         captured.isNotEmpty() && BleLinkRole.entries.mapNotNull { current(endpoint, it) } == captured
+
+    /** Sibling role changes do not invalidate a socket still backed by its original live role. */
+    @Synchronized fun ownsSocket(endpoint: String, captured: List<BleLink>): Boolean = captured.any {
+        it.endpoint == endpoint && isCurrent(it) && hasLiveRole(endpoint, it.role)
+    }
 
     @Synchronized fun isSetupOwner(owner: String): Boolean = links.values.any {
         it.handshakeOwner == owner &&

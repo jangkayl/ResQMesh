@@ -4,6 +4,7 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.protobuf.ProtoNumber
 
 @Serializable
+@OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
 data class MeshPayload(
     @ProtoNumber(1) val id: String = "",
     @ProtoNumber(2) val type: String = "MESSAGE", // MESSAGE, SYSTEM, SEEN, DELIVERED, LIVE_AUDIO
@@ -44,7 +45,9 @@ data class MeshPayload(
     @ProtoNumber(35) val createdAt: Long = 0L,
     /** Optional direct-link identity exchange metadata; zero denotes a legacy peer. */
     @ProtoNumber(36) val identityProtocol: Int = 0,
-    @ProtoNumber(37) val identityExchangeId: String = ""
+    @ProtoNumber(37) val identityExchangeId: String = "",
+    /** Direct SYSTEM capability only. Legacy peers retain whole-frame compatibility. */
+    @ProtoNumber(38) val transferProtocol: Int = 0
 ) {
     override fun equals(other: Any?): Boolean {
         if (this === other) return true

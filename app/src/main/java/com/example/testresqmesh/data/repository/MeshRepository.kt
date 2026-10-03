@@ -126,6 +126,7 @@ class MeshRepository(
     private var outboxRetryJob: Job? = null
     private val privateAcceptedAttempts = java.util.concurrent.ConcurrentHashMap<String, Int>()
     private val privateTimeoutOwners = java.util.concurrent.ConcurrentHashMap<String, Any>()
+    private val privateProgress = java.util.concurrent.ConcurrentHashMap<String, PrivateTransferProgress>()
 
     init {
         setupCallbacks()
@@ -159,6 +160,22 @@ class MeshRepository(
 
     private fun setupCallbacks() {        networkManager.onStatusChanged = { status ->
             _connectionStatus.value = status
+        }
+        networkManager.onOutboundFrame = { event ->
+            if (event.isPrivate) repositoryScope.launch {
+                outboxMutex.withLock {
+                    // A recovered journal can resume before the repository has registered a send.
+                    if (!privateTimeoutOwners.containsKey(event.messageId) && messageStore.isOutstandingPrivateSend(event.messageId)) {
+                        privateProgress.putIfAbsent(event.messageId, PrivateTransferProgress(event.transmissionId, event.hops)
+                            .observe(event, System.nanoTime() / 1_000_000))
+                        messageStore.markSent(event.messageId)
+                        awaitPrivateReceipt(event.messageId)
+                    }
+                    privateProgress.computeIfPresent(event.messageId) { _, progress ->
+                        progress.observe(event, System.nanoTime() / 1_000_000)
+                    }
+                }
+            }
         }
 
         networkManager.onTransportStateChanged = { state ->
@@ -198,6 +215,7 @@ class MeshRepository(
                 val existingIsLive = networkManager.hasLiveSocket(existingByIdentity.endpointId)
                 val incomingIsLive = networkManager.hasLiveSocket(device.endpointId)
                 val incomingIsReady = networkManager.hasReadyEndpoint(device.endpointId)
+                val preferredEndpoint = NodeIdentity.idOf(device.name)?.let(networkManager::preferredEndpointForPeer)
 
                 when {
                     !existingIsLive -> {
@@ -217,6 +235,10 @@ class MeshRepository(
                         AppLogger.d("BLE_MESH", "Selecting READY endpoint ${device.endpointId} for ${device.name}; retaining alternate radio role")
                         updatedList = updatedList.filter { it.endpointId != existingByIdentity.endpointId }
                     }
+                    preferredEndpoint == device.endpointId && preferredEndpoint != existingByIdentity.endpointId -> {
+                        updatedList = updatedList.filter { it.endpointId != existingByIdentity.endpointId }
+                    }
+                    preferredEndpoint == existingByIdentity.endpointId -> duplicateRejected = true
                     networkManager.linkEstablishedAt(existingByIdentity.endpointId) <= networkManager.linkEstablishedAt(device.endpointId) -> {
                         AppLogger.d("BLE_MESH", "Duplicate link to ${device.name}. Keeping older endpoint ${existingByIdentity.endpointId} in routing view.")
                         duplicateRejected = true
@@ -466,9 +488,10 @@ class MeshRepository(
                         }
                     } else {
                         repositoryScope.launch {
-                            messageStore.save(message, targetName = null)
+                            if (!messageStore.contains(msgId)) messageStore.save(message, targetName = null)
+                            networkManager.markPayloadStored(msgId)
+                            networkManager.broadcastDeliveredReceipt(msgId, isPrivate = false)
                         }
-                        networkManager.broadcastDeliveredReceipt(msgId, isPrivate = false)
                         
                         if (message.isSOS) {
                             _incomingSosAlert.value = message
@@ -478,7 +501,14 @@ class MeshRepository(
                     if (message.conversationKind == "RADIO" && message.audioBase64 != null) {
                         incomingVoiceMessage.tryEmit(message)
                     }
+                } else if (!isSystem && !isPrivate) {
+                    // Legacy off-channel content is intentionally ignored locally. Onward custody
+                    // still has to commit before the journal can release it.
+                    networkManager.markPayloadStored(msgId)
                 }
+            } else if (!isSystem && !isPrivate) {
+                // Our own broadcast row already exists when a duplicate returns by another path.
+                networkManager.markPayloadStored(msgId)
             }
         }
         networkManager.onMessageDelivered = { msgId, readerName, returnRoute ->
@@ -726,8 +756,19 @@ class MeshRepository(
         val owner = Any()
         privateTimeoutOwners[messageId] = owner
         repositoryScope.launch {
-            delay(PRIVATE_DELIVERY_TIMEOUT_MS)
+            val acceptedAt = System.nanoTime() / 1_000_000
+            if (networkManager.reportsOutboundProgress) {
+                while (privateTimeoutOwners[messageId] === owner) {
+                    delay(1_000L)
+                    if (!messageStore.isUnacknowledgedPrivateSend(messageId)) break
+                    val progress = privateProgress[messageId]
+                    val now = System.nanoTime() / 1_000_000
+                    if (progress?.shouldRetry(now, acceptedAt, networkManager.hasPendingTransfer(messageId)) == true) break
+                    if (progress == null && !networkManager.hasPendingTransfer(messageId) && now - acceptedAt >= 60_000L) break
+                }
+            } else delay(PRIVATE_DELIVERY_TIMEOUT_MS)
             if (!privateTimeoutOwners.remove(messageId, owner)) return@launch
+            privateProgress.remove(messageId)
             if (!messageStore.isUnacknowledgedPrivateSend(messageId)) {
                 privateAcceptedAttempts.remove(messageId)
                 return@launch
@@ -776,6 +817,9 @@ class MeshRepository(
                 continue
             }
             if (targetName != null) {
+                // The transport journal already owns this note; do not create a fresh competing
+                // transmission simply because a peer disappeared during its chunk transfer.
+                if (networkManager.hasPendingTransfer(message.id)) continue
                 // Private message retry
                 val currentTarget = currentPeerName(targetName)
                 // A saved pending row must not bypass the same key-change refusal as a new send.
@@ -801,6 +845,8 @@ class MeshRepository(
                 }.getOrNull() ?: continue
 
                 val delivery = PrivateDeliveryPlanner.select(currentTarget, directedRouteList, readyDevices)
+                val transmission = runCatching { ProtoBuf.decodeFromByteArray<com.example.testresqmesh.core.network.MeshPayload>(payloadBytes).id }.getOrNull()
+                if (transmission != null) privateProgress[message.id] = PrivateTransferProgress(transmission, directedRouteList.size - 1)
                 val dispatchResult = when (delivery) {
                     is PrivateDeliveryPlanner.Target.Endpoint -> {
                         networkManager.sendDirectPayload(delivery.endpointId, payloadBytes)
@@ -812,8 +858,9 @@ class MeshRepository(
                 if (dispatchResult?.accepted == true) {
                     messageStore.markSent(message.id)
                     awaitPrivateReceipt(message.id)
-                } else if (dispatchResult != null) {
-                    retryRejectedDispatch = true
+                } else {
+                    privateProgress.remove(message.id)
+                    if (dispatchResult != null) retryRejectedDispatch = true
                 }
             } else {
                 // Public message retry
@@ -973,13 +1020,14 @@ class MeshRepository(
             }
         }
         networkManager.broadcastDeliveredReceipt(p.id, isPrivate = false)
-        if (!fresh) return
-        recordPeerName(p.senderName)
-        message?.takeIf { it.conversationKind == "RADIO" && it.audioBase64 != null }?.let { incomingVoiceMessage.tryEmit(it) }
+        if (!fresh && !networkManager.hasPendingCustody(p.id)) return
+        if (fresh) recordPeerName(p.senderName)
+        if (fresh) message?.takeIf { it.conversationKind == "RADIO" && it.audioBase64 != null }?.let { incomingVoiceMessage.tryEmit(it) }
         if (p.ttl > 1 && p.relayHopCount < 10) {
             networkManager.broadcastPayload(ProtoBuf.encodeToByteArray(p.copy(ttl = p.ttl - 1,
                 relayHopCount = p.relayHopCount + 1, routePath = p.routePath + myNodeName)), endpoint)
         }
+        networkManager.markPayloadStored(p.id)
     }
 
     fun deleteConversationWith(peerName: String) {
@@ -1061,6 +1109,7 @@ class MeshRepository(
                 messageStore.save(message, targetName = currentTarget)
                 messageStore.markPending(msgId)
                 AppLogger.d("MeshNetwork_E2EE", "PRIVATE_PERSISTED message=$msgId elapsedMs=${android.os.SystemClock.elapsedRealtime()}")
+                privateProgress[msgId] = PrivateTransferProgress(msgId, directedRouteList.size - 1)
                 val dispatchResult = when (delivery) {
                     is PrivateDeliveryPlanner.Target.Endpoint -> {
                         AppLogger.d("MeshNetwork_E2EE", "Private route selected with ${directedRouteList.size - 1} hop(s)")
@@ -1073,6 +1122,7 @@ class MeshRepository(
                     messageStore.markSent(msgId)
                     awaitPrivateReceipt(msgId)
                 } else {
+                    privateProgress.remove(msgId)
                     messageStore.markPending(msgId)
                     AppLogger.d("MeshNetwork_E2EE", "Private dispatch was not accepted; retained for directed retry")
                     scheduleOutboxRetry()

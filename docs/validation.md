@@ -1,6 +1,6 @@
 # Validation
 
-Builds/tests do not prove BLE. Users operate phones; Codex prepares/analyzes cards. Map setup returns to its alert.
+Local checks do not prove BLE. Users operate phones.
 
 ## Local checks
 
@@ -13,7 +13,7 @@ git diff --check
 
 SOS conversation validation: [phone card](testing/sos-conversations-test-card.md). Run migration instrumentation only on an explicitly selected emulator; physical-phone operation stays with the user.
 
-Samsung: [GATT/receipt card](testing/samsung-send-test-card.md).
+Samsung: [GATT/receipt card](testing/samsung-send-test-card.md). Voice pressure: [hybrid/GATT transfer card](testing/ble-voice-transfer-test-card.md), including clean-snapshot checks and the mixed-workspace blocker. Diagnostic GATT: `-PbleL2cap=false`; normal builds enable L2CAP.
 
 ## Pull-request CI gate
 
@@ -25,7 +25,7 @@ PR/merge requires explicit instruction after local checks.
 
 Codex may build an APK. The user installs and operates physical phones unless explicitly requesting otherwise.
 
-Record APK, models/API, steps, result, failure time.
+Record APK, models/API, result, and timestamps.
 
 ## Focused Logcat workflow
 
@@ -102,7 +102,7 @@ Use `app/build/incident-sync-qa/TEST_CARD.md` with the APK hash. Cover READY/rec
 
 ## Latest verified results
 
-Keep only meaningful milestones; raw captures remain under `captures/`.
+Raw captures remain under `captures/`.
 
 | Date | Build/state | Devices | Scenario | Concise result | Capture |
 | --- | --- | --- | --- | --- | --- |

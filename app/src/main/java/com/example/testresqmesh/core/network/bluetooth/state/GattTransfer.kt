@@ -28,4 +28,5 @@ class GattTransferFlight(
     var chunkLength = 0
     var retryCount = 0
     var operationId = 0L
+    var started = false
 }

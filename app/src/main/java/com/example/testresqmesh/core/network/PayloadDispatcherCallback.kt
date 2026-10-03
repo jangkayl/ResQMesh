@@ -13,6 +13,9 @@ interface PayloadDispatcherCallback {
 
     fun sendDirectPayload(endpointId: String, payload: ByteArray): TransportDispatchResult
     fun sendPriorityPayload(endpointId: String, payload: ByteArray): TransportDispatchResult
+    fun hasPendingCustody(payloadId: String): Boolean = false
+    fun forwardPrivatePayload(nodeId: String, payload: ByteArray): TransportDispatchResult =
+        getConnectedEndpointIdByNodeId(nodeId)?.let { sendDirectPayload(it, payload) } ?: TransportDispatchResult.REJECTED_NOT_READY
     fun sendPrivateReceipt(payload: MeshPayload) {
         val ids = payload.directedRouteNodeIds
         val index = ids.indexOf(getMyNodeId())

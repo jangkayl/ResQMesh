@@ -4,9 +4,9 @@ Last reviewed: 2026-10-03. Source and device evidence prevail.
 
 ## System shape
 
-ResQMesh uses Kotlin (SDK 24–36), Compose, Room, Kotlin serialization, Koin, and coroutines.
+ResQMesh uses Kotlin (SDK 24–36), Compose, Room, serialization, Koin, and coroutines.
 
-Native BLE, GATT, and optional L2CAP carry traffic. GATT owns setup, readiness, heartbeat, and fallback. Direct dispatch reports acceptance or an exact rejection; only a receipt proves delivery. Nearby Connections and Wi-Fi Direct are not implemented.
+Native BLE uses GATT setup/fallback and optional L2CAP payloads. Acceptance transfers local ownership; recipient receipts prove delivery. Nearby Connections and Wi-Fi Direct are absent.
 
 ## Data path
 
@@ -23,7 +23,7 @@ Compose screen
     -> repository / Room / UI state
 ```
 
-`PayloadDispatcher` handles presence, heartbeat, messages, receipts, SOS, bounded incident events/sync, and audio. Incident events are validated before relay. `MeshRouter` maintains a graph of known neighbors; this is not proof of distance-vector routing or self-healing.
+`PayloadDispatcher` handles presence, messages, receipts, SOS, incident sync, and audio. Incident validation precedes relay. `MeshRouter` tracks known adjacency; self-healing remains unproven.
 
 ## Direct-link lifecycle
 
@@ -43,17 +43,19 @@ Client readiness requires discovery/CCCD; server readiness requires subscription
 
 Generations fence callbacks. Server indications capture the issued flight/operation at callback ingress; device wrappers need not be the same instance. Retirement removes local ownership before Android cancellation. Unresolved indications prevent same-address server reuse until completion; an idle server registration can renew without retiring client peers. Healthy server peers defer renewal. GATT work uses the main handler. Scans retain four starts per 30 seconds and failure backoff.
 
-Setup uses 20-byte ATT before MTU. A server callback for an outbound ACL does not create a duplicate role. Score/ID election selects an initiator, with isolated fallback. One outbound setup runs; candidates wait. Generation-owned handshake gates pause scans; retirement releases owners before forgetting links. Refresh reconciles orphan owners.
+Setup starts at 20-byte ATT. `ReadyPayloadSetup` serializes post-CCCD PSM reads and optional MTU 247 with writes; unresolved accepted operations keep their gate. A healthy L2CAP path survives ATT stalls. Same-ACL guards avoid duplicate roles. Score/ID election serializes connection attempts; handshake gates pause scans. Refresh reconciles orphan owners.
 
 Client connect/handshake deadlines are five seconds. Server timeouts catch orphans; identity waits until READY. Isolated failed scans retry; scans without advertisements for 15 seconds restart. AUTO remains default; absent ATT discovery response, that peer retries with explicit LE.
 
-L2CAP promotion resends complete frames, disarms obsolete GATT flights, and retains deferred work. Sockets have one FIFO ordinary/control writer. Each transport retains 128 transfers, eight reserved control slots, 2 MiB ordinary bytes, and 64 KiB headroom. Control overtakes waiting frames; GATT frames remain non-interruptible. Acknowledged progress protects busy links; stalls retain deadlines.
+L2CAP promotion waits for active GATT frames and unresolved indications. Receive buffers belong to each GATT generation. Sockets survive sibling-role changes while an original role remains live. `RetainedFallbackQueue` retries accepted socket frames against GATT pressure. Each transport retains 128 frames, eight control slots, 2 MiB ordinary bytes, and 64 KiB headroom. Controls run first; four small frames precede waiting bulk. Active frames remain non-interruptible.
+
+Direct SYSTEM advertises transfer protocol 1. `ReliableMeshTransfers` journals MESSAGE/CONVERSATION envelopes over 4 KiB as 1 KiB pieces, four unacknowledged pieces per neighbor. Hashes, durable hop acknowledgements, status bitmaps, reconnect/restart recovery, and 24-hour expiry preserve partial notes. Incoming/outgoing journals each bound ordinary data to 2 MiB; storage failures are explicit. Public custody preserves known-peer rosters; visited IDs prevent avoidable cycles. Older peers retain whole-frame compatibility and weaker local-completion evidence. Hop custody never proves recipient delivery.
 
 Limit: three direct neighbors; unknown endpoints occupy separate slots. Last-neighbor loss reconsiders fresh advertisements and resumes discovery. Keep 32 candidates; unobserved advertisements expire after eight seconds. Preserve healthy routes; permit a free third link to bridge unreachable clusters. Full-capacity reclamation requires idle GATT/L2CAP and recent directed alternate paths preserving reachability and a responsive first hop, with a 60-second cooldown. Use owned retirement; otherwise defer. Connect Directly retains block/duplicate/capacity guards. Five/ten-phone validation remains open.
 
 ## Identity, routing, and presence
 
-Stable `NodeIdentity` IDs identify peers across changing BLE endpoints. Private conversations group by ID. A separate ID-keyed Room name record updates from ready direct handshakes and received messages; shortened advertisements cannot overwrite it. Inbox and chat headers show that saved current name while historical messages retain their recorded labels. UI and routing select payload-ready links, not scanned or radio-connected endpoints.
+Stable `NodeIdentity` IDs survive BLE address changes. Room stores current names by ID; advertisements cannot overwrite them. Chat headers use current names, history retains recorded labels. Routing selects READY links; direct sends prefer responsive endpoints, then L2CAP.
 
 Peer names retain `#nodeId`. Setup sends no tag; older saved `[NODE]` defaults are omitted and incoming custom tags remain compatible, unverified labels.
 
@@ -71,11 +73,11 @@ Stable-ID topology uses authoritative directed per-origin snapshots: empty lists
 
 ## Private messaging
 
-CryptoManager uses Keystore RSA and per-message AES-GCM; node IDs derive from public-key hashes. Identity/key preferences exclude backup. Private sends require READY routes and trusted recipient keys. Directed receipts use reserved control capacity, with immediate first attempts and bounded five-second rejected-send retries. Incoming rows insert atomically before receipt/notification; duplicates replay receipts. Outgoing retries retain logical IDs, use fresh transmission IDs, and expire after 24 hours. A 15-second receipt deadline follows acceptance, with three accepted attempts per process. Restart recovers unacknowledged sends. SYSTEM keys use stable-ID TOFU; changed keys remain pending, and dismissal retains the pinned key.
+CryptoManager uses Keystore RSA and per-message AES-GCM; IDs derive from public-key hashes. Private sends require READY routes and trusted keys. Reserved-capacity receipts retry rejected sends every five seconds. Room insertion precedes receipt/notification; duplicates replay cached receipts. Retries retain logical IDs and expire after 24 hours. Native receipt timing follows wire/hop completion, allowing measured relay time; queued journal-owned notes cannot trigger competing retries. Only the intended recipient resolves private delivery. TOFU changes remain pending; first-contact authentication is unproven.
 
 Pending key changes pause private sends/retries. One serialized outbox wakes immediately; conditional Room updates protect receipts.
 
-This is not yet a basis for claiming authenticated end-to-end encryption or forward secrecy. TOFU can detect a later substitution but does not authenticate the first observation; out-of-band key verification UI remains an open production concern.
+Authenticated E2EE and forward secrecy remain unproven; out-of-band verification is open.
 
 ## Persistence and UI
 
@@ -105,7 +107,7 @@ Background mesh is opt-in. `MeshSessionController` owns start/stop; `MeshForegro
 | Session recovery | `core/network/bluetooth/BleSessionLifecycle.kt`, `BleScanStartBudget.kt` |
 | GATT callbacks | `core/network/bluetooth/gatt/` |
 | Link ownership and liveness | `core/network/bluetooth/state/` |
-| Payload schema and dispatch | `core/network/MeshPayload.kt`, `PayloadDispatcher.kt`, `dispatch/` |
+| Payloads and transfers | `core/network/MeshPayload.kt`, `PayloadDispatcher.kt`, `ReliableMeshTransfers.kt`, `TransferJournal.kt`, `dispatch/` |
 | Cryptography | `core/network/CryptoManager.kt`, `data/repository/PeerPublicKeyCache.kt` |
 | Repository and routing | `core/network/MeshNetworkGateway.kt`, `data/repository/MeshRepository.kt`, `MessageStore.kt`, `MeshRouter.kt`, `PayloadFactory.kt` |
 | Room | `data/local/` |

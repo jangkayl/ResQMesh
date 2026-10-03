@@ -10,6 +10,14 @@ typealias MessageReceivedCallback = (
 
 /** Repository-facing transport contract. It deliberately exposes no Android Bluetooth classes. */
 interface MeshNetworkGateway {
+    val reportsOutboundProgress: Boolean get() = false
+    var onOutboundFrame: ((OutboundFrameEvent) -> Unit)?
+        get() = null
+        set(@Suppress("UNUSED_PARAMETER") value) {}
+    fun hasPendingTransfer(messageId: String): Boolean = false
+    fun hasPendingCustody(payloadId: String): Boolean = false
+    fun markPayloadStored(messageId: String) {}
+    fun preferredEndpointForPeer(nodeId: String): String? = null
     var onConversationMessage: ((String, MeshPayload) -> Unit)?
         get() = null
         set(@Suppress("UNUSED_PARAMETER") value) {}
@@ -86,6 +94,12 @@ interface MeshNetworkGateway {
 
 /** Keeps NativeBleManager available to Android entry points while repositories depend on the contract. */
 class NativeBleGateway(private val manager: NativeBleManager) : MeshNetworkGateway {
+    override val reportsOutboundProgress = true
+    override var onOutboundFrame by manager::onOutboundFrame
+    override fun hasPendingTransfer(messageId: String) = manager.hasPendingTransfer(messageId)
+    override fun hasPendingCustody(payloadId: String) = manager.hasPendingCustody(payloadId)
+    override fun markPayloadStored(messageId: String) = manager.markPayloadStored(messageId)
+    override fun preferredEndpointForPeer(nodeId: String) = manager.preferredEndpointForPeer(nodeId)
     override var onConversationMessage by manager::onConversationMessage
     override var onSosPacket by manager::onSosPacket
     override var myDeviceName: String

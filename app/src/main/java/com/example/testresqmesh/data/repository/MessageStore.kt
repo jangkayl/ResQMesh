@@ -17,6 +17,8 @@ interface MessageStore {
     suspend fun incomingPrivateWasSeen(messageId: String): Boolean = false
     suspend fun recoverUnacknowledgedPrivateSends() {}
     suspend fun isUnacknowledgedPrivateSend(messageId: String): Boolean = false
+    suspend fun isOutstandingPrivateSend(messageId: String): Boolean = isUnacknowledgedPrivateSend(messageId) ||
+        getPendingOutbox().any { (message, target) -> message.id == messageId && target != null }
     suspend fun saveIncomingPrivateIfAbsent(message: ChatMessage): PrivateMessageInsert {
         if (contains(message.id)) return PrivateMessageInsert.DUPLICATE
         save(message, message.senderName)
@@ -35,6 +37,9 @@ interface MessageStore {
 enum class PrivateMessageInsert { INSERTED, DUPLICATE, REJECTED }
 
 class RoomMessageStore(private val dao: MessageDao) : MessageStore {
+    override suspend fun isOutstandingPrivateSend(messageId: String): Boolean = dao.getMessageById(messageId)?.let {
+        it.isMine && it.targetName != null && it.deliveredTo in setOf("", "PENDING") && it.seenBy.isEmpty()
+    } == true
     override suspend fun incomingPrivateWasSeen(messageId: String): Boolean =
         dao.getMessageById(messageId)?.let { !it.isMine && it.targetName != null && it.seenBy.isNotEmpty() } == true
     override suspend fun recoverUnacknowledgedPrivateSends() { dao.recoverUnacknowledgedPrivateSends() }
@@ -61,6 +66,7 @@ class RoomMessageStore(private val dao: MessageDao) : MessageStore {
 
     override suspend fun markDelivered(messageId: String, readerName: String) {
         val message = dao.getMessageById(messageId) ?: return
+        if (message.isMine && message.targetName != null && !NodeIdentity.matches(message.targetName, readerName)) return
         val readers = message.deliveredTo.split(',').filter { it.isNotEmpty() && it != "FAILED" && it != "PENDING" }
         if (readerName in readers) return
         dao.updateDeliveredTo(messageId, (readers + readerName).joinToString(","))
@@ -68,6 +74,7 @@ class RoomMessageStore(private val dao: MessageDao) : MessageStore {
 
     override suspend fun markSeen(messageId: String, readerName: String) {
         val message = dao.getMessageById(messageId) ?: return
+        if (message.isMine && message.targetName != null && !NodeIdentity.matches(message.targetName, readerName)) return
         val readers = message.seenBy.split(',').filter { it.isNotEmpty() && it != "FAILED" && it != "PENDING" }
         if (readerName in readers) return
         dao.updateSeenBy(messageId, (readers + readerName).joinToString(","))

@@ -335,9 +335,9 @@ class StandardMessageHandler : PayloadHandler {
                 if (routeIds.isNotEmpty()) {
                     val myIndex = routeIds.indexOf(callback.getMyNodeId())
                     if (myIndex >= 0) {
-                        val nextEndpoint = routeIds.getOrNull(myIndex + 1)?.let(callback::getConnectedEndpointIdByNodeId)
-                        if (nextEndpoint != null) {
-                            val result = callback.sendDirectPayload(nextEndpoint, updatedBytes)
+                        val nextNode = routeIds.getOrNull(myIndex + 1)
+                        if (nextNode != null) {
+                            val result = callback.forwardPrivatePayload(nextNode, updatedBytes)
                             AppLogger.d("PayloadDispatcher", "Private relay next-hop dispatch: $result")
                             return
                         }

@@ -93,4 +93,28 @@ class BleLinkRegistryTest {
         assertTrue(registry.forget(client))
         assertFalse(registry.hasReadyPeerExcept(server))
     }
+
+    @Test fun socketKeepsOriginalOwnerAcrossSiblingAdditionAndRemoval() {
+        val registry = BleLinkRegistry()
+        val client = registry.beginClient()
+        val captured = listOf(client)
+        val server = registry.begin(client.endpoint, BleLinkRole.SERVER, "stable-id", ConcurrentLinkedDeque(), AtomicBoolean(false))
+        assertTrue(registry.ownsSocket(client.endpoint, captured))
+        assertTrue(registry.forget(server))
+        assertTrue(registry.ownsSocket(client.endpoint, captured))
+        assertTrue(registry.forget(client))
+        registry.beginClient()
+        assertFalse(registry.ownsSocket(client.endpoint, captured))
+    }
+
+    @Test fun socketSurvivesOneCapturedRoleRetirementButNotAllCapturedRoles() {
+        val registry = BleLinkRegistry()
+        val client = registry.beginClient()
+        val server = registry.begin(client.endpoint, BleLinkRole.SERVER, "stable-id", ConcurrentLinkedDeque(), AtomicBoolean(false))
+        val captured = listOf(client, server)
+        registry.retire(server) { }
+        assertTrue(registry.ownsSocket(client.endpoint, captured))
+        registry.retire(client) { }
+        assertFalse(registry.ownsSocket(client.endpoint, captured))
+    }
 }

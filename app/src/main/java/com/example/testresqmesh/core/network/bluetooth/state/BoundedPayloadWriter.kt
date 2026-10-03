@@ -9,7 +9,10 @@ class BoundedPayloadWriter(
     private val write: (ByteArray) -> Unit,
     private val onFailure: (List<ByteArray>) -> Unit,
     startWorker: (() -> Unit) -> Unit = ::startSocketWriter,
-    private val onCapacityAvailable: () -> Unit = ::ignoreCapacityAvailable
+    private val onCapacityAvailable: () -> Unit = ::ignoreCapacityAvailable,
+    private val onStarted: (ByteArray) -> Unit = {},
+    private val onCompleted: (ByteArray) -> Unit = {},
+    private val onRetired: (List<ByteArray>) -> Unit = {}
 ) {
     private val monitor = Object()
     private val ordinary = ArrayDeque<ByteArray>()
@@ -18,6 +21,7 @@ class BoundedPayloadWriter(
     private var retainedBytes = 0L
     private var closed = false
     private var active: ByteArray? = null
+    private val selector = FairFrameSelector()
     fun isIdle(): Boolean = synchronized(monitor) { !closed && active == null && retainedCount == 0 }
 
     init { startWorker { runWriter() } }
@@ -50,12 +54,19 @@ class BoundedPayloadWriter(
             val payload = synchronized(monitor) {
                 while (!closed && control.isEmpty() && ordinary.isEmpty()) monitor.wait()
                 if (closed) return
-                (if (control.isNotEmpty()) control else ordinary).removeFirst().also { active = it }
+                val next = if (control.isNotEmpty()) control.removeFirst() else
+                    selector.next(ordinary, { false }, { it.size + Int.SIZE_BYTES })!!.also { ordinary.remove(it) }
+                next.also { active = it }
             }
-            if (!isOwned()) { close(); return }
+            if (!isOwned()) { onRetired(close()); return }
             try {
+                onStarted(payload)
                 write(payload)
-                synchronized(monitor) { active = null; retainedCount--; retainedBytes -= payload.size + Int.SIZE_BYTES }
+                synchronized(monitor) {
+                    if (closed) return
+                    active = null; retainedCount--; retainedBytes -= payload.size + Int.SIZE_BYTES
+                }
+                onCompleted(payload)
                 onCapacityAvailable()
             } catch (_: Exception) {
                 val abandoned = synchronized(monitor) {

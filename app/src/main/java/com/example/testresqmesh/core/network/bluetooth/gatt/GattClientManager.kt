@@ -13,6 +13,8 @@ import com.example.testresqmesh.core.model.NodeIdentity
 import com.example.testresqmesh.core.model.ScanEvent
 import com.example.testresqmesh.core.network.NativeBleManager
 import com.example.testresqmesh.core.network.bluetooth.BleConnectStartResult
+import com.example.testresqmesh.core.network.bluetooth.ReadyPayloadSetup
+import com.example.testresqmesh.core.network.bluetooth.state.BleLink
 import com.example.testresqmesh.core.network.bluetooth.state.BleLinkRole
 import com.example.testresqmesh.core.network.bluetooth.state.BleLinkState
 import com.example.testresqmesh.core.network.bluetooth.state.MeshFrameCodec
@@ -24,6 +26,10 @@ class GattClientManager(
     val context: Context,
     val manager: NativeBleManager
 ) {
+    private val setups = java.util.concurrent.ConcurrentHashMap<String, Pair<BleLink, ReadyPayloadSetup>>()
+    fun onGattIdle(endpoint: String) { setups[endpoint]?.takeIf { manager.store.links.isCurrent(it.first) }?.second?.onGattIdle() }
+    fun onSocketLost(endpoint: String) { setups[endpoint]?.takeIf { manager.store.links.isCurrent(it.first) }?.second?.onSocketLost() }
+    fun clearSetups() { setups.clear() }
     /**
      * Publishes a connection-state change for a peer that is already in the discovery list.
      * `peerConnections` / `peerScore` are deliberately left null so the repository keeps the values
@@ -88,6 +94,51 @@ class GattClientManager(
             AtomicBoolean(false).also { store.isWriting[macAddress] = it }
         } else store.isWriting.computeIfAbsent(macAddress) { AtomicBoolean(false) }
         val link = store.links.begin(macAddress, BleLinkRole.CLIENT, NodeIdentity.idOf(peerName), queue, writing)
+        val payloadSetup = ReadyPayloadSetup(
+            isCurrentReady = { isTransportGenerationCurrent(epoch) && store.links.isCurrent(link) && link.state == BleLinkState.READY },
+            isGattIdle = { !store.gattFlights.containsKey(macAddress) && !store.serverIndications.unresolved(macAddress) && link.currentOperation == null },
+            hasL2cap = { store.activeL2capSockets[macAddress]?.isConnected == true },
+            requestPort = {
+                val characteristic = link.gatt?.getService(SERVICE_UUID)?.getCharacteristic(L2CAP_PSM_CHARACTERISTIC_UUID)
+                characteristic != null && runCatching { link.gatt?.readCharacteristic(characteristic) == true }.getOrDefault(false)
+            },
+            requestMtu = { runCatching { link.gatt?.requestMtu(247) == true }.getOrDefault(false) },
+            openPort = { port, done ->
+                val socket = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q)
+                    runCatching { link.gatt?.device?.createInsecureL2capChannel(port) }.getOrNull() else null
+                if (socket == null || !trackPendingL2capSocket(socket, epoch)) done(false)
+                else {
+                    val finished = AtomicBoolean(false)
+                    handler.postDelayed({
+                        if (finished.compareAndSet(false, true)) {
+                            runCatching { socket.close() }; finishPendingL2capSocket(socket); done(false)
+                        }
+                    }, 10_000L)
+                    Thread {
+                        val connected = runCatching { socket.connect(); true }.getOrDefault(false)
+                        handler.post {
+                            finishPendingL2capSocket(socket)
+                            if (finished.compareAndSet(false, true)) {
+                                val owned = connected && isTransportGenerationCurrent(epoch) && store.links.isCurrent(link)
+                                if (owned) handleL2capConnection(macAddress, socket) else runCatching { socket.close() }
+                                done(owned)
+                            } else runCatching { socket.close() }
+                        }
+                    }.start()
+                }
+            },
+            schedule = { delay, action -> handler.postDelayed({ action() }, delay) },
+            gate = { operation ->
+                if (store.links.isCurrent(link)) {
+                    link.currentOperation = operation
+                    if (operation == null) processNextPayload(macAddress)
+                }
+            },
+            log = { AppLogger.d("BLE_MESH", "PAYLOAD_SETUP generation=${link.generation} endpoint=$macAddress $it") },
+            supportsPort = Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && com.example.testresqmesh.BuildConfig.BLE_L2CAP_ENABLED,
+            onStalled = { link.gattQuarantined = true; forceGattDisconnect(macAddress, link.gatt) }
+        )
+        setups[macAddress] = link to payloadSetup
         val stablePeerId = link.peerNodeId ?: NodeIdentity.idOf(peerName)
         val useExplicitLeTransport = stablePeerId != null &&
             store.explicitLeTransportPeers.contains(stablePeerId)
@@ -291,6 +342,7 @@ class GattClientManager(
                                 link.mtu = 20
                             }
                             requestServicesOnce(gatt)
+                            payloadSetup.onMtu()
 
                         }
                         handleCallback()
@@ -405,22 +457,9 @@ class GattClientManager(
                                     }
                                 }
 
-                                // Proceed to read the L2CAP PSM port
-                                val psmChar = gatt.getService(SERVICE_UUID)?.getCharacteristic(L2CAP_PSM_CHARACTERISTIC_UUID)
-                                if (psmChar != null) {
-                                    try {
-                                        gatt.readCharacteristic(psmChar)
-                                    } catch (e: SecurityException) {
-                                        AppLogger.d("BLE_MESH", "CLIENT L2CAP PSM read skipped: BLUETOOTH_CONNECT was revoked")
-                                        finishConnectPhase("Bluetooth permission revoked")
-                                        store.links.transition(link, BleLinkState.DISCONNECTING)
-                                        store.links.forget(link)
-                                        return
-                                    }
-                                }
-
                                 finishConnectPhase("descriptor written")
-                                sendSystemPulse()
+                                payloadSetup.start()
+                                sendSystemPulse(forceFull = true)
                                 processNextPayload(macAddress)
                             } else {
                                 AppLogger.d("BLE_MESH", "GATT descriptor write failed for ${macAddress}. Status: ${status}. Forcing UI disconnect.")
@@ -443,32 +482,10 @@ class GattClientManager(
                         if (!isTransportGenerationCurrent(epoch)) return@post
                         fun handleCallback() {
                             if (!owns(gatt, "characteristic read $status")) return
-                            if (status == BluetoothGatt.GATT_SUCCESS && characteristic.uuid == L2CAP_PSM_CHARACTERISTIC_UUID) {
-                                val psmBytes = capturedValue
-                                if (psmBytes != null && psmBytes.size == 4) {
-                                    val psm = java.nio.ByteBuffer.wrap(psmBytes).int
-                                    if (psm > 0 && android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
-                                        AppLogger.d("BLE_MESH", "Discovered Peer PSM: $psm for $macAddress. Opening L2CAP Socket...")
-                                        val l2capSocket = try { gatt.device.createInsecureL2capChannel(psm) }
-                                            catch (_: Exception) { return }
-                                        if (!trackPendingL2capSocket(l2capSocket, epoch)) return
-                                        Thread {
-                                            try {
-                                                l2capSocket.connect()
-                                                handler.post {
-                                                    finishPendingL2capSocket(l2capSocket)
-                                                    if (isTransportGenerationCurrent(epoch) && store.links.isCurrent(link)) {
-                                                        handleL2capConnection(macAddress, l2capSocket)
-                                                    } else try { l2capSocket.close() } catch (_: Exception) {}
-                                                }
-                                            } catch (_: Exception) {
-                                                try { l2capSocket.close() } catch (_: Exception) {}
-                                                handler.post { finishPendingL2capSocket(l2capSocket) }
-                                                AppLogger.d("BLE_MESH", "L2CAP connection failed; retaining GATT fallback")
-                                            }
-                                        }.start()
-                                    }
-                                }
+                            if (characteristic.uuid == L2CAP_PSM_CHARACTERISTIC_UUID) {
+                                val port = if (status == BluetoothGatt.GATT_SUCCESS && capturedValue?.size == 4)
+                                    java.nio.ByteBuffer.wrap(capturedValue).int else null
+                                payloadSetup.onPort(port)
                             }
 
                         }
@@ -484,22 +501,22 @@ class GattClientManager(
                             if (!owns(gatt, "notification")) return
                             val value = capturedValue ?: return
                             val now = System.currentTimeMillis()
-                            val lastInteraction = store.connectionInteractionTimes[macAddress] ?: 0L
-                            if (now - lastInteraction > 5000 && (store.chunkBuffers[macAddress]?.size ?: 0) > 0) {
+                            if (now - link.lastGattChunkAt > 5000 && link.receiveBuffer.isNotEmpty()) {
                                 AppLogger.d("BLE_MESH", "Client Buffer timeout! Clearing corrupted chunk buffer for $macAddress")
-                                store.chunkBuffers[macAddress] = ByteArray(0)
+                                link.receiveBuffer = byteArrayOf()
                             }
+                            link.lastGattChunkAt = now
                             store.connectionInteractionTimes[macAddress] = now
                             link.lastInteractionAt = now
 
-                            when (val result = MeshFrameCodec.append(store.chunkBuffers[macAddress] ?: ByteArray(0), value)) {
+                            when (val result = MeshFrameCodec.append(link.receiveBuffer, value)) {
                                 is MeshFrameCodec.AppendResult.Accepted -> {
                                     result.payloads.forEach { processBinaryPayload(macAddress, it) }
-                                    store.chunkBuffers[macAddress] = result.remainder
+                                    link.receiveBuffer = result.remainder
                                 }
                                 is MeshFrameCodec.AppendResult.Rejected -> {
                                     AppLogger.d("BLE_MESH", "Rejected malformed CLIENT frame from $macAddress: ${result.reason}")
-                                    store.chunkBuffers[macAddress] = ByteArray(0)
+                                    link.receiveBuffer = byteArrayOf()
                                 }
                             }
 

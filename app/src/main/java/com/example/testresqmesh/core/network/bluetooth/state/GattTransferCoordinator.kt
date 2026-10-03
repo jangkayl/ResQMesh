@@ -9,6 +9,7 @@ import android.bluetooth.BluetoothGatt
  */
 class GattTransferCoordinator(private val store: BleStateStore) {
     enum class Completion { STALE, MORE, DONE }
+    private val selectors = java.util.concurrent.ConcurrentHashMap<String, FairFrameSelector>()
 
     fun enqueue(endpoint: String, transfer: GattTransfer, priority: Boolean): Boolean {
         val queue = store.pendingQueues.computeIfAbsent(endpoint) { java.util.concurrent.ConcurrentLinkedDeque() }
@@ -43,7 +44,8 @@ class GattTransferCoordinator(private val store: BleStateStore) {
         }
         if (!writing.compareAndSet(false, true)) return null
         return synchronized(queue) {
-            val transfer = queue.pollFirst()
+            val transfer = selectors.computeIfAbsent(endpoint) { FairFrameSelector() }
+                .next(queue, { it.priority }, { it.frame.size })?.takeIf { queue.remove(it) }
             if (transfer == null) {
                 writing.set(false)
                 return@synchronized null
@@ -98,15 +100,16 @@ class GattTransferCoordinator(private val store: BleStateStore) {
     }
 
     fun drainForPromotion(endpoint: String): List<GattTransfer> {
+        // An ATT callback owns the active frame. Finish it before changing transports; otherwise
+        // the peer retains half a length-prefixed frame and a server indication stays unresolved.
+        if (store.gattFlights.containsKey(endpoint) || store.serverIndications.unresolved(endpoint)) return emptyList()
         val promoted = mutableListOf<GattTransfer>()
-        store.gattFlights.remove(endpoint)?.let { flight ->
-            flight.writing.set(false)
-            promoted += flight.transfer
-        }
         store.pendingQueues[endpoint]?.let { queue ->
             while (true) promoted += queue.pollFirst() ?: break
         }
         store.isWriting[endpoint]?.set(false)
         return promoted
     }
+
+    fun forget(endpoint: String) { selectors.remove(endpoint) }
 }

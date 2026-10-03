@@ -3,7 +3,9 @@ package com.example.testresqmesh.core.network.bluetooth
 import android.bluetooth.BluetoothSocket
 import android.os.Handler
 import com.example.testresqmesh.core.network.TransportDispatchResult
+import com.example.testresqmesh.core.network.OutboundFrameEvent
 import com.example.testresqmesh.core.network.bluetooth.state.BleLinkRole
+import com.example.testresqmesh.core.network.bluetooth.state.BleLink
 import com.example.testresqmesh.core.network.bluetooth.state.BoundedPayloadWriter
 import com.example.testresqmesh.core.network.bluetooth.state.BleStateStore
 import com.example.testresqmesh.core.network.bluetooth.state.MeshFrameCodec
@@ -23,10 +25,15 @@ class L2capTransport(
     private val onPromoteGattWork: (String) -> Unit,
     private val onSocketLost: (String) -> Unit,
     private val onWriteFailure: (String, ByteArray) -> Unit,
-    private val onConnected: () -> Unit
+    private val onConnected: () -> Unit,
+    private val onFrame: (String, ByteArray, OutboundFrameEvent.Stage) -> Unit = { _, _, _ -> },
+    private val priorityForPayload: (ByteArray) -> Boolean = { false }
 ) {
     private val writers = ConcurrentHashMap<String, BoundedPayloadWriter>()
     private val inboundFrames = ConcurrentHashMap<String, AtomicInteger>()
+    private val socketOwners = ConcurrentHashMap<String, List<BleLink>>()
+    fun isUsable(endpoint: String): Boolean = store.activeL2capSockets[endpoint]?.isConnected == true &&
+        store.links.ownsSocket(endpoint, socketOwners[endpoint].orEmpty())
     fun isIdle(endpoint: String): Boolean = writers[endpoint]?.isIdle() != false &&
         (inboundFrames[endpoint]?.get() ?: 0) == 0
 
@@ -39,18 +46,23 @@ class L2capTransport(
         val incoming = AtomicInteger()
         inboundFrames[endpoint] = incoming
         val gattOwners = BleLinkRole.entries.mapNotNull { store.links.current(endpoint, it) }
+        socketOwners[endpoint] = gattOwners
         fun isOwned() = store.isNodeActive.get() && store.activeL2capSockets[endpoint] === socket &&
-            hasLiveGattRole(endpoint) && store.links.ownsEndpoint(endpoint, gattOwners)
+            hasLiveGattRole(endpoint) && store.links.ownsSocket(endpoint, gattOwners)
         fun lost(abandoned: List<ByteArray>) {
             synchronized(this@L2capTransport) {
                 if (!store.activeL2capSockets.remove(endpoint, socket)) return
                 writers.remove(endpoint)?.close()
                 store.l2capOutboundProgressTimes.remove(endpoint)
                 inboundFrames.remove(endpoint, incoming)
+                socketOwners.remove(endpoint, gattOwners)
                 close(socket)
             }
             handler.post {
-                if (!store.links.ownsEndpoint(endpoint, gattOwners)) return@post
+                if (!store.links.ownsSocket(endpoint, gattOwners)) {
+                    abandoned.forEach { onFrame(endpoint, it, OutboundFrameEvent.Stage.FAILED) }
+                    return@post
+                }
                 abandoned.forEach { onWriteFailure(endpoint, it) }
                 onSocketLost(endpoint)
             }
@@ -75,13 +87,16 @@ class L2capTransport(
                 AppLogger.d("BLE_MESH", "L2CAP writer failed on $endpoint; ${abandoned.size} transfers need GATT fallback")
                 lost(abandoned)
             },
-            onCapacityAvailable = { handler.post { if (isOwned()) onPromoteGattWork(endpoint) } }
+            onCapacityAvailable = { handler.post { if (isOwned()) onPromoteGattWork(endpoint) } },
+            onStarted = { bytes -> handler.post { if (isOwned()) onFrame(endpoint, bytes, OutboundFrameEvent.Stage.STARTED) } },
+            onCompleted = { bytes -> handler.post { if (isOwned()) onFrame(endpoint, bytes, OutboundFrameEvent.Stage.COMPLETED) } },
+            onRetired = { abandoned -> handler.post { abandoned.forEach { onFrame(endpoint, it, OutboundFrameEvent.Stage.FAILED) } } }
         )
         writers[endpoint] = writer
         // Socket replacement retains accepted complete frames. A partly written old frame is
         // resent in full; existing message-ID dedupe handles an ambiguous successful old write.
         inherited.forEach { payload ->
-            if (!writer.offer(payload, priority = true)) {
+            if (!writer.offer(payload, priority = priorityForPayload(payload))) {
                 handler.post { if (isOwned()) onWriteFailure(endpoint, payload) }
             }
         }
@@ -127,7 +142,7 @@ class L2capTransport(
         if (!MeshFrameCodec.isValidPayloadLength(payload.size) ||
             !OutboundQueuePolicy.fitsSingleTransfer(payload.size + Int.SIZE_BYTES, priority)) return TransportDispatchResult.REJECTED_INVALID_FRAME
         val socket = store.activeL2capSockets[endpoint]
-        if (socket == null || !socket.isConnected || !hasLiveGattRole(endpoint)) return TransportDispatchResult.REJECTED_NOT_READY
+        if (socket == null || !isUsable(endpoint) || !hasLiveGattRole(endpoint)) return TransportDispatchResult.REJECTED_NOT_READY
         val writer = writers[endpoint] ?: return TransportDispatchResult.REJECTED_NOT_READY
         return if (writer.offer(payload, priority)) TransportDispatchResult.ACCEPTED else {
             AppLogger.d("BLE_MESH", "L2CAP queue full for $endpoint; rejected ${payload.size} bytes")
@@ -136,10 +151,13 @@ class L2capTransport(
     }
 
     @Synchronized fun disconnect(endpoint: String) {
-        writers.remove(endpoint)?.close()
+        writers.remove(endpoint)?.close()?.forEach { bytes ->
+            handler.post { onFrame(endpoint, bytes, OutboundFrameEvent.Stage.FAILED) }
+        }
         store.activeL2capSockets.remove(endpoint)?.let(::close)
         store.l2capOutboundProgressTimes.remove(endpoint)
         inboundFrames.remove(endpoint)
+        socketOwners.remove(endpoint)
     }
 
     fun stop() { (writers.keys + store.activeL2capSockets.keys).toSet().forEach(::disconnect) }

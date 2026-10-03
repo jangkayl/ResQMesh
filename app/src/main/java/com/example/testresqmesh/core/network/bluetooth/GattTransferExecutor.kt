@@ -10,6 +10,8 @@ import com.example.testresqmesh.core.network.bluetooth.state.BleLinkRole
 import com.example.testresqmesh.core.network.bluetooth.state.GattTransferCoordinator
 import com.example.testresqmesh.core.network.bluetooth.state.GattTransferFlight
 import com.example.testresqmesh.core.network.bluetooth.state.ServerIndicationLedger
+import com.example.testresqmesh.core.network.OutboundFrameEvent
+import com.example.testresqmesh.core.network.TransportDispatchResult
 import com.example.testresqmesh.core.network.bluetooth.state.BleStateStore
 import com.example.testresqmesh.core.network.bluetooth.state.payloadBytes
 import com.example.testresqmesh.core.utils.AppLogger
@@ -27,19 +29,23 @@ class GattTransferExecutor(
     private val readyLink: (String) -> BleLink?,
     private val hasUsableL2cap: (String) -> Boolean,
     private val promoteToL2cap: (String) -> Unit,
-    private val resendPayload: (String, ByteArray) -> Unit,
+    private val resendPayload: (String, ByteArray, Boolean) -> TransportDispatchResult,
     private val onHeartbeatSent: (String, BleLink, String) -> Unit,
     private val onFlightRemoved: (String) -> Unit,
     private val isCurrentLink: (BleLink) -> Boolean,
     private val disconnectClient: (String, BluetoothGatt?) -> Unit,
     private val disconnectServer: (BleLink) -> Unit,
-    private val chunkTimeoutMs: Long
+    private val chunkTimeoutMs: Long,
+    private val onGattIdle: (String) -> Unit = {},
+    private val onFrame: (String, ByteArray, OutboundFrameEvent.Stage) -> Unit = { _, _, _ -> }
 ) {
     fun processNext(endpoint: String) {
         if (Looper.myLooper() != Looper.getMainLooper()) {
             handler.post { processNext(endpoint) }
             return
         }
+        if (store.gattFlights.containsKey(endpoint)) return
+        onGattIdle(endpoint)
         if (hasUsableL2cap(endpoint)) {
             promoteToL2cap(endpoint)
             return
@@ -72,6 +78,7 @@ class GattTransferExecutor(
             when (coordinator.completeChunk(flight)) {
                 GattTransferCoordinator.Completion.MORE -> sendChunk(flight)
                 GattTransferCoordinator.Completion.DONE -> {
+                    onFrame(endpoint, flight.transfer.payloadBytes(), OutboundFrameEvent.Stage.COMPLETED)
                     flight.transfer.heartbeatId?.let { onHeartbeatSent(endpoint, flight.link, it) }
                     processNext(endpoint)
                 }
@@ -89,6 +96,7 @@ class GattTransferExecutor(
             when (coordinator.completeChunk(flight)) {
                 GattTransferCoordinator.Completion.MORE -> sendChunk(flight)
                 GattTransferCoordinator.Completion.DONE -> {
+                    onFrame(ticket.endpoint, flight.transfer.payloadBytes(), OutboundFrameEvent.Stage.COMPLETED)
                     flight.transfer.heartbeatId?.let { onHeartbeatSent(ticket.endpoint, flight.link, it) }
                     processNext(ticket.endpoint)
                 }
@@ -155,6 +163,10 @@ class GattTransferExecutor(
             }
             return
         }
+        if (!flight.started) {
+            flight.started = true
+            onFrame(endpoint, flight.transfer.payloadBytes(), OutboundFrameEvent.Stage.STARTED)
+        }
         handler.postDelayed({
             if (store.gattFlights[endpoint] === flight && flight.operationId == operationId) {
                 fail(flight, "GATT completion callback timed out")
@@ -166,15 +178,18 @@ class GattTransferExecutor(
         val endpoint = flight.link.endpoint
         if (!coordinator.remove(flight)) return
         onFlightRemoved(endpoint)
+        flight.link.gattQuarantined = true
         if (hasUsableL2cap(endpoint)) {
             AppLogger.d(
                 "BLE_MESH",
                 "Link ${flight.link.generation} $endpoint: $reason; preserving healthy L2CAP and promoting payload"
             )
-            resendPayload(endpoint, flight.transfer.payloadBytes())
+            val result = resendPayload(endpoint, flight.transfer.payloadBytes(), flight.transfer.priority)
+            if (!result.accepted) onFrame(endpoint, flight.transfer.payloadBytes(), OutboundFrameEvent.Stage.FAILED)
             promoteToL2cap(endpoint)
             return
         }
+        onFrame(endpoint, flight.transfer.payloadBytes(), OutboundFrameEvent.Stage.FAILED)
         AppLogger.d("BLE_MESH", "Link ${flight.link.generation} $endpoint: $reason; retiring link")
         if (!isCurrentLink(flight.link)) {
             processNext(endpoint)

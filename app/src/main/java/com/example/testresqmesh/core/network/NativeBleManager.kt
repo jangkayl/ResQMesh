@@ -39,6 +39,7 @@ import kotlinx.serialization.protobuf.ProtoBuf
 
 @SuppressLint("MissingPermission")
 class NativeBleManager(val context: Context) {
+    var onOutboundFrame: ((OutboundFrameEvent) -> Unit)? = null
     var onConversationMessage: ((String, MeshPayload) -> Unit)? = null
     var onSosPacket: ((String, MeshPayload) -> Unit)? = null
     val gattServerManager = com.example.testresqmesh.core.network.bluetooth.gatt.GattServerManager(context, this)
@@ -153,14 +154,17 @@ class NativeBleManager(val context: Context) {
         override fun getMyNodeId() = myNodeId
         override fun getSeenMessageIds() = store.seenMessageIds
         override fun getEndpointMedium(endpointId: String) = "Persistent BLE Mesh"
-        override fun getConnectedEndpointIdByName(name: String) =
-            store.connectedEndpointNames.entries.find { NodeIdentity.matches(it.value, name) }?.key
-        override fun getConnectedEndpointIdByNodeId(nodeId: String) =
-            (store.activeConnections.keys + store.activeServerConnections.keys).firstOrNull {
-                val epNodeId = nodeIdForEndpoint(it) ?: return@firstOrNull false
-                val idMatches = epNodeId.equals(nodeId, ignoreCase = true)
-                idMatches && store.links.isReady(it)
+        override fun getConnectedEndpointIdByName(name: String) = NodeIdentity.idOf(name)?.let(::endpointForPeer)
+        override fun getConnectedEndpointIdByNodeId(nodeId: String) = endpointForPeer(nodeId)
+        override fun hasPendingCustody(payloadId: String) = this@NativeBleManager.hasPendingCustody(payloadId)
+        override fun forwardPrivatePayload(nodeId: String, payload: ByteArray): TransportDispatchResult {
+            return if (peerTransferVersions[nodeId.uppercase()] == ReliableMeshTransfers.VERSION) {
+                reliableTransfers.offer(nodeId.uppercase(), payload, false, durableRelay = true)
+            } else {
+                val endpoint = endpointForPeer(nodeId) ?: return TransportDispatchResult.REJECTED_NOT_READY
+                sendLegacyRelay(nodeId.uppercase(), endpoint, payload)
             }
+        }
         override fun getStpNeighbors(): Set<String> {
             return this@NativeBleManager.stpNeighborsProvider?.invoke() ?: emptySet()
         }
@@ -221,6 +225,97 @@ class NativeBleManager(val context: Context) {
     
     val payloadDispatcher = PayloadDispatcher(payloadDispatcherCallback)
     val handler = Handler(Looper.getMainLooper())
+    private val peerTransferVersions = java.util.concurrent.ConcurrentHashMap<String, Int>()
+    private val legacyRelayFrames = java.util.concurrent.ConcurrentHashMap<String, String>()
+    private val transferIo = java.util.concurrent.Executors.newSingleThreadExecutor { task ->
+        Thread(task, "ResQMesh-transfer-journal").apply { isDaemon = true }
+    }
+    private val reliableTransfers by lazy {
+        ReliableMeshTransfers(
+            java.io.File(context.noBackupFilesDir, "mesh-transfers"),
+            active = { store.isNodeActive.get() },
+            ready = { peer -> peerTransferVersions[peer] == ReliableMeshTransfers.VERSION &&
+                endpointForPeer(peer)?.let { store.links.isIdentityAdmitted(it) } == true },
+            execute = { action -> transferIo.execute { action() } },
+            schedule = { delay, action -> handler.postDelayed({ action() }, delay) },
+            send = { peer, bytes, priority, done -> handler.post {
+                val endpoint = endpointForPeer(peer)
+                done(if (endpoint == null) TransportDispatchResult.REJECTED_NOT_READY else sendRawPayload(endpoint, bytes, priority))
+            } },
+            received = { peer, bytes -> handler.post { endpointForPeer(peer)?.let { processBinaryPayload(it, bytes) } } },
+            response = { peer, bytes -> handler.post { endpointForPeer(peer)?.let { sendRawPayload(it, bytes, true) } } },
+            event = { bytes, stage, queuedAt, startedAt -> handler.post {
+                reportFrame("", bytes, stage, "TRANSFER", queuedAt, startedAt)
+            } },
+            log = { AppLogger.d("BLE_TRANSFER", it) }
+        )
+    }
+    private data class FallbackFrame(val bytes: ByteArray, val priority: Boolean)
+    private val retainedFallback = com.example.testresqmesh.core.network.bluetooth.state.RetainedFallbackQueue<FallbackFrame>(
+        send = { endpoint, frame -> enqueueGattPayload(endpoint, frame.bytes, frame.priority) },
+        schedule = { delay, action -> handler.postDelayed({ action() }, delay) },
+        failed = { endpoint, frame -> reportFrame(endpoint, frame.bytes, OutboundFrameEvent.Stage.FAILED, "GATT") }
+    )
+    fun hasPendingTransfer(messageId: String) = reliableTransfers.hasOutbound(messageId)
+    fun hasPendingCustody(payloadId: String) = reliableTransfers.hasPendingCustody(payloadId)
+    fun markPayloadStored(messageId: String) = reliableTransfers.stored(messageId)
+    fun preferredEndpointForPeer(nodeId: String): String? = endpointForPeer(nodeId.uppercase())
+
+    private fun endpointForPeer(nodeId: String): String? = DirectSendPolicy.select(
+        (store.activeConnections.keys + store.activeServerConnections.keys).distinct().mapNotNull { endpoint ->
+            val id = nodeIdForEndpoint(endpoint) ?: return@mapNotNull null
+            val name = store.connectedEndpointNames[endpoint] ?: return@mapNotNull null
+            if (!id.equals(nodeId, true) || !hasReadyEndpoint(endpoint) || NodeIdentity.isPlaceholder(name) || isDeviceBlocked(name)) null
+            else DirectEndpoint(endpoint, id, hasUsableL2cap(endpoint),
+                !com.example.testresqmesh.core.network.bluetooth.state.BleLivenessPolicy.isUnresponsive(
+                    store.connectionInteractionTimes[endpoint] ?: 0, System.currentTimeMillis()))
+        }
+    )?.endpoint
+
+    private fun isControlPayload(bytes: ByteArray): Boolean = runCatching {
+        val p = ProtoBuf.decodeFromByteArray<MeshPayload>(bytes)
+        p.type in setOf("SYSTEM", "PING", "PONG", "SEEN", "DELIVERED", "BLOCK_REQUEST", "BLOCK_ACK",
+            "SOS_EVENT", "SOS_SYNC_REQ", "SOS_SYNC_RES", "EVENT_SYNC_REQ", ReliableMeshTransfers.ACK) ||
+            (p.type == ReliableMeshTransfers.PIECE && ProtoBuf.decodeFromByteArray<TransferPiece>(p.liveAudioChunk!!).let { it.priority || it.status })
+    }.getOrDefault(false)
+
+    private fun reportFrame(endpoint: String, bytes: ByteArray, stage: OutboundFrameEvent.Stage,
+                            transport: String, queuedAt: Long = 0L, startedAt: Long = 0L) {
+        val payload = runCatching { ProtoBuf.decodeFromByteArray<MeshPayload>(bytes) }.getOrNull() ?: return
+        if (payload.type == ReliableMeshTransfers.PIECE) { reliableTransfers.frame(payload, stage); return }
+        if (payload.type !in setOf("MESSAGE", "CONVERSATION")) return
+        val now = System.currentTimeMillis()
+        val event = OutboundFrameEvent(payload.id, payload.targetMessageId.ifBlank { payload.id }, stage, transport,
+            readyGattLink(endpoint)?.generation ?: 0L, android.os.SystemClock.elapsedRealtime(), bytes.size,
+            if (queuedAt > 0 && startedAt > 0) (startedAt - queuedAt).coerceAtLeast(0) else 0,
+            if (startedAt > 0) (now - startedAt).coerceAtLeast(0) else 0,
+            payload.isPrivate, (payload.directedRouteNodeIds.size - 1).coerceAtLeast(1))
+        AppLogger.d("BLE_TRANSFER", "FRAME_${stage.name} transmission=${event.transmissionId} message=${event.messageId} transport=$transport bytes=${event.bytes} queueMs=${event.queueMs} transferMs=${event.transferMs}")
+        if (stage == OutboundFrameEvent.Stage.COMPLETED && transport != "TRANSFER") {
+            nodeIdForEndpoint(endpoint)?.let { peer ->
+                if (legacyRelayFrames.remove("${peer.uppercase()}:${payload.id}", endpoint)) {
+                    reliableTransfers.legacyForwarded(peer.uppercase(), payload)
+                }
+            }
+        } else if (stage == OutboundFrameEvent.Stage.FAILED && transport != "TRANSFER") {
+            nodeIdForEndpoint(endpoint)?.let { legacyRelayFrames.remove("${it.uppercase()}:${payload.id}", endpoint) }
+        }
+        onOutboundFrame?.invoke(event)
+    }
+
+    private fun onL2capLost(endpoint: String) {
+        gattClientManager.onSocketLost(endpoint)
+        if (!hasLiveSocket(endpoint)) return
+        val quarantined = BleLinkRole.entries.mapNotNull { store.links.current(endpoint, it) }.filter { it.gattQuarantined }
+        if (quarantined.isNotEmpty()) {
+            // A failed ATT frame may still exist at the peer. Reopen that generation before reuse.
+            AppLogger.d("BLE_TRANSFER", "ATT_RECOVERY_REQUIRED endpoint=$endpoint")
+            quarantined.forEach { link ->
+                if (link.role == BleLinkRole.CLIENT) forceGattDisconnect(endpoint, link.gatt) else retireServerLink(link)
+            }
+        }
+        if (hasLiveSocket(endpoint)) { retainedFallback.flush(); startHeartbeatChallenge(endpoint) }
+    }
     private val privateReceipts = DirectedReceiptQueue(
         send = { payload ->
             val ids = payload.directedRouteNodeIds
@@ -234,6 +329,7 @@ class NativeBleManager(val context: Context) {
         log = { AppLogger.d("MeshNetwork_E2EE", it) }
     )
     fun queuePrivateReceipt(payload: MeshPayload) {
+        reliableTransfers.stored(payload.targetMessageId, ProtoBuf.encodeToByteArray(payload))
         handler.post { if (store.isNodeActive.get()) privateReceipts.offer(payload) }
     }
     fun wakePrivateReceipts() { handler.post { if (store.isNodeActive.get()) privateReceipts.wake() } }
@@ -253,18 +349,24 @@ class NativeBleManager(val context: Context) {
         readyLink = ::readyGattLink,
         hasUsableL2cap = ::hasUsableL2cap,
         promoteToL2cap = ::promoteGattWorkToL2cap,
-        resendPayload = ::sendDirectPayload,
+        resendPayload = ::sendRawPayload,
         onHeartbeatSent = ::markHeartbeatSent,
         onFlightRemoved = { endpoint -> heartbeatCoordinator.remove(endpoint) },
         isCurrentLink = { link -> store.links.isCurrent(link) },
         disconnectClient = ::forceGattDisconnect,
         disconnectServer = ::retireServerLink,
-        chunkTimeoutMs = GATT_CHUNK_TIMEOUT_MS
+        chunkTimeoutMs = GATT_CHUNK_TIMEOUT_MS,
+        onGattIdle = { endpoint -> gattClientManager.onGattIdle(endpoint) },
+        onFrame = { endpoint, bytes, stage -> reportFrame(endpoint, bytes, stage, "GATT") }
     )
     private val l2capTransport = L2capTransport(
         store, handler, ::hasLiveSocket, ::processBinaryPayload, ::promoteGattWorkToL2cap,
-        ::startHeartbeatChallenge, { endpoint, payload -> enqueueGattPayload(endpoint, payload, priority = true) },
-        { sendSystemPulse(forceFull = true) }
+        ::onL2capLost, { endpoint, payload ->
+            retainedFallback.retain(endpoint, listOf(FallbackFrame(payload, isControlPayload(payload))))
+        },
+        { sendSystemPulse(forceFull = true) },
+        { endpoint, bytes, stage -> reportFrame(endpoint, bytes, stage, "L2CAP") },
+        ::isControlPayload
     )
     private val lifecycleSupervisor = BleLifecycleSupervisor(
         store, handler, heartbeatCoordinator, HEARTBEAT_ACK_TIMEOUT_MS, CONNECT_LOCK_MAX_HOLD_MS,
@@ -286,7 +388,8 @@ class NativeBleManager(val context: Context) {
         disconnectEndpoint = ::disconnectFromEndpoint,
         isNodeActive = { store.isNodeActive.get() },
         canRetireForBridge = { endpoint -> canRetireForBridge?.invoke(endpoint) == true },
-        isTransportIdle = l2capTransport::isIdle
+        isTransportIdle = { endpoint -> l2capTransport.isIdle(endpoint) && !retainedFallback.hasPending(endpoint) &&
+            nodeIdForEndpoint(endpoint)?.let { !reliableTransfers.hasOutboundTo(it.uppercase()) } != false }
     )
 
     private val sessionLifecycle = BleSessionLifecycle(
@@ -407,6 +510,7 @@ class NativeBleManager(val context: Context) {
 
     private fun startTransport(generation: Long) {
         store.isNodeActive.set(true)
+        reliableTransfers.wake()
         serviceReady = false
         lastSystemPulseHash = 0
         lastSystemPulseTime = 0L
@@ -477,7 +581,7 @@ class NativeBleManager(val context: Context) {
                     senderName = myDeviceName
                 )
                 val payloadBytes = kotlinx.serialization.protobuf.ProtoBuf.encodeToByteArray(com.example.testresqmesh.core.network.MeshPayload.serializer(), payload)
-                broadcastPayload(payloadBytes)
+                broadcastPriorityPayload(payloadBytes)
                 return
             }
             
@@ -496,7 +600,8 @@ class NativeBleManager(val context: Context) {
                 connectedNodeIds = connectedNodeIds,
                 publicKey = com.example.testresqmesh.core.network.CryptoManager.getMyPublicKeyBase64(),
                 ttl = getMeshProfileTtl(),
-                topologySequence = topologySequence
+                topologySequence = topologySequence,
+                transferProtocol = ReliableMeshTransfers.VERSION
             )
             val payloadBytes = kotlinx.serialization.protobuf.ProtoBuf.encodeToByteArray(com.example.testresqmesh.core.network.MeshPayload.serializer(), payload)
             AppLogger.event(
@@ -505,7 +610,7 @@ class NativeBleManager(val context: Context) {
                 message = "Sending full SYSTEM pulse to ${store.activeConnections.size + store.activeServerConnections.size} GATT endpoints",
                 tag = "BLE_MESH"
             )
-            broadcastPayload(payloadBytes)
+            broadcastPriorityPayload(payloadBytes)
         } catch (e: Exception) {
             AppLogger.d("BLE_MESH", "Failed to send system pulse: ${e.message}")
         }
@@ -524,6 +629,10 @@ class NativeBleManager(val context: Context) {
 
     private fun stopTransport() {
         store.isNodeActive.set(false)
+        reliableTransfers.pause()
+        retainedFallback.clear()
+        legacyRelayFrames.clear()
+        gattClientManager.clearSetups()
         privateReceipts.clear()
         serviceReady = false
         handler.removeCallbacks(startupTimeout)
@@ -713,7 +822,13 @@ class NativeBleManager(val context: Context) {
     /** Retire the data socket and compatibility state only after the last GATT role ends. */
     fun cleanupEndpointIfUnowned(endpointId: String) {
         if (hasLiveSocket(endpointId)) return
+        legacyRelayFrames.entries.removeAll { it.value == endpointId }
+        nodeIdForEndpoint(endpointId)?.uppercase()?.let { reliableTransfers.wake(it) }
         l2capTransport.disconnect(endpointId)
+        retainedFallback.retire(endpointId)
+        store.gattFlights[endpointId]?.transfer?.let { reportFrame(endpointId, it.payloadBytes(), OutboundFrameEvent.Stage.FAILED, "GATT") }
+        store.pendingQueues[endpointId]?.forEach { reportFrame(endpointId, it.payloadBytes(), OutboundFrameEvent.Stage.FAILED, "GATT") }
+        transferCoordinator.forget(endpointId)
         store.pendingQueues.remove(endpointId)
         store.gattFlights.remove(endpointId)?.writing?.set(false)
         heartbeatCoordinator.remove(endpointId)
@@ -883,6 +998,15 @@ class NativeBleManager(val context: Context) {
         }
         try {
             val payload = kotlinx.serialization.protobuf.ProtoBuf.decodeFromByteArray(com.example.testresqmesh.core.network.MeshPayload.serializer(), payloadBytes)
+            if (payload.type in setOf(ReliableMeshTransfers.PIECE, ReliableMeshTransfers.ACK)) {
+                val peer = nodeIdForEndpoint(endpointId)?.uppercase() ?: return
+                if (!hasReadyEndpoint(endpointId) || !store.links.isIdentityAdmitted(endpointId) ||
+                    isDeviceBlocked(store.connectedEndpointNames[endpointId].orEmpty()) ||
+                    peerTransferVersions[peer] != ReliableMeshTransfers.VERSION ||
+                    payload.targetNodeId.isNotBlank() && !payload.targetNodeId.equals(myNodeId, true)) return
+                reliableTransfers.receive(peer, payload)
+                return
+            }
             onDeviceLivenessChanged?.invoke(endpointId, true)
             if (payload.type != "PONG") heartbeatCoordinator.remove(endpointId)
 
@@ -907,6 +1031,12 @@ class NativeBleManager(val context: Context) {
             // Relayed payloads carry a non-empty routePath; renaming from those would map a remote
             // node onto a local socket and corrupt the routing table.
             if (isDirectIdentityPulse) {
+                val claimedId = com.example.testresqmesh.core.network.bluetooth.DirectIdentityPolicy.validate(payload) {
+                    android.util.Base64.decode(it, android.util.Base64.DEFAULT)
+                } ?: return
+                receivingLinks.forEach { it.identityAdmitted = true }
+                peerTransferVersions[claimedId] = payload.transferProtocol
+                reliableTransfers.wake(claimedId, reconcile = false)
                 val oldName = store.connectedEndpointNames[endpointId]
                 if (NodeIdentity.isPlaceholder(oldName) || !NodeIdentity.matches(oldName, payload.senderName)) {
                     AppLogger.d("BLE_MESH", "Auto-rename: $endpointId is now ${payload.senderName}")
@@ -947,12 +1077,32 @@ class NativeBleManager(val context: Context) {
 
     fun broadcastPayload(payloadBytes: ByteArray, excludeEndpointId: String? = null): BroadcastDispatchResult {
         cacheOutgoingMessageId(payloadBytes)
-        val targets = mutableSetOf<String>()
-        targets.addAll(store.activeConnections.keys)
-        targets.addAll(store.activeServerConnections.keys)
-        targets.remove(excludeEndpointId)
-        
-        return BroadcastDispatchResult(targets.associateWith { sendDirectPayload(it, payloadBytes) })
+        val p = runCatching { ProtoBuf.decodeFromByteArray<MeshPayload>(payloadBytes) }.getOrNull()
+        val excludedPeer = excludeEndpointId?.let(::nodeIdForEndpoint)
+        val visited = if (p != null && !p.isPrivate && p.type in setOf("MESSAGE", "CONVERSATION"))
+            (p.routePath + p.senderName).mapNotNull(NodeIdentity::idOf).map { it.uppercase() }.toSet() else emptySet()
+        val peers = (store.activeConnections.keys + store.activeServerConnections.keys).distinct()
+            .filter { it != excludeEndpointId && hasReadyEndpoint(it) }.mapNotNull(::nodeIdForEndpoint)
+            .map { it.uppercase() }.filter { it !in visited && !it.equals(excludedPeer, true) && endpointForPeer(it) != null }.toSet()
+        val custody = p != null && excludeEndpointId != null && reliableTransfers.hasPendingCustody(p.id)
+        val roster = if (custody) reliableTransfers.relayTargets(p!!.id, peers) else peers
+        return BroadcastDispatchResult(roster.associateWith { peer ->
+            if (custody && reliableTransfers.alreadyForwarded(p!!.id, peer)) TransportDispatchResult.ACCEPTED
+            else if (custody && peerTransferVersions[peer] == ReliableMeshTransfers.VERSION) {
+                reliableTransfers.offer(peer, payloadBytes, false, durableRelay = true)
+            } else endpointForPeer(peer)?.let {
+                if (custody) sendLegacyRelay(peer, it, payloadBytes) else sendDirectPayload(it, payloadBytes)
+            } ?: TransportDispatchResult.REJECTED_NOT_READY
+        })
+    }
+
+    private fun sendLegacyRelay(peer: String, endpoint: String, bytes: ByteArray): TransportDispatchResult {
+        val payload = runCatching { ProtoBuf.decodeFromByteArray<MeshPayload>(bytes) }.getOrNull()
+            ?: return TransportDispatchResult.REJECTED_INVALID_FRAME
+        if (!reliableTransfers.hasPendingCustody(payload.id)) return sendDirectPayload(endpoint, bytes)
+        val key = "$peer:${payload.id}"
+        if (legacyRelayFrames.putIfAbsent(key, endpoint) != null) return TransportDispatchResult.ACCEPTED
+        return sendDirectPayload(endpoint, bytes).also { if (!it.accepted) legacyRelayFrames.remove(key, endpoint) }
     }
 
     /** SOS/control callers may overtake a queued low-priority attachment frame. */
@@ -984,9 +1134,9 @@ class NativeBleManager(val context: Context) {
 
     private fun readyGattLink(endpoint: String) =
         store.links.current(endpoint, BleLinkRole.CLIENT)?.takeIf {
-            it.state == BleLinkState.READY && store.activeConnections.containsKey(endpoint)
+            it.state == BleLinkState.READY && !it.gattQuarantined && it.currentOperation == null && store.activeConnections.containsKey(endpoint)
         } ?: store.links.current(endpoint, BleLinkRole.SERVER)?.takeIf {
-            it.state == BleLinkState.READY && store.activeServerConnections.containsKey(endpoint)
+            it.state == BleLinkState.READY && !it.gattQuarantined && store.activeServerConnections.containsKey(endpoint)
         }
 
     private fun startHeartbeatChallenge(endpoint: String) {
@@ -1047,51 +1197,46 @@ class NativeBleManager(val context: Context) {
 
     /** Sends a control payload ahead of normal GATT queue traffic; it never opens a new link. */
     fun sendPriorityPayload(targetEndpointId: String, payloadBytes: ByteArray): TransportDispatchResult {
-        if (!com.example.testresqmesh.core.network.bluetooth.state.OutboundQueuePolicy.fitsSingleTransfer(payloadBytes.size + Int.SIZE_BYTES, true)) {
-            return TransportDispatchResult.REJECTED_INVALID_FRAME
-        }
-        if (!BluetoothAdapter.checkBluetoothAddress(targetEndpointId)) return TransportDispatchResult.REJECTED_INVALID_ENDPOINT
-        if (!hasReadyEndpoint(targetEndpointId)) return TransportDispatchResult.REJECTED_NOT_READY
-        val l2capResult = l2capTransport.send(targetEndpointId, payloadBytes, priority = true)
-        if (l2capResult != TransportDispatchResult.REJECTED_NOT_READY) return l2capResult
-        return if (enqueueGattPayload(targetEndpointId, payloadBytes, priority = true)) {
-            TransportDispatchResult.ACCEPTED
-        } else {
-            TransportDispatchResult.REJECTED_QUEUE_FULL
-        }
+        return dispatchPayload(targetEndpointId, payloadBytes, true)
     }
 
     fun sendDirectPayload(targetMacAddress: String, payloadBytes: ByteArray): TransportDispatchResult {
-        if (!com.example.testresqmesh.core.network.bluetooth.state.OutboundQueuePolicy.fitsSingleTransfer(payloadBytes.size + Int.SIZE_BYTES, false)) {
-            return TransportDispatchResult.REJECTED_INVALID_FRAME
-        }
-        if (!BluetoothAdapter.checkBluetoothAddress(targetMacAddress)) return TransportDispatchResult.REJECTED_INVALID_ENDPOINT
-        val fullData = MeshFrameCodec.encode(payloadBytes)
-        if (fullData == null) {
-            AppLogger.d("BLE_MESH", "Rejected oversized or empty outbound payload for $targetMacAddress")
-            return TransportDispatchResult.REJECTED_INVALID_FRAME
-        }
-        
-        cacheOutgoingMessageId(payloadBytes)
+        return dispatchPayload(targetMacAddress, payloadBytes, isControlPayload(payloadBytes))
+    }
 
-        val l2capResult = l2capTransport.send(targetMacAddress, payloadBytes)
-        if (l2capResult != TransportDispatchResult.REJECTED_NOT_READY) return l2capResult
-        
-        val isServerConnected = store.activeServerConnections.containsKey(targetMacAddress)
-        val isClientConnected = store.activeConnections.containsKey(targetMacAddress)
-        if (!isServerConnected && !isClientConnected) {
-            AppLogger.d("BLE_MESH", "sendDirectPayload skipped: $targetMacAddress is not directly connected; relying on mesh routing")
+    private fun dispatchPayload(endpoint: String, bytes: ByteArray, priority: Boolean): TransportDispatchResult {
+        if (!BluetoothAdapter.checkBluetoothAddress(endpoint)) return TransportDispatchResult.REJECTED_INVALID_ENDPOINT
+        val payload = runCatching { ProtoBuf.decodeFromByteArray<MeshPayload>(bytes) }.getOrNull()
+            ?: return TransportDispatchResult.REJECTED_INVALID_FRAME
+        val peer = nodeIdForEndpoint(endpoint)?.uppercase()
+        val selected = if (peer != null && DirectSendPolicy.usesPeerEndpoint(payload.type)) endpointForPeer(peer) ?: endpoint else endpoint
+        if (!hasReadyEndpoint(selected)) return TransportDispatchResult.REJECTED_NOT_READY
+        if (payload.type in setOf("MESSAGE", "CONVERSATION") && !store.links.isIdentityAdmitted(selected)) {
             return TransportDispatchResult.REJECTED_NOT_READY
         }
+        cacheOutgoingMessageId(bytes)
+        return if (peer != null && peerTransferVersions[peer] == ReliableMeshTransfers.VERSION && DirectSendPolicy.usesPieces(payload.type, bytes.size)) {
+            reliableTransfers.offer(peer, bytes, priority, durableRelay = true)
+        } else sendRawPayload(selected, bytes, priority)
+    }
 
-        if (!hasReadyEndpoint(targetMacAddress)) return TransportDispatchResult.REJECTED_NOT_READY
-
-        if (!transferCoordinator.enqueue(targetMacAddress, GattTransfer(fullData), priority = false)) {
-            AppLogger.d("BLE_MESH", "GATT queue full for $targetMacAddress; rejected payload")
-            return TransportDispatchResult.REJECTED_QUEUE_FULL
+    /** Only complete wire frames enter a channel; transfer pieces bypass recursive fragmentation. */
+    private fun sendRawPayload(endpoint: String, bytes: ByteArray, priority: Boolean): TransportDispatchResult {
+        if (!com.example.testresqmesh.core.network.bluetooth.state.OutboundQueuePolicy.fitsSingleTransfer(bytes.size + Int.SIZE_BYTES, priority)) {
+            return TransportDispatchResult.REJECTED_INVALID_FRAME
         }
-
-        processNextPayload(targetMacAddress)
+        if (!hasReadyEndpoint(endpoint)) return TransportDispatchResult.REJECTED_NOT_READY
+        // The failed socket's accepted frames retain ownership before new ordinary work is admitted.
+        if (!priority && retainedFallback.hasPending(endpoint)) return TransportDispatchResult.REJECTED_QUEUE_FULL
+        val l2capResult = l2capTransport.send(endpoint, bytes, priority)
+        if (l2capResult != TransportDispatchResult.REJECTED_NOT_READY) {
+            if (l2capResult.accepted) reportFrame(endpoint, bytes, OutboundFrameEvent.Stage.QUEUED, "L2CAP")
+            return l2capResult
+        }
+        val frame = MeshFrameCodec.encode(bytes) ?: return TransportDispatchResult.REJECTED_INVALID_FRAME
+        if (!transferCoordinator.enqueue(endpoint, GattTransfer(frame), priority)) return TransportDispatchResult.REJECTED_QUEUE_FULL
+        reportFrame(endpoint, bytes, OutboundFrameEvent.Stage.QUEUED, "GATT")
+        processNextPayload(endpoint)
         return TransportDispatchResult.ACCEPTED
     }
 
@@ -1131,19 +1276,16 @@ class NativeBleManager(val context: Context) {
         releaseConnectLock(macAddress, "force disconnect")
         
         handler.post {
-            onDeviceDisconnected?.invoke(macAddress)
+            if (!hasReadyEndpoint(macAddress)) onDeviceDisconnected?.invoke(macAddress)
             sendSystemPulse()
         }
     }
 
     private fun hasUsableL2cap(endpoint: String): Boolean =
-        store.activeL2capSockets[endpoint]?.isConnected == true && hasLiveSocket(endpoint)
+        l2capTransport.isUsable(endpoint) && hasLiveSocket(endpoint)
 
     /**
-     * Atomically hands pending GATT work to an established L2CAP socket.
-     *
-     * The in-flight transfer is resent in full. Payload IDs are deduplicated by the receiver, while
-     * an incomplete GATT frame remains isolated in the GATT receive buffer and expires normally.
+     * Hands queued complete frames to L2CAP only after the callback-owned GATT frame finishes.
      */
     private fun promoteGattWorkToL2cap(endpoint: String) {
         if (Looper.myLooper() != Looper.getMainLooper()) {

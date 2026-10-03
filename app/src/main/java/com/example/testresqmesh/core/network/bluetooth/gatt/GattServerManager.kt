@@ -382,8 +382,9 @@ class GattServerManager(
                 device: BluetoothDevice, requestId: Int, characteristic: BluetoothGattCharacteristic,
                 preparedWrite: Boolean, responseNeeded: Boolean, offset: Int, value: ByteArray?
             ) {
+                    val receivingLink = store.links.current(device.address, BleLinkRole.SERVER) ?: return
                     handler.post {
-                        if (!ownsServer()) return@post
+                        if (!ownsServer() || !store.links.isCurrent(receivingLink)) return@post
                         fun handleCallback() {
                             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
                                 ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED
@@ -403,22 +404,22 @@ class GattServerManager(
                             value?.let {
                                 val macAddress = device.address
                                 val now = System.currentTimeMillis()
-                                val lastInteraction = store.connectionInteractionTimes[macAddress] ?: 0L
-                                if (now - lastInteraction > 5000 && (store.chunkBuffers[macAddress]?.size ?: 0) > 0) {
+                                if (now - receivingLink.lastGattChunkAt > 5000 && receivingLink.receiveBuffer.isNotEmpty()) {
                                     AppLogger.d("BLE_MESH", "Server Buffer timeout! Clearing corrupted chunk buffer for $macAddress")
-                                    store.chunkBuffers[macAddress] = ByteArray(0)
+                                    receivingLink.receiveBuffer = byteArrayOf()
                                 }
+                                receivingLink.lastGattChunkAt = now
                                 store.connectionInteractionTimes[macAddress] = now
                                 store.links.current(macAddress, BleLinkRole.SERVER)?.takeIf { it.serverDevice?.address == device.address }?.lastInteractionAt = now
 
-                                when (val result = MeshFrameCodec.append(store.chunkBuffers[macAddress] ?: ByteArray(0), it)) {
+                                when (val result = MeshFrameCodec.append(receivingLink.receiveBuffer, it)) {
                                     is MeshFrameCodec.AppendResult.Accepted -> {
                                         result.payloads.forEach { payload -> processBinaryPayload(macAddress, payload) }
-                                        store.chunkBuffers[macAddress] = result.remainder
+                                        receivingLink.receiveBuffer = result.remainder
                                     }
                                     is MeshFrameCodec.AppendResult.Rejected -> {
                                         AppLogger.d("BLE_MESH", "Rejected malformed SERVER frame from $macAddress: ${result.reason}")
-                                        store.chunkBuffers[macAddress] = ByteArray(0)
+                                        receivingLink.receiveBuffer = byteArrayOf()
                                     }
                                 }
                             }
@@ -466,6 +467,7 @@ class GattServerManager(
     }
 
     fun startL2capServer() {
+        if (!com.example.testresqmesh.BuildConfig.BLE_L2CAP_ENABLED) return
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
             ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED
         ) {
