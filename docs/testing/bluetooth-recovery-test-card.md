@@ -1,10 +1,14 @@
 # Bluetooth recovery phone card
 
-Physical results: **UNTESTED**. Users install and operate the phones; local tests are not BLE proof.
+Last reviewed: 2026-10-04. Source baseline: `2e27013`. Status: active procedure. Current APK/version/full hash and the qualitative report are in [validation](../validation.md); historical candidates below are not the current build.
 
-## Build and setup
+General restart, relay return, Bluetooth OFF/ON and locked/background messaging were reported working. Exact repetitions, cluster merging, permission transitions, load and Go offline coverage remain unconfirmed. DELIVERY-01 remains open for intermittent far-end loss.
 
-- APK: `app/build/outputs/apk/debug/app-debug.apk`. Final SHA-256/local check results are recorded below after validation. This working-tree build includes the existing conversation UI edits.
+Users install and operate phones. Report PASS/FAIL/UNTESTED for exact steps; the qualitative report does not pass this entire card. Local tests are not BLE proof.
+
+## Build identity and setup
+
+- APK: `app/build/outputs/apk/debug/app-debug.apk`. Use the current hash in validation. Historical recovery build evidence remains below.
 - Use the same APK on A/B, then A/B/C, then A/B/C/D/E. Record phone model, Android/API, existing block relationships, background setting, and local timestamps. Do not clear app data, keys, or blocks.
 - Keep phones in one room, Bluetooth/required permissions enabled, and join normally. Use unblocked peers with previously established private keys. Verify payload READY and bidirectional text first.
 - Capture with `powershell -ExecutionPolicy Bypass -File .\scripts\capture_ble_logcat.ps1 -DurationMinutes 10`. Repeat capture windows for longer tests.
@@ -28,10 +32,10 @@ Physical results: **UNTESTED**. Users install and operate the phones; local test
 - Report APK hash, device matrix, scenario/repetition, OFF/ON/READY timestamps, first recovery and full convergence times, text receipt counts, unexpected disconnects, and capture directory. Mark each scenario PASS/FAIL/UNTESTED.
 - Advance to ten phones only after the two/three/five-phone card passes; repeat startup, merge, toggle, quiet, and simultaneous-sender workloads.
 
-## Local validation identity
+## Historical local validation identity
 
-- Current working-tree APK on `fix/bluetooth-recovery-cluster-bridging-and-sos-ux`, version 1.0.1/code 2; identity checked 2026-10-02.
+- Historical October 2 working-tree APK on `fix/bluetooth-recovery-cluster-bridging-and-sos-ux`, version 1.0.1/code 2; identity checked 2026-10-02.
 - APK SHA-256: `6969A1839D7AD21CBCC9204092F527476B251D4AAC671251AB4A128A7EA90C9D`.
-- Earlier locally checked recovery APK: `78293628B17D16D412DD16CCF8A5525A2E6147D9E273D5762E7C9A984C02F36F`; use the current hash when reporting new phone runs.
+- Earlier locally checked recovery APK: `78293628B17D16D412DD16CCF8A5525A2E6147D9E273D5762E7C9A984C02F36F`; both October 2 hashes are historical; use validation's October 4 hash for current reports.
 - Passed `./gradlew.bat :app:assembleDebug :app:testDebugUnitTest :app:compileDebugAndroidTestKotlin :app:lintDebug --max-workers=1 --console=plain`: 266 tests, zero failures/errors/skips; Lint zero errors, 147 warnings, three hints. Android tests compiled but were not executed on phones.
-- Physical Bluetooth toggle, background, cluster merge, and traffic scenarios above remain **UNTESTED**.
+- The October 2 local batch did not execute phone scenarios. The October 4 report adds qualitative toggle/background/relay successes; exact cluster, traffic and repeated cases remain unconfirmed.

@@ -1,8 +1,10 @@
+> Historical/inactive reference archived 2026-10-04; see [disposition index](../README.md). Original claims, hashes and instructions are not current authorization.
+
 # NativeBleManager maintainability refactor
 
 Reviewed against source on 2026-10-02, branch `fix/bluetooth-recovery-cluster-bridging-and-sos-ux`.
 
-This is a deferred refactor guide. Bluetooth recovery and cluster admission are implemented in the current source; the extractions below remain proposed. Read [current status](../status.md), [architecture](../architecture.md), and [validation](../validation.md) before editing. Source overrides older plans.
+This is a deferred refactor guide. Bluetooth recovery and cluster admission are implemented in the current source; the extractions below remain proposed. Read [current status](../../../docs/status.md), [architecture](../../../docs/architecture.md), and [validation](../../../docs/validation.md) before editing. Source overrides older plans.
 
 ## Current source baseline
 
@@ -32,4 +34,4 @@ Recovery phone evidence remains pending. Defer lifecycle/event-surface extractio
 
 Antigravity should first provide a read-only source-to-collaborator map, affected paths, invariant list, and test plan. Implement one approved slice at a time. Keep payload/Room schemas, public ViewModel APIs, timing, routing choices, block policy, and transports stable.
 
-Run debug assembly, unit tests, Android-test compilation, Lint, documentation checks, and diff checks for approved edits. Device-facing work also needs the [recovery phone card](../testing/bluetooth-recovery-test-card.md). A build does not prove BLE behavior. Preserve unrelated files; commit/push only when the user authorizes them.
+Run debug assembly, unit tests, Android-test compilation, Lint, documentation checks, and diff checks for approved edits. Device-facing work also needs the [recovery phone card](../../../docs/testing/bluetooth-recovery-test-card.md). A build does not prove BLE behavior. Preserve unrelated files; commit/push only when the user authorizes them.

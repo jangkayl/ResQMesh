@@ -1,3 +1,5 @@
+> Historical/inactive reference archived 2026-10-04; see [disposition index](../README.md). Original claims, hashes and instructions are not current authorization.
+
 # Block-forced mesh-hop diagnosis and repair plan
 
 No-code plan for the reported failed/inconclusive mutual block test. It does not

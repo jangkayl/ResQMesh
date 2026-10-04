@@ -1,94 +1,93 @@
 # Engineering decisions
 
-Durable choices. New ideas remain in the Codex task until accepted, rejected, or deferred. Source/device evidence prevails.
+Last reviewed: 2026-10-04. Source baseline: `2e27013`. These describe accepted choices; source and bounded device evidence prevail.
 
 ## D1: Reliability before transport expansion
 
-The current release path prioritizes dependable BLE text/SOS delivery, reconnect recovery, honest UI state, and measured device behavior. Wi-Fi Direct, SoftAP, RFCOMM replacement, advertisement flooding, and other transport migrations are deferred. They add discovery, permissions, lifecycle, fallback, and device-matrix complexity before the existing path is stable.
+Prioritize BLE text/SOS, recovery and honest delivery state. Wi-Fi Direct, SoftAP, RFCOMM replacement, advertisement flooding and protocol migration remain deferred. Reported successes do not close intermittent A-to-D loss.
 
-## D2: Native BLE GATT remains the control path
+## D2: GATT remains the control path
 
-Native advertising/scanning and dual-role GATT are the implemented base. Optional L2CAP may carry payloads when it is owned and healthy, but GATT remains necessary for setup, readiness, heartbeat/fallback, and compatibility. A failed L2CAP path must not leave a peer falsely usable.
+Native advertising/scanning and dual-role GATT are the base. Owned, healthy L2CAP can carry payloads; GATT remains setup/readiness/liveness/fallback. A failed socket cannot leave a peer falsely usable.
 
 ## D3: Readiness is an application fact
 
-Radio `CONNECTED` is not sufficient for routing or user-visible online state. Payload use requires a verified `READY` role after required GATT configuration. Direct-ready, configuring/unresponsive, indirectly reachable, recently seen, and offline are distinct states.
+Radio CONNECTED is insufficient. Separate payload READY, configuring/unresponsive, routed, recently seen and offline states. Routing needs a usable first hop.
 
-## D4: Link attempts own their state
+## D4: Link attempts own state
 
-Queues, operations, timers, callbacks, buffers, MTU, sockets, and cleanup belong to a specific endpoint/role/generation. A stale callback or losing duplicate attempt must not mutate or delete a replacement link. Stable node identity remains separate from a BLE address.
+Queues, operations, timers, callbacks, buffers, MTU, sockets and cleanup belong to endpoint/role/generation. Old callbacks cannot mutate replacements. Stable node identity is separate from BLE address.
 
 ## D5: Private messaging fails closed
 
-Do not send private content as plaintext or as an invalid encrypted envelope when a usable recipient key is missing or encryption fails. Do not acknowledge, store, or present unencrypted/undecryptable private payloads as successful private delivery. Claims remain limited until public keys are authenticated and bound to identity with an intentional key lifecycle.
+Missing/unusable trusted keys or encryption failure cannot produce plaintext, invalid envelopes or successful delivery. Undecryptable traffic cannot be acknowledged as successful private delivery. Authentication and key-lifecycle guarantees remain limited.
 
 ## D6: Evidence controls claims
 
-A build proves compilation; a focused unit test proves a bounded rule; a physical run provides evidence for the tested devices and scenario. None alone establishes broad BLE reliability. Range, capacity, latency, battery, self-healing, security, and rescue claims must cite measured conditions and limitations.
+Builds, focused tests, executed instrumentation, qualitative user reports and analyzed captures prove different things. Quantitative range, capacity, latency, battery, delivery and security claims require conditions and measurements. Keep an actual failure open beside successful runs.
 
 ## D7: Conservative feature scope
 
-- Persistent outbox/delay-tolerant delivery is the strongest later feature because it directly supports disconnected clusters, but it follows the current reliability gate.
-- Battery-aware behavior should be driven by measurements rather than assumed optimization.
-- RSSI may support a cautious stronger/weaker trend, not precise distance, heatmaps, or victim triangulation.
-- Large media, virtual private mesh, data mules, and protocol replacement are research ideas rather than current requirements.
+Persistent origin outboxes and protocol-1 transfer journals are implemented; universal disconnected-cluster delivery is not guaranteed. Stronger transactional outbox capacity/route repair, bounded replication, resource requests, safety check-ins and unfinished location-confidence policies remain proposals. Battery-aware routing requires measurements. RSSI supports cautious trends, not distance/triangulation. Data mules, virtual private mesh, large media expansion and new protocols are inactive research ideas.
 
 ## D8: Lightweight context engineering
 
-Codex uses one root `AGENTS.md` router and a small set of canonical documents. There is no duplicate root `CONTEXT.md`, full ICM stage tree, knowledge graph, or project skill until real complexity demonstrates a need. Superseded material stays outside active routing.
+One root AGENTS router and six canonical documents own current context. Test cards hold procedures; validation owns outcomes. Avoid duplicate CONTEXT/GEMINI routers, ICM stage trees or knowledge graphs. Archived prompts are historical references and never authorize implementation.
 
 ## D9: Planning lifecycle
 
-Small work stays in one task. Medium work updates current status. Only large multi-session initiatives receive one temporary `docs/plans/<slug>.md`; after completion, lasting decisions move here and the plan is archived or removed. The user performs physical-phone tests and Codex maintains concise status/validation results.
+Small work stays in its task; medium work updates status. Only large multi-session initiatives get one active plan, capped at 1,200 words. Extract lasting decisions/results before archival. Label implemented, superseded, partially superseded and deferred material explicitly; preserve unique tests and historical build identities.
 
-## D10: Lean deterministic PR gate
+## D10: Deterministic PR gate
 
-Pull requests repeat the debug build, unit tests, canonical-document checks, and diff hygiene in GitHub Actions. A failed deterministic check blocks readiness and cannot be waived by AI interpretation. Codex reports locally validated work and waits for explicit permission before creating a pull request; merging is never automatic. CI is local-code evidence only, so device-facing BLE behavior still requires the user-run physical test card.
+CI repeats debug build, unit tests, Lint, docs and diff hygiene. Failed checks block readiness and cannot be waived by AI explanation. PR creation and merge require explicit instruction. Local/CI checks never substitute for physical evidence.
 
-## D11: Blocking is mutual direct-link denial, with independent local release
+## D11: Mutual direct-link denial, independent local release
 
-Block requests reach the peer directly or through a relay; acknowledgement precedes direct teardown. Both phones persist denial by stable identity and must explicitly unblock locally. Text/private/SOS/receipts/audio remain routable through other peers. Restart persistence, identity admission, and acknowledgement/retry require phone validation. This is a routing-debug policy, not authenticated security.
+Stable-ID block requests/ACKs establish denial before direct teardown. Both phones persist their own records and unblock locally. Relayed text/private/SOS/receipts/audio remain allowed. Basic behavior has user-reported success; loss/retry and repeated coverage remain bounded by validation. This is a routing-debug policy, not authenticated security.
 
-## D12: Recover sessions and bridge unreachable clusters conservatively
+## D12: Conservative recovery and cluster bridging
 
-Bluetooth OFF suspends an active session; ON rebuilds transport. Go offline ends recovery; background remains opt-in. Preserve healthy routes, but permit a free third link to bridge an unreachable cluster. Full-capacity reclamation requires idle transport and recent directed alternate paths preserving reachability, uses owned retirement, and has a 60-second cooldown. Otherwise defer. Block/duplicate/capacity guards remain. Physical evidence gates reliability claims.
+OFF suspends an active session; ON rebuilds it. Go offline cancels recovery; background is opt-in. Preserve healthy routes. A spare third link may bridge an unreachable cluster. Full-capacity reclamation requires idle transport, recent directed alternate paths preserving reachability, owned retirement and 60-second cooldown; otherwise defer.
 
-## D21: Incident synchronization uses history and projection digests
+## D13: MapLibre and local PMTiles
 
-Immediate broadcasts remain the fast path. After READY, incident changes, and every 30 seconds (±3 seconds), neighbors compare SHA-256 event-history and replicated-state digests. Different histories exchange missing original events; equal histories with different state rebuild projections. Signed authority still gates application/relay. Matching reporter versions or queue acceptance never proves synchronization. Completion belongs to one current peer/snapshot with no pending dependencies. Repair uses bounded ordinary pages and small control exchanges; legacy fallback has limited guarantees. Room separates validation from projection application. Pairing, transports, and range are unchanged; physical convergence, airtime, latency, and battery require measurements.
+MapLibre Native/local PMTiles replaces osmdroid and bulk public raster downloads. Local map display and SOS map use have user-reported offline success.
 
-## D13: Offline maps use MapLibre and local PMTiles
+## D14: Offline manifest signatures
 
-MapLibre Native with local PMTiles replaces osmdroid and public raster tile downloads. This supports offline maps without scraping OSM tiles.
+ECDSA P-256 is the default; Ed25519 is the supported fallback where available. This preserves older Android compatibility without an extra cryptography library. Packaging instructions must match the existing generator/verifier.
 
-## D14: Offline map manifest verification uses Universal ECDSA (NIST P-256)
+## D15: Notification setup gates
 
-Map packages default to ECDSA P-256 signatures with Ed25519 fallback because Android 24–29 lack native Ed25519 support. No extra cryptography library is required.
+Cold notification launches complete identity, permissions and setup before opening the saved destination. In-session notifications navigate directly.
 
-## D15: Notification deep link routing preserves node setup flow
+## D16: Emergency cartography
 
-Cold notification launches complete identity, permissions, and mesh setup before opening the saved chat or SOS destination. In-session notifications navigate directly.
+Show in-map attribution, medical POIs and subtle other-amenity labels at zoom 15+. Preserve the 36dp compass, distinct GPS/SOS markers and slide sheets. Map presence never proves location freshness.
 
-## D16: Tactical map overlays and emergency cartography filtering
+## D17: Permanent hardware-bound identity
 
-Maps show in-sheet OpenStreetMap attribution. Emergency POIs include medical infrastructure (`hospital`, `clinic`, `doctors`); other amenities appear as subtle labels at zoom 15+. Overlays use a 36dp compass, distinct GPS/SOS markers, and slide sheets.
+Node IDs derive from the Keystore public-key hash. Identity/peer-key preferences are excluded from cloud backup to avoid restoring metadata without keys. Pending key changes require explicit handling.
 
-## D17: Hardware-bound permanent node identity and cloud backup exclusions
+## D18: Leased topology and directed private delivery
 
-Node IDs derive from the Keystore public-key hash (`CryptoManager.getMyNodeId()`). Identity and peer-key preferences are excluded from cloud backup to avoid restoring keys without their Keystore pair. Pending key changes require explicit rejection.
+Accept empty withdrawals and ignore old topology versions. Private traffic uses stable-ID directed routes, never broadcast fallback. Rejected sends remain retryable; receipt timing follows transfer completion.
 
-## D18: Leased topology and accepted-only directed private delivery
+## D19: Reporter-selected lead helper
 
-Leased topology accepts empty withdrawals and ignores old versions. Private traffic uses exact directed IDs, never broadcast fallback. Rejected sends remain retryable; native receipt timing follows transfer completion.
+Stable identity/signing key owns reporter authority and historical names. Reporters select/revoke/close; helpers confirm/decline/withdraw. Selected offers cannot be edited. Withdrawal/offline revision requires fresh selection, never automatic replacement. Route loss never reassigns. Signed closure dependencies order replay; key continuity is not deployment authority.
 
-## D19: Reporter-selected civilian lead helper
+## D20: Bounded resumable recorded transfers
 
-Ownership uses stable user ID/signing key, preserving historical names. Reporters select/revoke/close; helpers confirm/decline/withdraw. Selection locks offer editing. Withdrawal/offline changes reopen requests; replacements require fresh selection. Helper versions never advance reporter versions. Route loss never reassigns. Signed closure prerequisites order events. Signing proves key continuity only; deployment authority remains open.
+Keep three neighbors and GATT setup/fallback with optional L2CAP. Protocol-1 envelopes over 4 KiB use durable 1 KiB pieces, four outstanding per neighbor and 24-hour expiry. Legacy peers retain whole frames. Keep 128-frame/2 MiB bounds, eight control slots/64 KiB reserve and safe priority between frames. Public custody preserves known-peer rosters; custody never proves recipient delivery.
 
-## D20: Bounded resumable voice transfers with compatible fallback
+## D21: Incident history and projection digests
 
-Keep three neighbors, GATT setup/fallback, and optional L2CAP. Protocol-1 peers use durable 1 KiB pieces for envelopes over 4 KiB, with four outstanding pieces per neighbor and 24-hour expiry. Older peers keep whole frames. Retain 128-frame/2 MiB bounds and eight slots/64 KiB control reserve; prioritize controls between frames. Serialize setup and finish active GATT frames before promotion. Public retries preserve known-peer custody; acceptance and hop acknowledgement never prove recipient delivery. Phone validation gates reliability claims.
+Immediate broadcasts remain the fast path. On READY, changes and a 30-second ±3-second backstop, compare history/state hashes. Exchange missing original events or rebuild divergent projections. Signed authority, bounded pages, current-peer snapshot ownership and pending dependencies gate completion. Queue acceptance/version equality never proves convergence.
 
-## D22: Conversations and SOS state have independent ownership
+## D22: Independent conversation and SOS ownership
 
-Community, Radio, and SOS separate history/unread/drafts. Save off-channel Radio silently. Hide unscoped SOS/voice history; retain migration classification. SOS ignores tuning; Back preserves it, receiver silence stays local, and signed origin-key cancellation ends it. Retain terminal records; reconcile on reconnect. Require matching builds; ignore unscoped cancellation. Acceptance isn't delivery. Sirens have 30-second limits; GATT frames remain non-interruptible.
+Community, Radio and SOS separate history/drafts/unread state. Off-channel Radio stores silently; unscoped history stays hidden. SOS ignores tuning. Sender Back preserves it; receiver silence is local; signed origin-key termination ends it. Retain terminal records and reconcile on reconnect. Sirens stop within 30 seconds; active GATT frames remain non-interruptible. Matching builds are required.
+
+Deferred designs are preserved in the [archive index](../archive/docs-superseded-2026-10-04/README.md); current evidence and failures live in [validation](validation.md) and [status](status.md).

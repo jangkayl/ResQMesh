@@ -1,15 +1,19 @@
 # SOS and Radio conversation phone card
 
-## Build and devices
+Last reviewed: 2026-10-04. Source baseline: `2e27013`. Status: active procedure. Current APK/version/full hash and the qualitative report are in [validation](../validation.md); historical candidates below are not the current build.
+
+Full incident/SOS lifecycle and reconnect behavior, including independent simultaneous-alert cancellation, were reported working. Exact Radio-channel isolation, autoplay, gestures, permission variants, accessibility and repeated load steps remain unconfirmed.
+
+## Build identity and devices
 
 Install the same upgraded APK on A, B, and C; mixed versions cannot relay the new protocol reliably. Record models/API, role, and GATT/L2CAP use. The user installs, starts, and operates phones.
 
 - APK: `app/build/outputs/apk/debug/app-debug.apk`
-- Version: 1.0.1, code 2; Room schema 11; built 2026-10-02.
+- Current identity: validation's October 4 normal candidate, version 1.0.1/code 2, Room 11. The local evidence below belongs to October 2.
 - Earlier SOS instrumentation APK SHA-256: `0EC7CBFA165F8995858AD9D49CB680A4D884C54DD4A4B7A6C56311FC6D5F0EE8`.
-- For the current recovery/SOS UI build, use the identity in the [Bluetooth recovery card](bluetooth-recovery-test-card.md). Earlier emulator results do not validate the latest floating-header/card changes.
+- For current phone reports use [validation](../validation.md); October 2 recovery/instrumentation hashes are historical. Earlier emulator results do not establish all current phone/UI cases.
 
-## Local evidence and reproduction
+## Historical local evidence and reproduction
 
 On 2026-10-02, debug build, Android-test build, 248 unit tests, Lint (zero errors, 147 warnings, three hints), documentation checks, and diff checks passed. Medium_Phone/x86_64/API 37 passed eleven instrumentation tests: migrations 6→11, 9→11, 10→11 plus sender Back, confirmed End/read-only history, receiver-local silence, compact/large-text controls, reminder layout/navigation, controls surviving height/IME changes, and a Daylight Radio composer with a visibly open keyboard. Historical migration test names retain their original boundaries; each opens the current schema. Screenshot review confirmed the reminder and composer remain clear of the keyboard.
 

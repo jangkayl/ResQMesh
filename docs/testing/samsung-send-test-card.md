@@ -1,12 +1,16 @@
 # Samsung outgoing GATT and receipt validation
 
+Last reviewed: 2026-10-04. Source baseline: `2e27013`. Status: active procedure. Current APK/version/full hash and the qualitative report are in [validation](../validation.md); historical candidates below are not the current build.
+
+The earlier Samsung success report is retained below. The October 4 report did not name phone models, so it does not independently establish Samsung-specific role/transport or repeated-card coverage.
+
 User operates devices. Do not clear app data, keys, blocks, or message history.
 
 User reports Samsung sending now works. Counts, role/transport coverage, and timing captures were not supplied; broader validation remains open.
 
-## Build
+## Historical candidate and local checks
 
-- Candidate: version 1.0.1, code 2, current working tree (uncommitted).
+- Historical October 3 candidate: version 1.0.1, code 2, then-current working tree before commit.
 - APK: `app/build/outputs/apk/debug/app-debug.apk`.
 - SHA-256: `95F1CBD26C6590F002AEE78D25DA377CC8556F1E9BEE285AD6A881250E38A21B`.
 - Installed failure APK on SM-P615: `F627902AB140CDFBC1FA902325CEE7927F80B6C144E7DD2D8D58F16CFA9F327A`.
@@ -16,7 +20,7 @@ User reports Samsung sending now works. Counts, role/transport coverage, and tim
 
 Before commit, a clean snapshot containing only tracked/staged files passed the normal debug build, all 280 unit tests (no exclusions, failures, errors, or skips), and Android instrumentation compilation. The earlier 350-test run also included unrelated untracked tests. Instrumentation remains unexecuted.
 
-A = Samsung SM-P615, Android 13/API 33. B = CPH2127 or CPH2219, Android 12/API 31. C = V2424/API 34 for relay/load. Install the same candidate APK on all selected devices yourself. Keep apps foreground and screens awake for the first run; put unused devices offline through the app.
+A = Samsung SM-P615, Android 13/API 33. B = CPH2127 or CPH2219, Android 12/API 31. C = V2424/API 34 for relay/load. Install the same current APK identified in validation on all selected devices yourself. Keep apps foreground and screens awake for the first run; put unused devices offline through the app.
 
 Record installed hash, device/API, selected names/IDs, start/failure times, Samsung CLIENT/SERVER role, and GATT/L2CAP transport from logs. Start `scripts/capture_ble_logcat.ps1 -DurationMinutes 10` on the connected devices. Capture technical markers only when sharing results; omit message content, keys, and ciphertext.
 

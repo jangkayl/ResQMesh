@@ -1,55 +1,54 @@
 # Capstone research guide
 
-This page separates defensible research claims from product aspirations. It is not a defense script and does not assign grades or predict panel reactions.
+Last reviewed: 2026-10-04. Source baseline: `2e27013`.
+
+Separate defensible research claims from product aspirations. This is not a defense script, a grade prediction or an assertion that a pilot has completed.
 
 ## Research purpose
 
-Evaluate whether nearby Android phones can support useful offline emergency text/SOS communication through a native BLE relay prototype under documented device and test conditions. The work also explores how connection lifecycle, routing, delivery feedback, and privacy behavior affect reliability.
+Evaluate whether nearby Android phones can support useful offline emergency text/SOS and incident coordination through native BLE relays under documented conditions. Examine how lifecycle, routing, feedback and private-message policy affect outcomes.
 
-ResQMesh is both a capstone artifact and a production-oriented prototype. Production intent increases the need for honest limits; it does not turn prototype evidence into a guarantee.
+Production intent raises the evidence requirement; it does not turn a prototype into a guarantee.
+
+## Current achievements and unresolved outcome
+
+Source implements native BLE/GATT, optional L2CAP, Protobuf, directed graph routing, Room persistence, origin outboxes, resumable transfer journals, Compose, Keystore-based private encryption, signed incident/SOS state and offline MapLibre/PMTiles.
+
+On 2026-10-04 the user reported successful A–B–C–D text arrival, private delivery/read receipts, complete recorded playback and SOS arrival on the current APK. Recovery, background, incident lifecycle/sync, independent SOS cancellation, blocking and offline map use were also confirmed qualitatively. See the [candidate and evidence limits](validation.md).
+
+The same report identifies intermittent public/private message or voice loss at D. Successful demonstrations establish capability; they do not establish consistent delivery. DELIVERY-01 remains open, with no diagnosed cause. Do not describe the four-phone chain as a reliable-capacity experiment or infer a success percentage.
 
 ## Core questions
 
-1. Can two phones repeatedly establish a payload-ready link, exchange messages in both directions, disconnect, and recover?
-2. Can a three-phone arrangement relay messages when the endpoints lack a direct usable link?
-3. How do phone model, Android version, distance/obstruction, process restart, Bluetooth toggling, and traffic affect delivery and recovery?
-4. Does the UI distinguish direct-ready, indirect, unresponsive, recently visible, and offline states accurately?
-5. Do private-message failures stop safely without plaintext fallback or false delivery?
-6. What measured limits prevent production use without further engineering?
+1. How repeatedly do phones establish READY links, deliver in both directions and recover?
+2. How do verified A–B–C and A–B–C–D relay paths affect arrival and receipt confirmation?
+3. How do device/API, obstruction, restart, toggles, background state and traffic affect loss and delay?
+4. Does the UI distinguish direct, checking, routed, nearby and offline states accurately?
+5. Do private-message failures stop without plaintext fallback or false delivery?
+6. Do incident/helper and independent SOS states converge after reconnect?
+7. Which measured limits prevent operational use?
 
 ## Evaluation method
 
-Use versioned builds and the test levels in `validation.md`. For each meaningful run, record devices, Android versions, topology, distance/conditions, test steps, attempt count, successes/failures, approximate timestamps, and focused capture path. Repeat reliability measurements rather than selecting one successful demonstration.
+Use versioned builds and the [physical procedures](validation.md). Record models/API, topology and actual transport, distance/conditions, workload, attempt count, sent/received/confirmed counts, duplicates, timestamps and focused captures. Define sample size and procedure before comparing builds. Include failures, unavailable conditions and untested cases.
 
-Recommended metrics:
+Measure READY success, bidirectional delivery, relay loss/duplicates, disconnect detection and recovery, arrival/receipt/playback latency, SOS cancellation, incident convergence, key refusal and battery over a stated duration. Cross-phone timing requires a shared reference. USB-powered captures do not establish battery behavior.
 
-- Connection and payload-ready success rate.
-- Bidirectional direct-message delivery rate.
-- Multi-hop delivery and duplicate rate.
-- Disconnect detection and recovery time.
-- Message latency under stated payload/traffic conditions.
-- SOS delivery/cancellation correctness.
-- Private-message blocked, delivered, and decrypt-failure outcomes.
-- Battery impact over a defined duration and device state.
-- Failure distribution by device model and Android version.
+Keep raw captures local and publish privacy-safe summaries. Existing test counts and emulator results apply to their named source snapshots, not automatically to the current phone build.
 
-Define the procedure and sample size before making comparative claims. Preserve raw local captures, but publish only privacy-safe summaries.
+## Claims still requiring evidence
 
-## Claims currently supportable
+- Guaranteed range, throughput, capacity, latency, battery, self-healing or delivery rate.
+- Controlled five/ten-phone reliability or consistent four-phone delivery.
+- Authenticated E2EE, forward secrecy or production identity/key security.
+- Precise distance/victim location from RSSI.
+- Wi-Fi Direct, Nearby Connections or completed transport migration.
+- Validated novice usability, accessibility, public-beta readiness or a completed pilot.
 
-- The checkout implements native BLE advertising/scanning, GATT client/server communication, optional L2CAP payload transfer, Protobuf messages, graph-based routing, Room persistence, Compose UI, and hybrid private-message encryption behavior described in `architecture.md`.
-- Focused builds/tests and several two-phone captures exist for specific lifecycle states and failures.
-- Device observations can support statements limited to the tested build, phones, topology, and scenario.
+Incident functional success is separate from the archived UX study proposal: five novice participants, four-of-five uncoached completion, helper intent within five seconds and no accidental destructive/false-delivery interpretations. This study and small-screen, 200% text, TalkBack, restoration and both-theme checks remain unconfirmed.
 
-## Claims not yet supportable
+## Future-work boundary
 
-- Guaranteed range, throughput, capacity, latency, battery life, self-healing, or delivery rate.
-- Reliable five-, ten-, or larger-node operation without a completed matrix.
-- Precise distance or victim location from RSSI.
-- Completed Wi-Fi Direct, Nearby Connections, or full protocol migration.
-- Authenticated E2EE, forward secrecy, or production-grade identity/key management.
-- Production readiness based only on compilation, unit tests, static review, or a successful demonstration.
+Implemented outboxes/journals must not be relabeled as wholly future store-and-forward. Stronger disconnected-cluster delivery, alternate-route repair/replication, resource requests, safety check-ins, location-confidence policies, battery-aware routing and new transports remain deferred unless separately prioritized and authorized.
 
-## Research and product boundary
-
-Ideas such as Wi-Fi Direct, store-and-forward delivery, battery-aware routing, or alternative protocols may be evaluated as future work. They enter active engineering only after a decision in `decisions.md` and an explicit priority in `status.md`. Historical Antigravity defense notes and blueprints are archived context, not evidence.
+Use [decisions](decisions.md) for accepted choices, [status](status.md) for active work and the [archive](../archive/docs-superseded-2026-10-04/README.md) for historical proposals.

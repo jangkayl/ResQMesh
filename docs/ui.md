@@ -1,84 +1,58 @@
 # UI guidance
 
-Use Jetpack Compose and Material 3; inspect source.
+Last reviewed: 2026-10-04. Source baseline: `2e27013`. Use Compose/Material 3; inspect current source.
 
-## Component and state boundaries
+## Components and ownership
 
-- Reuse shared components and theme tokens before local styling.
-- Dark-first tactical UI has a daylight preference; appearance affects presentation only.
-- Night uses black backgrounds, grey raised panels, and 1dp borders. Daylight uses white/grey backgrounds with black text.
-- Use Safety Orange (#FF5A00) for actions, green for positive states, amber for attention, red for SOS, theme tokens, and 48dp targets.
-- Home: larger name, plain location labels, network view inside nearby sharing.
-- Mission, Messages, Voice, and Mesh use the shared shell; SOS stays a persistent action.
-- Mission, Messages, and Voice use a solid theme background. Their navigation SOS action stays visually prominent without a continuous pulse; dedicated SOS screens retain their emergency treatment.
-- **Chat Composers** hide inline media tools while typing; a floating action bubble retains access.
-- **Network & Topology** uses cards and a 2D route map.
-- First-launch guide: three skippable animated pages, progress dots, no in-page Back; Settings replay.
-- Setup has no tag input. Names omit technical tags; peer details show ID. Headers resolve current names.
-- Controls use semantic shapes and textual status.
-- Keep business, routing, and transport decisions out of composables. ViewModels/use cases expose UI state and user actions.
-- Routes collect state; stateless UI lives in `ui/components`.
+- Reuse shared components/theme tokens. Night uses black/grey panels and 1dp borders; Daylight uses white/grey with black text.
+- Safety Orange (#FF5A00) marks actions; green positive, amber attention and red SOS. Use text/semantic shapes and at least 48dp targets.
+- Home retains its larger name, plain location labels and network view within nearby sharing.
+- Mission, Messages, Voice and Mesh use the shared shell. Mission/Messages/Voice have solid theme backgrounds and a prominent navigation SOS action without continuous pulse.
+- Chat composers hide inline media tools while typing; the floating action bubble retains access. Network/topology uses cards and a 2D route map.
+- The first-launch guide has three skippable animated pages, progress dots, no in-page Back and Settings replay.
+- Setup has no tag input. Names omit technical tags; peer details show ID; headers resolve current names.
+- Keep routing/transport/business decisions outside composables. Routes collect state; stateless components receive models/callbacks. ViewModels/use cases expose state/actions.
+- Preserve Antigravity cards, icons, semantic colors and scoped conversations.
 
 ## Connection language
 
-UI labels must reflect verified application state:
-
-| State | Meaning |
+| Label | Required evidence |
 | --- | --- |
-| Online (Direct) | A direct role is payload-ready and has recent inbound progress |
-| Checking connection | A direct role exists but recent peer response is missing while recovery is pending |
-| Reachable / Relayed | A route exists through another peer; do not present it as direct |
-| Nearby | Advertising/recently observed without a usable direct link |
-| Offline | A previously known peer is not direct-ready, routed, or currently nearby |
-| Connecting / Handshaking | Radio/setup work is incomplete; private send and direct-ready claims remain unavailable |
+| Online (Direct) | Payload READY plus recent inbound progress |
+| Checking connection | Existing direct role lacks recent response while recovery is pending |
+| Reachable / Relayed | Usable path through a READY first hop |
+| Nearby | Recent advertisement without a usable direct link |
+| Offline | Previously known peer has no direct, routed or nearby state |
+| Connecting / Handshaking | Setup incomplete; no direct-ready/private-send claim |
 
-Relayed status needs a verified path through a ready first hop. Cached topology/unblock cannot imply Direct; re-resolve shared state.
+Callbacks, cached topology, unblock and service-active do not independently prove readiness. Re-resolve shared state after changes. Permissions describe OS grants; an active mesh can still be searching for peers. About/Privacy explain Keystore and first-seen trust without claiming authenticated E2EE.
 
-BLE callbacks alone cannot imply connected; counters use routing readiness.
-Home may show an active mesh without a ready peer; direct-ready and checking need link evidence. Permissions describe OS grants, not Bluetooth or peer readiness. About and Privacy state Keystore and first-seen trust limits without claiming authenticated E2EE or delivery.
+## Messaging, voice and emergency feedback
 
-## Messaging and safety feedback
+Acceptance, hop custody, recipient arrival and application confirmation are distinct. Public rejection/partial acceptance needs feedback. Private failures explain unavailable routes/keys, preserve drafts and never imply delivery.
 
-Public queue rejection/partial acceptance uses feedback; acceptance never implies recipient delivery.
+Inbox rows do not mark private messages seen; visible chat bubbles do. Keep Unread selectable at zero with filter-specific empty states. Community reader circles require seenBy receipts.
 
-- Failed private sends remain unsent and explain missing readiness/keys without exposing crypto details.
-- Distinguish queued, sending, delivered, failed, and blocked outcomes; do not imply peer receipt from enqueue.
-- Inbox rows do not mark private messages seen; visible chat bubbles do. Keep Unread selectable at zero and use filter-specific empty states.
-- SOS threads isolate simultaneous alerts, replies, unread counts, and drafts. Show queued/link-sent/neighbor-confirmed state separately. Cancellation names its alert; local silence never cancels it.
-- Incidents show historical reporter names and owner badges. Identity loading/errors explain unavailable controls. Selection locks offer editing; withdrawal removes selection. Route loss never reassigns. Details use one page, docked actions, and verified connection labels.
-- SOS creation keeps the deliberate slide; early release resets. Cancel/Back returns to the hub. Sender thread Back keeps SOS active; its banner reopens it. Ending requires confirmation. Receiver Back silences locally; ended threads retain read-only history.
-- Voice separates channels from Community; hide unscoped SOS/voice history. Save received channels; autoplay only new selected-channel Radio notes. Tuning/Off clears bounded queue. Private audio stays manual; cancelled holds discard notes. SOS pauses Radio; manual playback takes priority.
-- Preserve Antigravity cards/icons, status/transmission badges, location accuracy, time, and history. Header fallback time never proves GPS freshness. Reserve SOS reminders outside content. Short/large-text threads expose scrollable “SOS controls”; badges wrap; activity describes retained events/latest-state sync.
-- Never render debug plaintext, keys, ciphertext previews, or sensitive location in the debug UI.
+Community, each Radio channel and each SOS isolate history/unread/drafts. Save off-channel Radio silently; autoplay only new selected-channel notes while monitoring. Tuning/Off clears bounded playback queues; old notes do not autoplay. Private audio stays manual. SOS pauses Radio; manual playback takes priority. Cancelled holds discard partial notes.
 
-## Background mesh status
+SOS creation uses deliberate slide-to-send; early release resets. Creation Cancel/Back returns to the hub. Sender thread Back preserves SOS and its reopen banner. End requires confirmation; receiver Back silences locally. Alert-specific cancellation cannot end another alert; terminal history stays read-only. Show queued, link-sent and neighbor-confirmed states separately.
 
-- Background mesh remains opt-in; service-active does not imply peer-ready.
-- Home/notification distinguish Bluetooth off, permission needed, starting, searching, and connected. OFF clears readiness and explains recovery.
-- Go offline cancels recovery; disabling background removes its anchor.
+SOS cards retain category/status/transmission, location accuracy, time and history. Header time fallback never proves GPS freshness. Reserve measured floating-header/reminder regions, reverse conversations and keep latest messages/composer above the IME. Short/large-text threads expose scrollable SOS controls; badges wrap. Ended badges say ENDED, not rescue completed.
 
-## Diagnostic terminal
+Incidents use historical reporter names and ownership badges. Identity loading/errors explain unavailable controls. Details use one page and docked actions. Selected offers cannot be edited; withdrawal removes selection and requires fresh approval. Route loss never reassigns. Connection labels describe the selected helper's actual route.
 
-- Terminal: bounded, session-only.
-- Categories: Connection, Sync, Transport, Routing, Security, System, Alerts. Must emit categories explicitly.
-- Direct summaries show owned lifecycle, endpoint, role, readiness, transport.
-- Newest first; pause follow while reading older events; provide Latest/Sync jumps.
-- Keep heartbeat/relay chatter behind Details.
+Never display debug plaintext, keys, ciphertext previews or sensitive location.
 
-## Hidden legacy UI
-- Legacy Radar/terminal stay behind Debugging Mode; Settings manages offline maps.
-- Validate restored actions, accessibility, empty, denied, and error states.
+## Sessions, navigation and diagnostics
 
-## Accessibility and interaction
+Background mesh is opt-in. Home/notification distinguish Bluetooth off, permission required, starting, searching and connected. OFF clears readiness; Go offline cancels recovery.
 
-- Provide contrast and accessible targets/labels.
-- Startup errors offer recovery; map setup returns to its SOS.
-- Preserve user drafts when a recoverable send fails.
-- Conversations reserve measured floating-header space, reverse the list, and follow latest messages above the IME. Radio uses a solid background. Community reader circles require `seenBy` receipts.
-- Avoid flicker; transitions follow repository/link evidence, not scan churn.
-- Home peer chips open the matching Network details by stable ID. Blocked peers remain in "Blocked Devices (Direct Link Denied)" with relay messaging when a route exists.
-- Verify both appearances.
+Home peer chips open matching stable-ID Network details. Blocked peers stay in Blocked Devices (Direct Link Denied), with relay messaging when a route exists. Legacy Radar/terminal remains behind Debugging Mode; Settings owns offline maps.
 
-## Validation
+The terminal is bounded and session-only. Explicit categories are Connection, Sync, Transport, Routing, Security, System and Alerts. Summaries show endpoint/role/generation/readiness/transport; put heartbeat/relay chatter under Details. Newest first, pause follow while reading, and provide Latest/Sync jumps.
 
-Run focused UI checks and inspect affected states. BLE, route, key, delivery, and SOS labels require physical tests from `validation.md`.
+## Accessibility and validation
+
+Support both appearances, contrast, targets/labels, empty/error/denied states, small screens, landscape, large text, TalkBack and restoration. Startup errors offer recovery; map setup returns to its SOS. Prevent reminder/header/keyboard overlap and scan-driven flicker.
+
+Functional phone successes are recorded in [validation](validation.md), alongside DELIVERY-01. They do not establish completed accessibility/novice usability, every channel/gesture regression or pressure/fallback scenario. Use the [presentation](testing/structure-organization-test-card.md) and [SOS/conversation](testing/sos-conversations-test-card.md) procedures. Keep measured outcomes in validation rather than adding transcripts here.

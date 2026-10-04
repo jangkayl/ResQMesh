@@ -1,3 +1,5 @@
+> Historical version preserved 2026-10-04. Original deadlines, unchecked procedures, hashes and instructions below retain their prior scope; they do not describe current completion or authorize work. See the [archive index](../README.md) for the active replacement.
+
 # Physical reliability checklist
 
 Prepared 2026-09-30. All boxes remain open until tested. Use this across sessions; report Pass, Fail, or Untested for each test. Passing this matrix supports the tested devices and conditions, not guaranteed capacity.

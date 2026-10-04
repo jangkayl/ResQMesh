@@ -1,77 +1,53 @@
 # Current status
 
-Last reviewed: 2026-10-04. Branch: `refactor/mvvm-presentation-organization`.
+Last reviewed: 2026-10-04. Branch: `refactor/mvvm-presentation-organization`; source baseline: `2e27013`.
 
 ## Current objective
 
-Validate the BLE voice-burst repair with [matching APKs and the phone card](testing/ble-voice-transfer-test-card.md). Connection, relay, background, and delivery evidence remain open.
+Documentation is synchronized with implemented behavior and user-reported achievements. The public README explains features, architecture, project structure and setup for repository readers. Preserve the working BLE/mesh mechanism; intermittent A-to-D delivery loss remains recorded for later investigation.
 
-[Phone validation pending](plans/capstone-demo-readiness.md): [incident UX redesign](plans/emergency-incidents-ux-redesign.md), withdrawal cleanup, reporter identity, and selected-offer editing guards.
+## Working by user report
+
+The user confirmed the October 4 APK identified in [validation](validation.md), including:
+
+- Successful A–B–C–D public/private text arrival, returning DELIVERED/READ confirmation, complete recorded notes, and SOS delivery.
+- App restart, relay removal/return, Bluetooth OFF/ON, and locked/background messaging.
+- Mutual direct-link blocking, relay use while blocked, restart persistence, and independent local unblock.
+- Incident offers, selection, confirmation, withdrawal/replacement, closure and reconnect synchronization; independent simultaneous SOS cancellation.
+- Offline map opening and SOS map display without internet.
+
+These are qualitative reports, not measured rates or proof that every card step passed. Four-phone delivery remains intermittent. Models/API levels, counts, durations, actual GATT/L2CAP use and captures were not supplied for this report.
 
 ## Implemented and locally checked
 
-Prior Samsung repair: build, Lint, 280 clean-snapshot tests passed; [card](testing/samsung-send-test-card.md). Voice repair: 348 clean-snapshot tests, builds, Android-test compilation, and Lint passed; physical results remain UNTESTED. Mixed-workspace unit compilation is blocked by the pre-existing untracked reconnect test.
+Current source includes generation-owned GATT/L2CAP, three-neighbor admission, directed leased topology, persistent private outbox, recipient receipts, resumable journaled transfers, permanent Keystore identity, opt-in background service, Room 11, signed incident/SOS synchronization, scoped conversations and MapLibre/PMTiles.
 
-Presentation organization preserves 217 protected files and Activity/ViewModel bodies. Navigation, feature/shared UI models, conversations, and components have owners. Twenty-four focused presentation tests passed; full-suite validation remains blocked. Run the [organization regression card](testing/structure-organization-test-card.md).
+Presentation organization preserves Activity/ViewModel bodies and 217 protected files. Navigation and shared/feature presentation now have explicit owners. Its recorded checks include APK builds, Android-test compilation, Lint and 24 focused presentation tests. Earlier Samsung/voice clean snapshots passed 280/348 unit tests respectively; these counts belong to different source snapshots.
 
-- Generation-owned BLE, acknowledged GATT, L2CAP promotion, directed READY-rooted topology, empty withdrawals, three-neighbor admission, and private fail-closed routing.
-- Persistent private outbox with 24-hour expiry, accepted-only delivery timing, pending-key-change refusal, and conditional failure updates.
-- Keystore-derived IDs, backup exclusions, opt-in background service, honest direct/relay/searching UI, restored homepage hierarchy, and incident triage/help UI.
-- Emergency incidents UX: single-page detail, prominent title and 80-char support, Room 6→7, 7→8, 8→9 migrations, signed events, reporter selection, helper confirmation, and closure. Legacy records remain readable.
-- Version 1.0.1/code 2 candidates build locally; signing, phone smoke, large-text/SOS-map review, and first-contact trust validation remain open.
+**Recorded local blocker:** the pre-existing untracked `PrivateReconnectDeliveryTest.kt` prevents standard mixed-workspace unit-test compilation. This audit did not rerun that suite or repair the fixture. Historical results and current limitations are in [validation](validation.md).
 
-## Reliability tracking checklist
+## Open issue and remaining evidence
 
-Record APK/device matrix, timestamps, results, and capture before checking physical phases.
-
-Use the [physical checklist](plans/physical-reliability-tests.md); record the installed APK.
-
-- [x] R1: Reject unknown blocked endpoints by captured generation; release retired handshake owners; Refresh reconciles orphan owners.
-- [x] R2: Only identified, unblocked READY neighbors suppress isolated recovery; unidentified endpoints occupy separate capacity slots.
-- [x] R3: Acknowledged write progress protects busy links; stalled chunks and unanswered heartbeats retain deadlines.
-- [x] R4: One bounded L2CAP writer per socket; FIFO within traffic classes; control reserve and byte/count bounds on both transports.
-- [x] R5: Public acceptance results, visible pending/partial feedback, persistence before dispatch, serialized outbox retry; no whole-broadcast retry after any acceptance.
-- [x] R6: 248 unit tests, debug APK, Android-test build, Lint, docs, and diff checks passed. Migration/SOS UI instrumentation is recorded below.
-- [ ] R7: A–B–C mutual block, unilateral unblock, restart, relay removal/return, and Refresh phone card below.
-- [ ] R8: Recorded-voice burst and mixed text/SOS tests on three phones, including GATT fallback and L2CAP.
-- [ ] R9: Five-phone matrix: quiet links, one sender, simultaneous senders, relay loss/recovery.
-- [ ] R10: Ten-phone matrix with the same workloads; measure delivery, p95 delay, churn, queue rejection, and recovery.
-- [ ] R11: Measure chunk scheduling, recording limits, SOS priority, and control retries. Keep live-PTT removal separate.
-
-Queue defaults remain 128 frames, eight control slots, 2 MiB ordinary bytes/64 KiB headroom. Upgraded peers use 1 KiB pieces with four outstanding per neighbor. Controls overtake waiting pieces; active frames remain non-interruptible. These bounds are unvalidated device capacity.
-
-## Open blockers
-
-Protocol-v2 incident sync adds history/state hashes, bounded repair/retries, READY snapshots, and a 30-second backstop. Room 9→10 separates validation/application. Migrations passed on the emulator; incident phone validation remains pending.
-
-| ID | Priority | Remaining completion evidence |
+| ID | State | Outstanding work |
 | --- | --- | --- |
-| BLE-OWN | P0 | Late same-address server callback ownership and replacement-link phone validation |
-| BLE-QUEUE | P0 | R8: no false retirement, starvation, or silent rejection; fallback/retry behavior under pressure |
-| BLOCK-01 | P0 | R7: B remains usable with A↔C blocked, restart persistence, honest unilateral-unblock state |
-| ADMIT-01 | P1 | Recovery to B without unblocking C, retained startup candidates, no redundant-link churn |
-| ROUTE-01 | P0 | Directed withdrawal/recovery and receipts; no false relay/private broadcast |
-| LIMIT-01 | P2 | R9/R10 measured matrix; prior five-device report is not stable-capacity proof |
-| SEC-01 | P1 | Fingerprint verification UI and first-contact trust boundary |
-| SOS-01 | P1 | Concurrent alert/cancellation ownership and load-time priority |
-| INCIDENT-01 | P1 | Incident UI runtime plus reconnect/connected-update and A–B–C convergence on phones |
-| BG-01 | P1 | Android 12–14+ lock-screen, process-death, and battery measurements |
+| DELIVERY-01 | User-reported failure; investigation deferred | On A→B→C→D, public/private text or voice sometimes fails to reach D. Cause unknown. Keys, forwarding and blocking are hypotheses only. |
+| TEST-01 | Recorded local blocker | Reconcile the existing reconnect fixture separately before claiming a full mixed-workspace suite pass. |
+| MEASURE-01 | Evidence pending | Repeated arrival/receipt counts, latency, sustained-load/fallback, late-callback and directed route-withdrawal coverage. |
+| SCALE-01 | Evidence pending | Five/ten-phone controlled matrices, range and capacity measurements. |
+| TRUST-01 | Work/evidence pending | First-contact verification and defined identity/security guarantees. |
+| RELEASE-01 | Evidence pending | Process-death/OEM/background battery matrix, upgrade/release signing, accessibility and novice usability. |
 
-## Current SOS validation
+Previously listed basic block, incident, SOS and recovery checks now have user-reported successes; their adversarial, load and repeated-measurement cases remain pending rather than known defects. Use the [physical checklist](testing/physical-reliability-tests.md) to distinguish them.
 
-Room 10→11, channel Radio history, identified SOS threads, signed lifecycle, bounded sync, and local silence are implemented. Cancellation returns to the hub; timestamps are guarded. Prior checks: debug build, 248 unit tests, Lint (zero errors; 147 warnings), and eleven Medium_Phone/API 37 instrumentation tests. Latest phone validation remains open.
+## Deferred work and context
 
-Run the [SOS conversation phone card](testing/sos-conversations-test-card.md) using its final APK identity. Use the existing physical checklist for R7/R8; preserve unrelated block/incident evidence.
+Transport/repository extraction, stronger route-repair/replication proposals, resource requests, safety check-ins and unfinished location-confidence policies remain inactive. The [dated archive index](../archive/docs-superseded-2026-10-04/README.md) preserves their disposition and unique historical checks. Archived prompts do not authorize implementation.
 
-Older unscoped SOS/voice history entries are intentionally hidden. Current Radio channels and identified SOS threads retain history, drafts, and unread counts; migration classification remains intact.
-
-Bluetooth recovery now separates session intent/radio lifetime, rebuilds after ON, fences old callbacks, retries isolated discovery, and permits safe cluster bridges. Debug build, 266 unit tests, Android-test compilation, and Lint passed. APK identity and physical steps are in the [recovery phone card](testing/bluetooth-recovery-test-card.md); phone results remain pending.
-
-Antigravity: [repository handoff](plans/phase5-repository-antigravity-guide.md) and [transport refactor](plans/nativeblemanager-refactor.md) reflect current source; extraction remains deferred.
+[Capstone preparation](plans/capstone-demo-readiness.md) remains active; no demo, pilot or deadline completion was confirmed.
 
 ## Next actions
 
-1. Run the burst card on two/three phones: hybrid/GATT comparison, overlapping notes, text/SOS latency, relay loss/resume, and foreground/background.
-2. Align the pre-existing reconnect test APIs for the mixed-workspace suite; preserve the validated repair scope.
-3. Run [organization](testing/structure-organization-test-card.md), [Bluetooth recovery](testing/bluetooth-recovery-test-card.md), R7, SOS, and incident cards; investigate focused captures.
-4. Complete trust/background evidence; advance to five/ten phones only after smaller matrices pass.
+1. Keep DELIVERY-01 for a separately authorized, focused investigation using the installed build and exact failure window.
+2. Add missing phone/build conditions and measured outcomes when supplied; use [voice/relay](testing/ble-voice-transfer-test-card.md) and physical procedures without blanket PASS labels.
+3. Resolve TEST-01 separately and repeat appropriate local gates.
+4. Complete capstone evidence, release/trust, accessibility and process-death/battery checks before broader claims.

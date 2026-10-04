@@ -1,86 +1,74 @@
 # Capstone demo and deployment preparation
 
-Prepared: 2026-10-01. Target: final demo in less than two weeks, followed by a supervised pilot and possible public beta installation.
+Last reviewed: 2026-10-04. Status: active preparation plan. Source baseline: `2e27013`. Originally prepared 2026-10-01; demo/pilot dates and completion are unconfirmed.
 
-This is a preparation checklist, not an instruction to change application code. Keep existing features and approved scope. Record failures before deciding on fixes.
+This checklist prepares evidence and installation; it does not authorize application or network changes.
 
-## Position the project clearly
+## Current achievements and pending preparation
 
-ResQMesh has sufficient feature scope for a software engineering capstone: offline communication, routing, persistence, access control, and emergency incident coordination. More features are not the current priority. Acceptance depends on the school's rubric; instructor approval and adviser support do not resolve an unspecified transaction requirement.
+[Validation](../validation.md) identifies the current October 4 APK and qualitative user-reported four-phone text/receipt/note/SOS success, recovery/toggles/background, mutual blocking, full incident lifecycle/reconciliation, independent SOS cancellation and offline maps.
 
-- [ ] Obtain the instructor's written interpretation of the dean's verbal transaction concern.
-- [ ] Keep the approved title; explain the system as offline emergency communication and incident coordination.
-- [ ] Present the incident business workflow: report → offer → select → confirm → withdraw or complete → resolve/cancel.
-- [ ] Distinguish local atomic Room transactions from eventual synchronization between disconnected phones. Do not claim distributed global ACID transactions.
-- [ ] Map each requirement to a screen, authorization rule, test, and recorded outcome.
-- [ ] Add scope only if a specific assessment requirement remains unmet; avoid speculative features.
+Intermittent A-to-D message/note loss remains DELIVERY-01, cause unknown. Models/API, repetitions, timings and transport/captures were not supplied. Functional success does not establish every exact test below, novice usability, deployment readiness or pilot completion.
 
-Software engineering includes requirements, design, construction, testing, and quality, beyond financial transactions. Reference: [IEEE SWEBOK topics](https://www.computer.org/education/bodies-of-knowledge/software-engineering/topics).
+- [ ] Map the approved project objectives to acceptance criteria and the assessment rubric.
+- [ ] Keep the approved title; explain offline communication and incident coordination.
+- [ ] Present report → offer → select → confirm → withdraw/replace → resolve/cancel.
+- [ ] Distinguish local atomic Room transactions from eventual cross-phone convergence; no distributed global ACID claim.
+- [ ] Map requirements to screens, authority rules, tests and bounded outcomes. Add scope only for a confirmed unmet requirement.
 
-## Prepare the evidence package
+## Evidence package and preparation order
 
-Use [current status](../status.md), [architecture](../architecture.md), [validation](../validation.md), and [research claim limits](../research.md) as canonical references. This checklist does not replace their technical procedures.
+Use [architecture](../architecture.md), [status](../status.md), [research](../research.md) and validation as canonical references.
 
-- [ ] Approved objectives, stakeholders, functional requirements, and acceptance criteria.
-- [ ] Architecture and incident state-transition diagrams; explain BLE, relay, Room persistence, and signed workflow events.
-- [ ] Requirements-to-test table with passed, failed, and untested outcomes.
-- [ ] Local check results: unit tests, debug build, Android-test compilation, Lint, and documentation checks.
-- [ ] Separate executed instrumentation results from compilation-only results.
-- [ ] Physical evidence with build identity, device matrix, timestamps, repetitions, and measured delays.
-- [ ] Known limitations: transport availability, trust assumptions, background behavior, capacity, and remaining failures.
-- [ ] User guide, installation instructions, privacy explanation, and issue-reporting contact.
-
-Existing documentation reports local checks but leaves physical incident convergence and other runtime checks open. Do not mark these complete based on a build or test count.
-
-## Prioritize the remaining time
-
-| Window | Preparation and exit evidence |
+| Order | Exit evidence |
 | --- | --- |
-| Days 1–2 | Clarify rubric; freeze major features; select phones; record baseline checks and installed APK identity. |
-| Days 3–7 | Run critical phone scenarios; document failures; arrange focused fixes separately if needed; repeat affected tests. |
-| Days 8–10 | Conduct supervised trial; collect usability feedback; rehearse the complete demo. |
-| Remaining days | Freeze one candidate APK; prepare slides, evidence, recorded backup, and connection-failure recovery steps. |
+| Baseline | Approved objectives/rubric, chosen phones, installed APK identity and recorded local-check limitations |
+| Critical scenarios | Repeated phone outcomes and focused failure records, including DELIVERY-01; fixes separately authorized |
+| Trial/rehearsal | Supervised usability trial and complete demo story, with actual results rather than planned completion |
+| Freeze | One candidate APK, known limitations, instructions, slides and clearly labeled recorded backup |
+| Wider installation | Signing/upgrade/privacy/support gates and supported-device evidence |
 
-Prioritize text/SOS delivery and honest status, then incident correctness, identity permissions, restart/migration/background behavior, and task-blocking UI issues. Five- and ten-phone capacity claims require their own measured matrix; a three-phone demo does not establish them.
+No calendar deadline or completed trial is inferred.
 
-## Physical phone test card
+- [ ] Architecture/state diagrams and requirements-to-test table: PASS/FAIL/UNTESTED.
+- [ ] Separate builds/unit checks, executed emulator instrumentation, user reports and analyzed phone captures.
+- [ ] Record phone/build matrix, timestamps, counts, route/transport and measured convergence/delays.
+- [ ] Document trust, background/OEM, capacity and intermittent loss limits.
+- [ ] User guide, installation/privacy explanation and issue-reporting contact.
+- [ ] Accessibility/novice review: both themes, small/landscape screens, 200% text, keyboard, TalkBack, restoration and denied/error states.
 
-**Build:** record version name/code, APK filename and SHA-256, source revision plus uncommitted-change state, and installation date. Recalculate identity for each candidate; do not reuse an old hash.
+The archived incident UX proposal's five-participant study (four-of-five uncoached task success, helper intent within five seconds, no destructive/false-delivery misunderstanding) remains unconfirmed. Keep it separate from the functional lifecycle report.
 
-**Devices:** A = reporter, B = helper, C = alternative helper. Record model, Android version, permissions, battery restrictions, and observed GATT/L2CAP use.
+## Reporter/helper phone card
 
-**Setup:** same APK on all phones; Bluetooth enabled; internet unavailable; avoid real emergency recipients. Verify actual READY links. A relay test needs a verified indirect path, not merely physical separation. Agree on a maximum convergence time before testing and record it.
+**Build:** use validation's current full APK hash/version/source baseline; record installed identity per phone and actual date. Preserve app data/keys. Users install and operate phones.
 
-Repeat critical scenarios five times. Record an unsupported or unavailable condition as untested.
+**Devices/setup:** A reporter, B helper, C alternate helper. Record models/API, permissions/restrictions, blocks and topology. Use matching APKs without internet and harmless emergencies. Verify indirect routes rather than inferring them from separation. Agree on and record a convergence limit before timed runs.
 
-| Test | Exact action | Expected result |
+Repeat critical cases five times; the present qualitative report does not establish those counts.
+
+| Case | Action | Expected result |
 | --- | --- | --- |
-| Pending withdrawal | A reports; B/C offer; A selects B; B withdraws. | B selection disappears everywhere; incident returns to Looking for help; A can select C. |
-| Confirmed withdrawal | Repeat, with B confirming before withdrawal. | Same cleanup; no stale confirmed-helper card; withdrawal remains in history. |
-| Reconnect | Disconnect a phone during selection/withdrawal; reconnect. | Replicas converge within the agreed limit; later reporter decisions remain possible. |
-| Reporter rename | Rename A before selection, while pending, and after confirmation; navigate and restart. | Reporter actions and My involvement remain; original report-time name persists. |
-| Edit policy | Attempt editing B's selected offer; remove selection and try again. | Selected edit blocked without revision change; active unselected edit allowed. |
-| Offline revision | B misses selection and edits its offer offline; reconnect. | Obsolete selection invalidates; fresh reporter selection is required. |
-| Identity isolation | Give C the same display name as A; attempt reporter actions. | C gains no reporter authorization. |
-| Lifecycle | Withdraw, re-offer, reselect; then resolve/cancel. | Fresh offers work; terminal incidents retain history and reject active changes. |
+| Pending withdrawal | B/C offer; A selects B; B withdraws | Selection clears everywhere; A can freshly select C |
+| Confirmed withdrawal | B confirms then withdraws | Same cleanup, no stale confirmed card; history retained |
+| Reconnect | Disconnect during selection/withdrawal, then restore | Replicas converge; later reporter decisions remain possible |
+| Reporter rename | Rename before selection, while pending and after confirmation; restart | Stable ownership/My activity preserved; report-time name remains |
+| Selected editing | Attempt selected B edit, then remove selection and retry | Selected edit rejected without revision change; unselected edit allowed |
+| Offline revision | B edits before learning selection; reconnect | Obsolete selection invalidates; fresh approval required |
+| Identity isolation | C uses A's display name and attempts owner actions | No reporter authority granted |
+| Lifecycle | Withdraw/re-offer/reselect; resolve/cancel; replay | Fresh offers work; terminal history rejects active changes |
 
-Also test direct public/private text, verified relay delivery, SOS cancellation ownership, duplicate delivery, app restart, and relevant background/upgrade cases from validation documentation.
+Basic lifecycle/recovery was reported working. Rename, unauthorized identity, exact editing/replay, timed repetitions and other unlisted cases remain unconfirmed. Use the [physical checklist](../testing/physical-reliability-tests.md) and [SOS card](../testing/sos-conversations-test-card.md) for transport, independent alerts and background/upgrade procedures.
 
-**Failure indicators:** stale helper display, missing reporter buttons, rejected valid selection, unauthorized action, stuck pending message, false delivery/relay status, lost history, or manual reset required.
+Failures: stale helper, missing owner controls, unauthorized/rejected valid action, stuck pending, false delivery/route state, lost history or manual reset. Report scenario/repetition, APK, models/API/topology, timestamps, expected/actual outcome, convergence and focused capture. Mark INCIDENT_IDENTITY/HELP/REPO/SYNC, READY, route/receipt/queue events without private contents/keys.
 
-**Logs:** capture focused windows around `IDENTITY`, `INCIDENT_IDENTITY`, `INCIDENT_HELP`, `INCIDENT_REPO`, `READY`, routing, queue rejection, and retirement markers as applicable. Do not include private message contents or key material.
+## Demo and release gates
 
-**Report template:** scenario; repetition; APK identity; devices; start/end timestamps; expected/actual result; convergence time; screenshot or focused capture reference; recovery needed; pass/fail/untested.
+- [ ] Rehearse offline report → two offers → select/confirm → withdraw → replace → resolve/history.
+- [ ] Show rename continuity/edit locking only after checking those exact cases.
+- [ ] Explain measured reconnect results and the intermittent-loss limitation.
+- [ ] Prepare charged phones/cables, frozen APK, instructions, slides and recorded backup.
+- [ ] Conduct and record a supervised pilot after critical scenarios pass.
+- [ ] Before wider beta: signed release, upgrade tests, device/API support, permissions/privacy/support and outstanding reliability/security issues.
 
-## Final demo and installation gates
-
-- [ ] Rehearse one story: offline report → two offers → selection → confirmation → withdrawal → replacement → resolution/history.
-- [ ] Show reporter rename continuity and helper edit locking as correctness safeguards.
-- [ ] Explain one reconnect scenario with measured results and limitations.
-- [ ] Prepare charged phones, cables, the frozen APK, installation guide, slides, and clearly labeled recorded backup.
-- [ ] Conduct a supervised pilot only after critical scenarios pass; gather task-completion feedback.
-- [ ] Before wider beta installation: prepare a signed release, test upgrades, document supported devices/Android versions, permissions, privacy, support, and known limitations; resolve blocking reliability/security issues.
-
-Public installation does not imply readiness for operational emergency dependence. Describe the release as a prototype/beta; do not claim guaranteed delivery, range, capacity, self-healing, authenticated E2EE, or production reliability without corresponding evidence.
-
-Archive this preparation plan after the demo/pilot, extracting lasting results and decisions into canonical documentation.
+Describe installation as prototype/beta, without operational emergency, authenticated E2EE or guaranteed range/capacity/delivery claims. Archive this plan after completed preparation, extracting lasting evidence/decisions.

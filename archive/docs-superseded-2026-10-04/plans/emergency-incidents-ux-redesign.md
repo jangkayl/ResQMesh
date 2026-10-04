@@ -1,3 +1,5 @@
+> Historical/inactive reference archived 2026-10-04; see [disposition index](../README.md). Original claims, hashes and instructions are not current authorization.
+
 # Emergency Incidents UX redesign and Antigravity handover
 
 Approved: 2026-10-01. Status: implemented and locally checked; usability/device validation pending. Baseline observations below describe the pre-redesign checkout.

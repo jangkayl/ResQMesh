@@ -1,20 +1,24 @@
 # Presentation organization regression
 
+Last reviewed: 2026-10-04. Source baseline: `2e27013`. Status: active procedure. Current APK/version/full hash and the qualitative report are in [validation](../validation.md); historical candidates below are not the current build.
+
+Basic messaging/receipts, notes, SOS, recovery and background use were reported on this APK. Exact navigation/history/draft, notification, theme/accessibility and every regression step remain unconfirmed; intermittent relay loss stays open.
+
 ## Build identity
 
-- Branch: `refactor/mvvm-presentation-organization`; base commit `d9fff4dd697f6a95eb7a1fbda39263788eea8bfc` plus the uncommitted organization changes.
+- Branch: `refactor/mvvm-presentation-organization`; organization is now committed as `2e27013`. Its original pre-change baseline was `d9fff4dd697f6a95eb7a1fbda39263788eea8bfc`.
 - Version: `1.0.1` / code `2`; debug build with the existing L2CAP flag enabled.
 - APK: `app/build/outputs/apk/debug/app-debug.apk`.
 - SHA-256: `D4638F9C5835016E136A0A33E1A8F3457A48D9B455CB0F1AD876D296DAE4E686`.
 - Devices: user-selected A/B; add relay B between A/C for the three-phone check. Record models and Android/API versions.
 
-## Scope and local evidence
+## Scope and recorded local evidence
 
 App navigation, UI state, scoped-conversation screens, shared presentation, and Home/network/inbox components have new file ownership. Networking, repositories, database, services, models, helpers, dependency wiring, and configuration remain unchanged: 217 protected files match their baseline hashes. Activity/ViewModel bodies and pre-existing untracked files are preserved.
 
 All 283 original Kotlin files were accounted for; 33 declaration groups were relocated without changing bodies, except qualified references and visibility needed across files. Debug and Android-test APK builds, docs, diff hygiene, and the structure guard passed. Lint passed with zero errors, 147 warnings, and three hints. A simulated mismatched BLE hash was rejected by the guard without changing source.
 
-Twenty-four existing presentation tests passed in a separate focused runner. Standard unit-test compilation remains blocked by the pre-existing untracked `PrivateReconnectDeliveryTest.kt`; all 18 compilation diagnostics match the pre-change baseline. This is not a full-suite pass. Device behavior remains UNTESTED.
+Twenty-four existing presentation tests passed in a separate focused runner. Standard unit-test compilation remains blocked by the pre-existing untracked `PrivateReconnectDeliveryTest.kt`; all 18 compilation diagnostics match the pre-change baseline. This is not a full-suite pass. The October 4 qualitative report covers basic functions; it does not complete every regression step.
 
 ## Setup
 

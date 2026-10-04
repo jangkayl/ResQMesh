@@ -1,3 +1,5 @@
+> Historical/inactive reference archived 2026-10-04; see [disposition index](../README.md). Original claims, hashes and instructions are not current authorization.
+
 # Mutual block control over direct and relayed links
 
 Supersedes `block-local-link-semantics.md` for BLOCK-01. This is a design plan,

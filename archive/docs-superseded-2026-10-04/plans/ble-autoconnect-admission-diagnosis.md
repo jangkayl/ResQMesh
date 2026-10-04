@@ -1,3 +1,5 @@
+> Historical/inactive reference archived 2026-10-04; see [disposition index](../README.md). Original claims, hashes and instructions are not current authorization.
+
 # BLE auto-connect admission diagnosis
 
 ## Purpose

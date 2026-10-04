@@ -1,12 +1,16 @@
 # BLE voice transfer repair: phone card
 
-Date: 2026-10-03. Base: `aab6749`, branch `fix/ble-voice-transfer-reliability`, with local changes. Version 1.0.1/code 2. Physical results: **UNTESTED**.
+Last reviewed: 2026-10-04. Source baseline: `2e27013`. Status: active procedure. Current APK/version/full hash and the qualitative report are in [validation](../validation.md); historical candidates below are not the current build.
 
-## Build identity and local checks
+Successful direct/relay note playback, text/receipts, SOS and recovery were reported. Intermittent A-to-D text/note loss remains DELIVERY-01. Exact bursts, join-under-load, diagnostic fallback, restart custody and timed background cases are not all confirmed.
+
+Historical repair snapshot: 2026-10-03, base `aab6749`, branch `fix/ble-voice-transfer-reliability`, then-local changes, version 1.0.1/code 2. Phone scenarios were unexecuted in that local check batch; the October 4 user report is separate.
+
+## Historical repair candidates and local checks
 
 Normal debug enables L2CAP; `-PbleL2cap=false` disables its client/server path for comparison. Both builds retain the same chunk protocol and GATT fallback. Install one variant on all phones in a run; record its hash and device models/API levels. Preserve data and keys.
 
-Candidates are in `app/build/outputs/ble-repair/`:
+Historical candidates were saved in `app/build/outputs/ble-repair/`; these hashes are not the current October 4 normal candidate. A current transport comparison needs separately prepared matching variants:
 
 | APK | SHA-256 |
 | --- | --- |
@@ -17,7 +21,7 @@ Local results: **PASS** — all 348 unit tests in the clean commit snapshot (zer
 
 Local checks cover setup sequencing, indication ownership/promotion, fallback queue pressure, endpoint health, chunk loss/restart/reassembly/custody, relay storage order, expiry, and private receipt timing. They do not simulate Android radio behavior.
 
-The mixed workspace has a pre-existing untracked `PrivateReconnectDeliveryTest.kt` that expects missing store APIs, repository injection parameters, and callback signatures. It still blocks that workspace's full unit-test compilation and remains outside this commit. Earlier checks passed 371 tests with only that fixture excluded. Commit validation instead archived `aab6749` into a temporary clean directory, overlaid the 46 selected repair paths, and ran `:app:testDebugUnitTest :app:assembleDebug` without an init file or exclusions. All 348 tests and the build passed. No physical tests have been run for these changes.
+The mixed workspace has a pre-existing untracked `PrivateReconnectDeliveryTest.kt` that expects missing store APIs, repository injection parameters, and callback signatures. It still blocks that workspace's full unit-test compilation and remains outside this commit. Earlier checks passed 371 tests with only that fixture excluded. Commit validation instead archived `aab6749` into a temporary clean directory, overlaid the 46 selected repair paths, and ran `:app:testDebugUnitTest :app:assembleDebug` without an init file or exclusions. All 348 tests and the build passed. No physical tests were run for that local check batch; current qualitative phone reports are recorded separately in validation.
 
 ## Devices and setup
 
@@ -33,7 +37,7 @@ Use the existing capture script on connected ADB devices: `scripts/capture_ble_l
 4. **Relay:** Arrange A–B–C with no direct A–C link; verify the actual route. Repeat the burst between A/C and exchange text/SOS through B. Expect directed private traffic, complete notes, recipient confirmation, and no duplicate playback. Do not infer hopping from physical placement alone.
 5. **Loss/resume:** Start three notes, then disable Bluetooth on the receiving side or relay before completion. Restore Bluetooth without clearing data and allow automatic recovery. Repeat with one app restart during transfer. Expect retained upgraded transfers to resume missing pieces after a new READY identity exchange. Missing routes must not trigger private broadcast. Record any duplicate presentation.
 6. **Background:** Repeat direct and relay bursts with one screen locked, then all screens locked for 10 minutes. Reopen and verify stored notes/receipts. Use Go offline afterward: expect transport to stop and remain stopped until a normal Join.
-7. **Transport comparison:** Repeat baseline/burst/loss with the GATT diagnostic APK on all phones, then reinstall the hybrid candidate. Compare delays, rejections, disconnects, and completion. GATT may be slower. Android/OEM link loss can still require reconnection.
+7. **Transport comparison:** Repeat baseline/burst/loss with the GATT diagnostic APK on all phones, then restore matching normal builds. Compare delays, rejections, disconnects, and completion. GATT may be slower. Android/OEM link loss can still require reconnection.
 
 ## Failure indicators and evidence
 

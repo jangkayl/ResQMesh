@@ -1,6 +1,8 @@
+> Historical/inactive reference archived 2026-10-04; see [disposition index](../README.md). Original claims, hashes and instructions are not current authorization.
+
 # Phase 5 repository extraction guide
 
-Reviewed against source on 2026-10-02, branch `fix/bluetooth-recovery-cluster-bridging-and-sos-ux`. Use in Google Antigravity after reading [current status](../status.md), [architecture](../architecture.md), [UI rules](../ui.md), and [validation](../validation.md).
+Reviewed against source on 2026-10-02, branch `fix/bluetooth-recovery-cluster-bridging-and-sos-ux`. Use in Google Antigravity after reading [current status](../../../docs/status.md), [architecture](../../../docs/architecture.md), [UI rules](../../../docs/ui.md), and [validation](../../../docs/validation.md).
 
 Phase 5 remains deferred. This guide records the implemented baseline and constraints for a future extraction; it does not authorize implementation or establish physical reliability.
 
@@ -38,7 +40,7 @@ Reuse existing SOS/incident coordinators and block storage. Preserve alert owner
 
 ## Workflow and Antigravity prompt
 
-Do not start extraction until focused recovery, queue-pressure, and L2CAP/GATT-fallback phone evidence establishes a baseline. The [Bluetooth recovery card](../testing/bluetooth-recovery-test-card.md) and existing R7/R8 procedures define pending evidence.
+Do not start extraction until focused recovery, queue-pressure, and L2CAP/GATT-fallback phone evidence establishes a baseline. The [Bluetooth recovery card](../../../docs/testing/bluetooth-recovery-test-card.md) and existing R7/R8 procedures define pending evidence.
 
 > Read AGENTS.md and the canonical docs linked above, then inspect MeshRepository.kt, MeshNetworkGateway.kt, and the relevant collaborators. Produce a read-only Phase 5A callback map, invariant list, proposed files, and checks against current source. Do not edit, commit, push, add tests, modify transport, or start another slice until the user approves implementation.
 
