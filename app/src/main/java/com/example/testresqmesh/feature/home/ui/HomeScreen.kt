@@ -16,6 +16,7 @@ import com.example.testresqmesh.feature.comms.viewmodel.CommunicationViewModel
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.dp
 import com.example.testresqmesh.core.location.LocationStatus
 import com.example.testresqmesh.core.model.NodeIdentity
 import com.example.testresqmesh.core.ui.theme.Spacing
@@ -118,7 +119,7 @@ fun HomeScreenContent(
         modifier = modifier
             .verticalScroll(rememberScrollState())
             .padding(horizontal = Spacing.Large)
-            .padding(top = Spacing.Large, bottom = Spacing.Large),
+            .padding(top = Spacing.Large, bottom = 120.dp),
         verticalArrangement = Arrangement.spacedBy(Spacing.Large)
     ) {
         // 1. Modern Social Header (Avatar, Greeting, Live Mesh Presence Pill)

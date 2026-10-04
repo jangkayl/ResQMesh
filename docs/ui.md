@@ -1,6 +1,6 @@
 # UI guidance
 
-Last reviewed: 2026-10-04. Source baseline: `2e27013`. Use Compose/Material 3; inspect current source.
+Last reviewed: 2026-10-05. Earlier presentation baseline: `2e27013`; incident UI repairs are recorded on `fix/incident-ui-ux`. Use Compose/Material 3; inspect current source.
 
 ## Components and ownership
 
@@ -40,6 +40,8 @@ SOS creation uses deliberate slide-to-send; early release resets. Creation Cance
 SOS cards retain category/status/transmission, location accuracy, time and history. Header time fallback never proves GPS freshness. Reserve measured floating-header/reminder regions, reverse conversations and keep latest messages/composer above the IME. Short/large-text threads expose scrollable SOS controls; badges wrap. Ended badges say ENDED, not rescue completed.
 
 Incidents use historical reporter names and ownership badges. Identity loading/errors explain unavailable controls. Details use one page and docked actions. Selected offers cannot be edited; withdrawal removes selection and requires fresh approval. Route loss never reassigns. Connection labels describe the selected helper's actual route.
+
+Helper chat shortcuts qualify the historical label with the offer's stable mesh node ID. Hide shortcuts for self or missing IDs; reporter user IDs and signing keys cannot substitute for a mesh ID. Quick filters expose selected semantics and 48dp targets; label the search input for accessibility. Selected-helper route text wraps, and helper replacement controls grow from a 48dp minimum. Keep existing filtering, ordering and workflow authority.
 
 Never display debug plaintext, keys, ciphertext previews or sensitive location.
 

@@ -1,10 +1,14 @@
 package com.example.testresqmesh.feature.incident.ui.components
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -20,24 +24,27 @@ import com.example.testresqmesh.feature.incident.viewmodel.IncidentFilterState
 fun IncidentFilterSheet(
     currentFilters: IncidentFilterState,
     destination: IncidentDestination,
-    onApply: (IncidentFilterState) -> Unit,
+    onFilterChange: (IncidentFilterState) -> Unit,
     onDismiss: () -> Unit
 ) {
-    var draft by remember(currentFilters) { mutableStateOf(currentFilters) }
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val hasActiveFilters = currentFilters.activeCount(destination) > 0
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
-        dragHandle = { BottomSheetDefaults.DragHandle() },
+        sheetState = sheetState,
+        dragHandle = { BottomSheetDefaults.DragHandle(modifier = Modifier.padding(vertical = 4.dp)) },
         containerColor = MaterialTheme.colorScheme.surface
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = Spacing.Large)
-                .padding(bottom = Spacing.Large)
+                .padding(bottom = Spacing.Medium)
                 .verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            verticalArrangement = Arrangement.spacedBy(6.dp)
         ) {
+            // Header: Title + Compact Clear All + Close Button
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -46,117 +53,168 @@ fun IncidentFilterSheet(
                 Text(
                     text = "Filter incidents",
                     style = MaterialTheme.typography.titleMedium.copy(
-                        fontSize = 20.sp,
+                        fontSize = 17.sp,
                         fontWeight = FontWeight.Bold
                     )
                 )
-                TextButton(
-                    onClick = { draft = IncidentFilterState() },
-                    modifier = Modifier.defaultMinSize(minHeight = 48.dp)
+
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    Text("Clear")
+                    if (hasActiveFilters) {
+                        TextButton(
+                            onClick = { onFilterChange(IncidentFilterState()) },
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                            modifier = Modifier.defaultMinSize(minHeight = 28.dp)
+                        ) {
+                            Text("Clear all", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                        }
+                    }
+
+                    IconButton(
+                        onClick = onDismiss,
+                        modifier = Modifier.size(30.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = "Close",
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
                 }
             }
 
-            // Emergency Type
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            // 1. Emergency Type (Tight 5dp horizontal gaps, 1-tap live apply)
+            Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
                 Text(
-                    text = "Emergency type",
-                    style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold)
+                    text = "EMERGENCY TYPE",
+                    style = MaterialTheme.typography.labelSmall.copy(
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 0.5.sp
+                    ),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 FlowRow(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                    horizontalArrangement = Arrangement.spacedBy(5.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                     val types = listOf("Medical", "Fire", "Search & Rescue", "Infrastructure", "Security", "Other")
                     IncidentFilterChip(
-                        selected = draft.emergencyType == null,
-                        onClick = { draft = draft.copy(emergencyType = null) },
-                        label = { Text("Any type") }
+                        selected = currentFilters.emergencyType == null,
+                        onClick = { onFilterChange(currentFilters.copy(emergencyType = null)) },
+                        label = { Text("Any type", fontSize = 12.sp) }
                     )
                     types.forEach { type ->
+                        val isSelected = currentFilters.emergencyType.equals(type, ignoreCase = true)
                         IncidentFilterChip(
-                            selected = draft.emergencyType.equals(type, ignoreCase = true),
+                            selected = isSelected,
                             onClick = {
-                                draft = draft.copy(
-                                    emergencyType = if (draft.emergencyType.equals(type, ignoreCase = true)) null else type
+                                onFilterChange(
+                                    currentFilters.copy(
+                                        emergencyType = if (isSelected) null else type
+                                    )
                                 )
                             },
-                            label = { Text(type) }
+                            label = { Text(type, fontSize = 12.sp) }
                         )
                     }
                 }
             }
 
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+            HorizontalDivider(
+                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.25f),
+                thickness = 0.5.dp
+            )
 
-            // Urgency
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            // 2. Urgency (Tight 5dp horizontal gaps, 1-tap live apply)
+            Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
                 Text(
-                    text = "Urgency",
-                    style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold)
+                    text = "URGENCY",
+                    style = MaterialTheme.typography.labelSmall.copy(
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 0.5.sp
+                    ),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 FlowRow(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                    horizontalArrangement = Arrangement.spacedBy(5.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                     val urgencies = listOf("Critical", "Serious", "Moderate")
                     IncidentFilterChip(
-                        selected = draft.urgency == null,
-                        onClick = { draft = draft.copy(urgency = null) },
-                        label = { Text("Any urgency") }
+                        selected = currentFilters.urgency == null,
+                        onClick = { onFilterChange(currentFilters.copy(urgency = null)) },
+                        label = { Text("Any urgency", fontSize = 12.sp) }
                     )
                     urgencies.forEach { urgency ->
+                        val isSelected = currentFilters.urgency.equals(urgency, ignoreCase = true)
                         IncidentFilterChip(
-                            selected = draft.urgency.equals(urgency, ignoreCase = true),
+                            selected = isSelected,
                             onClick = {
-                                draft = draft.copy(
-                                    urgency = if (draft.urgency.equals(urgency, ignoreCase = true)) null else urgency
+                                onFilterChange(
+                                    currentFilters.copy(
+                                        urgency = if (isSelected) null else urgency
+                                    )
                                 )
                             },
-                            label = { Text(urgency) }
+                            label = { Text(urgency, fontSize = 12.sp) }
                         )
                     }
                 }
             }
 
-            // Assistance (active destinations only)
+            // 3. Assistance needed (Active destinations only)
             if (destination != IncidentDestination.HISTORY) {
-                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                HorizontalDivider(
+                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.25f),
+                    thickness = 0.5.dp
+                )
 
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
                     Text(
-                        text = "Assistance needed",
-                        style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold)
+                        text = "ASSISTANCE NEEDED",
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 0.5.sp
+                        ),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     FlowRow(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                        horizontalArrangement = Arrangement.spacedBy(5.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
                         AssistanceFilter.entries.forEach { filter ->
                             IncidentFilterChip(
-                                selected = draft.assistance == filter,
-                                onClick = { draft = draft.copy(assistance = filter) },
-                                label = { Text(filter.label) }
+                                selected = currentFilters.assistance == filter,
+                                onClick = { onFilterChange(currentFilters.copy(assistance = filter)) },
+                                label = { Text(filter.label, fontSize = 12.sp) }
                             )
                         }
                     }
                 }
             }
 
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(2.dp))
 
-            // Apply button
-            Button(
-                onClick = {
-                    onApply(draft)
-                    onDismiss()
-                },
+            // Done Button
+            OutlinedButton(
+                onClick = onDismiss,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .defaultMinSize(minHeight = 56.dp)
+                    .height(40.dp),
+                shape = RoundedCornerShape(12.dp),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
             ) {
-                Text("Apply filters", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                Text(
+                    text = "Done",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 13.sp,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
             }
         }
     }

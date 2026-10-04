@@ -355,6 +355,7 @@ fun MainContainerScreen(
                             viewModel = incidentViewModel,
                             radarState = incidentRadarState,
                             onBack = { showIncidents = false },
+                            onDirectChat = { peerName -> activeChatNode = peerName },
                             onViewLocation = { lat, lng, reporter, description ->
                                 mapSosAlert = com.example.testresqmesh.core.model.ChatMessage(
                                     id = "incident_map_${System.currentTimeMillis()}",

@@ -1,10 +1,10 @@
 # Current status
 
-Last reviewed: 2026-10-04. Branch: `refactor/mvvm-presentation-organization`; source baseline: `2e27013`.
+Last reviewed: 2026-10-05. Branch: `fix/incident-ui-ux`; UI change set based on `2c2b9fc`. Earlier presentation source baseline: `2e27013`.
 
 ## Current objective
 
-Documentation is synchronized with implemented behavior and user-reported achievements. The public README explains features, architecture, project structure and setup for repository readers. Preserve the working BLE/mesh mechanism; intermittent A-to-D delivery loss remains recorded for later investigation.
+Deliver the reviewed incident UI/UX repairs on the user-requested local branch, including README, tests and affected docs. Validate the [handover](handoffs/antigravity-incident-ui-ux-repair.md) and [test card](testing/incident-ui-ux-repair-test-card.md). Preserve the visual design, BLE/mesh mechanism and unrelated work. Intermittent A-to-D delivery loss remains deferred; failed checks still block readiness.
 
 ## Working by user report
 
@@ -24,12 +24,19 @@ Current source includes generation-owned GATT/L2CAP, three-neighbor admission, d
 
 Presentation organization preserves Activity/ViewModel bodies and 217 protected files. Navigation and shared/feature presentation now have explicit owners. Its recorded checks include APK builds, Android-test compilation, Lint and 24 focused presentation tests. Earlier Samsung/voice clean snapshots passed 280/348 unit tests respectively; these counts belong to different source snapshots.
 
-**Recorded local blocker:** the pre-existing untracked `PrivateReconnectDeliveryTest.kt` prevents standard mixed-workspace unit-test compilation. This audit did not rerun that suite or repair the fixture. Historical results and current limitations are in [validation](validation.md).
+**UI repairs:** Antigravity's six earlier changes removed readiness/hardware claims, restored search/advanced filters, corrected critical-only wording, normalized guidance, restored secondary actions and wrapped the footer. The October 5 follow-up qualifies helper Chat targets with stable offer node IDs and hides self/missing-ID/reporter-name shortcuts. Quick filters expose selected semantics with 48dp targets; search has an accessible label. Mesh status wraps and helper replacement controls grow from 48dp after screenshot review found large-text clipping. Instrumentation exercises current labels, real filtering/search/reset, stable-ID callbacks and layout bounds.
+
+**Scope/checks:** production edits remain in UI/navigation; all 217 protected files and nine Activity/ViewModel bodies match the preserved baseline. The old structure guard still fails only on eight stale archived-document/tool entries. October 5 app/Android-test APK builds and Lint passed (zero errors, 148 warnings, three hints); all 18 incident UI tests plus four focused cases at 200% text passed on API 37. Physical validation remains pending. See [validation](validation.md) for bounded outcomes and APK identities.
+
+**Local Git delivery:** the user subsequently requested a conventional commit on `fix/incident-ui-ux`. Scope is 17 UI/navigation, instrumentation, README and repair-documentation files. Unrelated network helpers/tests, backups, device scripts and Figma tools remain uncommitted. Nothing is pushed; this local checkpoint does not close the remaining validation gates.
+
+**Reproduced local blocker:** the pre-existing untracked `PrivateReconnectDeliveryTest.kt` prevents standard mixed-workspace unit-test compilation with 18 diagnostics. The fixture was not repaired. Historical results and current audit identity/limitations are in [validation](validation.md).
 
 ## Open issue and remaining evidence
 
 | ID | State | Outstanding work |
 | --- | --- | --- |
+| UI-01 | Follow-up implemented; phone validation pending | Execute the repaired-candidate phone card. Full validation/readiness remains blocked by TEST-01 and the stale structure inventory. |
 | DELIVERY-01 | User-reported failure; investigation deferred | On A→B→C→D, public/private text or voice sometimes fails to reach D. Cause unknown. Keys, forwarding and blocking are hypotheses only. |
 | TEST-01 | Recorded local blocker | Reconcile the existing reconnect fixture separately before claiming a full mixed-workspace suite pass. |
 | MEASURE-01 | Evidence pending | Repeated arrival/receipt counts, latency, sustained-load/fallback, late-callback and directed route-withdrawal coverage. |
@@ -47,7 +54,8 @@ Transport/repository extraction, stronger route-repair/replication proposals, re
 
 ## Next actions
 
-1. Keep DELIVERY-01 for a separately authorized, focused investigation using the installed build and exact failure window.
-2. Add missing phone/build conditions and measured outcomes when supplied; use [voice/relay](testing/ble-voice-transfer-test-card.md) and physical procedures without blanket PASS labels.
-3. Resolve TEST-01 separately and repeat appropriate local gates.
-4. Complete capstone evidence, release/trust, accessibility and process-death/battery checks before broader claims.
+1. Execute the [phone card](testing/incident-ui-ux-repair-test-card.md), including stable-ID chat, both appearances, Back/rotation and accessibility.
+2. Resolve TEST-01 and the stale structure inventory separately; repeat appropriate gates. Failed checks remain blocking.
+3. Review phone-card outcomes against the local UI commit; resolve remaining gates before any separately authorized PR, push or merge.
+4. Keep DELIVERY-01 deferred until a focused investigation is separately authorized; add missing phone/transport/timing evidence when supplied.
+5. Complete capstone, release/trust and process-death/battery evidence before broader claims.

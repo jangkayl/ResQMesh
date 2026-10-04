@@ -9,11 +9,13 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.Construction
 import androidx.compose.material.icons.outlined.LocalFireDepartment
 import androidx.compose.material.icons.outlined.LocationOn
 import androidx.compose.material.icons.outlined.MedicalServices
 import androidx.compose.material.icons.outlined.People
+import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material.icons.outlined.Security
 import androidx.compose.material.icons.outlined.TravelExplore
 import androidx.compose.material.icons.outlined.WarningAmber
@@ -37,6 +39,8 @@ import com.example.testresqmesh.core.ui.theme.SafetyOrange
 import com.example.testresqmesh.core.ui.theme.Spacing
 import com.example.testresqmesh.core.ui.theme.TacticalBlack
 import com.example.testresqmesh.core.ui.theme.TacticalCarbon
+import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.height
 import com.example.testresqmesh.data.local.entity.IncidentEntity
 import com.example.testresqmesh.feature.incident.viewmodel.displayTitle
 
@@ -44,11 +48,12 @@ internal fun incidentCategoryIcon(incidentType: String): ImageVector = when (inc
     "medical" -> Icons.Outlined.MedicalServices
     "fire" -> Icons.Outlined.LocalFireDepartment
     "search & rescue", "rescue" -> Icons.Outlined.TravelExplore
-    "infrastructure" -> Icons.Outlined.Construction
+    "infrastructure", "hazard" -> Icons.Outlined.Construction
     "security" -> Icons.Outlined.Security
     else -> Icons.Outlined.WarningAmber
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun TacticalIncidentCard(
     incident: IncidentEntity,
@@ -83,13 +88,15 @@ fun TacticalIncidentCard(
 
     val helper = confirmedHelperName ?: incident.primaryResponderName
     val isConfirmed = helper != null && (incident.status == "RESPONDING" || incident.selectionConfirmedAt != null)
+    val isAwaitingConfirmation = !isConfirmed && (incident.status == "AWAITING_HELPER" || incident.selectionOfferId != null)
     val helperSummaryText = when {
         isConfirmed -> "$helper confirmed"
+        isAwaitingConfirmation && helper != null -> "$helper selected"
         activeOffersCount == 0 -> "No offers yet"
         activeOffersCount == 1 -> "1 offer"
         else -> "$activeOffersCount offers"
     }.let { base ->
-        if (hasMyOffer && !isConfirmed) "$base · You offered" else base
+        if (hasMyOffer && !isConfirmed && !isAwaitingConfirmation) "$base · You offered" else base
     }
 
     val relativeTime = DateUtils.getRelativeTimeSpanString(
@@ -102,6 +109,7 @@ fun TacticalIncidentCard(
     val isNight = MaterialTheme.colorScheme.background == TacticalBlack || MaterialTheme.colorScheme.surface == TacticalCarbon
     val hasCoordinates = incident.latitude != null && incident.longitude != null
     val hasLandmark = incident.areaDescription.isNotBlank()
+    val isCritical = incident.severity.equals("critical", ignoreCase = true)
 
     Surface(
         modifier = modifier
@@ -114,282 +122,323 @@ fun TacticalIncidentCard(
             },
         shape = RoundedCornerShape(16.dp),
         color = MaterialTheme.colorScheme.surface,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
-        tonalElevation = 1.dp
+        border = BorderStroke(
+            if (isCritical) 1.5.dp else 1.dp,
+            if (isCritical) urgencyColor.copy(alpha = 0.5f) else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+        ),
+        tonalElevation = 2.dp
     ) {
-        Column(
+        Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
+                .height(IntrinsicSize.Min)
         ) {
-            // 1. Author Header Row (Social Post Header)
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
+            // Left vertical urgency accent bar
+            Box(
+                modifier = Modifier
+                    .width(5.dp)
+                    .fillMaxHeight()
+                    .background(urgencyColor)
+            )
+
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
+                // 1. Author & Severity Header Row
                 Row(
-                    modifier = Modifier.weight(1f, fill = false),
+                    modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    // Avatar Circle with category badge overlay
-                    Box {
+                    Row(
+                        modifier = Modifier.weight(1f, fill = false),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        // Category Icon Circle with subtle urgency glow
                         Surface(
                             shape = CircleShape,
-                            color = MaterialTheme.colorScheme.primaryContainer,
-                            modifier = Modifier.size(40.dp)
+                            color = urgencyColor.copy(alpha = 0.15f),
+                            border = BorderStroke(1.dp, urgencyColor.copy(alpha = 0.35f)),
+                            modifier = Modifier.size(38.dp)
                         ) {
                             Box(contentAlignment = Alignment.Center) {
-                                Text(
-                                    text = incident.creatorName.take(1).uppercase(),
-                                    style = MaterialTheme.typography.titleSmall.copy(
-                                        fontSize = 15.sp,
-                                        fontWeight = FontWeight.Bold
-                                    ),
-                                    color = MaterialTheme.colorScheme.onPrimaryContainer
-                                )
-                            }
-                        }
-                        Surface(
-                            shape = CircleShape,
-                            color = MaterialTheme.colorScheme.surface,
-                            modifier = Modifier
-                                .size(18.dp)
-                                .align(Alignment.BottomEnd)
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .background(urgencyColor.copy(alpha = 0.15f)),
-                                contentAlignment = Alignment.Center
-                            ) {
                                 Icon(
                                     imageVector = incidentCategoryIcon(incident.incidentType),
                                     contentDescription = null,
                                     tint = urgencyColor,
-                                    modifier = Modifier.size(11.dp)
+                                    modifier = Modifier.size(18.dp)
                                 )
                             }
                         }
-                    }
 
-                    Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
+                        Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Text(
+                                    text = incident.creatorName,
+                                    style = MaterialTheme.typography.titleSmall.copy(
+                                        fontSize = 15.sp,
+                                        fontWeight = FontWeight.Bold
+                                    ),
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+
+                                if (isMine) {
+                                    Surface(
+                                        shape = RoundedCornerShape(4.dp),
+                                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)
+                                    ) {
+                                        Text(
+                                            text = "You",
+                                            style = MaterialTheme.typography.labelSmall.copy(
+                                                fontSize = 10.sp,
+                                                fontWeight = FontWeight.Bold
+                                            ),
+                                            color = MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp)
+                                        )
+                                    }
+                                }
+                            }
+
                             Text(
-                                text = incident.creatorName,
-                                style = MaterialTheme.typography.titleSmall.copy(
-                                    fontSize = 15.sp,
-                                    fontWeight = FontWeight.Bold
-                                ),
-                                color = MaterialTheme.colorScheme.onSurface,
+                                text = "$relativeTime · ${incident.incidentType}",
+                                style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
                             )
-
-                            if (isMine) {
-                                Surface(
-                                    shape = RoundedCornerShape(4.dp),
-                                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
-                                ) {
-                                    Text(
-                                        text = "You",
-                                        style = MaterialTheme.typography.labelSmall.copy(
-                                            fontSize = 10.sp,
-                                            fontWeight = FontWeight.Bold
-                                        ),
-                                        color = MaterialTheme.colorScheme.primary,
-                                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
-                                    )
-                                }
-                            }
                         }
+                    }
 
+                    // Urgency Badge
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = urgencyColor
+                    ) {
                         Text(
-                            text = "$relativeTime · ${incident.incidentType}",
-                            style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp),
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
+                            text = incident.severity.uppercase(),
+                            style = MaterialTheme.typography.labelSmall.copy(
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                letterSpacing = 0.6.sp
+                            ),
+                            color = Color.White,
+                            modifier = Modifier.padding(horizontal = 9.dp, vertical = 3.5.dp)
                         )
                     }
                 }
 
-                // Urgency Badge (Top-right of post)
-                Surface(
-                    shape = RoundedCornerShape(8.dp),
-                    color = urgencyColor
-                ) {
-                    Text(
-                        text = incident.severity.uppercase(),
-                        style = MaterialTheme.typography.labelSmall.copy(
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold,
-                            letterSpacing = 0.5.sp
-                        ),
-                        color = Color.White,
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
-                    )
-                }
-            }
-
-            // 2. Post Headline (Title)
-            Text(
-                text = incident.displayTitle(),
-                style = MaterialTheme.typography.titleMedium.copy(
-                    fontSize = 17.sp,
-                    fontWeight = FontWeight.Bold,
-                    lineHeight = 22.sp
-                ),
-                color = MaterialTheme.colorScheme.onSurface,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis
-            )
-
-            // 3. Post Body (Natural, Unboxed Description)
-            if (incident.description.isNotBlank()) {
+                // 2. Headline Title
                 Text(
-                    text = incident.description,
-                    style = MaterialTheme.typography.bodyMedium.copy(
-                        fontSize = 14.sp,
-                        lineHeight = 20.sp
+                    text = incident.displayTitle(),
+                    style = MaterialTheme.typography.titleMedium.copy(
+                        fontSize = 17.sp,
+                        fontWeight = FontWeight.Bold,
+                        lineHeight = 22.sp
                     ),
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.88f),
-                    maxLines = 3,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 2,
                     overflow = TextOverflow.Ellipsis
                 )
-            }
 
-            // 4. Attached Location (Media Attachment Style)
-            if (hasLandmark || hasCoordinates) {
-                Surface(
-                    shape = RoundedCornerShape(10.dp),
-                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                    border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 10.dp, vertical = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Row(
-                            modifier = Modifier.weight(1f, fill = false),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Outlined.LocationOn,
-                                contentDescription = null,
-                                modifier = Modifier.size(16.dp),
-                                tint = ResQTheme.colors.sos
-                            )
-                            Text(
-                                text = if (hasLandmark) incident.areaDescription else "Attached GPS Location",
-                                style = MaterialTheme.typography.bodySmall.copy(
-                                    fontSize = 13.sp,
-                                    fontWeight = FontWeight.Medium
-                                ),
-                                color = MaterialTheme.colorScheme.onSurface,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                        }
-
-                        if (hasCoordinates && onViewLocation != null) {
-                            Spacer(Modifier.width(8.dp))
-                            Surface(
-                                shape = RoundedCornerShape(6.dp),
-                                color = SafetyOrange.copy(alpha = 0.15f),
-                                modifier = Modifier.clickable {
-                                    onViewLocation(incident.latitude!!, incident.longitude!!)
-                                }
-                            ) {
-                                Text(
-                                    text = "Map",
-                                    style = MaterialTheme.typography.labelSmall.copy(
-                                        fontSize = 11.sp,
-                                        fontWeight = FontWeight.Bold
-                                    ),
-                                    color = SafetyOrange,
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-
-            // 5. Engagement Footer Row (Offers & Status)
-            HorizontalDivider(
-                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f),
-                thickness = 0.5.dp
-            )
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                // Offers Summary with Icon
-                Row(
-                    modifier = Modifier.weight(1f, fill = false),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(5.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Outlined.People,
-                        contentDescription = null,
-                        modifier = Modifier.size(15.dp),
-                        tint = if (isConfirmed) ResQTheme.colors.success else MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                // 3. Description
+                if (incident.description.isNotBlank()) {
                     Text(
-                        text = helperSummaryText,
-                        style = MaterialTheme.typography.bodySmall.copy(
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Medium
+                        text = incident.description,
+                        style = MaterialTheme.typography.bodyMedium.copy(
+                            fontSize = 14.sp,
+                            lineHeight = 20.sp
                         ),
-                        color = if (isConfirmed) ResQTheme.colors.success else MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.88f),
+                        maxLines = 3,
                         overflow = TextOverflow.Ellipsis
                     )
                 }
 
-                Spacer(Modifier.width(8.dp))
-
-                // Status Pill + Arrow
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
+                // 4. Attached Location & Mesh Connectivity
+                if (hasLandmark || hasCoordinates) {
                     Surface(
-                        shape = RoundedCornerShape(6.dp),
-                        color = MaterialTheme.colorScheme.surfaceVariant,
-                        border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f))
+                        shape = RoundedCornerShape(10.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
+                        border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)),
+                        modifier = Modifier.fillMaxWidth()
                     ) {
-                        Text(
-                            text = statusText,
-                            style = MaterialTheme.typography.labelSmall.copy(
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.SemiBold
-                            ),
-                            color = MaterialTheme.colorScheme.onSurface,
-                            modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.5.dp)
-                        )
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 10.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Row(
+                                modifier = Modifier.weight(1f, fill = false),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Outlined.LocationOn,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(16.dp),
+                                    tint = ResQTheme.colors.sos
+                                )
+                                Text(
+                                    text = if (hasLandmark) incident.areaDescription else "Attached GPS Location",
+                                    style = MaterialTheme.typography.bodySmall.copy(
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.Medium
+                                    ),
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+
+                            if (hasCoordinates && onViewLocation != null) {
+                                Spacer(Modifier.width(8.dp))
+                                Surface(
+                                    shape = RoundedCornerShape(6.dp),
+                                    color = SafetyOrange.copy(alpha = 0.15f),
+                                    border = BorderStroke(0.5.dp, SafetyOrange.copy(alpha = 0.5f)),
+                                    modifier = Modifier.clickable {
+                                        onViewLocation(incident.latitude!!, incident.longitude!!)
+                                    }
+                                ) {
+                                    Text(
+                                        text = "Map",
+                                        style = MaterialTheme.typography.labelSmall.copy(
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Bold
+                                        ),
+                                        color = SafetyOrange,
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // 5. Engagement Footer Row (Offers & Status)
+                HorizontalDivider(
+                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f),
+                    thickness = 0.5.dp
+                )
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // Offers / Helper Tag
+                    Surface(
+                        shape = RoundedCornerShape(20.dp),
+                        color = when {
+                            isConfirmed -> ResQTheme.colors.successContainer.copy(alpha = 0.6f)
+                            isAwaitingConfirmation -> ResQTheme.colors.warning.copy(alpha = 0.12f)
+                            else -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
+                        },
+                        border = BorderStroke(
+                            0.5.dp,
+                            when {
+                                isConfirmed -> ResQTheme.colors.success.copy(alpha = 0.4f)
+                                isAwaitingConfirmation -> ResQTheme.colors.warning.copy(alpha = 0.4f)
+                                else -> MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
+                            }
+                        ),
+                        modifier = Modifier
+                            .weight(1f, fill = false)
+                            .padding(end = 8.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(5.dp)
+                        ) {
+                            Icon(
+                                imageVector = when {
+                                    isConfirmed -> Icons.Outlined.CheckCircle
+                                    isAwaitingConfirmation -> Icons.Outlined.Schedule
+                                    else -> Icons.Outlined.People
+                                },
+                                contentDescription = null,
+                                modifier = Modifier.size(13.dp),
+                                tint = when {
+                                    isConfirmed -> ResQTheme.colors.success
+                                    isAwaitingConfirmation -> ResQTheme.colors.warning
+                                    else -> MaterialTheme.colorScheme.onSurfaceVariant
+                                }
+                            )
+                            Text(
+                                text = helperSummaryText,
+                                style = MaterialTheme.typography.bodySmall.copy(
+                                    fontSize = 11.5.sp,
+                                    fontWeight = FontWeight.SemiBold
+                                ),
+                                color = when {
+                                    isConfirmed -> ResQTheme.colors.success
+                                    isAwaitingConfirmation -> ResQTheme.colors.warning
+                                    else -> MaterialTheme.colorScheme.onSurface
+                                },
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
                     }
 
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.ArrowForward,
-                        contentDescription = null,
-                        modifier = Modifier.size(14.dp),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
-                    )
+                    // Status Pill + Arrow
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(5.dp)
+                    ) {
+                        Surface(
+                            shape = RoundedCornerShape(6.dp),
+                            color = when (incident.status) {
+                                "RESPONDING" -> ResQTheme.colors.success.copy(alpha = 0.12f)
+                                "AWAITING_HELPER" -> ResQTheme.colors.warning.copy(alpha = 0.12f)
+                                "RESOLVED" -> ResQTheme.colors.success.copy(alpha = 0.08f)
+                                else -> MaterialTheme.colorScheme.surfaceVariant
+                            },
+                            border = BorderStroke(
+                                0.5.dp,
+                                when (incident.status) {
+                                    "RESPONDING" -> ResQTheme.colors.success.copy(alpha = 0.35f)
+                                    "AWAITING_HELPER" -> ResQTheme.colors.warning.copy(alpha = 0.35f)
+                                    else -> MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f)
+                                }
+                            )
+                        ) {
+                            Text(
+                                text = statusText,
+                                style = MaterialTheme.typography.labelSmall.copy(
+                                    fontSize = 10.5.sp,
+                                    fontWeight = FontWeight.SemiBold
+                                ),
+                                color = when (incident.status) {
+                                    "RESPONDING" -> ResQTheme.colors.success
+                                    "AWAITING_HELPER" -> ResQTheme.colors.warning
+                                    else -> MaterialTheme.colorScheme.onSurface
+                                },
+                                maxLines = 1,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.5.dp)
+                            )
+                        }
+
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                            contentDescription = null,
+                            modifier = Modifier.size(13.dp),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                        )
+                    }
                 }
             }
         }

@@ -4,15 +4,21 @@ import android.Manifest
 import android.content.pm.PackageManager
 import android.location.Location
 import android.text.format.DateUtils
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.*
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -27,21 +33,27 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.ui.graphics.Color
 import androidx.core.content.ContextCompat
 import com.example.testresqmesh.core.ui.theme.ResQTheme
+import com.example.testresqmesh.core.ui.theme.SafetyOrange
 import com.example.testresqmesh.core.ui.theme.Spacing
 import com.example.testresqmesh.data.location.DefaultLocationClient
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class, ExperimentalFoundationApi::class)
 @Composable
 fun CreateIncidentSheet(
     onDismiss: () -> Unit,
@@ -69,6 +81,14 @@ fun CreateIncidentSheet(
     val titleFocusRequester = remember { FocusRequester() }
     val typeFocusRequester = remember { FocusRequester() }
     val urgencyFocusRequester = remember { FocusRequester() }
+
+    val coroutineScope = rememberCoroutineScope()
+    val scrollState = rememberScrollState()
+    val focusManager = LocalFocusManager.current
+    val isImeVisible = WindowInsets.isImeVisible
+    val titleBringIntoView = remember { BringIntoViewRequester() }
+    val descBringIntoView = remember { BringIntoViewRequester() }
+    val areaBringIntoView = remember { BringIntoViewRequester() }
 
     val categories = listOf("Medical", "Fire", "Search & Rescue", "Infrastructure", "Security", "Other")
 
@@ -137,42 +157,44 @@ fun CreateIncidentSheet(
         )
     }
 
-    Dialog(
-        onDismissRequest = ::handleBack,
-        properties = DialogProperties(usePlatformDefaultWidth = false)
-    ) {
-        Scaffold(
-            topBar = {
-                TopAppBar(
-                    title = {
-                        Text(
-                            text = "Report incident",
-                            style = MaterialTheme.typography.titleLarge.copy(
-                                fontSize = 18.sp,
-                                fontWeight = FontWeight.Bold
-                            )
+    BackHandler(onBack = ::handleBack)
+
+    Scaffold(
+        containerColor = MaterialTheme.colorScheme.background,
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
+        topBar = {
+            TopAppBar(
+                title = {
+                    Text(
+                        text = "Report Emergency",
+                        style = MaterialTheme.typography.titleLarge.copy(
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.Bold
                         )
-                    },
-                    navigationIcon = {
-                        IconButton(onClick = ::handleBack) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-                        }
-                    },
-                    colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = MaterialTheme.colorScheme.surface
                     )
+                },
+                navigationIcon = {
+                    IconButton(onClick = ::handleBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.background,
+                    scrolledContainerColor = MaterialTheme.colorScheme.background
                 )
-            },
-            bottomBar = {
+            )
+        },
+        bottomBar = {
+            if (!isImeVisible) {
                 Surface(
-                    color = MaterialTheme.colorScheme.surface,
-                    tonalElevation = 3.dp,
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                    color = MaterialTheme.colorScheme.background,
+                    border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f))
                 ) {
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(Spacing.Large)
+                            .navigationBarsPadding()
+                            .padding(horizontal = Spacing.Large, vertical = 8.dp)
                             .wrapContentWidth(Alignment.CenterHorizontally)
                             .widthIn(max = 680.dp)
                     ) {
@@ -181,41 +203,45 @@ fun CreateIncidentSheet(
                             enabled = !isSubmitting,
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .defaultMinSize(minHeight = 56.dp),
+                                .height(50.dp),
+                            shape = RoundedCornerShape(12.dp),
                             colors = ButtonDefaults.buttonColors(
-                                containerColor = MaterialTheme.colorScheme.primary
+                                containerColor = SafetyOrange,
+                                contentColor = Color.White
                             )
                         ) {
                             if (isSubmitting) {
                                 CircularProgressIndicator(
                                     modifier = Modifier.size(20.dp),
                                     strokeWidth = 2.dp,
-                                    color = MaterialTheme.colorScheme.onPrimary
+                                    color = Color.White
                                 )
                                 Spacer(Modifier.width(10.dp))
-                                Text("Saving…", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                                Text("Broadcasting to Mesh…", fontSize = 15.sp, fontWeight = FontWeight.Bold)
                             } else {
-                                Text("Report incident", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                                Text("Broadcast Request to Mesh Network", fontSize = 15.sp, fontWeight = FontWeight.Bold)
                             }
                         }
                     }
                 }
             }
-        ) { paddingValues ->
-            Box(
+        }
+    ) { paddingValues ->
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues)
+                .imePadding()
+                .wrapContentWidth(Alignment.CenterHorizontally)
+                .widthIn(max = 680.dp)
+        ) {
+            Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(paddingValues)
-                    .imePadding()
-                    .wrapContentWidth(Alignment.CenterHorizontally)
-                    .widthIn(max = 680.dp)
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(horizontal = Spacing.Large, vertical = Spacing.Medium)
-                        .verticalScroll(rememberScrollState()),
-                    verticalArrangement = Arrangement.spacedBy(18.dp)
+                    .padding(horizontal = Spacing.Large)
+                    .padding(top = Spacing.Small, bottom = Spacing.Small)
+                    .verticalScroll(scrollState),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     // Submission error banner if failed
                     if (submissionError != null) {
@@ -233,8 +259,189 @@ fun CreateIncidentSheet(
                         }
                     }
 
-                    // 1. Title (required, trimmed, 1-80 chars)
-                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    // 1. Emergency Category (Tactile 2x3 Grid)
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .focusRequester(typeFocusRequester),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Text(
+                                text = "Category",
+                                style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
+                                modifier = Modifier.semantics { heading() }
+                            )
+                            Text(
+                                text = "*",
+                                style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
+                                color = MaterialTheme.colorScheme.error
+                            )
+                        }
+
+                        val chunkedCategories = categories.chunked(3)
+                        chunkedCategories.forEach { rowCategories ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                rowCategories.forEach { cat ->
+                                    val isSelected = selectedType == cat
+                                    val icon = incidentCategoryIcon(cat)
+                                    val cardUrgencyColor = when (cat.lowercase()) {
+                                        "medical" -> ResQTheme.colors.sos
+                                        "fire" -> ResQTheme.colors.warning
+                                        else -> MaterialTheme.colorScheme.primary
+                                    }
+
+                                    Surface(
+                                        shape = RoundedCornerShape(12.dp),
+                                        color = if (isSelected) cardUrgencyColor.copy(alpha = 0.16f)
+                                            else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
+                                        border = BorderStroke(
+                                            if (isSelected) 1.5.dp else 1.dp,
+                                            if (isSelected) cardUrgencyColor else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                                        ),
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .height(72.dp)
+                                            .clickable { selectedType = cat }
+                                    ) {
+                                        Box(modifier = Modifier.fillMaxSize().padding(6.dp)) {
+                                            if (isSelected) {
+                                                Icon(
+                                                    imageVector = Icons.Default.Check,
+                                                    contentDescription = null,
+                                                    tint = cardUrgencyColor,
+                                                    modifier = Modifier
+                                                        .size(14.dp)
+                                                        .align(Alignment.TopEnd)
+                                                )
+                                            }
+                                            Column(
+                                                modifier = Modifier.fillMaxSize(),
+                                                horizontalAlignment = Alignment.CenterHorizontally,
+                                                verticalArrangement = Arrangement.Center
+                                            ) {
+                                                Icon(
+                                                    imageVector = icon,
+                                                    contentDescription = null,
+                                                    tint = if (isSelected) cardUrgencyColor else MaterialTheme.colorScheme.onSurfaceVariant,
+                                                    modifier = Modifier.size(24.dp)
+                                                )
+                                                Spacer(Modifier.height(4.dp))
+                                                Text(
+                                                    text = cat,
+                                                    style = MaterialTheme.typography.labelMedium.copy(
+                                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                                        fontSize = 11.5.sp
+                                                    ),
+                                                    color = if (isSelected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
+                                                    maxLines = 1,
+                                                    overflow = TextOverflow.Ellipsis
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        if (showErrors && selectedType == null) {
+                            Text(
+                                text = "Please select an emergency category",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.error
+                            )
+                        }
+                    }
+
+                    // 2. Urgency Level (High-Contrast Segmented Selector)
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .focusRequester(urgencyFocusRequester),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Text(
+                                text = "Urgency",
+                                style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
+                                modifier = Modifier.semantics { heading() }
+                            )
+                            Text(
+                                text = "*",
+                                style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
+                                color = MaterialTheme.colorScheme.error
+                            )
+                        }
+
+                        val urgencyOptions = listOf(
+                            Triple("Moderate", "Standard assistance", MaterialTheme.colorScheme.primary),
+                            Triple("Serious", "Urgent / High", ResQTheme.colors.warning),
+                            Triple("Critical", "Life threatening", ResQTheme.colors.sos)
+                        )
+
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f)),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(4.dp),
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                urgencyOptions.forEach { (level, subtitle, accentColor) ->
+                                    val isSelected = selectedUrgency == level
+                                    Surface(
+                                        shape = RoundedCornerShape(10.dp),
+                                        color = if (isSelected) accentColor else Color.Transparent,
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .defaultMinSize(minHeight = 44.dp)
+                                            .clickable { selectedUrgency = level }
+                                    ) {
+                                        Box(
+                                            contentAlignment = Alignment.Center,
+                                            modifier = Modifier.padding(vertical = 10.dp, horizontal = 4.dp)
+                                        ) {
+                                            Text(
+                                                text = level,
+                                                style = MaterialTheme.typography.labelMedium.copy(
+                                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                                    fontSize = 13.sp
+                                                ),
+                                                color = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        if (showErrors && selectedUrgency == null) {
+                            Text(
+                                text = "Please select urgency level",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.error
+                            )
+                        }
+                    }
+
+                    // 3. Title (required, trimmed, 1-80 chars)
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .bringIntoViewRequester(titleBringIntoView),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
                         val isTitleError = showErrors && (title.trim().isEmpty() || title.trim().length > 80)
                         OutlinedTextField(
                             value = title,
@@ -242,6 +449,7 @@ fun CreateIncidentSheet(
                             label = { Text("Title *") },
                             placeholder = { Text("Help moving an injured person") },
                             singleLine = true,
+                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
                             isError = isTitleError,
                             supportingText = {
                                 Row(
@@ -268,358 +476,240 @@ fun CreateIncidentSheet(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .focusRequester(titleFocusRequester)
+                                .onFocusChanged {
+                                    if (it.isFocused) {
+                                        coroutineScope.launch {
+                                            delay(200)
+                                            titleBringIntoView.bringIntoView()
+                                        }
+                                    }
+                                }
                         )
                     }
 
-                    // 2. Description (optional)
-                    OutlinedTextField(
-                        value = description,
-                        onValueChange = { description = it },
-                        label = { Text("Description") },
-                        placeholder = { Text("Describe what happened and the help needed.") },
-                        minLines = 3,
-                        maxLines = 5,
-                        colors = incidentTextFieldColors(),
-                        modifier = Modifier.fillMaxWidth()
-                    )
-
-                    // 3. Place or landmark (optional)
-                    OutlinedTextField(
-                        value = areaDescription,
-                        onValueChange = { areaDescription = it },
-                        label = { Text("Place or landmark") },
-                        placeholder = { Text("e.g. North entrance, school building") },
-                        singleLine = true,
-                        colors = incidentTextFieldColors(),
-                        modifier = Modifier.fillMaxWidth()
-                    )
-
-                    // 4. Emergency category (visual 1-tap chips)
+                    // 4. Description (optional) + Quick Need Chips
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .focusRequester(typeFocusRequester),
+                            .bringIntoViewRequester(descBringIntoView),
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
-                            Text(
-                                text = "Emergency type",
-                                style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
-                                modifier = Modifier.semantics { heading() }
-                            )
-                            Text(
-                                text = "*",
-                                style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
-                                color = MaterialTheme.colorScheme.error
-                            )
-                        }
+                        OutlinedTextField(
+                            value = description,
+                            onValueChange = { description = it },
+                            label = { Text("Description") },
+                            placeholder = { Text("Describe what happened and the assistance needed.") },
+                            minLines = 3,
+                            maxLines = 5,
+                            colors = incidentTextFieldColors(),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .onFocusChanged {
+                                    if (it.isFocused) {
+                                        coroutineScope.launch {
+                                            delay(200)
+                                            descBringIntoView.bringIntoView()
+                                        }
+                                    }
+                                }
+                        )
 
-                        FlowRow(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            categories.forEach { cat ->
-                                val isSelected = selectedType == cat
-                                val icon = incidentCategoryIcon(cat)
-                                Surface(
-                                    shape = RoundedCornerShape(20.dp),
-                                    color = if (isSelected) {
-                                        MaterialTheme.colorScheme.primaryContainer
-                                    } else {
-                                        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-                                    },
-                                    border = BorderStroke(
-                                        1.dp,
-                                        if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant
-                                    ),
-                                    modifier = Modifier
-                                        .defaultMinSize(minHeight = 40.dp)
-                                        .clickable { selectedType = cat }
-                                ) {
-                                    Row(
-                                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        // Quick resource / need tags
+                        val quickNeedTags = listOf("Stretcher", "Splint", "First aid kit", "4x4 Transport", "Oxygen", "Water")
+                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Text(
+                                text = "Quick needs (tap to add):",
+                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Medium),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            FlowRow(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                verticalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                quickNeedTags.forEach { tag ->
+                                    Surface(
+                                        shape = RoundedCornerShape(8.dp),
+                                        color = SafetyOrange.copy(alpha = 0.12f),
+                                        border = BorderStroke(0.5.dp, SafetyOrange.copy(alpha = 0.4f)),
+                                        modifier = Modifier.clickable {
+                                            val addition = "[Need: $tag] "
+                                            if (!description.contains(addition)) {
+                                                description = if (description.isBlank()) addition else "$description $addition"
+                                            }
+                                        }
                                     ) {
-                                        Icon(
-                                            imageVector = icon,
-                                            contentDescription = null,
-                                            tint = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
-                                            modifier = Modifier.size(18.dp)
-                                        )
                                         Text(
-                                            text = cat,
-                                            style = MaterialTheme.typography.labelMedium.copy(
-                                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                                fontSize = 13.sp
+                                            text = "+ $tag",
+                                            style = MaterialTheme.typography.labelSmall.copy(
+                                                fontSize = 11.5.sp,
+                                                fontWeight = FontWeight.Bold
                                             ),
-                                            color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
+                                            color = SafetyOrange,
+                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                                         )
                                     }
                                 }
                             }
                         }
-
-                        if (showErrors && selectedType == null) {
-                            Text(
-                                text = "Please select an emergency type",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.error
-                            )
-                        }
                     }
 
-                    // 5. Urgency level (3-column tactical selection cards)
-                    Column(
+                    // 5. Unified Location & Landmark Card (High-density merged section)
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
                         modifier = Modifier
                             .fillMaxWidth()
-                            .focusRequester(urgencyFocusRequester),
-                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                            .bringIntoViewRequester(areaBringIntoView)
                     ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        Column(
+                            modifier = Modifier.padding(12.dp),
+                            verticalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
-                            Text(
-                                text = "Urgency level",
-                                style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
-                                modifier = Modifier.semantics { heading() }
-                            )
-                            Text(
-                                text = "*",
-                                style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
-                                color = MaterialTheme.colorScheme.error
-                            )
-                        }
-
-                        val urgencyOptions = listOf(
-                            Triple("Moderate", "Help needed", MaterialTheme.colorScheme.primary),
-                            Triple("Serious", "Urgent", ResQTheme.colors.warning),
-                            Triple("Critical", "Life safety", ResQTheme.colors.sos)
-                        )
-
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            urgencyOptions.forEach { (level, subtitle, accentColor) ->
-                                val isSelected = selectedUrgency == level
-                                Surface(
-                                    shape = RoundedCornerShape(10.dp),
-                                    color = if (isSelected) {
-                                        accentColor.copy(alpha = 0.15f)
-                                    } else {
-                                        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
-                                    },
-                                    border = BorderStroke(
-                                        if (isSelected) 2.dp else 1.dp,
-                                        if (isSelected) accentColor else MaterialTheme.colorScheme.outlineVariant
-                                    ),
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .defaultMinSize(minHeight = 58.dp)
-                                        .clickable { selectedUrgency = level }
-                                ) {
-                                    Column(
-                                        modifier = Modifier
-                                            .padding(vertical = 10.dp, horizontal = 4.dp),
-                                        horizontalAlignment = Alignment.CenterHorizontally,
-                                        verticalArrangement = Arrangement.Center
-                                    ) {
-                                        Text(
-                                            text = level,
-                                            style = MaterialTheme.typography.labelMedium.copy(
-                                                fontWeight = FontWeight.Bold,
-                                                fontSize = 13.sp
-                                            ),
-                                            color = if (isSelected) accentColor else MaterialTheme.colorScheme.onSurface,
-                                            maxLines = 1
-                                        )
-                                        Spacer(Modifier.height(2.dp))
-                                        Text(
-                                            text = subtitle,
-                                            style = MaterialTheme.typography.labelSmall.copy(
-                                                fontSize = 10.sp,
-                                                fontWeight = FontWeight.Medium
-                                            ),
-                                            color = if (isSelected) accentColor else MaterialTheme.colorScheme.onSurfaceVariant,
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis
-                                        )
-                                    }
-                                }
-                            }
-                        }
-
-                        if (showErrors && selectedUrgency == null) {
-                            Text(
-                                text = "Please select urgency level",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.error
-                            )
-                        }
-                    }
-
-                    // 6. Attach my location
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text(
-                            text = "Location",
-                            style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
-                            modifier = Modifier.semantics { heading() }
-                        )
-
-                        val location = attachedLocation
-                        if (location == null) {
-                            OutlinedButton(
-                                onClick = {
-                                    val fine = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
-                                    val coarse = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
-                                    if (fine || coarse) {
-                                        acquireLocationSnapshot()
-                                    } else {
-                                        permissionLauncher.launch(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION))
-                                    }
+                            OutlinedTextField(
+                                value = areaDescription,
+                                onValueChange = { areaDescription = it },
+                                label = { Text("Place or landmark (optional)") },
+                                placeholder = { Text("e.g. 2nd Floor, Room 204, North Gate") },
+                                leadingIcon = {
+                                    Icon(
+                                        imageVector = Icons.Outlined.LocationOn,
+                                        contentDescription = null,
+                                        tint = if (attachedLocation != null) ResQTheme.colors.sos else MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(20.dp)
+                                    )
                                 },
-                                enabled = !isAcquiringLocation,
+                                singleLine = true,
+                                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                                keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() }),
+                                colors = incidentTextFieldColors(),
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .defaultMinSize(minHeight = 48.dp)
-                            ) {
-                                if (isAcquiringLocation) {
-                                    CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
-                                    Spacer(Modifier.width(8.dp))
-                                    Text("Acquiring GPS snapshot…")
-                                } else {
-                                    Icon(Icons.Outlined.LocationOn, contentDescription = null)
-                                    Spacer(Modifier.width(8.dp))
-                                    Text("Attach my location")
-                                }
-                            }
+                                    .onFocusChanged {
+                                        if (it.isFocused) {
+                                            coroutineScope.launch {
+                                                delay(200)
+                                                areaBringIntoView.bringIntoView()
+                                            }
+                                        }
+                                    }
+                            )
 
-                            if (locationError != null) {
+                            val location = attachedLocation
+                            if (location == null) {
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
                                     horizontalArrangement = Arrangement.SpaceBetween,
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Text(
-                                        text = locationError!!,
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        modifier = Modifier.weight(1f)
-                                    )
-                                    TextButton(onClick = ::acquireLocationSnapshot) {
-                                        Icon(Icons.Outlined.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
-                                        Spacer(Modifier.width(4.dp))
-                                        Text("Retry")
+                                    Row(
+                                        modifier = Modifier.weight(1f),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Outlined.LocationOn,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(16.dp),
+                                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                        Text(
+                                            text = if (isAcquiringLocation) "Acquiring GPS snapshot…" else "GPS not attached",
+                                            style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp),
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+
+                                    Button(
+                                        onClick = {
+                                            val fine = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
+                                            val coarse = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
+                                            if (fine || coarse) {
+                                                acquireLocationSnapshot()
+                                            } else {
+                                                permissionLauncher.launch(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION))
+                                            }
+                                        },
+                                        enabled = !isAcquiringLocation,
+                                        shape = RoundedCornerShape(8.dp),
+                                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                                        modifier = Modifier.defaultMinSize(minHeight = 34.dp)
+                                    ) {
+                                        if (isAcquiringLocation) {
+                                            CircularProgressIndicator(modifier = Modifier.size(14.dp), strokeWidth = 2.dp, color = Color.White)
+                                            Spacer(Modifier.width(6.dp))
+                                            Text("Locating…", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                                        } else {
+                                            Icon(Icons.Outlined.LocationOn, null, modifier = Modifier.size(14.dp))
+                                            Spacer(Modifier.width(6.dp))
+                                            Text("Attach GPS", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                                        }
                                     }
                                 }
-                            }
-                        } else {
-                            Surface(
-                                shape = RoundedCornerShape(12.dp),
-                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Column(modifier = Modifier.padding(12.dp)) {
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.SpaceBetween,
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
+
+                                if (locationError != null) {
+                                    Text(
+                                        text = locationError!!,
+                                        style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.5.sp),
+                                        color = MaterialTheme.colorScheme.error
+                                    )
+                                }
+                            } else {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column(modifier = Modifier.weight(1f)) {
                                         Row(
-                                            modifier = Modifier.weight(1f, fill = false),
                                             verticalAlignment = Alignment.CenterVertically,
                                             horizontalArrangement = Arrangement.spacedBy(6.dp)
                                         ) {
                                             Icon(
-                                                Icons.Outlined.LocationOn,
+                                                Icons.Default.Check,
                                                 contentDescription = null,
-                                                tint = MaterialTheme.colorScheme.primary,
-                                                modifier = Modifier.size(18.dp)
+                                                tint = ResQTheme.colors.success,
+                                                modifier = Modifier.size(14.dp)
                                             )
                                             Text(
                                                 text = "GPS Attached",
-                                                style = MaterialTheme.typography.bodyMedium.copy(
-                                                    fontSize = 14.sp,
-                                                    fontWeight = FontWeight.SemiBold
+                                                style = MaterialTheme.typography.labelMedium.copy(
+                                                    fontSize = 12.5.sp,
+                                                    fontWeight = FontWeight.Bold
                                                 ),
-                                                color = MaterialTheme.colorScheme.onSurface,
-                                                maxLines = 1,
-                                                overflow = TextOverflow.Ellipsis
-                                            )
-                                        }
-
-                                        Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
-                                            TextButton(
-                                                onClick = ::acquireLocationSnapshot,
-                                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
-                                            ) {
-                                                Text("Retry", fontSize = 13.sp)
-                                            }
-                                            TextButton(
-                                                onClick = { attachedLocation = null },
-                                                colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
-                                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
-                                            ) {
-                                                Text("Remove", fontSize = 13.sp)
-                                            }
-                                        }
-                                    }
-
-                                    // Expandable location details
-                                    Row(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .clickable { showLocationDetails = !showLocationDetails }
-                                            .padding(vertical = 4.dp),
-                                        horizontalArrangement = Arrangement.SpaceBetween,
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Text(
-                                            text = "Location details",
-                                            style = MaterialTheme.typography.labelSmall,
-                                            color = MaterialTheme.colorScheme.primary
-                                        )
-                                        Icon(
-                                            imageVector = if (showLocationDetails) Icons.Outlined.ExpandLess else Icons.Outlined.ExpandMore,
-                                            contentDescription = null,
-                                            modifier = Modifier.size(18.dp),
-                                            tint = MaterialTheme.colorScheme.primary
-                                        )
-                                    }
-
-                                    if (showLocationDetails) {
-                                        Spacer(Modifier.height(4.dp))
-                                        Text(
-                                            text = "Coordinates: ${"%.5f".format(location.latitude)}, ${"%.5f".format(location.longitude)}",
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
-                                        if (location.hasAccuracy()) {
-                                            Text(
-                                                text = "Accuracy: ±${location.accuracy.toInt()} m",
-                                                style = MaterialTheme.typography.bodySmall,
-                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                color = ResQTheme.colors.success
                                             )
                                         }
                                         Text(
-                                            text = "Captured: ${DateUtils.getRelativeTimeSpanString(location.time)}",
-                                            style = MaterialTheme.typography.bodySmall,
+                                            text = "%.5f, %.5f (±%dm)".format(location.latitude, location.longitude, location.accuracy.toInt()),
+                                            style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
                                             color = MaterialTheme.colorScheme.onSurfaceVariant
                                         )
+                                    }
+
+                                    Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+                                        TextButton(
+                                            onClick = ::acquireLocationSnapshot,
+                                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                                            modifier = Modifier.defaultMinSize(minHeight = 32.dp)
+                                        ) {
+                                            Text("Retry", fontSize = 12.sp)
+                                        }
+                                        TextButton(
+                                            onClick = { attachedLocation = null },
+                                            colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
+                                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                                            modifier = Modifier.defaultMinSize(minHeight = 32.dp)
+                                        ) {
+                                            Text("Remove", fontSize = 12.sp)
+                                        }
                                     }
                                 }
                             }
                         }
                     }
-
-                    Spacer(Modifier.height(16.dp))
                 }
             }
         }
@@ -648,5 +738,4 @@ fun CreateIncidentSheet(
                 }
             )
         }
-    }
 }

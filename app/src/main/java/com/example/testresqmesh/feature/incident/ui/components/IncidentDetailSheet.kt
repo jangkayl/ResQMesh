@@ -1,6 +1,7 @@
 package com.example.testresqmesh.feature.incident.ui.components
 
 import android.text.format.DateUtils
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.*
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -14,6 +15,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.ExpandLess
 import androidx.compose.material.icons.outlined.ExpandMore
@@ -30,14 +34,15 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
+import com.example.testresqmesh.core.model.NodeIdentity
 import com.example.testresqmesh.core.ui.theme.ResQTheme
 import com.example.testresqmesh.core.ui.theme.SafetyOrange
 import com.example.testresqmesh.core.ui.theme.Spacing
@@ -51,7 +56,7 @@ import com.example.testresqmesh.feature.incident.viewmodel.incidentPresentation
 import kotlinx.coroutines.launch
 import org.json.JSONObject
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun IncidentDetailSheet(
     incident: IncidentEntity,
@@ -77,7 +82,8 @@ fun IncidentDetailSheet(
     onReleaseAssignment: () -> Unit,
     onViewLocation: (Double, Double, String, String) -> Unit,
     identityLoading: Boolean = localUserId == null,
-    identityError: String? = null
+    identityError: String? = null,
+    onDirectChat: (String) -> Unit = {}
 ) {
     val presentation = remember(incident, offers, localUserId, localSigningKey, events, identityLoading, identityError) {
         incidentPresentation(incident, offers, localUserId, localSigningKey, events, identityLoading, identityError)
@@ -116,47 +122,29 @@ fun IncidentDetailSheet(
         else -> "Unavailable on mesh"
     }
 
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
+    BackHandler(onBack = onDismiss)
 
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState = sheetState,
-        containerColor = MaterialTheme.colorScheme.surface,
-        dragHandle = {
-            Surface(
-                modifier = Modifier.padding(top = 10.dp, bottom = 4.dp),
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
-                shape = RoundedCornerShape(2.dp)
-            ) {
-                Box(modifier = Modifier.size(width = 36.dp, height = 4.dp))
-            }
-        },
-        shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .navigationBarsPadding()
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = Spacing.Large, vertical = 4.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "Incident details",
-                    style = MaterialTheme.typography.titleLarge.copy(
-                        fontSize = 20.sp,
-                        fontWeight = FontWeight.Bold
+    Scaffold(
+        containerColor = MaterialTheme.colorScheme.background,
+        topBar = {
+            TopAppBar(
+                title = {
+                    Text(
+                        text = "Incident details",
+                        style = MaterialTheme.typography.titleLarge.copy(
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.Bold
+                        )
                     )
-                )
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    if (presentation.secondary.isNotEmpty()) {
+                },
+                navigationIcon = {
+                    IconButton(onClick = onDismiss) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                    }
+                },
+                actions = {
+                    val secondaryActions = presentation.secondary.filter { it != presentation.primary }
+                    if (secondaryActions.isNotEmpty()) {
                         IconButton(onClick = { showMoreMenu = true }) {
                             Icon(Icons.Default.MoreVert, contentDescription = "More actions")
                         }
@@ -164,7 +152,7 @@ fun IncidentDetailSheet(
                             expanded = showMoreMenu,
                             onDismissRequest = { showMoreMenu = false }
                         ) {
-                            presentation.secondary.forEach { action ->
+                            secondaryActions.forEach { action ->
                                 DropdownMenuItem(
                                     text = { Text(action.label) },
                                     onClick = {
@@ -177,29 +165,39 @@ fun IncidentDetailSheet(
                                             IncidentAction.RESOLVE -> confirmDialogAction = "resolve"
                                             IncidentAction.RELEASE -> onReleaseAssignment()
                                             IncidentAction.ACKNOWLEDGE -> onAcknowledge()
+                                            IncidentAction.ASSIGN -> onAssign()
+                                            IncidentAction.START -> onStartResponse()
                                             else -> Unit
                                         }
-                                    }
+                                    },
+                                    enabled = !actionBusy
                                 )
                             }
                         }
                     }
-                    IconButton(onClick = onDismiss) {
-                        Icon(Icons.Default.Close, contentDescription = "Close")
-                    }
-                }
-            }
-
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.surface
+                )
+            )
+        }
+    ) { paddingValues ->
             Column(
                 modifier = Modifier
-                    .weight(1f, fill = false)
-                    .fillMaxWidth()
-                    .wrapContentWidth(Alignment.CenterHorizontally)
-                    .widthIn(max = 680.dp)
-                    .verticalScroll(scrollState)
-                    .padding(horizontal = Spacing.Large, vertical = Spacing.Small),
-                verticalArrangement = Arrangement.spacedBy(14.dp)
+                    .fillMaxSize()
+                    .padding(paddingValues)
+                    .navigationBarsPadding()
             ) {
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth()
+                        .wrapContentWidth(Alignment.CenterHorizontally)
+                        .widthIn(max = 680.dp)
+                        .verticalScroll(scrollState)
+                        .padding(horizontal = Spacing.Large, vertical = Spacing.Small),
+                    verticalArrangement = Arrangement.spacedBy(14.dp)
+                ) {
                 // Action / Sync message banner
                 if (actionMessage != null) {
                     Surface(
@@ -253,15 +251,18 @@ fun IncidentDetailSheet(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
+                    // Left: Reporter Avatar + Info (weights to fill available space, never overlaps right items)
                     Row(
-                        modifier = Modifier.weight(1f, fill = false),
+                        modifier = Modifier
+                            .weight(1f)
+                            .padding(end = 8.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
                         Surface(
                             shape = CircleShape,
                             color = MaterialTheme.colorScheme.primaryContainer,
-                            modifier = Modifier.size(42.dp)
+                            modifier = Modifier.size(40.dp)
                         ) {
                             Box(contentAlignment = Alignment.Center) {
                                 Text(
@@ -275,36 +276,52 @@ fun IncidentDetailSheet(
                             }
                         }
 
-                        Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
+                        Column(
+                            modifier = Modifier.weight(1f),
+                            verticalArrangement = Arrangement.spacedBy(2.dp)
+                        ) {
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(6.dp)
                             ) {
                                 Text(
-                                    text = "Reported as ${incident.creatorName}",
+                                    text = incident.creatorName,
                                     style = MaterialTheme.typography.titleMedium.copy(
-                                        fontSize = 16.sp,
+                                        fontSize = 15.sp,
                                         fontWeight = FontWeight.Bold
                                     ),
                                     color = MaterialTheme.colorScheme.onSurface,
                                     maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.weight(1f, fill = false)
                                 )
 
                                 if (presentation.isReporter) {
                                     Surface(
                                         shape = RoundedCornerShape(4.dp),
-                                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
+                                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.14f),
+                                        border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.35f))
                                     ) {
-                                        Text(
-                                            text = "You reported this",
-                                            style = MaterialTheme.typography.labelSmall.copy(
-                                                fontSize = 10.sp,
-                                                fontWeight = FontWeight.Bold
-                                            ),
-                                            color = MaterialTheme.colorScheme.primary,
-                                            modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp)
-                                        )
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(3.dp),
+                                            modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.5.dp)
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.Person,
+                                                contentDescription = null,
+                                                modifier = Modifier.size(10.dp),
+                                                tint = MaterialTheme.colorScheme.primary
+                                            )
+                                            Text(
+                                                text = "You",
+                                                style = MaterialTheme.typography.labelSmall.copy(
+                                                    fontSize = 10.sp,
+                                                    fontWeight = FontWeight.Bold
+                                                ),
+                                                color = MaterialTheme.colorScheme.primary
+                                            )
+                                        }
                                     }
                                 }
                             }
@@ -317,13 +334,16 @@ fun IncidentDetailSheet(
                             ).toString()
 
                             Text(
-                                text = "$relativeTime · ${incident.incidentType}",
+                                text = "Reported $relativeTime · ${incident.incidentType}",
                                 style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp),
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
                             )
                         }
                     }
 
+                    // Right: Urgency Badge
                     Surface(
                         shape = RoundedCornerShape(8.dp),
                         color = urgencyColor
@@ -336,7 +356,7 @@ fun IncidentDetailSheet(
                                 letterSpacing = 0.5.sp
                             ),
                             color = Color.White,
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                         )
                     }
                 }
@@ -365,42 +385,53 @@ fun IncidentDetailSheet(
                     )
                 }
 
-                // 4. Attached Location (Media Attachment Banner)
+                // 4. Attached Location (Compact Single-Row Banner)
                 val hasCoordinates = incident.latitude != null && incident.longitude != null
                 val hasLandmark = incident.areaDescription.isNotBlank()
                 if (hasLandmark || hasCoordinates) {
                     Surface(
-                        shape = RoundedCornerShape(12.dp),
-                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f),
-                        border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f)),
+                        shape = RoundedCornerShape(10.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                        border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        Column(
+                        Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(12.dp),
-                            verticalArrangement = Arrangement.spacedBy(10.dp)
+                                .padding(horizontal = 12.dp, vertical = 8.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
                             Row(
+                                modifier = Modifier.weight(1f),
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
                                 Icon(
                                     imageVector = Icons.Outlined.LocationOn,
                                     contentDescription = null,
-                                    modifier = Modifier.size(20.dp),
+                                    modifier = Modifier.size(18.dp),
                                     tint = ResQTheme.colors.sos
                                 )
-                                Text(
-                                    text = if (hasLandmark) incident.areaDescription else "Attached GPS Location",
-                                    style = MaterialTheme.typography.titleSmall.copy(
-                                        fontSize = 15.sp,
-                                        fontWeight = FontWeight.Bold
-                                    ),
-                                    color = MaterialTheme.colorScheme.onSurface,
-                                    maxLines = 2,
-                                    overflow = TextOverflow.Ellipsis
-                                )
+                                Column {
+                                    Text(
+                                        text = if (hasLandmark) incident.areaDescription else "Attached GPS Location",
+                                        style = MaterialTheme.typography.bodyMedium.copy(
+                                            fontSize = 13.5.sp,
+                                            fontWeight = FontWeight.SemiBold
+                                        ),
+                                        color = MaterialTheme.colorScheme.onSurface,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                    if (hasCoordinates) {
+                                        Text(
+                                            text = "%.5f, %.5f".format(incident.latitude, incident.longitude),
+                                            style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                }
                             }
 
                             if (hasCoordinates) {
@@ -413,27 +444,25 @@ fun IncidentDetailSheet(
                                             incident.description
                                         )
                                     },
-                                    shape = RoundedCornerShape(10.dp),
+                                    shape = RoundedCornerShape(8.dp),
                                     colors = ButtonDefaults.buttonColors(
                                         containerColor = SafetyOrange
                                     ),
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .height(44.dp)
+                                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                                    modifier = Modifier.defaultMinSize(minHeight = 34.dp)
                                 ) {
                                     Icon(
                                         imageVector = Icons.Outlined.Map,
                                         contentDescription = null,
                                         tint = Color.White,
-                                        modifier = Modifier.size(18.dp)
+                                        modifier = Modifier.size(14.dp)
                                     )
-                                    Spacer(Modifier.width(8.dp))
+                                    Spacer(Modifier.width(4.dp))
                                     Text(
-                                        text = "VIEW ON MAP",
-                                        style = MaterialTheme.typography.labelLarge.copy(
-                                            fontSize = 13.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            letterSpacing = 0.8.sp
+                                        text = "Map",
+                                        style = MaterialTheme.typography.labelMedium.copy(
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.Bold
                                         ),
                                         color = Color.White
                                     )
@@ -455,8 +484,20 @@ fun IncidentDetailSheet(
                     ) {
                         Surface(
                             shape = RoundedCornerShape(6.dp),
-                            color = MaterialTheme.colorScheme.surfaceVariant,
-                            border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f))
+                            color = when (incident.status) {
+                                "RESPONDING" -> ResQTheme.colors.success.copy(alpha = 0.12f)
+                                "AWAITING_HELPER" -> ResQTheme.colors.warning.copy(alpha = 0.12f)
+                                "RESOLVED" -> ResQTheme.colors.success.copy(alpha = 0.08f)
+                                else -> MaterialTheme.colorScheme.surfaceVariant
+                            },
+                            border = BorderStroke(
+                                0.5.dp,
+                                when (incident.status) {
+                                    "RESPONDING" -> ResQTheme.colors.success.copy(alpha = 0.4f)
+                                    "AWAITING_HELPER" -> ResQTheme.colors.warning.copy(alpha = 0.4f)
+                                    else -> MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f)
+                                }
+                            )
                         ) {
                             Text(
                                 text = presentation.status,
@@ -464,7 +505,11 @@ fun IncidentDetailSheet(
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.SemiBold
                                 ),
-                                color = MaterialTheme.colorScheme.onSurface,
+                                color = when (incident.status) {
+                                    "RESPONDING" -> ResQTheme.colors.success
+                                    "AWAITING_HELPER" -> ResQTheme.colors.warning
+                                    else -> MaterialTheme.colorScheme.onSurface
+                                },
                                 modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.5.dp)
                             )
                         }
@@ -496,9 +541,8 @@ fun IncidentDetailSheet(
                                 fontWeight = FontWeight.Medium,
                                 lineHeight = 17.sp
                             ),
-                            color = if (isNight) SafetyOrange else MaterialTheme.colorScheme.primary,
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis
+                            color = if (presentation.terminal) MaterialTheme.colorScheme.onSurfaceVariant
+                                else if (isNight) SafetyOrange else MaterialTheme.colorScheme.primary
                         )
                     }
                 }
@@ -508,122 +552,162 @@ fun IncidentDetailSheet(
                     thickness = 0.5.dp
                 )
 
-                    // ==========================================
-                    // CARD 5: SELECTED HELPER SPOTLIGHT (IF ANY)
-                    // ==========================================
-                    val selectedHelper = presentation.selectedOffer
-                    if (selectedHelper != null || (incident.workflowVersion != 2 && incident.primaryResponderName != null)) {
-                        val helperName = selectedHelper?.helperName ?: incident.primaryResponderName ?: "Helper"
-                        val isConfirmed = incident.status == "RESPONDING" || incident.selectionConfirmedAt != null
-                        val statusLabel = if (isConfirmed) "Confirmed" else "Awaiting confirmation"
-                        val statusBadgeColor = if (isConfirmed) ResQTheme.colors.success else ResQTheme.colors.warning
+                // ==========================================
+                // CARD 5: SELECTED HELPER SPOTLIGHT (IF ANY)
+                // ==========================================
+                val selectedHelper = presentation.selectedOffer
+                val selectedHelperChatTarget = selectedHelper
+                    ?.takeUnless { it.helperKey == localSigningKey }
+                    ?.let(::helperChatTarget)
+                if (selectedHelper != null || (incident.workflowVersion != 2 && incident.primaryResponderName != null)) {
+                    val helperName = selectedHelper?.helperName ?: incident.primaryResponderName ?: "Helper"
+                    val isConfirmed = incident.status == "RESPONDING" || incident.selectionConfirmedAt != null
+                    val statusLabel = if (isConfirmed) "Confirmed" else "Awaiting confirmation"
+                    val statusBadgeColor = if (isConfirmed) ResQTheme.colors.success else ResQTheme.colors.warning
 
-                        Surface(
-                            shape = RoundedCornerShape(12.dp),
-                            color = MaterialTheme.colorScheme.surface,
-                            border = BorderStroke(1.5.dp, statusBadgeColor),
-                            tonalElevation = 2.dp,
-                            modifier = Modifier.fillMaxWidth()
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = MaterialTheme.colorScheme.surface,
+                        border = BorderStroke(1.5.dp, statusBadgeColor),
+                        tonalElevation = 2.dp,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(14.dp),
+                            verticalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
-                            Column(
-                                modifier = Modifier.padding(14.dp),
-                                verticalArrangement = Arrangement.spacedBy(10.dp)
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
+                                    modifier = Modifier
+                                        .weight(1f, fill = false)
+                                        .padding(end = 8.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
                                 ) {
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                                    ) {
-                                        Icon(
-                                            imageVector = if (isConfirmed) Icons.Outlined.CheckCircle else Icons.Outlined.Schedule,
-                                            contentDescription = null,
-                                            tint = statusBadgeColor,
-                                            modifier = Modifier.size(15.dp)
-                                        )
+                                    Icon(
+                                        imageVector = if (isConfirmed) Icons.Outlined.CheckCircle else Icons.Outlined.Schedule,
+                                        contentDescription = null,
+                                        tint = statusBadgeColor,
+                                        modifier = Modifier.size(15.dp)
+                                    )
+                                    Text(
+                                        text = if (isConfirmed) "CONFIRMED RESPONDER" else "SELECTED RESPONDER",
+                                        style = MaterialTheme.typography.labelSmall.copy(
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            letterSpacing = 0.6.sp
+                                        ),
+                                        color = statusBadgeColor,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+
+                                Surface(
+                                    shape = RoundedCornerShape(6.dp),
+                                    color = statusBadgeColor.copy(alpha = 0.14f),
+                                    border = BorderStroke(0.5.dp, statusBadgeColor.copy(alpha = 0.5f))
+                                ) {
+                                    Text(
+                                        text = statusLabel,
+                                        style = MaterialTheme.typography.labelSmall.copy(
+                                            fontSize = 10.5.sp,
+                                            fontWeight = FontWeight.Bold
+                                        ),
+                                        color = statusBadgeColor,
+                                        modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.5.dp)
+                                    )
+                                }
+                            }
+
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .then(
+                                        if (selectedHelperChatTarget != null) {
+                                            Modifier
+                                                .clip(RoundedCornerShape(8.dp))
+                                                .clickable { onDirectChat(selectedHelperChatTarget) }
+                                        } else Modifier
+                                    ),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                Surface(
+                                    shape = CircleShape,
+                                    color = statusBadgeColor.copy(alpha = 0.15f),
+                                    modifier = Modifier.size(36.dp)
+                                ) {
+                                    Box(contentAlignment = Alignment.Center) {
                                         Text(
-                                            text = if (isConfirmed) "CONFIRMED RESPONDER" else "ASSIGNED RESPONDER",
-                                            style = MaterialTheme.typography.labelSmall.copy(
-                                                fontSize = 11.sp,
-                                                fontWeight = FontWeight.Bold,
-                                                letterSpacing = 0.8.sp
+                                            text = helperName.take(1).uppercase(),
+                                            style = MaterialTheme.typography.titleSmall.copy(
+                                                fontSize = 14.sp,
+                                                fontWeight = FontWeight.Bold
                                             ),
                                             color = statusBadgeColor
                                         )
                                     }
-
-                                    Surface(
-                                        shape = RoundedCornerShape(6.dp),
-                                        color = statusBadgeColor.copy(alpha = 0.14f),
-                                        border = BorderStroke(0.5.dp, statusBadgeColor.copy(alpha = 0.5f))
-                                    ) {
-                                        Text(
-                                            text = statusLabel,
-                                            style = MaterialTheme.typography.labelSmall.copy(
-                                                fontSize = 10.5.sp,
-                                                fontWeight = FontWeight.Bold
-                                            ),
-                                            color = statusBadgeColor,
-                                            modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.5.dp)
-                                        )
-                                    }
                                 }
 
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                Column(
+                                    modifier = Modifier.weight(1f),
+                                    verticalArrangement = Arrangement.spacedBy(2.dp)
                                 ) {
-                                    Surface(
-                                        shape = androidx.compose.foundation.shape.CircleShape,
-                                        color = statusBadgeColor.copy(alpha = 0.15f),
-                                        modifier = Modifier.size(34.dp)
-                                    ) {
-                                        Box(contentAlignment = Alignment.Center) {
-                                            Text(
-                                                text = helperName.take(1).uppercase(),
-                                                style = MaterialTheme.typography.titleSmall.copy(
-                                                    fontSize = 14.sp,
-                                                    fontWeight = FontWeight.Bold
-                                                ),
-                                                color = statusBadgeColor
-                                            )
-                                        }
-                                    }
-
-                                    Column {
-                                        Text(
-                                            text = helperName,
-                                            style = MaterialTheme.typography.titleSmall.copy(
-                                                fontSize = 15.sp,
-                                                fontWeight = FontWeight.Bold
-                                            ),
-                                            color = MaterialTheme.colorScheme.onSurface
-                                        )
-                                        Text(
-                                            text = "Mesh radio: $formattedReachability",
-                                            style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp),
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
-                                    }
+                                    Text(
+                                        text = helperName,
+                                        style = MaterialTheme.typography.titleSmall.copy(
+                                            fontSize = 15.sp,
+                                            fontWeight = FontWeight.Bold
+                                        ),
+                                        color = MaterialTheme.colorScheme.onSurface,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                    Text(
+                                        text = "Mesh radio: $formattedReachability",
+                                        style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp),
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
                                 }
+                            }
 
-                                if (presentation.secondary.contains(IncidentAction.REVOKE)) {
+                            if (selectedHelper?.note?.isNotBlank() == true) {
+                                Text(
+                                    text = "“${selectedHelper.note}”",
+                                    style = MaterialTheme.typography.bodySmall.copy(
+                                        fontSize = 12.5.sp,
+                                        fontStyle = androidx.compose.ui.text.font.FontStyle.Italic
+                                    ),
+                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.85f),
+                                    maxLines = 2,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+
+                            if (presentation.secondary.contains(IncidentAction.REVOKE)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.End
+                                ) {
                                     OutlinedButton(
                                         onClick = { confirmDialogAction = "revoke" },
                                         shape = RoundedCornerShape(8.dp),
+                                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp),
                                         modifier = Modifier
-                                            .fillMaxWidth()
-                                            .defaultMinSize(minHeight = 40.dp)
+                                            .defaultMinSize(minHeight = 48.dp)
                                     ) {
-                                        Text("Select a different helper", fontSize = 13.sp)
+                                        Text("Select different helper", fontSize = 12.sp, fontWeight = FontWeight.Medium)
                                     }
                                 }
                             }
                         }
                     }
+                }
 
                     // People offering help section
                     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -677,6 +761,7 @@ fun IncidentDetailSheet(
                             }
 
                             displayedHelpers.forEach { helper ->
+                                val chatTarget = helperChatTarget(helper.offer)
                                 TacticalHelperOfferCard(
                                     helper = helper,
                                     onChoose = if (helper.canChoose) {
@@ -692,6 +777,9 @@ fun IncidentDetailSheet(
                                     } else null,
                                     onWithdraw = if (helper.isMe && IncidentAction.WITHDRAW in presentation.secondary) {
                                         { confirmDialogAction = "withdraw" }
+                                    } else null,
+                                    onDirectChat = if (!helper.isMe && chatTarget != null) {
+                                        { onDirectChat(chatTarget) }
                                     } else null
                                 )
                             }
@@ -800,7 +888,107 @@ fun IncidentDetailSheet(
                         }
                     }
 
-                    Spacer(Modifier.height(16.dp))
+                    // In-page secondary actions (Compact & De-emphasized)
+                    if (IncidentAction.RESOLVE in presentation.secondary && presentation.primary != IncidentAction.RESOLVE) {
+                        OutlinedButton(
+                            onClick = { confirmDialogAction = "resolve" },
+                            enabled = !actionBusy,
+                            shape = RoundedCornerShape(8.dp),
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(36.dp)
+                        ) {
+                            Text(
+                                text = "Mark resolved",
+                                style = MaterialTheme.typography.labelMedium.copy(
+                                    fontSize = 12.5.sp,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            )
+                        }
+                    }
+
+                    if (IncidentAction.ACKNOWLEDGE in presentation.secondary && presentation.primary != IncidentAction.ACKNOWLEDGE) {
+                        OutlinedButton(
+                            onClick = onAcknowledge,
+                            enabled = !actionBusy,
+                            shape = RoundedCornerShape(8.dp),
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(36.dp)
+                        ) {
+                            Text(
+                                text = "Acknowledge request",
+                                style = MaterialTheme.typography.labelMedium.copy(
+                                    fontSize = 12.5.sp,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            )
+                        }
+                    }
+
+                    if (IncidentAction.RELEASE in presentation.secondary) {
+                        OutlinedButton(
+                            onClick = onReleaseAssignment,
+                            enabled = !actionBusy,
+                            shape = RoundedCornerShape(8.dp),
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(36.dp)
+                        ) {
+                            Text(
+                                text = "Release assignment",
+                                style = MaterialTheme.typography.labelMedium.copy(
+                                    fontSize = 12.5.sp,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            )
+                        }
+                    }
+
+                    // Compact destructive action at the end of content
+                    if (IncidentAction.CANCEL in presentation.secondary) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 4.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            OutlinedButton(
+                                onClick = { confirmDialogAction = "cancel" },
+                                enabled = !actionBusy,
+                                colors = ButtonDefaults.outlinedButtonColors(
+                                    contentColor = MaterialTheme.colorScheme.error
+                                ),
+                                border = BorderStroke(0.8.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.4f)),
+                                shape = RoundedCornerShape(8.dp),
+                                contentPadding = PaddingValues(horizontal = 14.dp, vertical = 2.dp),
+                                modifier = Modifier
+                                    .defaultMinSize(minHeight = 32.dp)
+                                    .height(32.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Close,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(13.dp),
+                                    tint = MaterialTheme.colorScheme.error
+                                )
+                                Spacer(Modifier.width(6.dp))
+                                Text(
+                                    text = "Cancel Incident Report",
+                                    style = MaterialTheme.typography.labelSmall.copy(
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(Modifier.height(12.dp))
                 }
 
             // Docked primary action bar (pinned at bottom of sheet)
@@ -826,20 +1014,28 @@ fun IncidentDetailSheet(
                                 enabled = !actionBusy,
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .defaultMinSize(minHeight = 56.dp),
+                                    .defaultMinSize(minHeight = 52.dp)
+                                    .height(52.dp),
                                 shape = RoundedCornerShape(12.dp),
                                 colors = ButtonDefaults.buttonColors(
-                                    containerColor = if (isNight) SafetyOrange else Color(0xFF244F7A),
-                                    contentColor = if (isNight) TacticalBlack else Color.White
+                                    containerColor = SafetyOrange,
+                                    contentColor = Color.White
                                 )
                             ) {
+                                Icon(
+                                    imageVector = Icons.Outlined.CheckCircle,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(Modifier.width(8.dp))
                                 Text("Offer help", fontSize = 16.sp, fontWeight = FontWeight.Bold)
                             }
                         }
                         IncidentAction.EDIT_OFFER -> {
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Button(
                                     onClick = {
@@ -848,20 +1044,28 @@ fun IncidentDetailSheet(
                                     },
                                     enabled = !actionBusy,
                                     modifier = Modifier
-                                        .weight(1f)
-                                        .defaultMinSize(minHeight = 56.dp)
+                                        .weight(2.4f)
+                                        .defaultMinSize(minHeight = 50.dp)
+                                        .height(50.dp),
+                                    shape = RoundedCornerShape(12.dp)
                                 ) {
-                                    Text("Edit my offer", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                                    Text("Edit my offer", fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
                                 }
                                 OutlinedButton(
                                     onClick = { confirmDialogAction = "withdraw" },
                                     enabled = !actionBusy,
-                                    modifier = Modifier.defaultMinSize(minHeight = 56.dp),
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .defaultMinSize(minHeight = 50.dp)
+                                        .height(50.dp),
+                                    shape = RoundedCornerShape(12.dp),
+                                    contentPadding = PaddingValues(horizontal = 6.dp),
+                                    border = BorderStroke(0.8.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.5f)),
                                     colors = ButtonDefaults.outlinedButtonColors(
                                         contentColor = MaterialTheme.colorScheme.error
                                     )
                                 ) {
-                                    Text("Withdraw")
+                                    Text("Withdraw", fontSize = 12.5.sp, maxLines = 1)
                                 }
                             }
                         }
@@ -874,9 +1078,11 @@ fun IncidentDetailSheet(
                                 },
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .defaultMinSize(minHeight = 56.dp)
+                                    .defaultMinSize(minHeight = 50.dp)
+                                    .height(50.dp),
+                                shape = RoundedCornerShape(12.dp)
                             ) {
-                                Text("Review helpers", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                                Text("Review helpers", fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
                             }
                         }
                         IncidentAction.REVIEW_SELECTED -> {
@@ -888,37 +1094,55 @@ fun IncidentDetailSheet(
                                 },
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .defaultMinSize(minHeight = 56.dp)
+                                    .defaultMinSize(minHeight = 50.dp)
+                                    .height(50.dp),
+                                shape = RoundedCornerShape(12.dp)
                             ) {
-                                Text("Review selected helper", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                                Text("Review selected helper", fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
                             }
                         }
                         IncidentAction.CONFIRM -> {
+                            // Asymmetric CTA: prominent hero confirm button + compact secondary decline
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Button(
                                     onClick = onConfirmLead,
                                     enabled = !actionBusy,
                                     modifier = Modifier
-                                        .weight(1f)
-                                        .defaultMinSize(minHeight = 56.dp),
+                                        .weight(2.5f)
+                                        .defaultMinSize(minHeight = 52.dp)
+                                        .height(52.dp),
+                                    shape = RoundedCornerShape(12.dp),
                                     colors = ButtonDefaults.buttonColors(
                                         containerColor = ResQTheme.colors.success
                                     )
                                 ) {
-                                    Text("Confirm I can help", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                                    Icon(
+                                        imageVector = Icons.Outlined.CheckCircle,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    Spacer(Modifier.width(6.dp))
+                                    Text("Confirm I can help", fontSize = 15.sp, fontWeight = FontWeight.Bold)
                                 }
                                 OutlinedButton(
                                     onClick = { confirmDialogAction = "decline" },
                                     enabled = !actionBusy,
-                                    modifier = Modifier.defaultMinSize(minHeight = 56.dp),
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .defaultMinSize(minHeight = 52.dp)
+                                        .height(52.dp),
+                                    shape = RoundedCornerShape(12.dp),
+                                    contentPadding = PaddingValues(horizontal = 6.dp),
+                                    border = BorderStroke(0.8.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.5f)),
                                     colors = ButtonDefaults.outlinedButtonColors(
                                         contentColor = MaterialTheme.colorScheme.error
                                     )
                                 ) {
-                                    Text("I can’t help")
+                                    Text("Can’t help", fontSize = 12.5.sp, maxLines = 1)
                                 }
                             }
                         }
@@ -928,12 +1152,20 @@ fun IncidentDetailSheet(
                                 enabled = !actionBusy,
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .defaultMinSize(minHeight = 56.dp),
+                                    .defaultMinSize(minHeight = 52.dp)
+                                    .height(52.dp),
+                                shape = RoundedCornerShape(12.dp),
                                 colors = ButtonDefaults.buttonColors(
                                     containerColor = ResQTheme.colors.success
                                 )
                             ) {
-                                Text("Mark resolved", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                                Icon(
+                                    imageVector = Icons.Outlined.CheckCircle,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(Modifier.width(8.dp))
+                                Text("Mark resolved", fontSize = 16.sp, fontWeight = FontWeight.Bold)
                             }
                         }
                         // Legacy actions
@@ -1020,82 +1252,32 @@ fun IncidentDetailSheet(
                 }
             }
         }
+    }
 
-        // Offer Help / Edit Offer Dialog
+        // Offer Help / Edit Offer Sheet
         if (showOfferSheet) {
-            var localNote by rememberSaveable { mutableStateOf(offerDraftNote) }
-            val isNoteValid = localNote.trim().isNotEmpty() && localNote.trim().length <= 240
-            var showError by remember { mutableStateOf(false) }
-
-            AlertDialog(
-                onDismissRequest = { showOfferSheet = false },
-                title = {
-                    Text(
-                        text = "Your help offer",
-                        style = MaterialTheme.typography.titleMedium.copy(
-                            fontSize = 20.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                    )
+            TacticalHelpOfferSheet(
+                incidentTitle = incident.title,
+                incidentType = incident.incidentType,
+                initialNote = offerDraftNote,
+                isEditing = presentation.myOffer != null,
+                actionBusy = actionBusy,
+                onDismiss = { showOfferSheet = false },
+                onSubmit = { note ->
+                    onOffer(note)
+                    showOfferSheet = false
                 },
-                text = {
-                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        Text(
-                            text = "Describe the supplies or assistance you can provide.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-
-                        OutlinedTextField(
-                            value = localNote,
-                            onValueChange = { localNote = it },
-                            label = { Text("How can you help? *") },
-                            placeholder = { Text("e.g. I have a first-aid kit and can assist within 10 minutes.") },
-                            minLines = 3,
-                            maxLines = 5,
-                            isError = showError && !isNoteValid,
-                            supportingText = {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween
-                                ) {
-                                    if (showError && !isNoteValid) {
-                                        Text("Offer note must be 1–240 characters", color = MaterialTheme.colorScheme.error)
-                                    } else {
-                                        Text("Describe what assistance or equipment you have")
-                                    }
-                                    Text("${localNote.trim().length}/240")
-                                }
-                            },
-                            colors = incidentTextFieldColors(),
-                            modifier = Modifier.fillMaxWidth()
-                        )
+                onWithdraw = if (presentation.myOffer != null && IncidentAction.WITHDRAW in presentation.secondary) {
+                    {
+                        showOfferSheet = false
+                        confirmDialogAction = "withdraw"
                     }
-                },
-                confirmButton = {
-                    Button(
-                        onClick = {
-                            if (!isNoteValid) {
-                                showError = true
-                            } else {
-                                onOffer(localNote.trim())
-                                showOfferSheet = false
-                            }
-                        },
-                        enabled = !actionBusy
-                    ) {
-                        Text("Save help offer")
-                    }
-                },
-                dismissButton = {
-                    TextButton(onClick = { showOfferSheet = false }) {
-                        Text("Cancel")
-                    }
-                }
+                } else null
             )
         }
 
-        // Confirmation Dialogs
+
+        // Confirmation Dialogs (Stop Mesh Session UI/UX style)
         confirmDialogAction?.let { actionStr ->
             when {
                 actionStr.startsWith("choose:") -> {
@@ -1103,146 +1285,192 @@ fun IncidentDetailSheet(
                     val offerId = parts.getOrNull(1) ?: ""
                     val helperName = parts.getOrNull(2) ?: "this helper"
                     val offerNote = parts.getOrNull(3) ?: ""
+                    val message = if (offerNote.isNotBlank()) {
+                        "“$offerNote”\n\nThis helper must confirm they can assist before they are confirmed."
+                    } else {
+                        "This helper must confirm they can assist before they are confirmed."
+                    }
 
-                    AlertDialog(
-                        onDismissRequest = { confirmDialogAction = null },
-                        title = { Text("Choose $helperName?") },
-                        text = {
-                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                Text("$helperName offered: \"$offerNote\"")
-                                Text("This helper must confirm they can assist before they are confirmed.")
-                            }
+                    TacticalActionConfirmationSheet(
+                        title = "Choose $helperName?",
+                        message = message,
+                        confirmText = "Choose helper",
+                        cancelText = "Cancel",
+                        icon = Icons.Default.CheckCircle,
+                        confirmColor = SafetyOrange,
+                        confirmContentColor = Color.White,
+                        onConfirm = {
+                            onSelectLead(offerId)
+                            confirmDialogAction = null
                         },
-                        confirmButton = {
-                            Button(onClick = {
-                                onSelectLead(offerId)
-                                confirmDialogAction = null
-                            }) {
-                                Text("Choose helper")
-                            }
-                        },
-                        dismissButton = {
-                            TextButton(onClick = { confirmDialogAction = null }) {
-                                Text("Cancel")
-                            }
-                        }
+                        onDismiss = { confirmDialogAction = null }
                     )
                 }
                 actionStr == "revoke" -> {
-                    AlertDialog(
-                        onDismissRequest = { confirmDialogAction = null },
-                        title = { Text("Remove selection?") },
-                        text = { Text("This removes the selected helper from this incident so you can review offers again.") },
-                        confirmButton = {
-                            Button(
-                                onClick = {
-                                    onRevokeLead()
-                                    confirmDialogAction = null
-                                },
-                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
-                            ) {
-                                Text("Remove selection")
-                            }
+                    TacticalActionConfirmationSheet(
+                        title = "Remove selection?",
+                        message = "This removes the selected helper from this incident so you can review offers again.",
+                        confirmText = "Remove selection",
+                        cancelText = "Keep helper",
+                        icon = Icons.Default.Warning,
+                        confirmColor = ResQTheme.colors.sos,
+                        confirmContentColor = ResQTheme.colors.onSos,
+                        onConfirm = {
+                            onRevokeLead()
+                            confirmDialogAction = null
                         },
-                        dismissButton = {
-                            TextButton(onClick = { confirmDialogAction = null }) {
-                                Text("Keep helper")
-                            }
-                        }
+                        onDismiss = { confirmDialogAction = null }
                     )
                 }
                 actionStr == "withdraw" -> {
-                    AlertDialog(
-                        onDismissRequest = { confirmDialogAction = null },
-                        title = { Text("Withdraw offer?") },
-                        text = { Text("Are you sure you want to withdraw your help offer?") },
-                        confirmButton = {
-                            Button(
-                                onClick = {
-                                    onWithdrawOffer()
-                                    confirmDialogAction = null
-                                },
-                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
-                            ) {
-                                Text("Withdraw offer")
-                            }
+                    TacticalActionConfirmationSheet(
+                        title = "Withdraw offer?",
+                        message = "Are you sure you want to withdraw your help offer?",
+                        confirmText = "Withdraw offer",
+                        cancelText = "Keep offer",
+                        icon = Icons.Default.Warning,
+                        confirmColor = ResQTheme.colors.sos,
+                        confirmContentColor = ResQTheme.colors.onSos,
+                        onConfirm = {
+                            onWithdrawOffer()
+                            confirmDialogAction = null
                         },
-                        dismissButton = {
-                            TextButton(onClick = { confirmDialogAction = null }) {
-                                Text("Keep offer")
-                            }
-                        }
+                        onDismiss = { confirmDialogAction = null }
                     )
                 }
                 actionStr == "decline" -> {
-                    AlertDialog(
-                        onDismissRequest = { confirmDialogAction = null },
-                        title = { Text("Decline selection?") },
-                        text = { Text("Let the reporter know that you cannot help with this incident right now.") },
-                        confirmButton = {
-                            Button(
-                                onClick = {
-                                    onDeclineLead()
-                                    confirmDialogAction = null
-                                },
-                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
-                            ) {
-                                Text("I can’t help")
-                            }
+                    TacticalActionConfirmationSheet(
+                        title = "Decline selection?",
+                        message = "Let the reporter know that you cannot help with this incident right now.",
+                        confirmText = "I can’t help",
+                        cancelText = "Back",
+                        icon = Icons.Default.Warning,
+                        confirmColor = ResQTheme.colors.sos,
+                        confirmContentColor = ResQTheme.colors.onSos,
+                        onConfirm = {
+                            onDeclineLead()
+                            confirmDialogAction = null
                         },
-                        dismissButton = {
-                            TextButton(onClick = { confirmDialogAction = null }) {
-                                Text("Back")
-                            }
-                        }
+                        onDismiss = { confirmDialogAction = null }
                     )
                 }
                 actionStr == "resolve" -> {
-                    AlertDialog(
-                        onDismissRequest = { confirmDialogAction = null },
-                        title = { Text("Mark incident resolved?") },
-                        text = { Text("This records on this phone that help was completed and closes the incident.") },
-                        confirmButton = {
-                            Button(
-                                onClick = {
-                                    onResolve()
-                                    confirmDialogAction = null
-                                },
-                                colors = ButtonDefaults.buttonColors(containerColor = ResQTheme.colors.success)
-                            ) {
-                                Text("Mark resolved")
-                            }
+                    TacticalActionConfirmationSheet(
+                        title = "Mark incident resolved?",
+                        message = "This records on this phone that help was completed and closes the incident.",
+                        confirmText = "Mark resolved",
+                        cancelText = "Keep open",
+                        icon = Icons.Default.CheckCircle,
+                        confirmColor = ResQTheme.colors.success,
+                        confirmContentColor = ResQTheme.colors.onSuccess,
+                        onConfirm = {
+                            onResolve()
+                            confirmDialogAction = null
                         },
-                        dismissButton = {
-                            TextButton(onClick = { confirmDialogAction = null }) {
-                                Text("Keep open")
-                            }
-                        }
+                        onDismiss = { confirmDialogAction = null }
                     )
                 }
                 actionStr == "cancel" -> {
-                    AlertDialog(
-                        onDismissRequest = { confirmDialogAction = null },
-                        title = { Text("Cancel incident?") },
-                        text = { Text("This will cancel the emergency request on this phone.") },
-                        confirmButton = {
-                            Button(
-                                onClick = {
-                                    onCancel()
-                                    confirmDialogAction = null
-                                },
-                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
-                            ) {
-                                Text("Cancel incident")
-                            }
+                    TacticalActionConfirmationSheet(
+                        title = "Cancel incident?",
+                        message = "This will cancel the emergency request on this phone.",
+                        confirmText = "Cancel incident",
+                        cancelText = "Keep incident",
+                        icon = Icons.Default.Warning,
+                        confirmColor = ResQTheme.colors.sos,
+                        confirmContentColor = ResQTheme.colors.onSos,
+                        onConfirm = {
+                            onCancel()
+                            confirmDialogAction = null
                         },
-                        dismissButton = {
-                            TextButton(onClick = { confirmDialogAction = null }) {
-                                Text("Keep incident")
-                            }
-                        }
+                        onDismiss = { confirmDialogAction = null }
                     )
                 }
+            }
+        }
+}
+
+// Offers carry a mesh ID; reporter user IDs and historical names do not.
+private fun helperChatTarget(offer: IncidentOfferEntity): String? =
+    offer.helperNodeId.trim().takeIf { it.isNotEmpty() }
+        ?.let { NodeIdentity.compose(offer.helperName, it) }
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun TacticalActionConfirmationSheet(
+    title: String,
+    message: String,
+    confirmText: String,
+    cancelText: String = "Cancel",
+    icon: ImageVector = Icons.Default.Warning,
+    confirmColor: Color = ResQTheme.colors.sos,
+    confirmContentColor: Color = ResQTheme.colors.onSos,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        containerColor = MaterialTheme.colorScheme.surface,
+        dragHandle = { BottomSheetDefaults.DragHandle() }
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = Spacing.Large, vertical = Spacing.Medium)
+                .padding(bottom = 32.dp)
+                .verticalScroll(rememberScrollState()),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = confirmColor,
+                modifier = Modifier.size(48.dp)
+            )
+            Spacer(Modifier.height(Spacing.Medium))
+            Text(
+                text = title,
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Black,
+                textAlign = TextAlign.Center
+            )
+            Spacer(Modifier.height(Spacing.Small))
+            Text(
+                text = message,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center
+            )
+            Spacer(Modifier.height(Spacing.Large))
+            Button(
+                onClick = onConfirm,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(56.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = confirmColor,
+                    contentColor = confirmContentColor
+                ),
+                shape = RoundedCornerShape(16.dp)
+            ) {
+                Text(
+                    text = confirmText,
+                    fontWeight = FontWeight.Bold,
+                    style = MaterialTheme.typography.titleMedium
+                )
+            }
+            Spacer(Modifier.height(Spacing.Medium))
+            OutlinedButton(
+                onClick = onDismiss,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(56.dp),
+                shape = RoundedCornerShape(16.dp)
+            ) {
+                Text(
+                    text = cancelText,
+                    fontWeight = FontWeight.Bold
+                )
             }
         }
     }

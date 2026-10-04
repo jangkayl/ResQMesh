@@ -1,6 +1,6 @@
 <div align="center">
   <img src="app/src/main/res/drawable/resqmesh_sublogo.png" alt="ResQMesh logo" width="520">
-  <h1>ResQMesh</h1>
+
   <p><strong>Offline emergency communication and coordination for nearby Android devices.</strong></p>
   <p>Native Bluetooth Low Energy · Multi-hop messaging · Recorded voice · SOS · Incident coordination · Offline maps</p>
 </div>
