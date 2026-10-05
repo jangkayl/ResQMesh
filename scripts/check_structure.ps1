@@ -1,13 +1,20 @@
 param(
     [string]$RepositoryRoot = (Join-Path $PSScriptRoot '..'),
     [string]$BaselinePath = 'app/build/structure-audit/baseline.json',
-    [switch]$Capture
+    [switch]$Capture,
+    [switch]$ArchitectureOnly
 )
 
 $ErrorActionPreference = 'Stop'
 $root = (Resolve-Path -LiteralPath $RepositoryRoot).Path
 $source = 'app/src/main/java/com/example/testresqmesh'
 $baselineFile = if ([IO.Path]::IsPathRooted($BaselinePath)) { $BaselinePath } else { Join-Path $root $BaselinePath }
+if ($ArchitectureOnly) {
+    if ($Capture) { throw 'ArchitectureOnly is read-only and cannot be combined with Capture.' }
+    & python (Join-Path $PSScriptRoot 'check_network_refactor.py') --baseline $baselineFile --architecture-only
+    if ($LASTEXITCODE -ne 0) { throw 'Architecture inspection failed.' }
+    exit 0
+}
 $protectedRoots = @(
     "$source/core/di", "$source/core/domain", "$source/core/location",
     "$source/core/map", "$source/core/model", "$source/core/network",

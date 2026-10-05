@@ -1,11 +1,13 @@
 package com.example.testresqmesh.feature.comms.ui
 
+import com.example.testresqmesh.feature.comms.ui.radio.RadioMonitorControls
+import com.example.testresqmesh.feature.comms.ui.radio.RadioPlaybackStatus
+import com.example.testresqmesh.feature.comms.ui.radio.TacticalChannelHistoryButton
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -14,8 +16,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Mic
-import androidx.compose.material.icons.outlined.ChevronRight
-import androidx.compose.material.icons.outlined.GraphicEq
 import androidx.compose.material.icons.outlined.Radio
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -25,7 +25,6 @@ import com.example.testresqmesh.core.model.ConversationPolicy
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
@@ -34,7 +33,6 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -42,7 +40,6 @@ import androidx.compose.ui.unit.sp
 import com.example.testresqmesh.core.utils.MediaHelper
 import com.example.testresqmesh.core.ui.theme.Spacing
 import com.example.testresqmesh.core.ui.theme.ResQTheme
-import com.example.testresqmesh.core.ui.components.layout.ResQGlassSurface
 import com.example.testresqmesh.feature.comms.viewmodel.CommunicationViewModel
 import com.example.testresqmesh.feature.comms.viewmodel.WalkieTalkieViewModel
 import androidx.compose.ui.graphics.luminance
@@ -205,105 +202,9 @@ fun WalkieTalkieScreen(
 
         Spacer(Modifier.height(Spacing.Medium))
 
-    // Voice Receiver / Radio Monitor Panel
-        ResQGlassSurface(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(22.dp),
-            contentPadding = PaddingValues(16.dp),
-            shadowElevation = 4.dp
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Surface(
-                    modifier = Modifier.size(44.dp),
-                    shape = CircleShape,
-                    color = if (receiverOn) ResQTheme.colors.success.copy(alpha = 0.15f) else MaterialTheme.colorScheme.surfaceVariant
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(
-                            Icons.Outlined.GraphicEq,
-                            contentDescription = null,
-                            tint = if (receiverOn) ResQTheme.colors.success else MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(22.dp)
-                        )
-                    }
-                }
-                Spacer(Modifier.width(12.dp))
-                Column(Modifier.weight(1f)) {
-                    Text(
-                        text = "Channel Monitor",
-                        fontWeight = FontWeight.Bold,
-                        style = MaterialTheme.typography.titleMedium
-                    )
-                    Text(
-                        text = if (receiverOn) "New CH $channel notes autoplay" else "Muted · Tap switch to listen",
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        style = MaterialTheme.typography.bodySmall
-                    )
-                }
-                Switch(
-                    checked = receiverOn,
-                    onCheckedChange = { walkieTalkieViewModel.toggleWalkieTalkieMode() },
-                    colors = SwitchDefaults.colors(
-                        checkedThumbColor = ResQTheme.colors.success,
-                        checkedTrackColor = ResQTheme.colors.success.copy(alpha = 0.35f)
-                    )
-                )
-            }
-        }
+    RadioMonitorControls(receiverOn, channel, walkieTalkieViewModel::toggleWalkieTalkieMode)
 
-        Spacer(Modifier.height(Spacing.Medium))
-
-        // Active Speaker / Channel Status Card (Who's Talking)
-        Surface(
-            shape = RoundedCornerShape(20.dp),
-            color = if (speaker != null && receiverOn) ResQTheme.colors.success.copy(alpha = 0.12f) else MaterialTheme.colorScheme.surface,
-            border = BorderStroke(
-                1.dp,
-                if (speaker != null && receiverOn) ResQTheme.colors.success.copy(alpha = 0.35f) else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)
-            ),
-            shadowElevation = 1.dp
-        ) {
-            Row(
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                if (speaker != null && receiverOn) {
-                    Box(
-                        modifier = Modifier
-                            .size(10.dp)
-                            .clip(CircleShape)
-                            .background(ResQTheme.colors.success)
-                    )
-                    Icon(
-                        imageVector = Icons.Outlined.GraphicEq,
-                        contentDescription = null,
-                        tint = ResQTheme.colors.success,
-                        modifier = Modifier.size(18.dp)
-                    )
-                    Text(
-                        text = "Playing: $speaker",
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                } else {
-                    Box(
-                        modifier = Modifier
-                            .size(8.dp)
-                            .clip(CircleShape)
-                            .background(if (receiverOn) ResQTheme.colors.success.copy(alpha = 0.6f) else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f))
-                    )
-                    Text(
-                        text = if (receiverOn) "Monitoring CH $channel · New notes autoplay" else "Monitor muted · Channel $channel",
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
-        }
-
+        RadioPlaybackStatus(receiverOn, channel, speaker)
         Spacer(Modifier.weight(1f))
 
         // Active Status & Equalizer Display
@@ -497,84 +398,4 @@ fun WalkieTalkieScreen(
     }
 }
 
-}
-
-@Composable
-private fun TacticalChannelHistoryButton(
-    unreadCount: Int,
-    onClick: () -> Unit,
-    isLight: Boolean,
-    modifier: Modifier = Modifier
-) {
-    Surface(
-        onClick = onClick,
-        modifier = modifier
-            .fillMaxWidth()
-            .semantics { contentDescription = "Open channel conversations and history" },
-        shape = RoundedCornerShape(18.dp),
-        color = if (isLight) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
-        border = BorderStroke(1.dp, if (isLight) MaterialTheme.colorScheme.outlineVariant else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f)),
-        shadowElevation = if (isLight) 1.dp else 2.dp
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 14.dp, vertical = 10.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Surface(
-                modifier = Modifier.size(38.dp),
-                shape = CircleShape,
-                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Icon(
-                        imageVector = Icons.Outlined.GraphicEq,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
-            }
-
-            Spacer(Modifier.width(12.dp))
-
-            Column(Modifier.weight(1f)) {
-                Text(
-                    text = "Channel History & Notes",
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Text(
-                    text = "Recorded audio & chatter on CH 1–5",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-
-            if (unreadCount > 0) {
-                Surface(
-                    shape = RoundedCornerShape(10.dp),
-                    color = ResQTheme.colors.sos
-                ) {
-                    Text(
-                        text = "$unreadCount new",
-                        color = Color.White,
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
-                    )
-                }
-                Spacer(Modifier.width(6.dp))
-            }
-
-            Icon(
-                imageVector = Icons.Outlined.ChevronRight,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-                modifier = Modifier.size(20.dp)
-            )
-        }
-    }
 }

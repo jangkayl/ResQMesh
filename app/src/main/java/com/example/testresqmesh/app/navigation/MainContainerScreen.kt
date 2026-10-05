@@ -1,5 +1,7 @@
 package com.example.testresqmesh.app.navigation
 
+import com.example.testresqmesh.app.navigation.MainDestinationContent
+import com.example.testresqmesh.app.navigation.overlays.MainApplicationOverlays
 import com.example.testresqmesh.core.ui.components.layout.ActiveSosReminder
 import com.example.testresqmesh.core.ui.components.layout.SosReminderHost
 import androidx.activity.compose.BackHandler
@@ -10,12 +12,9 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.runtime.collectAsState
 import com.example.testresqmesh.feature.comms.ui.ActiveChatScreen
-import com.example.testresqmesh.feature.comms.ui.ChatContainerScreen
 import com.example.testresqmesh.feature.comms.ui.PublicChatTab
-import com.example.testresqmesh.feature.comms.ui.WalkieTalkieScreen
 import com.example.testresqmesh.feature.radar.ui.NetworkScreen
 import com.example.testresqmesh.feature.radar.ui.ResponderTrackerScreen
-import com.example.testresqmesh.feature.home.ui.HomeScreen
 import com.example.testresqmesh.feature.sos.ui.SOSBroadcastScreen
 import com.example.testresqmesh.feature.sos.ui.SosMapScreen
 import com.example.testresqmesh.feature.profile.ui.ProfileScreen
@@ -30,23 +29,9 @@ import com.example.testresqmesh.core.utils.MediaHelper
 import com.example.testresqmesh.core.ui.components.layout.ResQAppShell
 import com.example.testresqmesh.core.ui.components.layout.ResQAuroraBackground
 import com.example.testresqmesh.core.ui.components.layout.ResQDestination
-import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.border
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Terminal
-import androidx.compose.material3.Icon
-import androidx.compose.material3.Surface
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.unit.dp
 import com.example.testresqmesh.core.ui.theme.AppAppearance
 import com.example.testresqmesh.core.ui.theme.ResQMotion
-import com.example.testresqmesh.core.ui.components.debug.DebugTerminal
 import com.example.testresqmesh.core.utils.AppLogger
 import androidx.compose.ui.platform.LocalContext
 import com.example.testresqmesh.core.utils.NotificationHelper
@@ -396,38 +381,27 @@ fun MainContainerScreen(
                             },
                             label = "ScreenTransition"
                         ) { targetScreen ->
-                            when (targetScreen) {
-                                ResQDestination.Mission -> HomeScreen(
-                                    setupViewModel = setupViewModel,
-                                    radarViewModel = radarViewModel,
-                                    commsViewModel = commsViewModel,
-                                    locationStatus = locationStatus,
-                                    onMessagesClick = { currentDestination = ResQDestination.Messages },
-                                    onNetworkClick = {
+                            MainDestinationContent(targetScreen, setupViewModel, radarViewModel, commsViewModel, walkieTalkieViewModel, mediaHelper, locationStatus, incidentMetrics.totalActive, incidentMetrics.criticalCount,
+                                onMessages = { currentDestination = ResQDestination.Messages },
+                                onNetwork = {
                                         selectedNetworkPeerKey = null
                                         showNetworkDetails = true
                                     },
-                                    onPeerClick = { peerName ->
+                                onPeer = { peerName ->
                                         activeChatNode = peerName
                                     },
-                                    onProfileClick = { showProfile = true },
-                                    onVoiceClick = { currentDestination = ResQDestination.Voice },
-                                    onIncidentsClick = { showIncidents = true },
-                                    onChatSelected = { peerName ->
+                                onProfile = { showProfile = true },
+                                onVoice = { currentDestination = ResQDestination.Voice },
+                                onIncidents = { showIncidents = true },
+                                onChat = { peerName ->
                                         activeChatNode = peerName
                                     },
-                                    onCommunityClick = {
+                                onChat1 = { activeChatNode = it },
+                                onCommunity = {
                                         isCommunityConversationOpen = true
                                     },
-                                    activeIncidentCount = incidentMetrics.totalActive,
-                                    criticalIncidentCount = incidentMetrics.criticalCount
-                                )
-                                ResQDestination.Messages -> ChatContainerScreen(
-                                    viewModel = commsViewModel,
-                                    mediaHelper = mediaHelper,
-                                    onChatSelected = { activeChatNode = it },
-                                    onCommunityClick = { isCommunityConversationOpen = true },
-                                    onViewMap = { lat, lng, sender, text ->
+                                onCommunity1 = { isCommunityConversationOpen = true },
+                                onMap = { lat, lng, sender, text ->
                                         mapSosAlert = com.example.testresqmesh.core.model.ChatMessage(
                                             id = "view_map_${System.currentTimeMillis()}",
                                             senderName = sender,
@@ -439,15 +413,8 @@ fun MainContainerScreen(
                                             isMine = false,
                                             isPrivate = false
                                         )
-                                    }
-                                )
-                                ResQDestination.Voice -> WalkieTalkieScreen(
-                                    commsViewModel = commsViewModel,
-                                    walkieTalkieViewModel = walkieTalkieViewModel,
-                                    mediaHelper = mediaHelper,
-                                    onHistory = { showRadioHistory = true }
-                                )
-                            }
+                                    },
+                                onHistory = { showRadioHistory = true })
                         }
                     }
                 }
@@ -455,61 +422,9 @@ fun MainContainerScreen(
 
         }
 
-        if (isDeveloperMode && incomingSosAlert == null && mapSosAlert == null && activeSosMessageId == null && !isSOSActive) {
-            FloatingDeveloperBadge(
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .statusBarsPadding()
-                    .padding(top = 8.dp, end = 12.dp),
-                onClick = {
-                    AppLogger.toggleTerminal()
-                },
-                onLongClick = {
-                    showDeveloperRadar = !showDeveloperRadar
-                }
-            )
-        }
-
-        androidx.compose.material3.SnackbarHost(
-            hostState = publicSendSnackbar,
-            modifier = Modifier.align(Alignment.BottomCenter).padding(horizontal = 16.dp, vertical = 88.dp)
-        )
-
-        DebugTerminal(
-            onOpenRadar = {
-                showDeveloperRadar = true
-                AppLogger.hideTerminal()
-            }
-        )
-    }
-}
-
-@OptIn(ExperimentalFoundationApi::class)
-@Composable
-private fun FloatingDeveloperBadge(
-    modifier: Modifier = Modifier,
-    onClick: () -> Unit,
-    onLongClick: (() -> Unit)? = null
-) {
-    Surface(
-        modifier = modifier
-            .size(38.dp)
-            .border(1.5.dp, Color(0xFF00FF00), CircleShape)
-            .combinedClickable(
-                onClick = onClick,
-                onLongClick = onLongClick
-            ),
-        shape = CircleShape,
-        color = Color(0xEE121814),
-        shadowElevation = 8.dp
-    ) {
-        Box(contentAlignment = Alignment.Center) {
-            Icon(
-                imageVector = Icons.Default.Terminal,
-                contentDescription = "Developer Debug Mode",
-                tint = Color(0xFF00FF00),
-                modifier = Modifier.size(19.dp)
-            )
-        }
+        MainApplicationOverlays(isDeveloperMode, incomingSosAlert != null, mapSosAlert != null, activeSosMessageId != null, isSOSActive, publicSendSnackbar,
+            onToggleTerminal = { AppLogger.toggleTerminal() },
+            onToggleRadar = { showDeveloperRadar = !showDeveloperRadar },
+            onOpenRadar = { showDeveloperRadar = true; AppLogger.hideTerminal() })
     }
 }

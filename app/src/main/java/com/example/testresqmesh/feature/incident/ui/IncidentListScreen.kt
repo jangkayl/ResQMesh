@@ -1,15 +1,18 @@
 package com.example.testresqmesh.feature.incident.ui
 
+import com.example.testresqmesh.feature.incident.ui.list.IncidentSearchField
+import com.example.testresqmesh.feature.incident.ui.list.IncidentDestinations
+import com.example.testresqmesh.feature.incident.ui.list.IncidentQuickFilters
+import com.example.testresqmesh.feature.incident.ui.list.IncidentAppliedFilters
+import com.example.testresqmesh.feature.incident.ui.list.QuickFilterChip as QuickFilterChipSection
 import androidx.compose.animation.*
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -23,10 +26,8 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.heading
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -37,17 +38,13 @@ import com.example.testresqmesh.core.model.NodeIdentity
 import com.example.testresqmesh.core.ui.theme.SafetyOrange
 import com.example.testresqmesh.core.ui.theme.SignalAmber
 import com.example.testresqmesh.core.ui.theme.SignalGreen
-import com.example.testresqmesh.core.ui.theme.SignalRed
 import com.example.testresqmesh.core.ui.theme.Spacing
-import com.example.testresqmesh.core.ui.theme.TacticalBlack
-import com.example.testresqmesh.core.ui.theme.TacticalCarbon
 import com.example.testresqmesh.feature.incident.ui.components.CreateIncidentSheet
 import com.example.testresqmesh.feature.incident.ui.components.IncidentDetailSheet
 import com.example.testresqmesh.feature.incident.ui.components.IncidentFilterSheet
 import com.example.testresqmesh.feature.incident.ui.components.TacticalIncidentCard
 import com.example.testresqmesh.feature.incident.viewmodel.AssistanceFilter
 import com.example.testresqmesh.feature.incident.viewmodel.IncidentDestination
-import com.example.testresqmesh.feature.incident.viewmodel.IncidentFilterState
 import com.example.testresqmesh.feature.incident.viewmodel.IncidentViewModel
 import com.example.testresqmesh.data.repository.IncidentOwnership
 import com.example.testresqmesh.core.ui.model.NodeKind
@@ -224,143 +221,9 @@ fun IncidentListScreen(
                     }
                 }
 
-                // Compact Tactical Search input
-                AnimatedVisibility(
-                    visible = isSearchVisible || searchQuery.isNotEmpty(),
-                    enter = expandVertically() + fadeIn(),
-                    exit = shrinkVertically() + fadeOut()
-                ) {
-                    Surface(
-                        shape = RoundedCornerShape(10.dp),
-                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                        border = BorderStroke(
-                            0.8.dp,
-                            MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f)
-                        ),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = Spacing.Large, vertical = 3.dp)
-                            .height(38.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .padding(horizontal = 10.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Outlined.Search,
-                                contentDescription = null,
-                                modifier = Modifier.size(16.dp),
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
+                IncidentSearchField(isSearchVisible, searchQuery, viewModel::setSearchQuery)
 
-                            Box(
-                                modifier = Modifier.weight(1f),
-                                contentAlignment = Alignment.CenterStart
-                            ) {
-                                if (searchQuery.isEmpty()) {
-                                    Text(
-                                        text = "Search title, landmark, reporter, or helper…",
-                                        style = MaterialTheme.typography.bodySmall.copy(
-                                            fontSize = 12.5.sp
-                                        ),
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
-                                }
-                                androidx.compose.foundation.text.BasicTextField(
-                                    value = searchQuery,
-                                    onValueChange = { viewModel.setSearchQuery(it) },
-                                    singleLine = true,
-                                    textStyle = MaterialTheme.typography.bodySmall.copy(
-                                        fontSize = 12.5.sp,
-                                        color = MaterialTheme.colorScheme.onSurface
-                                    ),
-                                    cursorBrush = androidx.compose.ui.graphics.SolidColor(MaterialTheme.colorScheme.primary),
-                                    modifier = Modifier.fillMaxWidth().semantics {
-                                        contentDescription = "Search incidents"
-                                    }
-                                )
-                            }
-
-                            if (searchQuery.isNotEmpty()) {
-                                IconButton(
-                                    onClick = { viewModel.setSearchQuery("") },
-                                    modifier = Modifier.size(24.dp)
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Clear,
-                                        contentDescription = "Clear search",
-                                        modifier = Modifier.size(15.dp),
-                                        tint = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-
-                // Primary Destination Segmented Pill Bar (Matching Concept Mockup)
-                val isNight = MaterialTheme.colorScheme.background == TacticalBlack || MaterialTheme.colorScheme.surface == TacticalCarbon
-                val activeTabBg = if (isNight) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.primary
-                val activeTabTextColor = if (isNight) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onPrimary
-
-                Surface(
-                    shape = RoundedCornerShape(24.dp),
-                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = Spacing.Large, vertical = 6.dp)
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(4.dp),
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        IncidentDestination.values().forEach { destination ->
-                            val isSelected = currentDestination == destination
-                            val count = when (destination) {
-                                IncidentDestination.ACTIVE -> metrics.totalActive
-                                IncidentDestination.MY_ACTIVITY -> metrics.myActivityCount
-                                IncidentDestination.HISTORY -> metrics.historyCount
-                            }
-                            val label = when (destination) {
-                                IncidentDestination.ACTIVE -> "Active ($count)"
-                                IncidentDestination.MY_ACTIVITY -> "My activity ($count)"
-                                IncidentDestination.HISTORY -> "History ($count)"
-                            }
-
-                            Surface(
-                                shape = RoundedCornerShape(20.dp),
-                                color = if (isSelected) activeTabBg else Color.Transparent,
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .clip(RoundedCornerShape(20.dp))
-                                    .clickable { viewModel.setDestination(destination) }
-                            ) {
-                                Box(
-                                    contentAlignment = Alignment.Center,
-                                    modifier = Modifier.padding(vertical = 7.dp, horizontal = 2.dp)
-                                ) {
-                                    Text(
-                                        text = label,
-                                        style = MaterialTheme.typography.labelMedium.copy(
-                                            fontSize = 11.5.sp,
-                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
-                                        ),
-                                        color = if (isSelected) activeTabTextColor else MaterialTheme.colorScheme.onSurfaceVariant,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
+                IncidentDestinations(currentDestination, metrics, viewModel::setDestination)
 
                 // Quick Triage Filter Row (tightened horizontal gaps)
                 Row(
@@ -371,137 +234,14 @@ fun IncidentListScreen(
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    val isAllSelected = filters.emergencyType == null && filters.urgency == null && filters.assistance == AssistanceFilter.ANY && searchQuery.isEmpty()
-                    val isCriticalSelected = filters.urgency.equals("Critical", ignoreCase = true)
-                    val isMedicalSelected = filters.emergencyType.equals("Medical", ignoreCase = true)
-                    val isNeedsHelpSelected = filters.assistance == AssistanceFilter.LOOKING_FOR_HELP
-
-                    QuickFilterChip(
-                        label = "All",
-                        isSelected = isAllSelected,
-                        onClick = { viewModel.clearFilters() }
-                    )
-
-                    QuickFilterChip(
-                        label = "Critical only",
-                        isSelected = isCriticalSelected,
-                        accentColor = SignalRed,
-                        onClick = {
-                            viewModel.applyFilters(
-                                filters.copy(urgency = if (isCriticalSelected) null else "Critical")
-                            )
-                        }
-                    )
-
-                    QuickFilterChip(
-                        label = "Medical",
-                        isSelected = isMedicalSelected,
-                        accentColor = SafetyOrange,
-                        onClick = {
-                            viewModel.applyFilters(
-                                filters.copy(emergencyType = if (isMedicalSelected) null else "Medical")
-                            )
-                        }
-                    )
-
-                    if (currentDestination != IncidentDestination.HISTORY) {
-                        QuickFilterChip(
-                            label = "Needs Helper",
-                            isSelected = isNeedsHelpSelected,
-                            accentColor = Color(0xFFFF9500),
-                            onClick = {
-                                viewModel.applyFilters(
-                                    filters.copy(
-                                        assistance = if (isNeedsHelpSelected) AssistanceFilter.ANY else AssistanceFilter.LOOKING_FOR_HELP
-                                    )
-                                )
-                            }
-                        )
-                    }
-
-                    QuickFilterChip(
-                        label = if (appliedFilterCount > 0) "Filters ($appliedFilterCount)" else "Filters…",
-                        isSelected = showFilterSheet || appliedFilterCount > 0,
-                        onClick = { showFilterSheet = true }
-                    )
+                    IncidentQuickFilters(filters, searchQuery, currentDestination, appliedFilterCount, showFilterSheet,
+                        onClearFilters = viewModel::clearFilters, onOpenFilters = { showFilterSheet = true },
+                        onToggleCritical = { selected -> viewModel.applyFilters(filters.copy(urgency = if (selected) null else "Critical")) },
+                        onToggleMedical = { selected -> viewModel.applyFilters(filters.copy(emergencyType = if (selected) null else "Medical")) },
+                        onToggleNeedsHelp = { selected -> viewModel.applyFilters(filters.copy(assistance = if (selected) AssistanceFilter.ANY else AssistanceFilter.LOOKING_FOR_HELP)) })
                 }
 
-                // Compact active filter banner / reset row
-                if (appliedFilterCount > 0 || searchQuery.isNotEmpty()) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = Spacing.Large, vertical = 2.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        val filterText = when {
-                            appliedFilterCount > 0 && searchQuery.isNotEmpty() ->
-                                "$appliedFilterCount filter(s) • \"$searchQuery\""
-                            appliedFilterCount > 0 ->
-                                "$appliedFilterCount filter(s) active"
-                            else ->
-                                "\"$searchQuery\""
-                        }
-                        Surface(
-                            shape = RoundedCornerShape(12.dp),
-                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
-                            border = BorderStroke(0.6.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.3f))
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.5.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(4.dp)
-                            ) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(5.dp)
-                                        .background(MaterialTheme.colorScheme.primary, shape = androidx.compose.foundation.shape.CircleShape)
-                                )
-                                Text(
-                                    text = filterText,
-                                    style = MaterialTheme.typography.labelSmall.copy(
-                                        fontSize = 11.sp,
-                                        fontWeight = FontWeight.Medium
-                                    ),
-                                    color = MaterialTheme.colorScheme.primary,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                            }
-                        }
-
-                        Surface(
-                            shape = RoundedCornerShape(12.dp),
-                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
-                            border = BorderStroke(0.6.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)),
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(12.dp))
-                                .clickable { viewModel.clearFilters() }
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(3.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Close,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(11.dp),
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                                Text(
-                                    text = "Clear",
-                                    style = MaterialTheme.typography.labelSmall.copy(
-                                        fontSize = 11.sp,
-                                        fontWeight = FontWeight.SemiBold
-                                    ),
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                        }
-                    }
-                }
+                IncidentAppliedFilters(appliedFilterCount, searchQuery, viewModel::clearFilters)
             }
         },
         floatingActionButton = {
@@ -734,44 +474,4 @@ internal fun QuickFilterChip(
     isSelected: Boolean,
     accentColor: Color = MaterialTheme.colorScheme.primary,
     onClick: () -> Unit
-) {
-    Surface(
-        shape = RoundedCornerShape(16.dp),
-        color = if (isSelected) accentColor.copy(alpha = 0.2f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-        border = BorderStroke(
-            width = if (isSelected) 1.5.dp else 1.dp,
-            color = if (isSelected) accentColor else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
-        ),
-        modifier = Modifier
-            .defaultMinSize(minHeight = 48.dp)
-            .clip(RoundedCornerShape(16.dp))
-            .selectable(selected = isSelected, role = Role.Button, onClick = onClick)
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.Center
-        ) {
-            if (isSelected) {
-                Box(
-                    modifier = Modifier
-                        .size(6.dp)
-                        .background(accentColor, shape = androidx.compose.foundation.shape.CircleShape)
-                )
-                Spacer(Modifier.width(6.dp))
-            }
-            Text(
-                text = label,
-                style = MaterialTheme.typography.labelMedium.copy(
-                    fontSize = 12.sp,
-                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
-                ),
-                color = if (isSelected) {
-                    if (accentColor == MaterialTheme.colorScheme.primary) MaterialTheme.colorScheme.primary else accentColor
-                } else {
-                    MaterialTheme.colorScheme.onSurfaceVariant
-                }
-            )
-        }
-    }
-}
+) = QuickFilterChipSection(label, isSelected, accentColor, onClick)

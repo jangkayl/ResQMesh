@@ -1,9 +1,12 @@
 package com.example.testresqmesh.feature.incident.ui.components
 
+import com.example.testresqmesh.feature.incident.ui.form.IncidentCategoryField
+import com.example.testresqmesh.feature.incident.ui.form.IncidentUrgencyField
+import com.example.testresqmesh.feature.incident.ui.form.IncidentTitleField
+import com.example.testresqmesh.feature.incident.ui.form.IncidentDescriptionField
 import android.Manifest
 import android.content.pm.PackageManager
 import android.location.Location
-import android.text.format.DateUtils
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -11,7 +14,6 @@ import androidx.compose.animation.*
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.relocation.BringIntoViewRequester
 import androidx.compose.foundation.relocation.bringIntoViewRequester
@@ -22,25 +24,18 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.outlined.ExpandLess
-import androidx.compose.material.icons.outlined.ExpandMore
 import androidx.compose.material.icons.outlined.LocationOn
-import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
-import androidx.compose.ui.semantics.heading
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.material.icons.filled.Check
@@ -259,300 +254,24 @@ fun CreateIncidentSheet(
                         }
                     }
 
-                    // 1. Emergency Category (Tactile 2x3 Grid)
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .focusRequester(typeFocusRequester),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
-                            Text(
-                                text = "Category",
-                                style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
-                                modifier = Modifier.semantics { heading() }
-                            )
-                            Text(
-                                text = "*",
-                                style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
-                                color = MaterialTheme.colorScheme.error
-                            )
-                        }
+                    IncidentCategoryField(categories, selectedType, showErrors, typeFocusRequester, { selectedType = it })
 
-                        val chunkedCategories = categories.chunked(3)
-                        chunkedCategories.forEach { rowCategories ->
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                rowCategories.forEach { cat ->
-                                    val isSelected = selectedType == cat
-                                    val icon = incidentCategoryIcon(cat)
-                                    val cardUrgencyColor = when (cat.lowercase()) {
-                                        "medical" -> ResQTheme.colors.sos
-                                        "fire" -> ResQTheme.colors.warning
-                                        else -> MaterialTheme.colorScheme.primary
-                                    }
+                    IncidentUrgencyField(selectedUrgency, showErrors, urgencyFocusRequester, { selectedUrgency = it })
 
-                                    Surface(
-                                        shape = RoundedCornerShape(12.dp),
-                                        color = if (isSelected) cardUrgencyColor.copy(alpha = 0.16f)
-                                            else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
-                                        border = BorderStroke(
-                                            if (isSelected) 1.5.dp else 1.dp,
-                                            if (isSelected) cardUrgencyColor else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
-                                        ),
-                                        modifier = Modifier
-                                            .weight(1f)
-                                            .height(72.dp)
-                                            .clickable { selectedType = cat }
-                                    ) {
-                                        Box(modifier = Modifier.fillMaxSize().padding(6.dp)) {
-                                            if (isSelected) {
-                                                Icon(
-                                                    imageVector = Icons.Default.Check,
-                                                    contentDescription = null,
-                                                    tint = cardUrgencyColor,
-                                                    modifier = Modifier
-                                                        .size(14.dp)
-                                                        .align(Alignment.TopEnd)
-                                                )
-                                            }
-                                            Column(
-                                                modifier = Modifier.fillMaxSize(),
-                                                horizontalAlignment = Alignment.CenterHorizontally,
-                                                verticalArrangement = Arrangement.Center
-                                            ) {
-                                                Icon(
-                                                    imageVector = icon,
-                                                    contentDescription = null,
-                                                    tint = if (isSelected) cardUrgencyColor else MaterialTheme.colorScheme.onSurfaceVariant,
-                                                    modifier = Modifier.size(24.dp)
-                                                )
-                                                Spacer(Modifier.height(4.dp))
-                                                Text(
-                                                    text = cat,
-                                                    style = MaterialTheme.typography.labelMedium.copy(
-                                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                                        fontSize = 11.5.sp
-                                                    ),
-                                                    color = if (isSelected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
-                                                    maxLines = 1,
-                                                    overflow = TextOverflow.Ellipsis
-                                                )
-                                            }
-                                        }
-                                    }
-                                }
+                    IncidentTitleField(title, showErrors, titleBringIntoView, titleFocusRequester,
+                        onTitleChanged = { title = it }, onTitleFocusChanged = { focus ->
+                            if (focus.isFocused) { coroutineScope.launch { delay(200); titleBringIntoView.bringIntoView() } }
+                        })
+
+                    IncidentDescriptionField(description, descBringIntoView,
+                        onDescriptionChanged = { description = it }, onDescriptionFocusChanged = { focus ->
+                            if (focus.isFocused) { coroutineScope.launch { delay(200); descBringIntoView.bringIntoView() } }
+                        }, onAppendNeed = { tag ->
+                            val addition = "[Need: $tag] "
+                            if (!description.contains(addition)) {
+                                description = if (description.isBlank()) addition else "$description $addition"
                             }
-                        }
-
-                        if (showErrors && selectedType == null) {
-                            Text(
-                                text = "Please select an emergency category",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.error
-                            )
-                        }
-                    }
-
-                    // 2. Urgency Level (High-Contrast Segmented Selector)
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .focusRequester(urgencyFocusRequester),
-                        verticalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
-                            Text(
-                                text = "Urgency",
-                                style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
-                                modifier = Modifier.semantics { heading() }
-                            )
-                            Text(
-                                text = "*",
-                                style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
-                                color = MaterialTheme.colorScheme.error
-                            )
-                        }
-
-                        val urgencyOptions = listOf(
-                            Triple("Moderate", "Standard assistance", MaterialTheme.colorScheme.primary),
-                            Triple("Serious", "Urgent / High", ResQTheme.colors.warning),
-                            Triple("Critical", "Life threatening", ResQTheme.colors.sos)
-                        )
-
-                        Surface(
-                            shape = RoundedCornerShape(12.dp),
-                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f)),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth().padding(4.dp),
-                                horizontalArrangement = Arrangement.spacedBy(4.dp)
-                            ) {
-                                urgencyOptions.forEach { (level, subtitle, accentColor) ->
-                                    val isSelected = selectedUrgency == level
-                                    Surface(
-                                        shape = RoundedCornerShape(10.dp),
-                                        color = if (isSelected) accentColor else Color.Transparent,
-                                        modifier = Modifier
-                                            .weight(1f)
-                                            .defaultMinSize(minHeight = 44.dp)
-                                            .clickable { selectedUrgency = level }
-                                    ) {
-                                        Box(
-                                            contentAlignment = Alignment.Center,
-                                            modifier = Modifier.padding(vertical = 10.dp, horizontal = 4.dp)
-                                        ) {
-                                            Text(
-                                                text = level,
-                                                style = MaterialTheme.typography.labelMedium.copy(
-                                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                                    fontSize = 13.sp
-                                                ),
-                                                color = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-                        }
-
-                        if (showErrors && selectedUrgency == null) {
-                            Text(
-                                text = "Please select urgency level",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.error
-                            )
-                        }
-                    }
-
-                    // 3. Title (required, trimmed, 1-80 chars)
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .bringIntoViewRequester(titleBringIntoView),
-                        verticalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        val isTitleError = showErrors && (title.trim().isEmpty() || title.trim().length > 80)
-                        OutlinedTextField(
-                            value = title,
-                            onValueChange = { title = it },
-                            label = { Text("Title *") },
-                            placeholder = { Text("Help moving an injured person") },
-                            singleLine = true,
-                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
-                            isError = isTitleError,
-                            supportingText = {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween
-                                ) {
-                                    if (isTitleError) {
-                                        Text(
-                                            text = if (title.trim().isEmpty()) "Title is required" else "Maximum 80 characters",
-                                            color = MaterialTheme.colorScheme.error,
-                                            modifier = Modifier.weight(1f, fill = false)
-                                        )
-                                    } else {
-                                        Text(
-                                            text = "Short descriptive title (max 80 chars)",
-                                            modifier = Modifier.weight(1f, fill = false)
-                                        )
-                                    }
-                                    Spacer(Modifier.width(8.dp))
-                                    Text("${title.trim().length}/80")
-                                }
-                            },
-                            colors = incidentTextFieldColors(),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .focusRequester(titleFocusRequester)
-                                .onFocusChanged {
-                                    if (it.isFocused) {
-                                        coroutineScope.launch {
-                                            delay(200)
-                                            titleBringIntoView.bringIntoView()
-                                        }
-                                    }
-                                }
-                        )
-                    }
-
-                    // 4. Description (optional) + Quick Need Chips
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .bringIntoViewRequester(descBringIntoView),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        OutlinedTextField(
-                            value = description,
-                            onValueChange = { description = it },
-                            label = { Text("Description") },
-                            placeholder = { Text("Describe what happened and the assistance needed.") },
-                            minLines = 3,
-                            maxLines = 5,
-                            colors = incidentTextFieldColors(),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .onFocusChanged {
-                                    if (it.isFocused) {
-                                        coroutineScope.launch {
-                                            delay(200)
-                                            descBringIntoView.bringIntoView()
-                                        }
-                                    }
-                                }
-                        )
-
-                        // Quick resource / need tags
-                        val quickNeedTags = listOf("Stretcher", "Splint", "First aid kit", "4x4 Transport", "Oxygen", "Water")
-                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                            Text(
-                                text = "Quick needs (tap to add):",
-                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Medium),
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            FlowRow(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                verticalArrangement = Arrangement.spacedBy(6.dp)
-                            ) {
-                                quickNeedTags.forEach { tag ->
-                                    Surface(
-                                        shape = RoundedCornerShape(8.dp),
-                                        color = SafetyOrange.copy(alpha = 0.12f),
-                                        border = BorderStroke(0.5.dp, SafetyOrange.copy(alpha = 0.4f)),
-                                        modifier = Modifier.clickable {
-                                            val addition = "[Need: $tag] "
-                                            if (!description.contains(addition)) {
-                                                description = if (description.isBlank()) addition else "$description $addition"
-                                            }
-                                        }
-                                    ) {
-                                        Text(
-                                            text = "+ $tag",
-                                            style = MaterialTheme.typography.labelSmall.copy(
-                                                fontSize = 11.5.sp,
-                                                fontWeight = FontWeight.Bold
-                                            ),
-                                            color = SafetyOrange,
-                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    }
+                        })
 
                     // 5. Unified Location & Landmark Card (High-density merged section)
                     Surface(

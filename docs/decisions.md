@@ -1,6 +1,6 @@
 # Engineering decisions
 
-Last reviewed: 2026-10-04. Source baseline: `2e27013`. These describe accepted choices; source and bounded device evidence prevail.
+Last reviewed: 2026-10-06. Source baseline: `db2260e` plus networking maintenance. These describe accepted choices; source and bounded device evidence prevail.
 
 ## D1: Reliability before transport expansion
 
@@ -91,3 +91,11 @@ Immediate broadcasts remain the fast path. On READY, changes and a 30-second ±3
 Community, Radio and SOS separate history/drafts/unread state. Off-channel Radio stores silently; unscoped history stays hidden. SOS ignores tuning. Sender Back preserves it; receiver silence is local; signed origin-key termination ends it. Retain terminal records and reconcile on reconnect. Sirens stop within 30 seconds; active GATT frames remain non-interruptible. Matching builds are required.
 
 Deferred designs are preserved in the [archive index](../archive/docs-superseded-2026-10-04/README.md); current evidence and failures live in [validation](validation.md) and [status](status.md).
+
+## D23: Preserve behavior during networking decomposition
+
+Keep facade APIs and shared resource ownership. Use role-specific GATT hosts, synchronous live-listener adapters, a presence publisher and initialization-time repository bindings. Preserve callback/body order, main-handler execution, generation fences, persistence, queues, routing, blocking and protocol values. Validate against a fixed scope and pre-edit snapshot; no performance or delivery-rate improvement is implied. Completed lifecycle/outbox/incident slices retain separate baselines and evidence.
+
+The approved whole-app phases target cohesive 200–400-line owners and review files above 500. Phase 1 extracts ingress/outbound/progress responsibilities; later phases retain local gates and snapshots; the user deferred physical comparison until the final build. Keep one outbox worker/mutex, per-attempt ownership, incident lock order and Compose state/effect lifetime. Preserve historical baselines and use explicit current phase mappings. No library/framework/module migration or behavior redesign is included.
+
+NativeBleManager retains the reviewed 743-line public host/construction exception. Every other original oversized source is below 500; keeping original Compose/lifecycle owners together takes priority over a 400-line ceiling. Four baseline automated navigation failures remain an acceptance gate; final-candidate F1–F14 phone checks are user-reported PASS on October 6.

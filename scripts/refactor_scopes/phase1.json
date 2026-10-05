@@ -1,0 +1,195 @@
+{
+  "version": 1,
+  "phase": "message-pipeline",
+  "source": "app/src/main/java/com/example/testresqmesh/core/network/NativeBleManager.kt",
+  "moves": [
+    {
+      "name": "forwardPrivatePayload",
+      "target": "app/src/main/java/com/example/testresqmesh/core/network/transport/NativeOutboundDispatcher.kt",
+      "replacements": {
+        "::nodeIdForEndpoint": "nodeIdForEndpoint",
+        "l2capTransport.send(": "sendL2cap(",
+        "heartbeatCoordinator.remove(": "removeHeartbeat("
+      },
+      "delegate": "outboundDispatcher.forwardPrivatePayload(nodeId, payload)"
+    },
+    {
+      "name": "endpointForPeer",
+      "target": "app/src/main/java/com/example/testresqmesh/core/network/transport/NativeOutboundDispatcher.kt",
+      "replacements": {
+        "::nodeIdForEndpoint": "nodeIdForEndpoint",
+        "l2capTransport.send(": "sendL2cap(",
+        "heartbeatCoordinator.remove(": "removeHeartbeat("
+      },
+      "delegate": "outboundDispatcher.endpointForPeer(nodeId)"
+    },
+    {
+      "name": "isControlPayload",
+      "target": "app/src/main/java/com/example/testresqmesh/core/network/transport/NativeOutboundDispatcher.kt",
+      "replacements": {
+        "::nodeIdForEndpoint": "nodeIdForEndpoint",
+        "l2capTransport.send(": "sendL2cap(",
+        "heartbeatCoordinator.remove(": "removeHeartbeat("
+      },
+      "delegate": "outboundDispatcher.isControlPayload(bytes)"
+    },
+    {
+      "name": "broadcastPayload",
+      "target": "app/src/main/java/com/example/testresqmesh/core/network/transport/NativeOutboundDispatcher.kt",
+      "replacements": {
+        "::nodeIdForEndpoint": "nodeIdForEndpoint",
+        "l2capTransport.send(": "sendL2cap(",
+        "heartbeatCoordinator.remove(": "removeHeartbeat("
+      },
+      "delegate": "outboundDispatcher.broadcastPayload(payloadBytes, excludeEndpointId)"
+    },
+    {
+      "name": "sendLegacyRelay",
+      "target": "app/src/main/java/com/example/testresqmesh/core/network/transport/NativeOutboundDispatcher.kt",
+      "replacements": {
+        "::nodeIdForEndpoint": "nodeIdForEndpoint",
+        "l2capTransport.send(": "sendL2cap(",
+        "heartbeatCoordinator.remove(": "removeHeartbeat("
+      },
+      "delegate": "outboundDispatcher.sendLegacyRelay(peer, endpoint, bytes)",
+      "target_private": true,
+      "facade_removed": true
+    },
+    {
+      "name": "broadcastPriorityPayload",
+      "target": "app/src/main/java/com/example/testresqmesh/core/network/transport/NativeOutboundDispatcher.kt",
+      "replacements": {
+        "::nodeIdForEndpoint": "nodeIdForEndpoint",
+        "l2capTransport.send(": "sendL2cap(",
+        "heartbeatCoordinator.remove(": "removeHeartbeat("
+      },
+      "delegate": "outboundDispatcher.broadcastPriorityPayload(payloadBytes, excludeEndpointId)"
+    },
+    {
+      "name": "enqueueGattPayload",
+      "target": "app/src/main/java/com/example/testresqmesh/core/network/transport/NativeOutboundDispatcher.kt",
+      "replacements": {
+        "::nodeIdForEndpoint": "nodeIdForEndpoint",
+        "l2capTransport.send(": "sendL2cap(",
+        "heartbeatCoordinator.remove(": "removeHeartbeat("
+      },
+      "delegate": "outboundDispatcher.enqueueGattPayload(endpoint, payloadBytes, priority, heartbeatId)"
+    },
+    {
+      "name": "sendPriorityPayload",
+      "target": "app/src/main/java/com/example/testresqmesh/core/network/transport/NativeOutboundDispatcher.kt",
+      "replacements": {
+        "::nodeIdForEndpoint": "nodeIdForEndpoint",
+        "l2capTransport.send(": "sendL2cap(",
+        "heartbeatCoordinator.remove(": "removeHeartbeat("
+      },
+      "delegate": "outboundDispatcher.sendPriorityPayload(targetEndpointId, payloadBytes)"
+    },
+    {
+      "name": "sendDirectPayload",
+      "target": "app/src/main/java/com/example/testresqmesh/core/network/transport/NativeOutboundDispatcher.kt",
+      "replacements": {
+        "::nodeIdForEndpoint": "nodeIdForEndpoint",
+        "l2capTransport.send(": "sendL2cap(",
+        "heartbeatCoordinator.remove(": "removeHeartbeat("
+      },
+      "delegate": "outboundDispatcher.sendDirectPayload(targetMacAddress, payloadBytes)"
+    },
+    {
+      "name": "dispatchPayload",
+      "target": "app/src/main/java/com/example/testresqmesh/core/network/transport/NativeOutboundDispatcher.kt",
+      "replacements": {
+        "::nodeIdForEndpoint": "nodeIdForEndpoint",
+        "l2capTransport.send(": "sendL2cap(",
+        "heartbeatCoordinator.remove(": "removeHeartbeat("
+      },
+      "delegate": "outboundDispatcher.dispatchPayload(endpoint, bytes, priority)",
+      "target_private": true,
+      "facade_removed": true
+    },
+    {
+      "name": "sendRawPayload",
+      "target": "app/src/main/java/com/example/testresqmesh/core/network/transport/NativeOutboundDispatcher.kt",
+      "replacements": {
+        "::nodeIdForEndpoint": "nodeIdForEndpoint",
+        "l2capTransport.send(": "sendL2cap(",
+        "heartbeatCoordinator.remove(": "removeHeartbeat("
+      },
+      "delegate": "outboundDispatcher.sendRawPayload(endpoint, bytes, priority)"
+    },
+    {
+      "name": "cacheOutgoingMessageId",
+      "target": "app/src/main/java/com/example/testresqmesh/core/network/transport/NativeOutboundDispatcher.kt",
+      "replacements": {
+        "::nodeIdForEndpoint": "nodeIdForEndpoint",
+        "l2capTransport.send(": "sendL2cap(",
+        "heartbeatCoordinator.remove(": "removeHeartbeat("
+      },
+      "delegate": "outboundDispatcher.cacheOutgoingMessageId(payloadBytes)"
+    },
+    {
+      "name": "promoteGattWorkToL2cap",
+      "target": "app/src/main/java/com/example/testresqmesh/core/network/transport/NativeOutboundDispatcher.kt",
+      "replacements": {
+        "::nodeIdForEndpoint": "nodeIdForEndpoint",
+        "l2capTransport.send(": "sendL2cap(",
+        "heartbeatCoordinator.remove(": "removeHeartbeat("
+      },
+      "delegate": "outboundDispatcher.promoteGattWorkToL2cap(endpoint)"
+    },
+    {
+      "name": "processBinaryPayload",
+      "target": "app/src/main/java/com/example/testresqmesh/core/network/dispatch/NativeInboundPipeline.kt",
+      "replacements": {
+        "heartbeatCoordinator.remove(": "removeHeartbeat(",
+        "payloadDispatcher.dispatch(": "dispatch("
+      },
+      "delegate": "inboundPipeline.processBinaryPayload(endpointId, payloadBytes)"
+    },
+    {
+      "name": "reportFrame",
+      "target": "app/src/main/java/com/example/testresqmesh/core/network/transport/OutboundFrameReporter.kt",
+      "replacements": {
+        "legacyRelayFrames.remove(": "removeLegacyFrame("
+      },
+      "delegate": "frameReporter.reportFrame(endpoint, bytes, stage, transport, queuedAt, startedAt)"
+    }
+  ],
+  "remaining_replacements": {
+    "retainedFallback.flush()": "outboundDispatcher.flushFallback()",
+    "retainedFallback.hasPending(endpoint)": "outboundDispatcher.hasPendingFallback(endpoint)",
+    "retainedFallback.clear()": "outboundDispatcher.clearFallback()",
+    "legacyRelayFrames.clear()": "outboundDispatcher.clearLegacyFrames()",
+    "legacyRelayFrames.entries.removeAll { it.value == endpointId }": "outboundDispatcher.retireLegacyFrames(endpointId)",
+    "retainedFallback.retire(endpointId)": "outboundDispatcher.retireFallback(endpointId)",
+    "retainedFallback.retain(endpoint, listOf(FallbackFrame(payload, isControlPayload(payload))))": "outboundDispatcher.retainFailedL2cap(endpoint, payload)"
+  },
+  "allowed": [
+    "app/src/main/java/com/example/testresqmesh/core/network/NativeBleManager.kt",
+    "app/src/main/java/com/example/testresqmesh/core/network/dispatch/NativeInboundPipeline.kt",
+    "app/src/main/java/com/example/testresqmesh/core/network/transport/NativeOutboundDispatcher.kt",
+    "app/src/main/java/com/example/testresqmesh/core/network/transport/OutboundFrameReporter.kt",
+    "scripts/check_network_refactor.py",
+    "scripts/check_structure.ps1",
+    "scripts/refactor_phase_checks.py",
+    "scripts/refactor_scopes/phase1.json",
+    "app/src/test/java/com/example/testresqmesh/core/network/dispatch/NativeInboundPipelineTest.kt",
+    "app/src/test/java/com/example/testresqmesh/core/network/transport/NativeOutboundDispatcherTest.kt",
+    "app/src/test/java/com/example/testresqmesh/core/network/transport/OutboundFrameReporterTest.kt",
+    "docs/status.md",
+    "docs/architecture.md",
+    "docs/decisions.md",
+    "docs/validation.md",
+    "docs/plans/network-maintainability-refactor.md",
+    "docs/testing/network-maintainability-test-card.md",
+    "docs/handoffs/maintainability-size-inventory.md",
+    "archive/docs-superseded-2026-10-05/network-maintainability-before-phases.md",
+    "archive/docs-superseded-2026-10-05/README.md"
+  ],
+  "facade_hash": "cd0e9fa7aedd0d330e31f713edd3d1f1f95ab73d1bfb698e462237b7686f129c",
+  "collaborator_shells": {
+    "app/src/main/java/com/example/testresqmesh/core/network/transport/NativeOutboundDispatcher.kt": "67c527189a6801817836b149b557e1a33c30247dc119b291dfd5bfa0a23ec5ab",
+    "app/src/main/java/com/example/testresqmesh/core/network/dispatch/NativeInboundPipeline.kt": "9ddc5501699643f58ad95902b5816bdd6cf84e6f418488aee6e6bb3ea0f62397",
+    "app/src/main/java/com/example/testresqmesh/core/network/transport/OutboundFrameReporter.kt": "c041bf99f8375bb423feaffc647b287af0ad53168a23241f8a17d897be1d713d"
+  }
+}

@@ -82,7 +82,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\check_docs.ps1
 git diff --check
 ```
 
-Run updated UI instrumentation on an available emulator; physical phones remain user-operated. Report compilation and execution separately. The unrelated reconnect fixture currently blocks full unit compilation; do not edit/delete it or silently exclude it to claim success.
+Run updated UI instrumentation on an available emulator; physical phones remain user-operated. Report compilation and execution separately. The reconnect fixture blocked unit compilation at the audit. The user subsequently authorized a separate TEST-01 fixture repair, recorded in [validation](../validation.md); do not silently exclude tests to claim success.
 
 Record before/after hashes for protected files and unrelated work using a separate scope-aware manifest. The old structure baseline has stale archived-document/tool entries: disclose them, preserve that baseline and verify protected content independently.
 

@@ -1,6 +1,6 @@
 # UI guidance
 
-Last reviewed: 2026-10-05. Earlier presentation baseline: `2e27013`; incident UI repairs are recorded on `fix/incident-ui-ux`. Use Compose/Material 3; inspect current source.
+Last reviewed: 2026-10-06. Earlier presentation baseline: `2e27013`; incident UI repairs are recorded on `fix/incident-ui-ux`. Use Compose/Material 3; inspect current source.
 
 ## Components and ownership
 
@@ -52,6 +52,8 @@ Background mesh is opt-in. Home/notification distinguish Bluetooth off, permissi
 Home peer chips open matching stable-ID Network details. Blocked peers stay in Blocked Devices (Direct Link Denied), with relay messaging when a route exists. Legacy Radar/terminal remains behind Debugging Mode; Settings owns offline maps.
 
 The terminal is bounded and session-only. Explicit categories are Connection, Sync, Transport, Routing, Security, System and Alerts. Summaries show endpoint/role/generation/readiness/transport; put heartbeat/relay chatter under Details. Newest first, pause follow while reading, and provide Latest/Sync jumps.
+
+Screen sections live within their features; saveable state, launchers, effects and coroutine scopes stay with original owners. The map canvas owns one MapView/observer/subscription/cleanup. The [size ledger](handoffs/maintainability-size-inventory.md) records ownership; [validation](validation.md) records UI-02's existing navigation failures.
 
 ## Accessibility and validation
 

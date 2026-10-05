@@ -20,7 +20,7 @@ class IncidentWithdrawalTransactionTest {
     private lateinit var database: AppDatabase
     private val id = "withdrawal-transaction"
 
-    @Before fun setUp() = runBlocking {
+    @Before fun setUp(): Unit = runBlocking {
         database = Room.inMemoryDatabaseBuilder(ApplicationProvider.getApplicationContext(), AppDatabase::class.java)
             .allowMainThreadQueries().build()
         database.incidentDao().insertOrUpdate(IncidentEntity(id, "R", "Reporter", "Medical", "Serious",

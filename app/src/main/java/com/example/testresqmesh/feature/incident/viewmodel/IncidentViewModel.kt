@@ -1,5 +1,7 @@
 package com.example.testresqmesh.feature.incident.viewmodel
 
+import com.example.testresqmesh.feature.incident.model.incidentMetrics
+import com.example.testresqmesh.feature.incident.model.selectIncidents
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.testresqmesh.data.local.entity.DomainEventEntity
@@ -21,58 +23,6 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
-
-enum class IncidentDestination(val label: String) {
-    ACTIVE("Active"),
-    MY_ACTIVITY("My activity"),
-    HISTORY("History")
-}
-
-typealias IncidentScope = IncidentDestination
-
-enum class AssistanceFilter(val label: String) {
-    ANY("Any"),
-    LOOKING_FOR_HELP("Looking for help"),
-    NO_OFFERS_YET("No offers yet")
-}
-
-data class IncidentFilterState(
-    val emergencyType: String? = null,
-    val urgency: String? = null,
-    val assistance: AssistanceFilter = AssistanceFilter.ANY
-) {
-    fun activeCount(destination: IncidentDestination): Int {
-        var count = 0
-        if (emergencyType != null) count++
-        if (urgency != null) count++
-        if (destination != IncidentDestination.HISTORY && assistance != AssistanceFilter.ANY) count++
-        return count
-    }
-}
-
-enum class TriageQuickFilter {
-    ALL,
-    NEEDS_TRIAGE,
-    CRITICAL_ONLY,
-    MY_TASKS,
-    UNASSISTED_ONLY
-}
-
-typealias IncidentTriageTab = IncidentDestination
-
-data class IncidentMetrics(
-    val totalActive: Int = 0,
-    val myActivityCount: Int = 0,
-    val historyCount: Int = 0,
-    val criticalCount: Int = 0
-)
-
-data class IncidentIdentityState(
-    val user: UserEntity? = null,
-    val signingKey: String? = null,
-    val loading: Boolean = true,
-    val error: String? = null
-)
 
 class IncidentViewModel(
     private val incidentRepository: IncidentRepository,
@@ -123,18 +73,7 @@ class IncidentViewModel(
     val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
 
     val metrics: StateFlow<IncidentMetrics> = combine(allIncidents, identityState, offersByIncident) { incidents, identity, offersMap ->
-        val active = incidents.filter { it.status !in setOf("RESOLVED", "CANCELLED") }
-        val history = incidents.filter { it.status in setOf("RESOLVED", "CANCELLED") }
-        val localKey = identity.signingKey
-        val myActivity = active.filter { inc ->
-            isInvolved(inc, offersMap[inc.incidentId].orEmpty(), identity.user?.userId, localKey)
-        }
-        IncidentMetrics(
-            totalActive = active.size,
-            myActivityCount = myActivity.size,
-            historyCount = history.size,
-            criticalCount = active.count { it.severity.equals("Critical", ignoreCase = true) }
-        )
+        incidentMetrics(incidents, identity, offersMap)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), IncidentMetrics())
 
     val filteredIncidents: StateFlow<List<IncidentEntity>> = combine(
@@ -156,78 +95,7 @@ class IncidentViewModel(
         val query = (args[5] as? String).orEmpty().trim().lowercase()
         val localKey = identity.signingKey
 
-        incidents.filter { incident ->
-            // 1. Destination filter
-            val matchesDest = when (currentDest) {
-                IncidentDestination.ACTIVE -> incident.status !in setOf("RESOLVED", "CANCELLED")
-                IncidentDestination.MY_ACTIVITY -> {
-                    incident.status !in setOf("RESOLVED", "CANCELLED") &&
-                        isInvolved(incident, offersMap[incident.incidentId].orEmpty(), user?.userId, localKey)
-                }
-                IncidentDestination.HISTORY -> incident.status in setOf("RESOLVED", "CANCELLED")
-            }
-            if (!matchesDest) return@filter false
-
-            // 2. Emergency Type filter
-            if (currentFilters.emergencyType != null &&
-                !incident.incidentType.equals(currentFilters.emergencyType, ignoreCase = true)
-            ) {
-                return@filter false
-            }
-
-            // 3. Urgency filter
-            if (currentFilters.urgency != null &&
-                !incident.severity.equals(currentFilters.urgency, ignoreCase = true)
-            ) {
-                return@filter false
-            }
-
-            // 4. Assistance filter (active destinations only)
-            if (currentDest != IncidentDestination.HISTORY) {
-                val activeOffers = offersMap[incident.incidentId].orEmpty().filter { !it.withdrawn }
-                when (currentFilters.assistance) {
-                    AssistanceFilter.ANY -> Unit
-                    AssistanceFilter.LOOKING_FOR_HELP -> {
-                        if (incident.status != "OPEN") return@filter false
-                    }
-                    AssistanceFilter.NO_OFFERS_YET -> {
-                        if (incident.status != "OPEN" || activeOffers.isNotEmpty()) return@filter false
-                    }
-                }
-            }
-
-            // 5. Keyword search query
-            if (query.isNotEmpty()) {
-                val matchesTitle = incident.title.lowercase().contains(query) ||
-                    incident.displayTitle().lowercase().contains(query)
-                val matchesDesc = incident.description.lowercase().contains(query)
-                val matchesLandmark = incident.areaDescription.lowercase().contains(query)
-                val matchesReporter = incident.creatorName.lowercase().contains(query)
-                val matchesHelper = (incident.primaryResponderName?.lowercase()?.contains(query) == true) ||
-                    offersMap[incident.incidentId].orEmpty().any { it.helperName.lowercase().contains(query) }
-                val matchesId = incident.incidentId.lowercase().contains(query)
-
-                if (!matchesTitle && !matchesDesc && !matchesLandmark && !matchesReporter && !matchesHelper && !matchesId) {
-                    return@filter false
-                }
-            }
-
-            true
-        }.sortedWith(
-            if (currentDest == IncidentDestination.HISTORY) {
-                // History: latest update descending, stable ID
-                compareByDescending<IncidentEntity> { it.updatedAt }.thenBy { it.incidentId }
-            } else {
-                // Active / My activity: urgency descending, latest update, stable ID
-                compareByDescending<IncidentEntity> {
-                    when (it.severity.lowercase()) {
-                        "critical" -> 3
-                        "serious" -> 2
-                        else -> 1
-                    }
-                }.thenByDescending { it.updatedAt }.thenBy { it.incidentId }
-            }
-        )
+        selectIncidents(incidents, user, offersMap, currentDest, currentFilters, query, localKey)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     fun setDestination(dest: IncidentDestination) {

@@ -4,13 +4,13 @@ Prepared: 2026-10-04. Updated: 2026-10-05. Status: physical cases UNTESTED; boun
 
 ## Build identity and setup
 
-Candidate: reviewed UI change set on `fix/incident-ui-ux`, based on `2c2b9fc`, including incident UI/navigation, tests, README and documentation. Version `1.0.1`/code `2`, debug signing, existing L2CAP enabled; no configuration changes. APK: `app/build/outputs/apk/debug/app-debug.apk`, SHA-256 `2EF834DED01EE73173DBB27D3E0FBB433D5CFEE2542B1E8C6DDD19A61127A097`. Install one matching candidate on every participant; preserve app data and keys. Users install, launch and operate physical phones.
+Candidate: UI commit `db2260e` on `fix/incident-ui-ux`, rebuilt during the separate TEST-01 fixture repair. Production source/configuration is unchanged. Version `1.0.1`/code `2`, debug signing, existing L2CAP enabled. APK: `app/build/outputs/apk/debug/app-debug.apk`, SHA-256 `B2061C4B213E538675D9F800D39F7EFECD510E31E15DE3E76345255D9563AE3B`. Install one matching candidate on every participant; preserve app data and keys. Users install, launch and operate physical phones.
 
 Earlier audit and installed-build identities remain in [validation](../validation.md). Their outcomes do not carry forward to this candidate.
 
 Use A reporter, B helper and C alternate helper. Record models/API, route, permissions, blocks and appearance. Use harmless test reports. For deterministic legacy/stale-state/key-unavailable cases, use Compose instrumentation fixtures; do not alter phone databases or identities to manufacture cases.
 
-Recorded emulator evidence: 18/18 incident UI tests passed on Medium_Phone/API 37, followed by 4/4 focused cases at 200% text (Night/Daylight details, footer and actual filter/search/reset). Screenshots confirm the full selected-helper mesh status and replacement label. This is partial fixture coverage of the cases below; physical steps, TalkBack, landscape, rotation and actual chat/history navigation remain UNTESTED. See [validation](../validation.md) for candidate identity, environment limits and remaining gate failures.
+Recorded emulator evidence belongs to the earlier `2EF834...` APK: 18/18 incident UI tests passed on Medium_Phone/API 37, followed by 4/4 focused cases at 200% text (Night/Daylight details, footer and actual filter/search/reset). Screenshots confirm the full selected-helper mesh status and replacement label. The rebuilt artifact has not been instrumented again. Physical steps, TalkBack, landscape, rotation and actual chat/history navigation remain UNTESTED. See [validation](../validation.md) for full identities, environment limits and remaining gates.
 
 ## Exact cases
 

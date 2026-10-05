@@ -60,14 +60,15 @@ class PrivateReceiptStorageTest {
         val accepted = ChatMessage(id = "accepted", senderName = "Alice#A001", text = "test", isMine = true,
             imageBase64 = null, audioBase64 = null, isPrivate = true, timestamp = System.currentTimeMillis())
         store.rows[accepted.id] = accepted
-        val awaitReceipt = MeshRepository::class.java.getDeclaredMethod("awaitPrivateReceipt", String::class.java).apply { isAccessible = true }
-        awaitReceipt.invoke(repo, accepted.id); runCurrent()
+        val deliveryOwner = MeshRepository::class.java.getDeclaredField("outbound").apply { isAccessible = true }.get(repo)
+        val awaitReceipt = deliveryOwner.javaClass.getDeclaredMethod("awaitPrivateReceipt", String::class.java).apply { isAccessible = true }
+        awaitReceipt.invoke(deliveryOwner, accepted.id); runCurrent()
         assertEquals(0L, testScheduler.currentTime)
         advanceTimeBy(15_000); runCurrent()
         assertEquals(listOf("PENDING"), store.rows[accepted.id]!!.deliveredTo)
         // Receipt confirmation wins over a later timeout.
         store.rows[accepted.id] = accepted.copy(seenBy = listOf("Bob#B001"))
-        awaitReceipt.invoke(repo, accepted.id); runCurrent(); advanceTimeBy(15_000); runCurrent()
+        awaitReceipt.invoke(deliveryOwner, accepted.id); runCurrent(); advanceTimeBy(15_000); runCurrent()
         assertEquals(listOf("Bob#B001"), store.rows[accepted.id]!!.seenBy)
         assertTrue(store.rows[accepted.id]!!.deliveredTo.isEmpty())
     }

@@ -1,14 +1,12 @@
 package com.example.testresqmesh.data.repository
 
-import com.example.testresqmesh.core.model.DomainEvent
-import com.example.testresqmesh.core.model.EntityType
-import com.example.testresqmesh.core.model.EventType
-import com.example.testresqmesh.core.model.IncidentState
+import com.example.testresqmesh.data.repository.incident.IncidentCommands
+import com.example.testresqmesh.data.repository.incident.IncidentEventIngestor
+import com.example.testresqmesh.data.repository.incident.LegacyIncidentProjection
+import com.example.testresqmesh.data.repository.incident.LegacyIncidentSync
 import com.example.testresqmesh.core.network.MeshNetworkGateway
 import com.example.testresqmesh.core.network.MeshPayload
 import com.example.testresqmesh.core.utils.AppLogger
-import com.example.testresqmesh.core.utils.TerminalLogCategory
-import com.example.testresqmesh.core.utils.TerminalLogLevel
 import com.example.testresqmesh.data.local.dao.DomainEventDao
 import com.example.testresqmesh.data.local.dao.IncidentDao
 import com.example.testresqmesh.data.local.dao.IncidentOfferDao
@@ -20,15 +18,10 @@ import com.example.testresqmesh.data.local.entity.IncidentEntity
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.flow.collect
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.encodeToByteArray
 import kotlinx.serialization.protobuf.ProtoBuf
-import org.json.JSONArray
 import org.json.JSONObject
 import java.util.UUID
 
@@ -44,11 +37,10 @@ class IncidentRepository(
     private val database: AppDatabase? = null,
     private val eventSigning: IncidentEventSigning? = null
 ) {
-    private val projectionMutex = Mutex()
+    private val ingestor: IncidentEventIngestor = createEventIngestor()
     private val helpWorkflow = if (offerDao != null && eventSigning != null)
         IncidentHelpWorkflow(database, incidentDao, offerDao, domainEventDao, identityManager,
             eventSigning, ::broadcastDomainEvent) else null
-    private var rebuilding = false
     private val syncStore = object : IncidentSyncStore {
         override suspend fun snapshot(): IncidentSyncSnapshot {
             suspend fun read(): IncidentSyncSnapshot {
@@ -62,9 +54,14 @@ class IncidentRepository(
         override suspend fun replay(incidentId: String) = replayPendingForIncident(incidentId)
         override suspend fun rebuild(incidentId: String) = rebuildProjection(incidentId)
     }
+    private val commands: IncidentCommands = createCommands()
+    private val projection: LegacyIncidentProjection = createLegacyIncidentProjection()
+    private val legacySync: LegacyIncidentSync = createLegacyIncidentSync()
+
     private val syncCoordinator = readyPeerEvents?.let {
         IncidentSyncCoordinator(networkGateway, it, syncStore, repositoryScope, ::startLegacyReconciliationWithPeer)
     }
+
     init {
         helpWorkflow?.let { workflow ->
             repositoryScope.launch {
@@ -139,579 +136,35 @@ class IncidentRepository(
         locationCapturedAt: Long? = null,
         locationAccuracyMeters: Float? = null,
         title: String = ""
-    ): IncidentEntity {
-        val cleanTitle = title.trim()
-        require(cleanTitle.length <= 80) { "Incident title cannot exceed 80 characters" }
-        val user = identityManager.getOrCreateUser()
-        val incidentId = "INC-${UUID.randomUUID().toString().replace("-", "").take(8).uppercase()}"
-        val eventId = "EVT-${UUID.randomUUID().toString().replace("-", "").take(8).uppercase()}"
-        val now = System.currentTimeMillis()
+    ): IncidentEntity = commands.createIncident(incidentType, severity, description, areaDescription, latitude, longitude, locationCapturedAt, locationAccuracyMeters, title)
 
-        val incident = IncidentEntity(
-            incidentId = incidentId,
-            creatorId = user.userId,
-            creatorName = user.displayName,
-            incidentType = incidentType,
-            severity = severity,
-            description = description,
-            areaDescription = areaDescription,
-            latitude = latitude,
-            longitude = longitude,
-            locationCapturedAt = locationCapturedAt,
-            locationAccuracyMeters = locationAccuracyMeters,
-            status = IncidentState.OPEN.name,
-            primaryResponderId = null,
-            primaryResponderName = null,
-            version = 1,
-            createdAt = now,
-            updatedAt = now,
-            workflowVersion = if (helpWorkflow != null) 2 else 1,
-            reporterSigningKey = eventSigning?.publicKey,
-            title = cleanTitle
-        )
+    suspend fun acknowledgeIncident(incidentId: String): Boolean = commands.acknowledgeIncident(incidentId)
 
-        val payloadJson = JSONObject().apply {
-            if (cleanTitle.isNotBlank()) {
-                put("title", cleanTitle)
-            }
-            put("incidentType", incidentType)
-            put("severity", severity)
-            put("description", description)
-            put("areaDescription", areaDescription)
-            if (helpWorkflow != null) {
-                put("workflowVersion", 2)
-                put("reporterSigningKey", eventSigning?.publicKey)
-            }
-            latitude?.let { put("latitude", it) }
-            longitude?.let { put("longitude", it) }
-            locationCapturedAt?.let { put("locationCapturedAt", it) }
-            locationAccuracyMeters?.let { put("locationAccuracyMeters", it) }
-        }.toString()
+    suspend fun assignIncident(incidentId: String): Boolean = commands.assignIncident(incidentId)
 
-        val unsignedEvent = DomainEventEntity(
-            eventId = eventId,
-            entityId = incidentId,
-            entityType = EntityType.INCIDENT.name,
-            eventType = EventType.INCIDENT_CREATED.name,
-            actorId = user.userId,
-            actorName = user.displayName,
-            logicalVersion = 1,
-            timestamp = now,
-            payloadJson = payloadJson,
-            applied = true
-        )
-        val event = if (helpWorkflow != null) unsignedEvent.copy(signature = eventSigning?.sign(unsignedEvent))
-            else unsignedEvent
+    suspend fun startResponding(incidentId: String): Boolean = commands.startResponding(incidentId)
 
-        suspend fun persist() {
-            incidentDao.insertOrUpdate(incident)
-            domainEventDao.insertEvent(event)
-        }
-        if (database != null) database.withTransaction { persist() } else persist()
+    suspend fun resolveIncident(incidentId: String): Boolean = commands.resolveIncident(incidentId)
 
-        AppLogger.event(
-            category = TerminalLogCategory.SYSTEM,
-            event = "INCIDENT_CREATED",
-            message = "Created new SOS Incident $incidentId by ${user.displayName}",
-            level = TerminalLogLevel.INFO,
-            tag = "INCIDENT_REPO"
-        )
+    suspend fun cancelIncident(incidentId: String): Boolean = commands.cancelIncident(incidentId)
 
-        broadcastDomainEvent(event, isP0 = true)
-        return incident
-    }
+    suspend fun releaseAssignment(incidentId: String): Boolean = commands.releaseAssignment(incidentId)
 
-    suspend fun acknowledgeIncident(incidentId: String): Boolean {
-        val current = incidentDao.getIncidentById(incidentId) ?: return false
-        val user = identityManager.getOrCreateUser()
-        if (!IncidentPolicy.mayPerform(current, EventType.INCIDENT_ACKNOWLEDGED.name, user.userId)) return false
-        val now = System.currentTimeMillis()
-        val newVersion = current.version + 1
-        val eventId = "EVT-${UUID.randomUUID().toString().replace("-", "").take(8).uppercase()}"
+    suspend fun applyIncomingEventJson(eventJson: String): Boolean = ingestor.applyIncomingEventJson(eventJson)
 
-        val updated = current.copy(
-            status = IncidentState.ACKNOWLEDGED.name,
-            version = newVersion,
-            updatedAt = now
-        )
+    suspend fun ingestIncomingEventJson(eventJson: String): IncidentIngestionResult = ingestor.ingestIncomingEventJson(eventJson)
 
-        val event = DomainEventEntity(
-            eventId = eventId,
-            entityId = incidentId,
-            entityType = EntityType.INCIDENT.name,
-            eventType = EventType.INCIDENT_ACKNOWLEDGED.name,
-            actorId = user.userId,
-            actorName = user.displayName,
-            logicalVersion = newVersion,
-            timestamp = now,
-            payloadJson = "{}",
-            applied = true
-        )
+    suspend fun applyIncomingEvent(event: DomainEventEntity): Boolean = ingestor.applyIncomingEvent(event)
 
-        incidentDao.insertOrUpdate(updated)
-        domainEventDao.insertEvent(event)
-        broadcastDomainEvent(event, isP0 = false)
-        return true
-    }
+    suspend fun ingestIncomingEvent(event: DomainEventEntity): IncidentIngestionResult = ingestor.ingestIncomingEvent(event)
 
-    suspend fun assignIncident(incidentId: String): Boolean {
-        val current = incidentDao.getIncidentById(incidentId) ?: return false
-        val user = identityManager.getOrCreateUser()
-        if (!IncidentPolicy.mayPerform(current, EventType.INCIDENT_ASSIGNED.name, user.userId)) return false
-        val now = System.currentTimeMillis()
-        val newVersion = current.version + 1
-        val eventId = "EVT-${UUID.randomUUID().toString().replace("-", "").take(8).uppercase()}"
 
-        val updated = current.copy(
-            status = IncidentState.ASSIGNED.name,
-            primaryResponderId = user.userId,
-            primaryResponderName = user.displayName,
-            version = newVersion,
-            updatedAt = now
-        )
 
-        val payloadJson = JSONObject().apply {
-            put("responderId", user.userId)
-            put("responderName", user.displayName)
-        }.toString()
 
-        val event = DomainEventEntity(
-            eventId = eventId,
-            entityId = incidentId,
-            entityType = EntityType.INCIDENT.name,
-            eventType = EventType.INCIDENT_ASSIGNED.name,
-            actorId = user.userId,
-            actorName = user.displayName,
-            logicalVersion = newVersion,
-            timestamp = now,
-            payloadJson = payloadJson,
-            applied = true
-        )
 
-        incidentDao.insertOrUpdate(updated)
-        domainEventDao.insertEvent(event)
-        broadcastDomainEvent(event, isP0 = true)
-        return true
-    }
+    private suspend fun applyLegacyProjection(event: DomainEventEntity): Boolean = projection.applyLegacyProjection(event)
 
-    suspend fun startResponding(incidentId: String): Boolean {
-        val current = incidentDao.getIncidentById(incidentId) ?: return false
-        val user = identityManager.getOrCreateUser()
-        if (!IncidentPolicy.mayPerform(current, EventType.INCIDENT_RESPONSE_STARTED.name, user.userId)) return false
-        val now = System.currentTimeMillis()
-        val newVersion = current.version + 1
-        val eventId = "EVT-${UUID.randomUUID().toString().replace("-", "").take(8).uppercase()}"
-
-        val updated = current.copy(
-            status = IncidentState.RESPONDING.name,
-            version = newVersion,
-            updatedAt = now
-        )
-
-        val event = DomainEventEntity(
-            eventId = eventId,
-            entityId = incidentId,
-            entityType = EntityType.INCIDENT.name,
-            eventType = EventType.INCIDENT_RESPONSE_STARTED.name,
-            actorId = user.userId,
-            actorName = user.displayName,
-            logicalVersion = newVersion,
-            timestamp = now,
-            payloadJson = "{}",
-            applied = true
-        )
-
-        incidentDao.insertOrUpdate(updated)
-        domainEventDao.insertEvent(event)
-        broadcastDomainEvent(event, isP0 = false)
-        return true
-    }
-
-    suspend fun resolveIncident(incidentId: String): Boolean {
-        val current = incidentDao.getIncidentById(incidentId) ?: return false
-        val user = identityManager.getOrCreateUser()
-        if (!IncidentPolicy.mayPerform(current, EventType.INCIDENT_RESOLVED.name, user.userId)) return false
-        val now = System.currentTimeMillis()
-        val newVersion = current.version + 1
-        val eventId = "EVT-${UUID.randomUUID().toString().replace("-", "").take(8).uppercase()}"
-
-        val updated = current.copy(
-            status = IncidentState.RESOLVED.name,
-            version = newVersion,
-            updatedAt = now
-        )
-
-        val event = DomainEventEntity(
-            eventId = eventId,
-            entityId = incidentId,
-            entityType = EntityType.INCIDENT.name,
-            eventType = EventType.INCIDENT_RESOLVED.name,
-            actorId = user.userId,
-            actorName = user.displayName,
-            logicalVersion = newVersion,
-            timestamp = now,
-            payloadJson = "{}",
-            applied = true
-        )
-
-        incidentDao.insertOrUpdate(updated)
-        domainEventDao.insertEvent(event)
-        broadcastDomainEvent(event, isP0 = false)
-        return true
-    }
-
-    suspend fun cancelIncident(incidentId: String): Boolean {
-        val current = incidentDao.getIncidentById(incidentId) ?: return false
-        val user = identityManager.getOrCreateUser()
-        if (!IncidentPolicy.mayPerform(current, EventType.INCIDENT_CANCELLED.name, user.userId)) return false
-        val now = System.currentTimeMillis()
-        val newVersion = current.version + 1
-        val eventId = "EVT-${UUID.randomUUID().toString().replace("-", "").take(8).uppercase()}"
-
-        val updated = current.copy(
-            status = IncidentState.CANCELLED.name,
-            version = newVersion,
-            updatedAt = now
-        )
-
-        val event = DomainEventEntity(
-            eventId = eventId,
-            entityId = incidentId,
-            entityType = EntityType.INCIDENT.name,
-            eventType = EventType.INCIDENT_CANCELLED.name,
-            actorId = user.userId,
-            actorName = user.displayName,
-            logicalVersion = newVersion,
-            timestamp = now,
-            payloadJson = "{}",
-            applied = true
-        )
-
-        incidentDao.insertOrUpdate(updated)
-        domainEventDao.insertEvent(event)
-        broadcastDomainEvent(event, isP0 = true)
-        return true
-    }
-
-    suspend fun releaseAssignment(incidentId: String): Boolean {
-        val current = incidentDao.getIncidentById(incidentId) ?: return false
-        val user = identityManager.getOrCreateUser()
-        if (!IncidentPolicy.mayPerform(current, EventType.INCIDENT_ASSIGNMENT_RELEASED.name, user.userId)) return false
-        val now = System.currentTimeMillis()
-        val event = DomainEventEntity(
-            eventId = "EVT-${UUID.randomUUID().toString().replace("-", "").take(8).uppercase()}",
-            entityId = incidentId,
-            entityType = EntityType.INCIDENT.name,
-            eventType = EventType.INCIDENT_ASSIGNMENT_RELEASED.name,
-            actorId = user.userId,
-            actorName = user.displayName,
-            logicalVersion = current.version + 1,
-            timestamp = now,
-            payloadJson = "{}",
-            applied = true
-        )
-        incidentDao.insertOrUpdate(current.copy(
-            status = IncidentState.ACKNOWLEDGED.name,
-            primaryResponderId = null,
-            primaryResponderName = null,
-            version = event.logicalVersion,
-            updatedAt = now
-        ))
-        domainEventDao.insertEvent(event)
-        broadcastDomainEvent(event, isP0 = false)
-        return true
-    }
-
-    suspend fun applyIncomingEventJson(eventJson: String): Boolean =
-        ingestIncomingEventJson(eventJson) == IncidentIngestionResult.APPLIED
-
-    suspend fun ingestIncomingEventJson(eventJson: String): IncidentIngestionResult {
-        return try {
-            val json = JSONObject(eventJson)
-            val event = DomainEventEntity(
-                eventId = json.getString("eventId"),
-                entityId = json.getString("entityId"),
-                entityType = json.getString("entityType"),
-                eventType = json.getString("eventType"),
-                actorId = json.getString("actorId"),
-                actorName = json.optString("actorName", ""),
-                logicalVersion = json.getLong("logicalVersion"),
-                timestamp = json.getLong("timestamp"),
-                payloadJson = json.optString("payloadJson", "{}"),
-                signature = json.optString("signature").takeIf { it.isNotBlank() },
-                applied = true
-            )
-            ingestIncomingEvent(event)
-        } catch (cancelled: CancellationException) {
-            throw cancelled
-        } catch (e: Exception) {
-            AppLogger.d("INCIDENT_REPO", "Failed to deserialize domain event")
-            IncidentIngestionResult.REJECTED
-        }
-    }
-
-    suspend fun applyIncomingEvent(event: DomainEventEntity): Boolean =
-        ingestIncomingEvent(event) == IncidentIngestionResult.APPLIED
-
-    suspend fun ingestIncomingEvent(event: DomainEventEntity): IncidentIngestionResult = projectionMutex.withLock {
-        ingestEventLocked(event)
-    }
-
-    private suspend fun ingestEventLocked(event: DomainEventEntity): IncidentIngestionResult {
-        var prior = domainEventDao.getEventById(event.eventId)
-        // Invalid first arrivals cannot reserve an ID against a later authentic original.
-        if (prior?.validationStatus == "REJECTED" &&
-            (prior.signature != event.signature || IncidentSyncSnapshot.eventHash(prior) != IncidentSyncSnapshot.eventHash(event))) {
-            domainEventDao.deleteRejectedEvent(event.eventId)
-            prior = null
-        }
-        if (prior != null && IncidentSyncSnapshot.eventHash(prior) != IncidentSyncSnapshot.eventHash(event)) {
-            AppLogger.d("INCIDENT_SYNC", "REJECTED reason=conflicting-event-id")
-            return IncidentIngestionResult.REJECTED
-        }
-        if (prior?.validationStatus == "REJECTED") return IncidentIngestionResult.REJECTED
-        if (prior?.applied == true) return IncidentIngestionResult.DUPLICATE
-        val applied = applyIncomingEventProjection(event)
-        val stored = domainEventDao.getEventById(event.eventId)
-        val result = when {
-            applied || stored?.applied == true -> IncidentIngestionResult.APPLIED
-            stored != null && stored.validationStatus != "REJECTED" -> IncidentIngestionResult.DEFERRED
-            else -> IncidentIngestionResult.REJECTED
-        }
-        if (result == IncidentIngestionResult.APPLIED) syncCoordinator?.changed()
-        if (result == IncidentIngestionResult.DEFERRED)
-            AppLogger.d("INCIDENT_SYNC", "DEPENDENCY_PENDING incident=${event.entityId}")
-        return result
-    }
-
-    private suspend fun applyIncomingEventProjection(event: DomainEventEntity): Boolean {
-        val existingIncident = incidentDao.getIncidentById(event.entityId)
-        if (existingIncident?.workflowVersion == 2 && event.eventType !in IncidentHelpWorkflow.TYPES &&
-            event.eventType !in setOf(EventType.INCIDENT_RESOLVED.name, EventType.INCIDENT_CANCELLED.name)) {
-            return rejectIncoming(event, "legacy action is not allowed on a helper workflow")
-        }
-        if (event.eventType in IncidentHelpWorkflow.TYPES ||
-            (event.eventType in setOf(EventType.INCIDENT_RESOLVED.name, EventType.INCIDENT_CANCELLED.name) &&
-                existingIncident?.workflowVersion == 2)) {
-            return if (rebuilding) helpWorkflow?.applyDuringReplay(event) ?: false else helpWorkflow?.apply(event) ?: false
-        }
-        return if (database != null) database.withTransaction { applyLegacyProjection(event) }
-            else applyLegacyProjection(event)
-    }
-
-    private suspend fun applyLegacyProjection(event: DomainEventEntity): Boolean {
-        // Deduplication: Has this exact business event been recorded already?
-        if (domainEventDao.getEventById(event.eventId)?.applied == true) {
-            AppLogger.d("INCIDENT_REPO", "Deduplication: Event ${event.eventId} already processed, skipping.")
-            return false
-        }
-
-        if (event.entityType != EntityType.INCIDENT.name) {
-            return rejectIncoming(event, "not an incident event")
-        }
-
-        val current = incidentDao.getIncidentById(event.entityId)
-        val isCompetingAssignment = event.eventType == EventType.INCIDENT_ASSIGNED.name &&
-            current?.status == IncidentState.ASSIGNED.name && event.logicalVersion == current.version
-        if (event.eventType == EventType.INCIDENT_CREATED.name && event.logicalVersion != 1L) {
-            domainEventDao.insertEvent(event.copy(applied = false, validationStatus = "REJECTED"))
-            return false
-        }
-        if (event.eventType != EventType.INCIDENT_CREATED.name && !isCompetingAssignment) {
-            if (current == null || event.logicalVersion > current.version + 1L) {
-                domainEventDao.insertEvent(event.copy(applied = false, validationStatus = "UNVERIFIED"))
-                return false
-            }
-            if (!IncidentPolicy.mayPerform(current, event.eventType, event.actorId) || event.logicalVersion != current.version + 1L)
-                return rejectIncoming(event, "invalid legacy authority or version")
-        }
-        val applied = when (event.eventType) {
-            EventType.INCIDENT_CREATED.name -> {
-                if (current != null) {
-                    AppLogger.d("INCIDENT_REPO", "Incident ${event.entityId} already exists, ignoring creation.")
-                    false
-                } else {
-                    val p = JSONObject(event.payloadJson)
-                    val workflowVersion = p.optInt("workflowVersion", 1)
-                    val reporterKey = p.optString("reporterSigningKey").takeIf { it.isNotBlank() }
-                    if (workflowVersion == 2 && (reporterKey == null ||
-                            eventSigning?.verify(event, reporterKey) != true)) {
-                        return rejectIncoming(event, "invalid reporter identity")
-                    }
-                    val incomingTitle = if (p.has("title")) {
-                        val raw = p.opt("title")
-                        if (raw == null || raw == JSONObject.NULL) {
-                            ""
-                        } else if (raw !is String) {
-                            return rejectIncoming(event, "title must be a text string")
-                        } else {
-                            val trimmed = raw.trim()
-                            if (trimmed.length > 80) {
-                                return rejectIncoming(event, "title cannot exceed 80 characters")
-                            }
-                            trimmed
-                        }
-                    } else {
-                        ""
-                    }
-                    val newIncident = IncidentEntity(
-                        incidentId = event.entityId,
-                        creatorId = event.actorId,
-                        creatorName = event.actorName,
-                        incidentType = p.optString("incidentType", "Emergency"),
-                        severity = p.optString("severity", "Critical"),
-                        description = p.optString("description", ""),
-                        areaDescription = p.optString("areaDescription", ""),
-                        latitude = p.optionalDouble("latitude"),
-                        longitude = p.optionalDouble("longitude"),
-                        locationCapturedAt = p.optionalLong("locationCapturedAt"),
-                        locationAccuracyMeters = p.optionalFloat("locationAccuracyMeters"),
-                        status = IncidentState.OPEN.name,
-                        primaryResponderId = null,
-                        primaryResponderName = null,
-                        version = event.logicalVersion,
-                        createdAt = event.timestamp,
-                        updatedAt = event.timestamp,
-                        workflowVersion = workflowVersion,
-                        reporterSigningKey = reporterKey,
-                        title = incomingTitle
-                    )
-                    if (workflowVersion == 2 && database != null) {
-                        database.withTransaction {
-                            incidentDao.insertOrUpdate(newIncident)
-                            domainEventDao.insertEvent(event.copy(applied = true))
-                            domainEventDao.setApplied(event.eventId, true)
-                            domainEventDao.setValidationStatus(event.eventId, "ACCEPTED")
-                        }
-                        return true
-                    }
-                    incidentDao.insertOrUpdate(newIncident)
-                    true
-                }
-            }
-            EventType.INCIDENT_ACKNOWLEDGED.name -> {
-                if (current != null) {
-                    incidentDao.insertOrUpdate(
-                        current.copy(
-                            status = IncidentState.ACKNOWLEDGED.name,
-                            version = event.logicalVersion,
-                            updatedAt = event.timestamp
-                        )
-                    )
-                    true
-                } else false
-            }
-            EventType.INCIDENT_ASSIGNED.name -> {
-                if (current != null) {
-                    val p = JSONObject(event.payloadJson)
-                    val newResponderId = p.optString("responderId", event.actorId)
-                    val newResponderName = p.optString("responderName", event.actorName)
-                    if (newResponderId != event.actorId) return rejectIncoming(event, "assignment responder differs from actor")
-
-                    // Conflict resolution if already assigned
-                    if (current.status == IncidentState.ASSIGNED.name) {
-                        val existingAssignmentEvent = domainEventDao.getEventsForEntity(event.entityId)
-                            .firstOrNull {
-                                it.eventType == EventType.INCIDENT_ASSIGNED.name &&
-                                    it.logicalVersion == current.version && it.applied
-                            }
-                        // Deterministic conflict winner: earliest timestamp, then event ID.
-                        val isEarlier = event.timestamp < current.updatedAt ||
-                                (event.timestamp == current.updatedAt &&
-                                    event.eventId < (existingAssignmentEvent?.eventId ?: "~"))
-                        if (isEarlier) {
-                            incidentDao.insertOrUpdate(
-                                current.copy(
-                                    primaryResponderId = newResponderId,
-                                    primaryResponderName = newResponderName,
-                                    version = event.logicalVersion,
-                                    updatedAt = event.timestamp
-                                )
-                            )
-                            true
-                        } else {
-                            AppLogger.d("INCIDENT_REPO", "Assignment conflict: keeping existing responder ${current.primaryResponderName}")
-                            false
-                        }
-                    } else if (IncidentPolicy.mayPerform(current, event.eventType, event.actorId)) {
-                        incidentDao.insertOrUpdate(
-                            current.copy(
-                                status = IncidentState.ASSIGNED.name,
-                                primaryResponderId = newResponderId,
-                                primaryResponderName = newResponderName,
-                                version = event.logicalVersion,
-                                updatedAt = event.timestamp
-                            )
-                        )
-                        true
-                    } else false
-                } else false
-            }
-            EventType.INCIDENT_RESPONSE_STARTED.name -> {
-                if (current != null) {
-                    incidentDao.insertOrUpdate(
-                        current.copy(
-                            status = IncidentState.RESPONDING.name,
-                            version = event.logicalVersion,
-                            updatedAt = event.timestamp
-                        )
-                    )
-                    true
-                } else false
-            }
-            EventType.INCIDENT_RESOLVED.name -> {
-                if (current != null) {
-                    incidentDao.insertOrUpdate(
-                        current.copy(
-                            status = IncidentState.RESOLVED.name,
-                            version = event.logicalVersion,
-                            updatedAt = event.timestamp
-                        )
-                    )
-                    true
-                } else false
-            }
-            EventType.INCIDENT_CANCELLED.name -> {
-                if (current != null) {
-                    incidentDao.insertOrUpdate(
-                        current.copy(
-                            status = IncidentState.CANCELLED.name,
-                            version = event.logicalVersion,
-                            updatedAt = event.timestamp
-                        )
-                    )
-                    true
-                } else false
-            }
-            EventType.INCIDENT_ASSIGNMENT_RELEASED.name -> {
-                if (current != null) {
-                    incidentDao.insertOrUpdate(
-                        current.copy(
-                            status = IncidentState.ACKNOWLEDGED.name,
-                            primaryResponderId = null,
-                            primaryResponderName = null,
-                            version = event.logicalVersion,
-                            updatedAt = event.timestamp
-                        )
-                    )
-                    true
-                } else false
-            }
-            else -> false
-        }
-
-        domainEventDao.insertEvent(event.copy(applied = applied))
-        domainEventDao.setApplied(event.eventId, applied)
-        domainEventDao.setValidationStatus(event.eventId, if (applied) "ACCEPTED" else "REJECTED")
-        return applied
-    }
-
-    private suspend fun rejectIncoming(event: DomainEventEntity, reason: String): Boolean {
-        AppLogger.d("INCIDENT_REPO", "Rejected incident event ${event.eventId}: $reason")
-        domainEventDao.insertEvent(event.copy(applied = false, validationStatus = "REJECTED"))
-        domainEventDao.setValidationStatus(event.eventId, "REJECTED")
-        return false
-    }
+    private suspend fun rejectIncoming(event: DomainEventEntity, reason: String): Boolean = projection.rejectIncoming(event, reason)
 
     private fun broadcastDomainEvent(event: DomainEventEntity, isP0: Boolean) {
         repositoryScope.launch {
@@ -750,14 +203,11 @@ class IncidentRepository(
         }
     }
 
-    private fun JSONObject.optionalDouble(name: String): Double? =
-        if (has(name) && !isNull(name)) getDouble(name) else null
 
-    private fun JSONObject.optionalLong(name: String): Long? =
-        if (has(name) && !isNull(name)) getLong(name) else null
 
-    private fun JSONObject.optionalFloat(name: String): Float? =
-        if (has(name) && !isNull(name)) getDouble(name).toFloat() else null
+
+
+
 
     private fun forwardAcceptedDomainEvent(payload: MeshPayload, sourceEndpointId: String) {
         val canRelay = if (payload.ttl > 0) payload.ttl > 1 else payload.relayHopCount < 6
@@ -779,222 +229,60 @@ class IncidentRepository(
         else startLegacyReconciliationWithPeer(endpointId)
     }
 
-    private fun startLegacyReconciliationWithPeer(endpointId: String) {
-        repositoryScope.launch {
-            if (!networkGateway.hasReadyEndpoint(endpointId)) return@launch
-            requestEventPage(endpointId, 0)
-            val summaries = incidentDao.getRecentIncidentsForSync(MAX_SYNC_INCIDENTS)
-            val json = JSONObject().apply {
-                put("type", "SYNC_SUMMARY")
-                put("protocol", SYNC_PROTOCOL)
-                put("incidents", JSONArray().apply {
-                    summaries.forEach { incident -> put(JSONObject().apply {
-                        put("incidentId", incident.incidentId)
-                        put("version", incident.version)
-                    }) }
-                })
-            }.toString()
+    private fun startLegacyReconciliationWithPeer(endpointId: String) = legacySync.startLegacyReconciliationWithPeer(endpointId)
 
-            val payload = MeshPayload(
-                id = UUID.randomUUID().toString(),
-                type = "EVENT_SYNC_REQ",
-                senderName = networkGateway.myDeviceName,
-                senderNodeId = networkGateway.myNodeId,
-                text = json
-            )
-            val bytes = ProtoBuf.encodeToByteArray(payload)
-            dispatchLegacyPayload(endpointId, bytes)
-        }
-    }
+    suspend fun handleSyncRequest(endpointId: String, text: String) = legacySync.handleSyncRequest(endpointId, text)
 
-    suspend fun handleSyncRequest(endpointId: String, text: String) {
-        try {
-            val json = JSONObject(text)
-            if (json.optString("type") == "INCIDENT_EVENT_PAGE") {
-                val offset = json.optInt("offset").coerceAtLeast(0)
-                val page = domainEventDao.getSyncPage(MAX_SYNC_EVENTS + 1, offset)
-                val events = page.take(MAX_SYNC_EVENTS)
-                val response = MeshPayload(
-                    id = UUID.randomUUID().toString(), type = "EVENT_SYNC_RESP",
-                    senderName = networkGateway.myDeviceName,
-                    senderNodeId = networkGateway.myNodeId,
-                    text = JSONObject().put("type", "INCIDENT_EVENT_PAGE")
-                        .put("nextOffset", offset + events.size)
-                        .put("hasMore", page.size > MAX_SYNC_EVENTS)
-                        .put("events", JSONArray().apply { events.forEach { put(eventToJson(it)) } })
-                        .toString()
-                )
-                dispatchLegacyPayload(endpointId, ProtoBuf.encodeToByteArray(response))
-                return
-            }
-            if (json.optInt("protocol", SYNC_PROTOCOL) != SYNC_PROTOCOL) return
-            val peerVersions = mutableMapOf<String, Long>()
-            val summaries = json.optJSONArray("incidents")
-            if (summaries != null) {
-                for (i in 0 until summaries.length()) {
-                    val summary = summaries.getJSONObject(i)
-                    peerVersions[summary.getString("incidentId")] = summary.optLong("version", 0L)
-                }
-            }
-            val eventsToSend = mutableListOf<DomainEventEntity>()
-            incidentDao.getRecentIncidentsForSync(MAX_SYNC_INCIDENTS).forEach { incident ->
-                val knownVersion = peerVersions[incident.incidentId] ?: 0L
-                if (knownVersion < incident.version && eventsToSend.size < MAX_SYNC_EVENTS) {
-                    eventsToSend += domainEventDao.getEventsAfterVersion(
-                        incident.incidentId,
-                        knownVersion,
-                        MAX_SYNC_EVENTS - eventsToSend.size
-                    )
-                }
-            }
-            if (eventsToSend.isNotEmpty()) {
-                val eventsArray = JSONArray()
-                eventsToSend.forEach { e ->
-                    eventsArray.put(JSONObject().apply {
-                        put("eventId", e.eventId)
-                        put("entityId", e.entityId)
-                        put("entityType", e.entityType)
-                        put("eventType", e.eventType)
-                        put("actorId", e.actorId)
-                        put("actorName", e.actorName)
-                        put("logicalVersion", e.logicalVersion)
-                        put("timestamp", e.timestamp)
-                        put("payloadJson", e.payloadJson)
-                        e.signature?.let { put("signature", it) }
-                    })
-                }
+    suspend fun handleSyncResponse(endpointId: String, text: String) = legacySync.handleSyncResponse(endpointId, text)
 
-                val respPayload = MeshPayload(
-                    id = UUID.randomUUID().toString(),
-                    type = "EVENT_SYNC_RESP",
-                    senderName = networkGateway.myDeviceName,
-                    senderNodeId = networkGateway.myNodeId,
-                    text = JSONObject().apply {
-                        put("events", eventsArray)
-                        put("hasMore", eventsToSend.size >= MAX_SYNC_EVENTS)
-                    }.toString()
-                )
-                val bytes = ProtoBuf.encodeToByteArray(respPayload)
-                dispatchLegacyPayload(endpointId, bytes)
-            }
-        } catch (e: Exception) {
-            AppLogger.d("INCIDENT_REPO", "Failed handling sync request: ${e.message}")
-        }
-    }
 
-    suspend fun handleSyncResponse(endpointId: String, text: String) {
-        try {
-            val response = JSONObject(text)
-            val eventsArray = response.optJSONArray("events") ?: JSONArray()
-            for (i in 0 until eventsArray.length()) {
-                val item = eventsArray.getJSONObject(i)
-                applyIncomingEventJson(item.toString())
-            }
-            eventsArray.let {
-                for (i in 0 until it.length()) replayPendingForIncident(it.getJSONObject(i).optString("entityId"))
-            }
-            if (response.optString("type") == "INCIDENT_EVENT_PAGE") {
-                if (response.optBoolean("hasMore", false) && networkGateway.hasReadyEndpoint(endpointId))
-                    requestEventPage(endpointId, response.optInt("nextOffset"))
-                return
-            }
-            if (response.optBoolean("hasMore", false) && networkGateway.hasReadyEndpoint(endpointId)) {
-                startReconciliationWithPeer(endpointId)
-            }
-        } catch (e: Exception) {
-            AppLogger.d("INCIDENT_REPO", "Failed handling sync response: ${e.message}")
-        }
-    }
 
-    private companion object {
-        const val SYNC_PROTOCOL = 1
-        const val MAX_SYNC_INCIDENTS = 24
-        const val MAX_SYNC_EVENTS = 24
-    }
 
-    private fun eventToJson(event: DomainEventEntity): JSONObject = JSONObject().apply {
-        put("eventId", event.eventId)
-        put("entityId", event.entityId)
-        put("entityType", event.entityType)
-        put("eventType", event.eventType)
-        put("actorId", event.actorId)
-        put("actorName", event.actorName)
-        put("logicalVersion", event.logicalVersion)
-        put("timestamp", event.timestamp)
-        put("payloadJson", event.payloadJson)
-        event.signature?.let { put("signature", it) }
-    }
 
-    private fun requestEventPage(endpointId: String, offset: Int) {
-        val request = MeshPayload(
-            id = UUID.randomUUID().toString(), type = "EVENT_SYNC_REQ",
-            senderName = networkGateway.myDeviceName,
-            senderNodeId = networkGateway.myNodeId,
-            text = JSONObject().put("type", "INCIDENT_EVENT_PAGE")
-                .put("offset", offset).toString()
-        )
-        dispatchLegacyPayload(endpointId, ProtoBuf.encodeToByteArray(request))
-    }
 
-    private fun dispatchLegacyPayload(endpointId: String, bytes: ByteArray) {
-        repositoryScope.launch {
-            repeat(4) { attempt ->
-                if (!networkGateway.hasReadyEndpoint(endpointId)) return@launch
-                val result = networkGateway.sendDirectPayload(endpointId, bytes)
-                AppLogger.d("INCIDENT_SYNC", "LEGACY_SEND endpoint=$endpointId accepted=${result.accepted} bytes=${bytes.size}")
-                if (result.accepted) return@launch
-                if (attempt < 3) delay(longArrayOf(2_000, 4_000, 8_000)[attempt])
-            }
-        }
-    }
 
-    private suspend fun replayPendingForIncident(incidentId: String) {
-        if (incidentId.isBlank()) return
-        helpWorkflow?.reconcileWithdrawnSelection(incidentId)
-        while (true) {
-            var progressed = false
-            // Helper revision streams do not share the reporter's logical version. Drain
-            // available offer changes before reporter closure, including legacy empty payloads.
-            domainEventDao.getUnappliedForIncident(incidentId)
-                .sortedBy { if (it.eventType in IncidentHelpWorkflow.OFFER_TYPES) 0 else 1 }
-                .forEach { pending ->
-                if (applyIncomingEvent(pending)) {
-                    progressed = true
-                    broadcastDomainEvent(pending, pending.eventType == EventType.INCIDENT_LEAD_SELECTED.name ||
-                        pending.eventType == EventType.INCIDENT_CANCELLED.name)
-                }
-            }
-            if (!progressed) return
-        }
-    }
 
-    private suspend fun rebuildProjection(incidentId: String) = projectionMutex.withLock {
-        suspend fun rebuild() {
-            suspend fun work() {
-                val original = domainEventDao.getEventsForEntity(incidentId)
-                    .filter { it.validationStatus == "ACCEPTED" }
-                if (original.none { it.eventType == EventType.INCIDENT_CREATED.name }) return
-                incidentDao.deleteIncident(incidentId)
-                offerDao?.deleteForIncident(incidentId)
-                domainEventDao.resetIncidentApplication(incidentId)
-                rebuilding = true
-                try {
-                    var pending = original.sortedWith(compareBy<DomainEventEntity> {
-                        if (it.eventType == EventType.INCIDENT_CREATED.name) 0 else if (it.eventType in IncidentHelpWorkflow.OFFER_TYPES) 1 else 2
-                    }.thenBy { it.logicalVersion }.thenBy { it.eventId })
-                    while (pending.isNotEmpty()) {
-                        var progressed = false
-                        pending.forEach { if (ingestEventLocked(it) == IncidentIngestionResult.APPLIED) progressed = true }
-                        pending = pending.filter { domainEventDao.getEventById(it.eventId)?.applied != true }
-                        if (!progressed) break
-                    }
-                    check(incidentDao.getIncidentById(incidentId) != null)
-                    check(pending.isEmpty()) { "history replay incomplete" }
-                    AppLogger.d("INCIDENT_SYNC", "PROJECTION_REBUILT incident=$incidentId")
-                } finally { rebuilding = false }
-            }
-            if (database != null) database.withTransaction { work() } else work()
-        }
-        if (helpWorkflow != null) helpWorkflow.withReplayLock { rebuild() } else rebuild()
-    }
+
+    private suspend fun replayPendingForIncident(incidentId: String) = ingestor.replayPendingForIncident(incidentId)
+
+    private suspend fun rebuildProjection(incidentId: String) = ingestor.rebuildProjection(incidentId)
+
+    private fun createCommands() = IncidentCommands(
+        incidentDao,
+        domainEventDao,
+        identityManager,
+        database,
+        eventSigning,
+        { helpWorkflow },
+        ::broadcastDomainEvent
+    )
+
+    private fun createEventIngestor() = IncidentEventIngestor(
+        incidentDao,
+        domainEventDao,
+        offerDao,
+        database,
+        { helpWorkflow },
+        { syncCoordinator },
+        ::broadcastDomainEvent,
+        ::applyLegacyProjection,
+        ::rejectIncoming
+    )
+
+    private fun createLegacyIncidentProjection() = LegacyIncidentProjection(
+        incidentDao,
+        domainEventDao,
+        database,
+        eventSigning
+    )
+
+    private fun createLegacyIncidentSync() = LegacyIncidentSync(
+        incidentDao,
+        domainEventDao,
+        networkGateway,
+        repositoryScope,
+        ::applyIncomingEventJson,
+        ::replayPendingForIncident,
+        ::startReconciliationWithPeer
+    )
 }

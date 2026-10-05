@@ -562,4 +562,43 @@ class IncidentUiTest {
         rule.onAllNodesWithText("Miguel")[0].performScrollTo().performClick()
         assertEquals("HN", NodeIdentity.idOf(target))
     }
+    @Test
+    fun reportDraftAndSelectionsSurviveStateRestoration() {
+        val restoration = androidx.compose.ui.test.junit4.StateRestorationTester(rule)
+        var submitted: List<String>? = null
+        restoration.setContent {
+            TestResQMeshTheme {
+                CreateIncidentSheet(onDismiss = {}, onSubmit = { title, type, severity, desc, _, _, _, _, _ ->
+                    submitted = listOf(title, type, severity, desc)
+                })
+            }
+        }
+        rule.onNodeWithText("Title *").performScrollTo().performTextInput("Need transport")
+        Espresso.closeSoftKeyboard()
+        rule.onNodeWithText("Medical").performScrollTo().performClick()
+        rule.onNodeWithText("Serious").performScrollTo().performClick()
+        restoration.emulateSavedInstanceStateRestore()
+        rule.onNodeWithText("Need transport").performScrollTo().assertIsDisplayed()
+        rule.onNodeWithText("Broadcast Request to Mesh Network").assertIsDisplayed().performClick()
+        rule.runOnIdle { assertEquals(listOf("Need transport", "Medical", "Serious", ""), submitted) }
+    }
+
+    @Test
+    fun offerEditorAndDraftSurviveStateRestoration() {
+        val restoration = androidx.compose.ui.test.junit4.StateRestorationTester(rule)
+        var submitted: String? = null
+        restoration.setContent {
+            TestResQMeshTheme {
+                Detail(user = "visitor", key = "visitor-key", onOffer = { submitted = it })
+            }
+        }
+        rule.onNodeWithText("Offer help").performClick()
+        rule.onNodeWithText("How can you assist? *").performScrollTo().performTextInput("First aid kit ready")
+        Espresso.closeSoftKeyboard()
+        restoration.emulateSavedInstanceStateRestore()
+        rule.onNodeWithText("First aid kit ready").performScrollTo().assertIsDisplayed()
+        rule.onNodeWithText("Transmit help offer").performScrollTo().performClick()
+        rule.runOnIdle { assertEquals("First aid kit ready", submitted) }
+    }
+
 }

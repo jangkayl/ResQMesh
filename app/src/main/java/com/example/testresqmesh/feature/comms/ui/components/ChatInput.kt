@@ -1,5 +1,8 @@
 package com.example.testresqmesh.feature.comms.ui.components
 
+import com.example.testresqmesh.feature.comms.ui.components.composer.LocationAcquisitionBanner
+import com.example.testresqmesh.feature.comms.ui.components.composer.ComposerAttachmentPreview
+import com.example.testresqmesh.feature.comms.ui.components.composer.ComposerActionPopup
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -27,7 +30,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -206,215 +208,28 @@ fun ChatInput(
             }
         }
 
-        // GPS Satellite Acquisition Progress Banner
-        androidx.compose.animation.AnimatedVisibility(
-            visible = isAcquiringLocation,
-            enter = fadeIn() + androidx.compose.animation.expandVertically(),
-            exit = fadeOut() + androidx.compose.animation.shrinkVertically()
-        ) {
-            Surface(
-                shape = RoundedCornerShape(14.dp),
-                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.90f),
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 8.dp, vertical = 4.dp),
-                shadowElevation = 6.dp
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 12.dp, vertical = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(18.dp),
-                            strokeWidth = 2.2.dp,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                        Spacer(Modifier.width(10.dp))
-                        Column {
-                            Text(
-                                text = "ACQUIRING GPS LOCK...",
-                                style = MaterialTheme.typography.labelSmall,
-                                fontFamily = FontFamily.Monospace,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer
-                            )
-                            Text(
-                                text = "Triangulating precision fix before sending",
-                                style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp),
-                                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.75f)
-                            )
-                        }
-                    }
-                    Surface(
-                        shape = RoundedCornerShape(6.dp),
-                        color = ResQTheme.colors.success.copy(alpha = 0.2f),
-                        border = BorderStroke(1.dp, ResQTheme.colors.success.copy(alpha = 0.4f))
-                    ) {
-                        Text(
-                            text = "SATELLITE",
-                            style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp, fontFamily = FontFamily.Monospace),
-                            fontWeight = FontWeight.Bold,
-                            color = ResQTheme.colors.success,
-                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                        )
-                    }
-                }
-            }
-        }
+        LocationAcquisitionBanner(isAcquiringLocation)
 
-        // 2. Pending Attachments Preview
-        if (pendingImage != null || pendingAudio != null) {
-            Surface(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 8.dp, vertical = 4.dp),
-                shape = RoundedCornerShape(14.dp),
-                color = MaterialTheme.colorScheme.surfaceVariant,
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 12.dp, vertical = 6.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        imageVector = if (pendingImage != null) Icons.Outlined.Image else Icons.Outlined.Mic,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(18.dp)
-                    )
-                    Spacer(Modifier.width(8.dp))
-                    Text(
-                        text = if (pendingImage != null) stringResource(R.string.private_chat_photo) else stringResource(R.string.private_chat_voice_note),
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        modifier = Modifier.weight(1f)
-                    )
-                    IconButton(
-                        onClick = { if (pendingImage != null) onClearImage() else onClearAudio() },
-                        modifier = Modifier.size(24.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Outlined.Close,
-                            contentDescription = stringResource(R.string.private_chat_remove_attachment),
-                            modifier = Modifier.size(16.dp)
-                        )
-                    }
-                }
-            }
-        }
+        ComposerAttachmentPreview(pendingImage, pendingAudio, onClearImage, onClearAudio)
 
-        // 3. Floating Glassmorphic Bubble (Pops up above when typing and '+' is clicked)
-        AnimatedVisibility(
-            visible = isTyping && isPopupExpanded,
-            enter = fadeIn(tween(180)) + slideInVertically(animationSpec = spring(dampingRatio = Spring.DampingRatioLowBouncy)) { it / 2 } + scaleIn(initialScale = 0.85f),
-            exit = fadeOut(tween(140)) + slideOutVertically(tween(140)) { it / 2 } + scaleOut(targetScale = 0.85f)
-        ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(start = 8.dp, bottom = 6.dp),
-                contentAlignment = Alignment.BottomStart
-            ) {
-                Surface(
-                    shape = RoundedCornerShape(22.dp),
-                    color = Color(0xFF0F131D).copy(alpha = 0.94f),
-                    border = BorderStroke(1.2.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.45f)),
-                    shadowElevation = 14.dp
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        // Photo Attachment Button
-                        Surface(
-                            shape = CircleShape,
-                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
-                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.35f)),
-                            onClick = {
+        ComposerActionPopup(isTyping, isPopupExpanded, isAcquiringLocation,
+            onPickImage = {
                                 haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                 imagePicker.launch("image/*")
                                 isPopupExpanded = false
                             },
-                            modifier = Modifier.size(38.dp)
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Icon(
-                                    imageVector = Icons.Outlined.Image,
-                                    contentDescription = stringResource(R.string.private_chat_add_image_action),
-                                    tint = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.size(19.dp)
-                                )
-                            }
-                        }
-
-                        // Location Sharing Button
-                        Surface(
-                            shape = CircleShape,
-                            color = ResQTheme.colors.success.copy(alpha = 0.15f),
-                            border = BorderStroke(1.dp, ResQTheme.colors.success.copy(alpha = 0.35f)),
-                            onClick = {
+            onPickLocation = {
                                 if (!isAcquiringLocation) {
                                     haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                     onSendLocation()
                                     isPopupExpanded = false
                                 }
                             },
-                            modifier = Modifier.size(38.dp)
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                if (isAcquiringLocation) {
-                                    CircularProgressIndicator(
-                                        modifier = Modifier.size(18.dp),
-                                        strokeWidth = 2.dp,
-                                        color = ResQTheme.colors.success
-                                    )
-                                } else {
-                                    Icon(
-                                        imageVector = Icons.Outlined.LocationOn,
-                                        contentDescription = stringResource(R.string.private_chat_share_location_action),
-                                        tint = ResQTheme.colors.success,
-                                        modifier = Modifier.size(19.dp)
-                                    )
-                                }
-                            }
-                        }
-
-                        // Voice Recording Button
-                        Surface(
-                            shape = CircleShape,
-                            color = ResQTheme.colors.sos.copy(alpha = 0.15f),
-                            border = BorderStroke(1.dp, ResQTheme.colors.sos.copy(alpha = 0.35f)),
-                            onClick = {
+            onRecord = {
                                 haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                 onToggleRecord()
                                 isPopupExpanded = false
-                            },
-                            modifier = Modifier.size(38.dp)
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Icon(
-                                    imageVector = Icons.Outlined.Mic,
-                                    contentDescription = stringResource(R.string.private_chat_record_action),
-                                    tint = ResQTheme.colors.sos,
-                                    modifier = Modifier.size(19.dp)
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-        }
+                            })
 
         // 4. Floating Frosted-Glass Composer Row
         ResQGlassSurface(

@@ -1,6 +1,6 @@
 # Validation
 
-Last reviewed: 2026-10-05. Branch: `fix/incident-ui-ux`; UI candidate based on `2c2b9fc`. Earlier presentation source baseline: `2e27013`.
+Last reviewed: 2026-10-06. Branch: `fix/incident-ui-ux`; networking baseline `db2260e`. Earlier presentation baseline: `2e27013`.
 
 Local checks, executed instrumentation, user reports and analyzed captures are different evidence. Users install and operate physical phones.
 
@@ -34,33 +34,29 @@ powershell -ExecutionPolicy Bypass -File .\scripts\check_docs.ps1
 git diff --check
 ```
 
-The documented pre-existing untracked reconnect fixture blocks standard mixed-workspace unit-test compilation. Focused or clean-snapshot results do not waive this blocker. No Android suite or physical tests were run for the earlier documentation-only synchronization.
+Earlier mixed-workspace unit compilation was blocked by the untracked reconnect fixture. Its separately authorized repair is recorded below. No Android suite or physical tests ran for the documentation-only synchronization.
 
-### Antigravity's recorded UI repair, October 4
+### October 4–5 UI and fixture snapshots
 
-Antigravity recorded debug build, Android-test compilation, Lint (zero errors, 147 warnings, three hints), docs and diff hygiene success. Its six source repairs removed unsupported readiness/hardware claims, restored search/advanced filters, clarified Critical only, normalized guidance, restored secondary actions and wrapped the card footer. These recorded results belong to that snapshot; they do not validate subsequent edits. Unit compilation remained blocked by 18 diagnostics in the preserved untracked `PrivateReconnectDeliveryTest.kt` (TEST-01).
+Full audit narratives, historical APK hashes and original limitations are preserved in the [October 5 validation snapshot](../archive/docs-superseded-2026-10-05/README.md).
 
-Repaired candidate debug APK SHA-256: `11F6D282A3945CDFE4A5FEFDB436184A8DA20D8B2F56C4BC905D4CFF9E20AED3`, generated at `app/build/outputs/apk/debug/app-debug.apk`. Physical phone validation following the [repair card](testing/incident-ui-ux-repair-test-card.md) remains pending user execution.
+The committed `db2260e` UI follow-up retains stable-ID helper Chat, accessible selected filters/search, wrapped status and growing helper controls. Debug/Android-test APK builds and Lint passed: zero errors, 148 warnings, three hints. On API 37, eighteen incident UI tests and four focused cases at 200% text passed. These are emulator results; physical execution remains pending under the [UI repair card](testing/incident-ui-ux-repair-test-card.md).
 
-### Provisional follow-up audit, October 4
+The separately authorized reconnect fixture repair passed all 403 tests without exclusions, including 29 reconnect cases and three JVM Base64 checks. Production/configuration was unchanged; TEST-01 is resolved locally. Historical presentation-guard discrepancies are now accounted for in the [size ledger](handoffs/maintainability-size-inventory.md); its original baseline remains unchanged.
 
-The user confirmed ongoing editing. Three follow-up findings were historical-name Chat targets, obsolete UI-test selectors and missing quick-filter selected semantics. The combined check built an APK and reproduced TEST-01, then was interrupted; Lint completion/latest revision were unverified. No tests executed or physical phones operated. The reviewer made no app edits or commit. All 217 protected files and nine Activity/ViewModel bodies matched; the old structure guard failed only on eight stale archived-document/tool entries. Docs/diff hygiene passed.
+### Maintainability refactor, October 5
 
-Audit-generated APK SHA-256: `A918F5DF95890EE565B98DBBDFB9CB779D86DC524CE980DA91BB3D839B6ED3F4`. It predates subsequent edits and is not the final candidate. The earlier pre-repair audit APK was `E7FAE6292F3019D55F9DC6C2FF14B3F858C2E495C392F98B3A1049A0301ECCED`. Neither hash inherits the installed-build phone results above.
+Immutable source snapshots, reviewed declaration maps, full historical APK identities and phase results are preserved in the [local evidence ledger](handoffs/maintainability-local-evidence.md). Original baseline/presentation modes still describe their historical snapshots; newer phases use their own explicit scopes. Historical full-suite blockers above remain recorded.
 
-### Follow-up implementation, October 5
+Phases 0–7 source work is complete. Final debug/instrumentation builds, all 426 JVM tests, Lint and preservation checks pass. Of forty selected emulator cases, 36 pass and four navigation assertions fail; the same four fail on the saved pre-phase APK with unchanged sources/tests (UI-02). Four repeated 200%-font incident cases pass. Exact build identities/results are in the ledger; final local acceptance remains blocked.
 
-Helper Chat callbacks retain stable offer node IDs; self/missing-ID and reporter-name shortcuts are unavailable. Quick filters expose selection with 48dp targets; search has an accessible label. Updated instrumentation uses current labels and real filtering/search/reset, plus stable-ID chat cases. Large-text screenshots exposed a clipped helper-replacement button and truncated route text: the button now grows from 48dp and status wraps. Transport, repositories, schema, policies and ViewModels are unchanged.
+The user deferred intermediate phone gates until the final batch build. October 4 reports do not validate refactor APKs. Builds and emulator checks do not establish BLE delivery or transport coverage.
 
-`assembleDebug`, `assembleDebugAndroidTest` and `lintDebug` completed in both the initial combined gate and final layout build. Lint: zero errors, 148 warnings, three hints. The combined `testDebugUnitTest --continue` gate failed at unit compilation with the same 18 TEST-01 diagnostics; no unit tests executed or fixtures excluded. The final standalone build used `--no-daemon --max-workers=1` with a 1GB JVM and in-process Kotlin compilation.
+### October 6 final-candidate phone report
 
-Final app APK SHA-256: `2EF834DED01EE73173DBB27D3E0FBB433D5CFEE2542B1E8C6DDD19A61127A097`; version 1.0.1/code 2, debug, existing L2CAP enabled. Android-test APK: `2B46D4A576CD2EC0047EA4BC0D3848DB2B2DE562179EC0ED26A88D649CD8EC8E`.
+The user confirmed **F1–F14 PASS** in the [network card](testing/network-maintainability-test-card.md) on the final APK whose hash starts `1AE82B6C`. The preserved APK rehashes to `1AE82B6CE482EBBF4415E64C4FD74FD103D888104A3790AA8EDCEA979441BFE0`. This covers the card's direct/relay messaging, receipts, notes, recovery, blocking/channels, persistence, incident/SOS, drafts, maps and accessibility scenarios as user-reported results.
 
-Final candidate: **18 incident UI tests passed**, none failed/ignored; **four focused cases passed again at 200% text** (Night/Daylight details, footer and real list filtering/search/reset). Coverage includes current labels, selected semantics, stable-ID callbacks, missing-ID guards, withdrawal/terminal fixtures, legacy acknowledgement and create/offer interactions. The layout check verifies visible glyph bounds/lost lines/ellipsis and the 48dp replacement control; a cached paragraph's unused width initially caused an overly strict overflow assertion to fail. Screenshots confirm the repaired label/status. Font scale and package states were restored, then the emulator was stopped. Logs/screenshots are in ignored `app/build/incident-ui-repair/`.
-
-The earlier October 5 candidate `32B01BA7C62561B08DF440A52959A1CE681B01CA29F34BF523EC404EB289ED61` (test APK `A02EB9BD25C615EBAD9C3AE9CD5C9BB4FE7BEE1386BAF6EC3A9E0E7C0F65BC15`) passed 18 `IncidentUiTest` cases and four focused cases at 200% text on Medium_Phone/API 37. Its large-text screenshots prompted the final layout correction above. Initial startup attempts died before discovery with Android exit reason `LOW_MEMORY`; execution used 3GB emulator RAM with Google Play services, Android System Intelligence and Google Search temporarily disabled. This fixture evidence does not establish BLE, TalkBack or physical-phone behavior.
-
-All 217 protected files and nine Activity/ViewModel bodies still match. The preserved structure guard fails only on the same eight stale inventory entries. A separate 455-file before/after manifest found no changes outside the three repair code/test files and affected docs. Implementation ended without staging, branch, commit or physical-phone operation. The user subsequently requested a local commit of 17 reviewed UI/navigation, test, README and documentation files on `fix/incident-ui-ux`; unrelated work remains uncommitted. This does not waive failed gates. Device behavior remains subject to the [repair card](testing/incident-ui-ux-repair-test-card.md).
+Report received October 6; actual test times, phone models/API levels, counts, durations, transport evidence and captures were not supplied. No automated rerun was reported. The four recorded UI-02 emulator failures remain unresolved. Successful reported runs do not close intermittent DELIVERY-01 or establish quantitative reliability.
 
 | Historical snapshot | Recorded evidence |
 | --- | --- |
@@ -78,6 +74,7 @@ PR CI runs build/unit tests, Lint, docs and diff hygiene. Failed deterministic c
 
 | Procedure | Coverage |
 | --- | --- |
+| [Networking maintenance](testing/network-maintainability-test-card.md) | Direct/relay messaging, live identity, recovery, blocks, background and incident comparisons after structural extraction |
 | [Physical checklist](testing/physical-reliability-tests.md) | Block/route recovery, identity/receipt guards, ordinary versus segmented traffic, restart custody, load, scale and other feature regressions |
 | [Voice/relay](testing/ble-voice-transfer-test-card.md) | Direct/relay notes, bursts, joining, fallback, recovery and arrival versus confirmation |
 | [Recovery](testing/bluetooth-recovery-test-card.md) | OFF/ON, isolation, cluster merge, permissions, background and Go offline |
@@ -100,4 +97,4 @@ Search application markers and the reported window first: READY/generation, iden
 
 Measure recipient arrival, receipt confirmation and playback separately. Acceptance and hop custody are not recipient delivery. Cross-phone timing needs a common video/clock; unrelated monotonic clocks cannot be subtracted.
 
-For DELIVERY-01, preserve a focused failure report for later analysis. No root-cause investigation or network repair is authorized by this documentation work.
+For DELIVERY-01, preserve a focused failure report for later analysis. Root-cause investigation and network repair remain outside this maintenance refactor.

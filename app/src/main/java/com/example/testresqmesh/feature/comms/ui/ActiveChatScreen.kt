@@ -1,50 +1,25 @@
 package com.example.testresqmesh.feature.comms.ui
 
+import com.example.testresqmesh.feature.comms.ui.privatechat.PrivateChatHeader as PrivateChatHeaderSection
+import com.example.testresqmesh.feature.comms.ui.privatechat.PrivateMessageBubble
+import com.example.testresqmesh.feature.comms.ui.privatechat.deliveryFeedback as deliveryFeedbackSection
+import com.example.testresqmesh.feature.comms.ui.privatechat.deliveryLabel as deliveryLabelSection
+import com.example.testresqmesh.feature.comms.ui.privatechat.messageTime as messageTimeSection
+import com.example.testresqmesh.feature.comms.ui.privatechat.DeleteConversationDialog
 import android.Manifest
 import android.content.pm.PackageManager
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.ArrowBack
-import androidx.compose.material.icons.automirrored.outlined.Reply
-import androidx.compose.material.icons.outlined.DeleteOutline
-import androidx.compose.material.icons.outlined.Image
-import com.example.testresqmesh.core.ui.components.dialogs.ResQConfirmationDialog
 import com.example.testresqmesh.feature.comms.ui.components.ChatInput
-import com.example.testresqmesh.core.ui.components.location.TacticalLocationCard
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -56,16 +31,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import com.example.testresqmesh.R
 import com.example.testresqmesh.core.model.ChatMessage
@@ -75,11 +44,7 @@ import com.example.testresqmesh.core.ui.components.layout.ResQAuroraBackground
 import com.example.testresqmesh.core.ui.theme.Spacing
 import com.example.testresqmesh.core.ui.theme.TestResQMeshTheme
 import com.example.testresqmesh.core.utils.MediaHelper
-import com.example.testresqmesh.feature.comms.ui.components.FullscreenImageViewer
-import com.example.testresqmesh.feature.comms.ui.components.ModernVoicePlayer
 import com.example.testresqmesh.feature.comms.viewmodel.CommunicationViewModel
-import java.text.SimpleDateFormat
-import java.util.Date
 import java.util.Locale
 
 @Composable
@@ -299,303 +264,14 @@ internal fun PrivateChatHeader(
     availability: RecipientAvailability,
     onBack: () -> Unit,
     onDelete: () -> Unit
-) {
-    Surface(
-        color = MaterialTheme.colorScheme.surface,
-        shadowElevation = 2.dp
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = Spacing.Small, vertical = Spacing.Small),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            IconButton(onClick = onBack) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Outlined.ArrowBack,
-                    contentDescription = stringResource(R.string.private_chat_back_action)
-                )
-            }
-            Surface(
-                modifier = Modifier.size(46.dp),
-                shape = CircleShape,
-                color = MaterialTheme.colorScheme.primaryContainer,
-                border = BorderStroke(1.5.dp, availability.color().copy(alpha = 0.6f))
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Text(
-                        text = name.firstOrNull()?.uppercase() ?: "?",
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                }
-            }
-            Spacer(Modifier.width(10.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = name,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-                    Box(
-                        modifier = Modifier
-                            .size(7.dp)
-                            .clip(CircleShape)
-                            .background(availability.color())
-                    )
-                    Text(
-                        text = availability.label(),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = availability.color(),
-                        fontWeight = FontWeight.SemiBold
-                    )
-                }
-            }
-            IconButton(onClick = onDelete) {
-                Icon(
-                    imageVector = Icons.Outlined.DeleteOutline,
-                    contentDescription = stringResource(R.string.private_chat_delete_action),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        }
-    }
-}
+) = PrivateChatHeaderSection(name, availability, onBack, onDelete)
+
+internal fun deliveryFeedback(message: ChatMessage): DeliveryFeedback = deliveryFeedbackSection(message)
 
 @Composable
-private fun PrivateMessageBubble(
-    message: ChatMessage,
-    mediaHelper: MediaHelper,
-    onViewMap: (Double, Double) -> Unit,
-    onReplyClick: ((ChatMessage) -> Unit)? = null
-) {
-    val mine = message.isMine
-    val bubbleColor = if (mine) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface
-    val contentColor = if (mine) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
-    val shape = if (mine) {
-        RoundedCornerShape(18.dp, 18.dp, 4.dp, 18.dp)
-    } else {
-        RoundedCornerShape(18.dp, 18.dp, 18.dp, 4.dp)
-    }
+internal fun deliveryLabel(message: ChatMessage): String = deliveryLabelSection(message)
 
-    var fullScreenImage by remember { mutableStateOf<String?>(null) }
-    var showMenu by remember { mutableStateOf(false) }
-
-    if (fullScreenImage != null) {
-        FullscreenImageViewer(
-            imageBase64 = fullScreenImage!!,
-            mediaHelper = mediaHelper,
-            onDismiss = { fullScreenImage = null }
-        )
-    }
-
-    Column(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalAlignment = if (mine) Alignment.End else Alignment.Start
-    ) {
-        Box {
-            Surface(
-                modifier = Modifier
-                    .widthIn(max = if (message.locationLat != null || message.imageBase64 != null) 300.dp else 260.dp)
-                    .clickable { showMenu = true },
-                shape = shape,
-                color = bubbleColor,
-                contentColor = contentColor,
-                shadowElevation = if (mine) 3.dp else 4.dp
-            ) {
-                Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)) {
-                    message.imageBase64?.let { image ->
-                        val bitmap = remember(image) { mediaHelper.decodeBase64ToBitmap(image) }
-                        if (bitmap != null) {
-                            Image(
-                                bitmap = bitmap.asImageBitmap(),
-                                contentDescription = stringResource(R.string.private_chat_image_description),
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(180.dp)
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .clickable { fullScreenImage = image },
-                                contentScale = ContentScale.Crop
-                            )
-                            Spacer(Modifier.height(Spacing.Small))
-                        }
-                    }
-                    message.audioBase64?.let { audio ->
-                        ModernVoicePlayer(
-                            audioBase64 = audio,
-                            mediaHelper = mediaHelper,
-                            modifier = Modifier.padding(vertical = 4.dp)
-                        )
-                        Spacer(Modifier.height(Spacing.ExtraSmall))
-                    }
-
-                    val (replyQuote, actualText) = remember(message.text) {
-                        if (message.text.startsWith("> ") && message.text.contains("\n")) {
-                            val firstNewline = message.text.indexOf("\n")
-                            val quote = message.text.substring(2, firstNewline).trim()
-                            val rest = message.text.substring(firstNewline + 1).trim()
-                            quote to rest
-                        } else {
-                            null to message.text
-                        }
-                    }
-
-                    if (replyQuote != null) {
-                        Surface(
-                            shape = RoundedCornerShape(8.dp),
-                            color = contentColor.copy(alpha = 0.12f),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(bottom = 6.dp)
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Box(
-                                    modifier = Modifier
-                                        .width(3.dp)
-                                        .height(20.dp)
-                                        .clip(RoundedCornerShape(1.5.dp))
-                                        .background(if (mine) Color.White.copy(alpha = 0.85f) else MaterialTheme.colorScheme.primary)
-                                )
-                                Spacer(Modifier.width(6.dp))
-                                Icon(
-                                    imageVector = Icons.AutoMirrored.Outlined.Reply,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(13.dp),
-                                    tint = if (mine) Color.White.copy(alpha = 0.85f) else MaterialTheme.colorScheme.primary
-                                )
-                                Spacer(Modifier.width(4.dp))
-                                Text(
-                                    text = replyQuote,
-                                    style = MaterialTheme.typography.labelSmall.copy(
-                                        fontSize = 11.sp,
-                                        fontFamily = FontFamily.Monospace
-                                    ),
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                    color = contentColor.copy(alpha = 0.9f)
-                                )
-                            }
-                        }
-                    }
-
-                    val isDefaultLocation = message.locationLat != null && (actualText.isBlank() || actualText.contains("I am sharing my location"))
-
-                    if (message.locationLat != null && message.locationLng != null) {
-                        TacticalLocationCard(
-                            latitude = message.locationLat,
-                            longitude = message.locationLng,
-                            senderName = message.senderName,
-                            noteText = if (!isDefaultLocation) actualText else null,
-                            isMine = mine,
-                            onTrackOnMap = { onViewMap(message.locationLat, message.locationLng) }
-                        )
-                        Spacer(Modifier.height(Spacing.Small))
-                    }
-
-                    if (actualText.isNotBlank() && !isDefaultLocation) {
-                        Text(text = actualText, style = MaterialTheme.typography.bodyLarge)
-                    }
-
-                    Spacer(Modifier.height(Spacing.ExtraSmall))
-                    Row(
-                        modifier = Modifier.align(Alignment.End),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        if (mine) {
-                            Text(
-                                text = deliveryLabel(message),
-                                style = MaterialTheme.typography.labelMedium,
-                                color = contentColor.copy(alpha = 0.72f)
-                            )
-                            Spacer(Modifier.width(Spacing.Small))
-                        }
-                        Text(
-                            text = messageTime(message.timestamp),
-                            style = MaterialTheme.typography.labelMedium,
-                            color = contentColor.copy(alpha = 0.72f)
-                        )
-                    }
-                }
-            }
-
-            if (onReplyClick != null) {
-                DropdownMenu(
-                    expanded = showMenu,
-                    onDismissRequest = { showMenu = false }
-                ) {
-                    DropdownMenuItem(
-                        text = { Text(stringResource(R.string.chat_reply_action)) },
-                        leadingIcon = {
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Outlined.Reply,
-                                contentDescription = null
-                            )
-                        },
-                        onClick = {
-                            showMenu = false
-                            onReplyClick.invoke(message)
-                        }
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun DeleteConversationDialog(
-    name: String,
-    onDismiss: () -> Unit,
-    onDelete: () -> Unit
-) {
-    ResQConfirmationDialog(
-        title = stringResource(R.string.private_chat_delete_title),
-        message = stringResource(R.string.private_chat_delete_description, name),
-        confirmText = stringResource(R.string.private_chat_delete_confirm),
-        cancelText = stringResource(R.string.private_chat_cancel_action),
-        icon = Icons.Outlined.DeleteOutline,
-        isDestructive = true,
-        onConfirm = onDelete,
-        onDismiss = onDismiss
-    )
-}
-
-internal enum class DeliveryFeedback {
-    Pending,
-    Sent,
-    Delivered,
-    Read,
-    Failed
-}
-
-internal fun deliveryFeedback(message: ChatMessage): DeliveryFeedback = when {
-    message.seenBy.isNotEmpty() -> DeliveryFeedback.Read
-    message.deliveredTo.contains("FAILED") -> DeliveryFeedback.Failed
-    message.deliveredTo.contains("PENDING") -> DeliveryFeedback.Pending
-    message.deliveredTo.isNotEmpty() -> DeliveryFeedback.Delivered
-    else -> DeliveryFeedback.Sent
-}
-
-@Composable
-internal fun deliveryLabel(message: ChatMessage): String = stringResource(
-    when (deliveryFeedback(message)) {
-        DeliveryFeedback.Pending -> R.string.private_chat_status_pending
-        DeliveryFeedback.Sent -> R.string.private_chat_status_sent
-        DeliveryFeedback.Delivered -> R.string.private_chat_status_delivered
-        DeliveryFeedback.Read -> R.string.private_chat_status_read
-        DeliveryFeedback.Failed -> R.string.private_chat_status_failed
-    }
-)
-
-internal fun messageTime(timestamp: Long): String =
-    SimpleDateFormat("h:mm a", Locale.getDefault()).format(Date(timestamp))
+internal fun messageTime(timestamp: Long): String = messageTimeSection(timestamp)
 
 @Preview(showBackground = true, widthDp = 390, heightDp = 844)
 @Composable
