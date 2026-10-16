@@ -52,15 +52,22 @@ object CryptoManager {
     }
 
     /** Deterministic 4-char hex node ID derived from the SHA-256 hash of the hardware public key. */
-    fun getMyNodeId(): String = MessageDigest.getInstance("SHA-256")
-        .digest(keyPair.public.encoded)
-        .take(2)
-        .joinToString("") { "%02X".format(it) }
+    private val cachedNodeId: String by lazy {
+        MessageDigest.getInstance("SHA-256")
+            .digest(keyPair.public.encoded)
+            .take(2)
+            .joinToString("") { "%02X".format(it) }
+    }
+    private val cachedKeyFingerprint: String by lazy {
+        MessageDigest.getInstance("SHA-256")
+            .digest(keyPair.public.encoded)
+            .joinToString("") { "%02X".format(it) }
+            .take(16)
+    }
 
-    fun getMyPublicKeyFingerprint(): String = MessageDigest.getInstance("SHA-256")
-        .digest(keyPair.public.encoded)
-        .joinToString("") { "%02X".format(it) }
-        .take(16)
+    fun getMyNodeId(): String = cachedNodeId
+
+    fun getMyPublicKeyFingerprint(): String = cachedKeyFingerprint
 
     private fun getPublicKeyFromString(base64PublicKey: String): PublicKey {
         val byteKey = Base64.decode(base64PublicKey.toByteArray(), Base64.DEFAULT)

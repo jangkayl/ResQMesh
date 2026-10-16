@@ -10,6 +10,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
+import com.example.testresqmesh.core.utils.SCAN_UI_THROTTLE_MS
+import com.example.testresqmesh.core.utils.throttleLatest
 
 class RadarViewModel(private val useCases: com.example.testresqmesh.core.domain.usecase.MeshUseCases) : ViewModel() {
 
@@ -20,7 +22,7 @@ class RadarViewModel(private val useCases: com.example.testresqmesh.core.domain.
 
     init {
         viewModelScope.launch {
-            useCases.observeScannedDevices().collect { scanned ->
+            useCases.observeScannedDevices().throttleLatest(SCAN_UI_THROTTLE_MS).collect { scanned ->
                 _uiState.update { it.copy(scannedDevices = scanned) }
             }
         }

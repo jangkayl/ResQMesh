@@ -6,7 +6,9 @@ import com.example.testresqmesh.core.network.CryptoManager
 import com.example.testresqmesh.core.logging.AppLogger
 import com.example.testresqmesh.data.local.dao.UserDao
 import com.example.testresqmesh.data.local.entity.UserEntity
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.util.UUID
@@ -45,14 +47,13 @@ class LocalIdentityManager internal constructor(
             return@withLock user
         }
 
-        val deviceId = nodeIdProvider()
+        val (deviceId, publicKey) = withContext(Dispatchers.Default) { nodeIdProvider() to publicKeyProvider() }
         val name = cleanName
             ?: prefs.getString("custom_name", null)
             ?: defaultName
 
         val savedUserId = prefs.getString("user_id", null)
         val userId = savedUserId ?: "USR-${UUID.randomUUID().toString().replace("-", "").take(8).uppercase()}"
-        val publicKey = publicKeyProvider()
 
         val newUser = UserEntity(
             userId = userId,

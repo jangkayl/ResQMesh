@@ -115,6 +115,7 @@ fun HomeScreenContent(
     nodes: List<NodeItemData> = emptyList(),
     connectionStatus: String = if (isNodeActive) "Searching for nearby devices" else "Mesh is offline"
 ) {
+    val displayNodes = if (nodes.isNotEmpty()) nodes else remember(radarState) { classifyRadarNodes(radarState) }
     Column(
         modifier = modifier
             .verticalScroll(rememberScrollState())
@@ -133,7 +134,7 @@ fun HomeScreenContent(
 
         // 2. "Nearby Mesh Friends" Stories/Presence Bar
         NearbyMeshStoriesBar(
-            nodes = if (nodes.isNotEmpty()) nodes else classifyRadarNodes(radarState),
+            nodes = displayNodes,
             directNodeNames = directNodeNames,
             isNodeActive = isNodeActive,
             connectionStatus = connectionStatus,

@@ -4,14 +4,45 @@ import android.util.Log
 import com.example.testresqmesh.BuildConfig
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.FlowCollector
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.onSubscription
 import java.text.SimpleDateFormat
-import java.util.*
+import java.util.ArrayDeque
+import java.util.Date
+import java.util.Locale
 
 object AppLogger {
     private val lock = Any()
     private val _logs = MutableStateFlow<List<TerminalLogEntry>>(emptyList())
-    val logs: StateFlow<List<TerminalLogEntry>> = _logs.asStateFlow()
+    private val buffer = ArrayDeque<TerminalLogEntry>()
+    private var dirty = false
+
+    /**
+     * Snapshots are only published while someone collects; otherwise entries stay in [buffer]
+     * and the next read/collect flushes them, so hot paths avoid copying the whole list per log.
+     */
+    val logs: StateFlow<List<TerminalLogEntry>> = object : StateFlow<List<TerminalLogEntry>> by _logs {
+        override val value: List<TerminalLogEntry>
+            get() {
+                flushIfDirty()
+                return _logs.value
+            }
+
+        // Flush once subscribed so an entry logged between flush and subscription is not missed.
+        override suspend fun collect(collector: FlowCollector<List<TerminalLogEntry>>): Nothing {
+            _logs.onSubscription { flushIfDirty() }.collect(collector)
+        }
+
+        private fun flushIfDirty() {
+            synchronized(lock) {
+                if (dirty) {
+                    _logs.value = buffer.toList()
+                    dirty = false
+                }
+            }
+        }
+    }
     private val _links = MutableStateFlow<List<TerminalLinkSnapshot>>(emptyList())
     val links: StateFlow<List<TerminalLinkSnapshot>> = _links.asStateFlow()
     private const val MAX_LOGS = 1_000
@@ -72,7 +103,14 @@ object AppLogger {
                 role = role,
                 isVerbose = isVerbose
             )
-            _logs.value = (_logs.value + entry).takeLast(MAX_LOGS)
+            if (buffer.size >= MAX_LOGS) buffer.removeFirst()
+            buffer.addLast(entry)
+            if (_logs.subscriptionCount.value > 0) {
+                _logs.value = buffer.toList()
+                dirty = false
+            } else {
+                dirty = true
+            }
         }
     }
 
@@ -125,12 +163,16 @@ object AppLogger {
 
     fun clear() {
         synchronized(lock) {
+            buffer.clear()
+            dirty = false
             _logs.value = emptyList()
         }
     }
 
+    // Every endpoint match contains ':', so messages without one cannot match the regex.
     private fun redactEndpoints(message: String): String =
-        endpointRegex.replace(message) { match -> TerminalLogEntry.shortEndpoint(match.value) }
+        if (':' !in message) message
+        else endpointRegex.replace(message) { match -> TerminalLogEntry.shortEndpoint(match.value) }
 
     private val endpointRegex = Regex("(?:[0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}")
 }

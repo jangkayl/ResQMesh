@@ -15,6 +15,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -40,7 +41,7 @@ import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.sin
 
-private const val SPLASH_DURATION_MILLIS = 3_000L
+private const val SPLASH_DURATION_MILLIS = 800L
 
 /**
  * Modern Tactical Radar Sweep Splash Screen.
@@ -87,7 +88,7 @@ private fun SplashContent(loadingProgress: Float) {
         label = "sweepAngle"
     )
 
-    val radarPulseAlpha by infiniteTransition.animateFloat(
+    val radarPulseAlpha = infiniteTransition.animateFloat(
         initialValue = 0.4f,
         targetValue = 0.9f,
         animationSpec = infiniteRepeatable(
@@ -254,10 +255,21 @@ private fun SplashContent(loadingProgress: Float) {
                         modifier = Modifier.size(76.dp),
                         shape = CircleShape,
                         color = MaterialTheme.colorScheme.surface.copy(alpha = 0.90f),
-                        border = BorderStroke(1.5.dp, primaryColor.copy(alpha = radarPulseAlpha)),
                         shadowElevation = 12.dp
                     ) {
-                        Box(contentAlignment = Alignment.Center) {
+                        Box(
+                            contentAlignment = Alignment.Center,
+                            modifier = Modifier.drawWithContent {
+                                drawContent()
+                                // Pulse alpha is read in the draw phase only (no recomposition per frame).
+                                val strokeWidth = 1.5.dp.toPx()
+                                drawCircle(
+                                    color = primaryColor.copy(alpha = radarPulseAlpha.value),
+                                    radius = (size.minDimension - strokeWidth) / 2f,
+                                    style = Stroke(width = strokeWidth)
+                                )
+                            }
+                        ) {
                             Image(
                                 painter = painterResource(R.drawable.resqmesh_logo),
                                 contentDescription = null,

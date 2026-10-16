@@ -24,7 +24,10 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.withContext
 
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flowOf
@@ -32,7 +35,8 @@ import kotlinx.coroutines.flow.map
 
 class IncidentViewModel(
     private val incidentRepository: IncidentRepository,
-    private val identityManager: IdentityProvider
+    private val identityManager: IdentityProvider,
+    private val cryptoDispatcher: CoroutineDispatcher = Dispatchers.Default
 ) : ViewModel() {
 
     val activeIncidents: StateFlow<List<IncidentEntity>> = incidentRepository.getActiveIncidents()
@@ -165,9 +169,9 @@ class IncidentViewModel(
         _identityState.value = IncidentIdentityState()
         identityJob = viewModelScope.launch {
             try {
-                identityManager.getOrCreateUser()
+                withContext(cryptoDispatcher) { identityManager.getOrCreateUser() }
                 identityManager.observeUser().collect { user ->
-                    val key = incidentRepository.localIncidentSigningKey()
+                    val key = withContext(cryptoDispatcher) { incidentRepository.localIncidentSigningKey() }
                     _identityState.value = IncidentIdentityState(user, key, loading = false,
                         error = when {
                             user == null -> "Your identity is unavailable. Retry to restore incident controls."

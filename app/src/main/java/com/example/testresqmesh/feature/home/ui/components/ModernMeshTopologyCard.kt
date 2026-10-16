@@ -22,6 +22,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -48,6 +49,7 @@ internal fun ModernMeshTopologyCard(
     onNetworkClick: () -> Unit,
     onPeerClick: (String) -> Unit
 ) {
+    val graphNodes = remember(radarState) { classifyRadarNodes(radarState) }
     val hasDirect = summary.directPeers >= 1
     val hubColor = if (hasDirect) ModernMint else MaterialTheme.colorScheme.primary
     val hubBg = if (hasDirect) ModernMint.copy(alpha = 0.15f) else MaterialTheme.colorScheme.primaryContainer
@@ -151,7 +153,7 @@ internal fun ModernMeshTopologyCard(
                 border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
             ) {
                 NetworkGraphVisualizer(
-                    nodes = classifyRadarNodes(radarState),
+                    nodes = graphNodes,
                     myDeviceName = myDeviceName,
                     showEmptyScanPrompt = false,
                     modifier = Modifier

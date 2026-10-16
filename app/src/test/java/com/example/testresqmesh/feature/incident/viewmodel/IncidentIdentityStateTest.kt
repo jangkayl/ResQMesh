@@ -43,7 +43,7 @@ class IncidentIdentityStateTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
         val dao = IncidentEntityFakeDao()
         dao.insertOrUpdate(incident)
-        val vm = IncidentViewModel(repository(dao, signer(), this), identity)
+        val vm = IncidentViewModel(repository(dao, signer(), this), identity, StandardTestDispatcher(testScheduler))
         try {
             assertTrue(vm.identityState.value.loading)
             backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { vm.filteredIncidents.collect {} }
@@ -82,7 +82,7 @@ class IncidentIdentityStateTest {
             override fun sign(event: DomainEventEntity) = "signature"
             override fun verify(event: DomainEventEntity, publicKey: String) = true
         }
-        val vm = IncidentViewModel(repository(dao, signing, this), identity)
+        val vm = IncidentViewModel(repository(dao, signing, this), identity, StandardTestDispatcher(testScheduler))
         try {
             runCurrent()
             assertFalse(vm.identityState.value.loading)

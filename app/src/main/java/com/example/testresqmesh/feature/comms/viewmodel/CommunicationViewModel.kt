@@ -15,6 +15,8 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.SharingStarted
 import com.example.testresqmesh.data.repository.asMessage
 import kotlinx.coroutines.launch
+import com.example.testresqmesh.core.utils.SCAN_UI_THROTTLE_MS
+import com.example.testresqmesh.core.utils.throttleLatest
 
 class CommunicationViewModel(
     private val useCases: com.example.testresqmesh.core.domain.usecase.MeshUseCases,
@@ -118,7 +120,7 @@ class CommunicationViewModel(
             }
         }
         viewModelScope.launch {
-            useCases.observeScannedDevices().collect { devices ->
+            useCases.observeScannedDevices().throttleLatest(SCAN_UI_THROTTLE_MS).collect { devices ->
                 _uiState.update { it.copy(scannedDevices = devices) }
             }
         }

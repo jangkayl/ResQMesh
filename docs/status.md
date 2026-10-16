@@ -19,6 +19,7 @@ Behavior and source ownership are in [architecture](architecture.md); accepted p
 | ID | State | Outstanding work |
 | --- | --- | --- |
 | UX-01 | User-reported concern; details pending | UI/UX issues not yet described. Record screens, steps and screenshots when supplied. |
+| PERF-01 | User-reported lag on app open; fixes local, device evidence pending | Source review: 3 s splash, keystore on Main, per-scan Home recomposition, logger list copies, BLE parsing on the main looper. The first four are fixed locally; BLE threading is deferred because of mesh risk. Run the [startup lag card](testing/startup-lag-card.md) before/after. |
 | MESH-02 | User-reported concern; details pending | Mesh issues beyond DELIVERY-01 not yet described. Record topology, APK, times and focused captures when supplied. |
 | DELIVERY-01 | User-reported failure; investigation deferred | On A→B→C→D, public/private text or voice sometimes fails to reach D. Cause unknown; keys, forwarding and blocking are hypotheses only. |
 | UI-02 | Local failures; acceptance blocked | Four emulator navigation assertions fail on both the pre-refactor baseline and the current candidate. |

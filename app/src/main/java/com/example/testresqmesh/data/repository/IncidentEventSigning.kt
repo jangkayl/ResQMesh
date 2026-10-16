@@ -37,8 +37,7 @@ class KeystoreIncidentEventSigning : IncidentEventSigning {
         }.generateKeyPair()
     }
 
-    override val publicKey: String
-        get() = Base64.encodeToString(pair.public.encoded, Base64.NO_WRAP)
+    override val publicKey: String by lazy { Base64.encodeToString(pair.public.encoded, Base64.NO_WRAP) }
 
     override fun sign(event: DomainEventEntity): String = Base64.encodeToString(
         Signature.getInstance("SHA256withECDSA").apply {
