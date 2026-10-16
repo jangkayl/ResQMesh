@@ -223,7 +223,7 @@ Report APK hash, models/API, topology, actual transport, background setting, cou
 
 ## Current progress and known limitations
 
-Reviewed **2026-10-04** against source baseline **`2e27013`**.
+Reviewed **2026-10-04**; baseline and current evidence are in [status](docs/status.md).
 
 User-reported successes include four-phone text/receipts, complete notes/SOS, restart/relay recovery, toggles/background, mutual blocking, incident lifecycle/reconciliation, independent SOS cancellation and offline maps. These qualitative reports lack a complete device/count/timing/transport matrix.
 

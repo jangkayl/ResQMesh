@@ -1,6 +1,6 @@
 # Physical reliability checklist
 
-Last reviewed: 2026-10-04. Status: active procedure with qualitative user-reported successes and remaining exact-case coverage. Source baseline: `2e27013`.
+Last reviewed: 2026-10-04. Status: active procedure with qualitative user-reported successes and remaining exact-case coverage.
 
 ## Build identity and evidence
 

@@ -1,6 +1,6 @@
 # Bluetooth recovery phone card
 
-Last reviewed: 2026-10-04. Source baseline: `2e27013`. Status: active procedure. Current APK/version/full hash and the qualitative report are in [validation](../validation.md); historical candidates below are not the current build.
+Last reviewed: 2026-10-04. Status: active procedure. Current APK/version/full hash and the qualitative report are in [validation](../validation.md); historical candidates below are not the current build.
 
 General restart, relay return, Bluetooth OFF/ON and locked/background messaging were reported working. Exact repetitions, cluster merging, permission transitions, load and Go offline coverage remain unconfirmed. DELIVERY-01 remains open for intermittent far-end loss.
 

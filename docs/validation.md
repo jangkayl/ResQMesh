@@ -1,6 +1,6 @@
 # Validation
 
-Last reviewed: 2026-10-06. Branch: `fix/incident-ui-ux`; networking baseline `db2260e`. Earlier presentation baseline: `2e27013`.
+Last reviewed: 2026-10-06. Baseline: see [status](status.md). This page owns build identities, counts and hashes.
 
 Local checks, executed instrumentation, user reports and analyzed captures are different evidence. Users install and operate physical phones.
 

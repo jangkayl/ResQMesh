@@ -1,6 +1,6 @@
 # Samsung outgoing GATT and receipt validation
 
-Last reviewed: 2026-10-04. Source baseline: `2e27013`. Status: active procedure. Current APK/version/full hash and the qualitative report are in [validation](../validation.md); historical candidates below are not the current build.
+Last reviewed: 2026-10-04. Status: active procedure. Current APK/version/full hash and the qualitative report are in [validation](../validation.md); historical candidates below are not the current build.
 
 The earlier Samsung success report is retained below. The October 4 report did not name phone models, so it does not independently establish Samsung-specific role/transport or repeated-card coverage.
 

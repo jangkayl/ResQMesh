@@ -1,6 +1,6 @@
 # Capstone demo and deployment preparation
 
-Last reviewed: 2026-10-04. Status: active preparation plan. Source baseline: `2e27013`. Originally prepared 2026-10-01; demo/pilot dates and completion are unconfirmed.
+Last reviewed: 2026-10-04. Status: active preparation plan. Originally prepared 2026-10-01; demo/pilot dates and completion are unconfirmed.
 
 This checklist prepares evidence and installation; it does not authorize application or network changes.
 

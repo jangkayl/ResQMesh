@@ -1,6 +1,6 @@
 # BLE voice transfer repair: phone card
 
-Last reviewed: 2026-10-04. Source baseline: `2e27013`. Status: active procedure. Current APK/version/full hash and the qualitative report are in [validation](../validation.md); historical candidates below are not the current build.
+Last reviewed: 2026-10-04. Status: active procedure. Current APK/version/full hash and the qualitative report are in [validation](../validation.md); historical candidates below are not the current build.
 
 Successful direct/relay note playback, text/receipts, SOS and recovery were reported. Intermittent A-to-D text/note loss remains DELIVERY-01. Exact bursts, join-under-load, diagnostic fallback, restart custody and timed background cases are not all confirmed.
 

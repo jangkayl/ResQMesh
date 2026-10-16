@@ -1,6 +1,6 @@
 # Capstone research guide
 
-Last reviewed: 2026-10-04. Source baseline: `2e27013`.
+Last reviewed: 2026-10-04. Baseline: see [status](status.md).
 
 Separate defensible research claims from product aspirations. This is not a defense script, a grade prediction or an assertion that a pilot has completed.
 

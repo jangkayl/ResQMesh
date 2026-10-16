@@ -1,6 +1,6 @@
 # Current status
 
-Last reviewed: 2026-10-06. Branch: `fix/incident-ui-ux`; networking baseline `db2260e`. Earlier presentation baseline: `2e27013`.
+Last reviewed: 2026-10-06. Branch: `fix/incident-ui-ux`. Source HEAD: `a9a27ed` (whole-app decomposition committed after the last doc review; its effect on these docs is unverified). Docs reflect `db2260e` plus networking maintenance; earlier presentation baseline `2e27013`. This page owns the baseline and open issues.
 
 ## Current objective
 
@@ -26,17 +26,13 @@ These are qualitative reports, not measured rates or proof that every card step 
 
 Current source includes generation-owned GATT/L2CAP, three-neighbor admission, directed leased topology, persistent private outbox, recipient receipts, resumable journaled transfers, permanent Keystore identity, opt-in background service, Room 11, signed incident/SOS synchronization, scoped conversations and MapLibre/PMTiles.
 
-Presentation organization preserves Activity/ViewModel bodies and 217 protected files. Navigation and shared/feature presentation now have explicit owners. Its recorded checks include APK builds, Android-test compilation, Lint and 24 focused presentation tests. Earlier Samsung/voice clean snapshots passed 280/348 unit tests respectively; these counts belong to different source snapshots.
+**Local checks:** the latest builds, unit/Lint counts, emulator results and APK hashes are owned by [validation](validation.md); status does not repeat them. Four emulator navigation assertions (UI-02) fail on both the saved baseline and the final candidate. TEST-01 (reconnect fixtures) is resolved locally.
 
-**UI repairs:** stable-ID helper Chat, accessible selected filters/search, clear guidance, secondary actions and wrapping/growing controls are implemented. Recorded October 5 builds and Lint passed; eighteen incident UI tests and four focused 200%-text cases passed on API 37. Final phone checks are user-reported PASS. Historical inventory differences are accounted for in the ledger; original evidence stays in [validation](validation.md) and its snapshot.
+**UI repairs (UI-01):** stable-ID helper Chat, accessible filters/search, clear guidance and wrapping controls are implemented; final phone checks are user-reported PASS.
 
-**Local Git delivery:** `db2260e` retains the earlier UI checkpoint. The user authorized an October 6 progress commit on `fix/incident-ui-ux`, saving 182 source/test, documentation, archive and preservation-check files. Backups, the device script and Figma tools remain untracked. Nothing is pushed; UI-02 remains blocking.
+**Local Git delivery:** progress commits live on `fix/incident-ui-ux`; backups, the device script and Figma tools remain untracked. Nothing is pushed.
 
-**Reconnect fixture repair:** separately authorized TEST-01 repair updated obsolete hooks, callbacks, recipient keys and timing/wake expectations. JVM-only Base64 support retains all 29 reconnect cases. Its build and 403 tests passed without exclusions; production/configuration was unchanged. The historical guard's stale entries and fixture edit are now reconciled without replacing its baseline.
-
-**Initial networking maintenance:** extracted handler/gateway ownership, presence, live callbacks, repository bindings and GATT host contracts. That stage passed 411 tests, APK compilation and Lint; its guard preserved 447 unrelated files. No device/emulator execution or DELIVERY-01 investigation occurred.
-
-**Maintainability:** 426 JVM tests, builds, Lint (zero errors) and preservation checks pass. NativeBleManager is 743 lines; GATT managers 133/44, admission 158 and MeshRepository 368. 36/40 selected emulator cases pass; four navigation failures reproduce on the saved baseline. Final phone F1–F14 is user-reported PASS. Baselines, failed attempts and exact hashes belong to the [local evidence ledger](../archive/docs-superseded-2026-10-16/handoffs/maintainability-local-evidence.md).
+**Maintainability:** whole-app decomposition is implemented (NativeBleManager keeps a reviewed 743-line facade exception). Phase plan, size ledger and evidence ledger are archived in the [October 16 snapshot](../archive/docs-superseded-2026-10-16/handoffs/maintainability-local-evidence.md); no device execution or DELIVERY-01 investigation occurred in that work.
 
 ## Open issue and remaining evidence
 

@@ -1,6 +1,6 @@
 # UI guidance
 
-Last reviewed: 2026-10-06. Earlier presentation baseline: `2e27013`; incident UI repairs are recorded on `fix/incident-ui-ux`. Use Compose/Material 3; inspect current source.
+Last reviewed: 2026-10-06. Baseline: see [status](status.md); incident UI repairs are recorded on `fix/incident-ui-ux`. Use Compose/Material 3; inspect current source.
 
 ## Components and ownership
 

@@ -1,6 +1,6 @@
 # SOS and Radio conversation phone card
 
-Last reviewed: 2026-10-04. Source baseline: `2e27013`. Status: active procedure. Current APK/version/full hash and the qualitative report are in [validation](../validation.md); historical candidates below are not the current build.
+Last reviewed: 2026-10-04. Status: active procedure. Current APK/version/full hash and the qualitative report are in [validation](../validation.md); historical candidates below are not the current build.
 
 Full incident/SOS lifecycle and reconnect behavior, including independent simultaneous-alert cancellation, were reported working. Exact Radio-channel isolation, autoplay, gestures, permission variants, accessibility and repeated load steps remain unconfirmed.
 

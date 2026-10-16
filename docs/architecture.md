@@ -1,6 +1,6 @@
 # Architecture
 
-Last reviewed: 2026-10-06. Source baseline: `db2260e` plus networking maintenance. Source and bounded device evidence prevail.
+Last reviewed: 2026-10-06. Baseline: see [status](status.md). Source and bounded device evidence prevail.
 
 ## System shape and data path
 

@@ -1,6 +1,6 @@
 # Engineering decisions
 
-Last reviewed: 2026-10-06. Source baseline: `db2260e` plus networking maintenance. These describe accepted choices; source and bounded device evidence prevail.
+Last reviewed: 2026-10-06. Baseline: see [status](status.md). These describe accepted choices; source and bounded device evidence prevail.
 
 ## D1: Reliability before transport expansion
 
