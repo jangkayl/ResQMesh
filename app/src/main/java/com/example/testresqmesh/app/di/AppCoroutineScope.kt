@@ -1,4 +1,4 @@
-package com.example.testresqmesh.core.di
+package com.example.testresqmesh.app.di
 
 import java.io.Closeable
 import kotlinx.coroutines.CoroutineDispatcher

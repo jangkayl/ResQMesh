@@ -40,6 +40,8 @@ kotlinx-serialization-protobuf = { group = "org.jetbrains.kotlinx", name = "kotl
 kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version.ref = "kotlinxSerialization" }
 io-insert-koin-koin-android = { group = "io.insert-koin", name = "koin-android", version.ref = "koin" }
 io-insert-koin-koin-androidx-compose = { group = "io.insert-koin", name = "koin-androidx-compose", version.ref = "koin" }
+io-insert-koin-koin-test = { group = "io.insert-koin", name = "koin-test", version.ref = "koin" }
+io-insert-koin-koin-test-junit4 = { group = "io.insert-koin", name = "koin-test-junit4", version.ref = "koin" }
 
 org-json = { group = "org.json", name = "json", version.ref = "orgJson" }
 play-services-location = { group = "com.google.android.gms", name = "play-services-location", version.ref = "playServicesLocation" }
