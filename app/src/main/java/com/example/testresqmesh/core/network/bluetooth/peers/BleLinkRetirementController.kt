@@ -104,7 +104,7 @@ internal class BleLinkRetirementController(
         val link = store.links.current(macAddress, BleLinkRole.CLIENT)
         if (gatt != null && link?.gatt != null && link.gatt !== gatt) {
             AppLogger.d("BLE_MESH", "Ignoring forced cleanup from stale CLIENT GATT on $macAddress")
-            try { gatt.close() } catch (e: Exception) {}
+            try { gatt.close() } catch (e: Exception) { AppLogger.d("BLE_MESH", "stale client gatt.close ignored: ${e.javaClass.simpleName}") }
             return
         }
         if (link != null) {
@@ -113,7 +113,7 @@ internal class BleLinkRetirementController(
         try {
             gatt?.disconnect()
             gatt?.close()
-        } catch (e: Exception) { }
+        } catch (e: Exception) { AppLogger.d("BLE_MESH", "forced gatt disconnect/close ignored: ${e.javaClass.simpleName}") }
 
         if (gatt != null) store.activeConnections.remove(macAddress, gatt)
         else store.activeConnections.remove(macAddress)
@@ -147,13 +147,13 @@ internal class BleLinkRetirementController(
         try {
             gatt?.disconnect()
             gatt?.close()
-        } catch (e: Exception) {}
+        } catch (e: Exception) { AppLogger.d("BLE_MESH", "endpoint gatt disconnect/close ignored: ${e.javaClass.simpleName}") }
 
         val serverDevice = store.activeServerConnections.remove(endpointId)
         serverDevice?.let { device ->
             try {
                 gattServer?.cancelConnection(device)
-            } catch (e: Exception) {}
+            } catch (e: Exception) { AppLogger.d("BLE_MESH", "gattServer.cancelConnection ignored: ${e.javaClass.simpleName}") }
         }
 
         l2capTransport.disconnect(endpointId)

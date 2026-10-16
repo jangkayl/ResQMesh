@@ -1,6 +1,7 @@
 package com.example.testresqmesh.core.utils
 
 import android.util.Log
+import com.example.testresqmesh.BuildConfig
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -51,8 +52,10 @@ object AppLogger {
         role: String? = null,
         isVerbose: Boolean = false
     ) {
-        // Preserve the existing Logcat contract: callers historically used AppLogger.d().
-        Log.d(tag, message)
+        // Logcat output is debug-only; the in-app terminal below logs in all builds.
+        if (BuildConfig.DEBUG) {
+            Log.d(tag, message)
+        }
 
         synchronized(lock) {
             val entry = TerminalLogEntry(

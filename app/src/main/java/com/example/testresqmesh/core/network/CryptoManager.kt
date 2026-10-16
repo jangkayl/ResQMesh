@@ -101,7 +101,7 @@ object CryptoManager {
 
             return Pair(base64Payload, base64EncryptedAesKey)
         } catch (e: Exception) {
-            e.printStackTrace()
+            AppLogger.d("MeshNetwork_E2EE", "encrypt failed: ${e.javaClass.simpleName}")
             return null
         }
     }
@@ -129,7 +129,7 @@ object CryptoManager {
 
             return String(decryptedPayloadBytes, Charsets.UTF_8)
         } catch (e: Exception) {
-            e.printStackTrace()
+            AppLogger.d("MeshNetwork_E2EE", "decrypt failed: ${e.javaClass.simpleName}")
             return null
         }
     }

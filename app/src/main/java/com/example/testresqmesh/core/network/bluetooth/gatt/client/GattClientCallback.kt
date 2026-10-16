@@ -103,7 +103,7 @@ internal class GattClientCallback(
                         try {
                             val localMethod = gatt.javaClass.getMethod("refresh")
                             localMethod.invoke(gatt)
-                        } catch (e: Exception) {}
+                        } catch (e: Exception) { AppLogger.d("BLE_MESH", "gatt refresh ignored: ${e.javaClass.simpleName}") }
                         finishConnectPhase("tx characteristic missing")
                         forceGattDisconnect(macAddress, gatt)
                     }
