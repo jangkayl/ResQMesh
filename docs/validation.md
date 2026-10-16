@@ -44,7 +44,7 @@ Full October 4–5 audit narratives and APK hashes are in the [October 5 validat
 | Historical snapshot | Recorded evidence |
 | --- | --- |
 | Incident UI follow-up `db2260e`, October 5 | Debug/Android-test builds and Lint (zero errors, 148 warnings); 18 incident UI tests and four 200%-text cases passed on API 37 emulator. |
-| Batch A cleanup, October 16 | 426/426 JVM tests, Lint (0 errors), Android-test compilation; reviewer PASS, auditor APPROVE. Run with `--max-workers=1` and a 1.5 GB heap after out-of-memory daemon crashes on a 7.7 GB machine. No phone run yet. |
+| Batch A cleanup, October 16 | 426/426 JVM tests, Lint (0 errors), Android-test compilation; reviewer PASS, auditor APPROVE. Run with `--max-workers=1` and a 1.5 GB heap after out-of-memory daemon crashes on a 7.7 GB machine. User reported all smoke-card steps working on 2026-10-16; APK hash, phone models/API, counts and captures not supplied, and the optional relay step does not close DELIVERY-01. |
 | Reconnect fixture repair (TEST-01), October 5 | 403 tests without exclusions, including 29 reconnect cases and three JVM Base64 checks; production unchanged. |
 | Samsung repair, October 3 | Clean snapshot: 280 unit tests and debug build; Android tests compiled. Earlier 350 isolated tests included unrelated fixtures. See [Samsung card](testing/samsung-send-test-card.md). |
 | Voice repair, October 3 | Clean snapshot: 348 unit tests without exclusions, builds, Android-test compilation and Lint. See [voice card](testing/ble-voice-transfer-test-card.md). |

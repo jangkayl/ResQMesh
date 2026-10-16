@@ -1,6 +1,6 @@
 # Batch A cleanup smoke card
 
-Prepared: 2026-10-16. Status: UNTESTED. Branch `refactor/batch-a-cleanup`.
+Prepared: 2026-10-16. Status: user-reported PASS on 2026-10-16 (all steps; APK hash, models, counts and captures not supplied). Branch `refactor/batch-a-cleanup`.
 
 Batch A is meant to change no mesh behavior: it removes unused incident UI files, adds two thread-safety fixes, logs previously empty catches (class name only), makes Logcat debug-only and names existing timer values. This card checks for regressions only.
 

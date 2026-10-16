@@ -31,11 +31,11 @@ Basic block, incident, SOS and recovery checks have user-reported successes; the
 
 **Untracked local files:** four disabled tests (`*.kt.bak` under `app/src/test`, about 1.7k lines, ignored by Git and with no Git copy), `scripts/manage_devices.ps1` and `tools/figma-resqmesh-preview/` scripts. Triage them in the code review.
 
-**Batch A cleanup** (branch `refactor/batch-a-cleanup`): dead incident UI removed, two thread-safety fixes, swallowed-exception logging, debug-only Logcat and named timer constants. Local checks pass; phone smoke is UNTESTED ([card](testing/batch-a-cleanup-smoke-card.md)). Remaining review batches: B crypto/delivery (RSA PKCS#1 padding, unauthenticated private envelopes, decrypt-failure custody retry), C release/CI (R8, signing, androidTest compile in CI, catalog versions, release in-app terminal contents), D architecture (core→data imports, sos→comms coupling, audio in core/utils, 400–500-line screens).
+**Batch A cleanup** (branch `refactor/batch-a-cleanup`): dead incident UI removed, two thread-safety fixes, swallowed-exception logging, debug-only Logcat and named timer constants. Local checks pass; the user reported all [smoke card](testing/batch-a-cleanup-smoke-card.md) steps working on 2026-10-16 (build hash, models and counts not supplied). Remaining review batches: B crypto/delivery (RSA PKCS#1 padding, unauthenticated private envelopes, decrypt-failure custody retry), C release/CI (R8, signing, androidTest compile in CI, catalog versions, release in-app terminal contents), D architecture (core→data imports, sos→comms coupling, audio in core/utils, 400–500-line screens).
 
 ## Next actions
 
-1. Run the Batch A smoke card on phones; you decide on push/PR for `chore/context-routing` and `refactor/batch-a-cleanup`.
+1. Decide push/PR for `chore/context-routing` and `refactor/batch-a-cleanup`.
 2. Choose the next review batch (B, C or D); plan before editing code.
 3. Collect UX-01 and MESH-02 details, then prioritize them with UI-02 and DELIVERY-01.
 4. Work the [capstone plan](plans/capstone-demo-readiness.md) toward the demo, including DEPLOY-01 items needed for installation.
