@@ -19,7 +19,7 @@ Label A/B/C, then D/E onward; record model/API, installed hash, stable IDs, bloc
 Use numbered harmless texts and unique recording labels. Count recipient arrival, private confirmation and complete playback separately. Use test SOS content and end it afterward. Connect only authorized ADB phones and retain phone-to-serial mapping:
 
 ```powershell
-.\scripts\capture_ble_logcat.ps1 -DurationMinutes 15
+.\scripts\device\capture_ble_logcat.ps1 -DurationMinutes 15
 ```
 
 USB-powered captures do not measure battery performance. Timings across phones require common video/clock; per-device monotonic deltas describe only local stages.

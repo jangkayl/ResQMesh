@@ -29,7 +29,7 @@ Behavior and source ownership are in [architecture](architecture.md); accepted p
 
 Basic block, incident, SOS and recovery checks have user-reported successes; their adversarial, load and repeated cases remain pending, not known defects. See the [physical checklist](testing/physical-reliability-tests.md).
 
-**Untracked local files:** four disabled tests (`*.kt.bak` under `app/src/test`, about 1.7k lines, ignored by Git and with no Git copy), `scripts/manage_devices.ps1` and `tools/figma-resqmesh-preview/` scripts. Triage them in the code review.
+**Repo hygiene (Phase 0):** the four disabled `*.kt.bak` tests were removed; `scripts/manage_devices.ps1` now lives in `scripts/device/`; refactor-era check scripts and the Figma preview plugin are archived (see the archive index).
 
 **Batch A cleanup** (branch `refactor/batch-a-cleanup`): dead incident UI removed, two thread-safety fixes, swallowed-exception logging, debug-only Logcat and named timer constants. Local checks pass; the user reported all [smoke card](testing/batch-a-cleanup-smoke-card.md) steps working on 2026-10-16 (build hash, models and counts not supplied). Remaining review batches: B crypto/delivery (RSA PKCS#1 padding, unauthenticated private envelopes, decrypt-failure custody retry), C release/CI (R8, signing, androidTest compile in CI, catalog versions, release in-app terminal contents), D architecture (core→data imports, sos→comms coupling, audio in core/utils, 400–500-line screens).
 

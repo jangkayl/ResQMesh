@@ -21,3 +21,5 @@ docs/.obsidian/
 *.part
 cebu-*.zip
 *.bak
+
+__pycache__/

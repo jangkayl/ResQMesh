@@ -30,7 +30,7 @@ Require `OK (11 tests)`; ADB exit zero alone does not establish a pass. A cold r
 
 ## Setup
 
-Establish actual READY A–B and B–C links, avoiding a direct A–C link. Verify ordinary public/private text. Tune A to Radio 1, B to 2, C to 3. Keep background mesh opt-in consistent and note whether enabled. Start a focused 10-minute capture with `scripts/capture_ble_logcat.ps1`.
+Establish actual READY A–B and B–C links, avoiding a direct A–C link. Verify ordinary public/private text. Tune A to Radio 1, B to 2, C to 3. Keep background mesh opt-in consistent and note whether enabled. Start a focused 10-minute capture with `scripts/device/capture_ble_logcat.ps1`.
 
 ## Steps and expected results
 

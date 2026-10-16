@@ -18,7 +18,7 @@ Before commit, a clean snapshot containing only tracked/staged files passed the 
 
 A = Samsung SM-P615, Android 13/API 33. B = CPH2127 or CPH2219, Android 12/API 31. C = V2424/API 34 for relay/load. Install the same current APK identified in validation on all selected devices yourself. Keep apps foreground and screens awake for the first run; put unused devices offline through the app.
 
-Record installed hash, device/API, selected names/IDs, start/failure times, Samsung CLIENT/SERVER role, and GATT/L2CAP transport from logs. Start `scripts/capture_ble_logcat.ps1 -DurationMinutes 10` on the connected devices. Capture technical markers only when sharing results; omit message content, keys, and ciphertext.
+Record installed hash, device/API, selected names/IDs, start/failure times, Samsung CLIENT/SERVER role, and GATT/L2CAP transport from logs. Start `scripts/device/capture_ble_logcat.ps1 -DurationMinutes 10` on the connected devices. Capture technical markers only when sharing results; omit message content, keys, and ciphertext.
 
 ## Steps and expected results
 

@@ -11,7 +11,7 @@ Users install and operate phones. Report PASS/FAIL/UNTESTED for exact steps; the
 - APK: `app/build/outputs/apk/debug/app-debug.apk`. Use the current hash in validation. Historical recovery build evidence remains below.
 - Use the same APK on A/B, then A/B/C, then A/B/C/D/E. Record phone model, Android/API, existing block relationships, background setting, and local timestamps. Do not clear app data, keys, or blocks.
 - Keep phones in one room, Bluetooth/required permissions enabled, and join normally. Use unblocked peers with previously established private keys. Verify payload READY and bidirectional text first.
-- Capture with `powershell -ExecutionPolicy Bypass -File .\scripts\capture_ble_logcat.ps1 -DurationMinutes 10`. Repeat capture windows for longer tests.
+- Capture with `powershell -ExecutionPolicy Bypass -File .\scripts\device\capture_ble_logcat.ps1 -DurationMinutes 10`. Repeat capture windows for longer tests.
 
 ## Steps and expected results
 

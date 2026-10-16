@@ -71,7 +71,7 @@ Existing diagnostic APKs are historical candidates. The normal build enables L2C
 ## Focused capture and reporting
 
 ```powershell
-.\scripts\capture_ble_logcat.ps1 -DurationMinutes 10
+.\scripts\device\capture_ble_logcat.ps1 -DurationMinutes 10
 ```
 
 Report test ID, APK hash, A/B/C/D roles/models/API, topology, blocks, permissions/background state, sent/arrived/confirmed/duplicate counts, exact failure time and capture folder. Mark each exact scenario PASS, FAIL or UNTESTED; a qualitative success does not check all repeated steps.

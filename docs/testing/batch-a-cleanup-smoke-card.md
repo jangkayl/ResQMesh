@@ -10,7 +10,7 @@ Build `.\gradlew.bat :app:assembleDebug` from the branch head and record the com
 
 ## Devices and setup
 
-Two phones (A, B) minimum; a third (C) for the relay step if available. Bluetooth on, app foreground, screens awake. Start a capture with `.\scripts\capture_ble_logcat.ps1 -DurationMinutes 10`.
+Two phones (A, B) minimum; a third (C) for the relay step if available. Bluetooth on, app foreground, screens awake. Start a capture with `.\scripts\device\capture_ble_logcat.ps1 -DurationMinutes 10`.
 
 ## Steps and expected results
 

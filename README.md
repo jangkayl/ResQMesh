@@ -217,7 +217,7 @@ Android-test compilation is separate from execution; builds/emulators do not pro
 Use the [physical checklist](docs/testing/physical-reliability-tests.md) and [Validation](docs/validation.md) for build identities and exact cases. Users install and operate physical phones.
 
 ```powershell
-.\scripts\capture_ble_logcat.ps1 -DurationMinutes 10
+.\scripts\device\capture_ble_logcat.ps1 -DurationMinutes 10
 ```
 
 Report APK hash, models/API, topology, actual transport, background setting, counts, exact failure time and focused capture. Measure arrival, receipt confirmation and playback separately. Never share message/audio content, key material or ciphertext previews.

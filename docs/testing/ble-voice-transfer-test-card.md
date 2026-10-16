@@ -14,7 +14,7 @@ Historical candidates, APK hashes and local check counts: see [validation](../va
 
 Use A/B for direct tests, then A/B/C with B as the relay. Include the Samsung device that previously failed, if available. Enable Bluetooth/permissions and join the same team. For locked-screen tests enable the existing opt-in background mesh on every phone. Record initial direct/relay paths and trusted-key status. Use harmless test notes of 10–30 seconds; label them A1, A2, B1, etc.
 
-Use the existing capture script on connected ADB devices: `scripts/capture_ble_logcat.ps1 -DurationMinutes 10`. The user installs, launches, operates, and stops phone apps.
+Use the existing capture script on connected ADB devices: `scripts/device/capture_ble_logcat.ps1 -DurationMinutes 10`. The user installs, launches, operates, and stops phone apps.
 
 ## Exact steps and expected behavior
 

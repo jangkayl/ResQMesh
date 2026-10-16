@@ -1,6 +1,6 @@
 param(
     [string]$AdbPath = 'C:\Users\Kyle\AppData\Local\Android\Sdk\platform-tools\adb.exe',
-    [string]$OutputDir = (Join-Path $PSScriptRoot '..\captures\ble-logcat'),
+    [string]$OutputDir = (Join-Path $PSScriptRoot '..\..\captures\ble-logcat'),
     [ValidateRange(1, 60)][int]$PollSeconds = 3,
     [ValidateRange(0, 1440)][int]$DurationMinutes = 0
 )
