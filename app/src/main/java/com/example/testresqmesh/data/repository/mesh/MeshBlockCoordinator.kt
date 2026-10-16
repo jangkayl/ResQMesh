@@ -21,6 +21,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
 import com.example.testresqmesh.data.repository.BlockRelationshipStore
 import com.example.testresqmesh.data.repository.MeshRouter
 import com.example.testresqmesh.data.repository.PayloadFactory
@@ -46,7 +47,7 @@ internal class MeshBlockCoordinator(
     private val _blockedDeviceNames get() = blockedNames()
     private fun readyConnectedDevices() = readyPeers()
 
-    private val blockRetryJobs = mutableMapOf<String, Job>()
+    private val blockRetryJobs = ConcurrentHashMap<String, Job>()
 
     fun onNetworkDeviceBlocked(senderName: String): Unit = run {
         AppLogger.d("BLE_MESH", "Ignoring legacy block callback from $senderName")

@@ -147,9 +147,7 @@ abstract class AppDatabase : RoomDatabase() {
 
         fun getDatabase(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
-                val instance = buildDatabase(context, "resqmesh_database")
-                INSTANCE = instance
-                instance
+                INSTANCE ?: buildDatabase(context, "resqmesh_database").also { INSTANCE = it }
             }
         }
 
