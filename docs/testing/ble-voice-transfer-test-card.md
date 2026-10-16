@@ -6,22 +6,9 @@ Successful direct/relay note playback, text/receipts, SOS and recovery were repo
 
 Historical repair snapshot: 2026-10-03, base `aab6749`, branch `fix/ble-voice-transfer-reliability`, then-local changes, version 1.0.1/code 2. Phone scenarios were unexecuted in that local check batch; the October 4 user report is separate.
 
-## Historical repair candidates and local checks
+## Build identity
 
-Normal debug enables L2CAP; `-PbleL2cap=false` disables its client/server path for comparison. Both builds retain the same chunk protocol and GATT fallback. Install one variant on all phones in a run; record its hash and device models/API levels. Preserve data and keys.
-
-Historical candidates were saved in `app/build/outputs/ble-repair/`; these hashes are not the current October 4 normal candidate. A current transport comparison needs separately prepared matching variants:
-
-| APK | SHA-256 |
-| --- | --- |
-| `resqmesh-hybrid-debug.apk` | `8FF098B678ABB1F5D3C250A6A5EBC6C61B76B024995EC1E15086E147D95DE933` |
-| `resqmesh-gatt-debug.apk` | `EB724BC786F0E25AE4B4B4B962A904B6E69068CA0193FDE28FE05A7A6DA224B0` |
-
-Local results: **PASS** — all 348 unit tests in the clean commit snapshot (zero failures/errors/skips, no test exclusions), debug build, earlier hybrid/GATT APK builds, `compileDebugAndroidTestKotlin`, Lint (zero errors; 147 warnings), docs, and diff hygiene. Normal `app-debug.apk` was rebuilt with L2CAP enabled. These checks provide no physical BLE evidence.
-
-Local checks cover setup sequencing, indication ownership/promotion, fallback queue pressure, endpoint health, chunk loss/restart/reassembly/custody, relay storage order, expiry, and private receipt timing. They do not simulate Android radio behavior.
-
-The mixed workspace has a pre-existing untracked `PrivateReconnectDeliveryTest.kt` that expects missing store APIs, repository injection parameters, and callback signatures. It still blocks that workspace's full unit-test compilation and remains outside this commit. Earlier checks passed 371 tests with only that fixture excluded. Commit validation instead archived `aab6749` into a temporary clean directory, overlaid the 46 selected repair paths, and ran `:app:testDebugUnitTest :app:assembleDebug` without an init file or exclusions. All 348 tests and the build passed. No physical tests were run for that local check batch; current qualitative phone reports are recorded separately in validation.
+Historical candidates, APK hashes and local check counts: see [validation](../validation.md) and the [dated archive](../../archive/README.md).
 
 ## Devices and setup
 

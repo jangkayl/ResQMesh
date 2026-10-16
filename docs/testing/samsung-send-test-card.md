@@ -8,13 +8,9 @@ User operates devices. Do not clear app data, keys, blocks, or message history.
 
 User reports Samsung sending now works. Counts, role/transport coverage, and timing captures were not supplied; broader validation remains open.
 
-## Historical candidate and local checks
+## Build identity
 
-- Historical October 3 candidate: version 1.0.1, code 2, then-current working tree before commit.
-- APK: `app/build/outputs/apk/debug/app-debug.apk`.
-- SHA-256: `95F1CBD26C6590F002AEE78D25DA377CC8556F1E9BEE285AD6A881250E38A21B`.
-- Installed failure APK on SM-P615: `F627902AB140CDFBC1FA902325CEE7927F80B6C144E7DD2D8D58F16CFA9F327A`.
-- Local: debug build and Android instrumentation compilation passed; instrumentation was not run. All 350 isolated unit tests passed (zero failures/errors/skips). Standard full suite is blocked by the existing untracked `PrivateReconnectDeliveryTest.kt` and `BleLifecycleSupervisorTest.kt`; an external temporary Gradle init script excludes only those files. This does not establish a full-suite pass. Lint initially crashed during analysis; a separate single-worker, fresh-daemon retry passed. Documentation and diff checks passed.
+Historical candidates, APK hashes and local check counts: see [validation](../validation.md) and the [dated archive](../../archive/README.md).
 
 ## Devices and setup
 

@@ -32,10 +32,3 @@ Users install and operate phones. Report PASS/FAIL/UNTESTED for exact steps; the
 - Report APK hash, device matrix, scenario/repetition, OFF/ON/READY timestamps, first recovery and full convergence times, text receipt counts, unexpected disconnects, and capture directory. Mark each scenario PASS/FAIL/UNTESTED.
 - Advance to ten phones only after the two/three/five-phone card passes; repeat startup, merge, toggle, quiet, and simultaneous-sender workloads.
 
-## Historical local validation identity
-
-- Historical October 2 working-tree APK on `fix/bluetooth-recovery-cluster-bridging-and-sos-ux`, version 1.0.1/code 2; identity checked 2026-10-02.
-- APK SHA-256: `6969A1839D7AD21CBCC9204092F527476B251D4AAC671251AB4A128A7EA90C9D`.
-- Earlier locally checked recovery APK: `78293628B17D16D412DD16CCF8A5525A2E6147D9E273D5762E7C9A984C02F36F`; both October 2 hashes are historical; use validation's October 4 hash for current reports.
-- Passed `./gradlew.bat :app:assembleDebug :app:testDebugUnitTest :app:compileDebugAndroidTestKotlin :app:lintDebug --max-workers=1 --console=plain`: 266 tests, zero failures/errors/skips; Lint zero errors, 147 warnings, three hints. Android tests compiled but were not executed on phones.
-- The October 2 local batch did not execute phone scenarios. The October 4 report adds qualitative toggle/background/relay successes; exact cluster, traffic and repeated cases remain unconfirmed.
