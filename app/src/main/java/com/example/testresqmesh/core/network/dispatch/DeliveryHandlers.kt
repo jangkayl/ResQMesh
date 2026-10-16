@@ -9,6 +9,7 @@ import kotlinx.serialization.encodeToByteArray
 import kotlinx.serialization.protobuf.ProtoBuf
 import android.util.Base64
 import com.example.testresqmesh.core.utils.BinaryCompressor
+import com.example.testresqmesh.core.utils.PerfTrace
 import kotlinx.serialization.ExperimentalSerializationApi
 
 @OptIn(ExperimentalSerializationApi::class)
@@ -59,6 +60,12 @@ class ReceiptHandler : PayloadHandler {
     }
 }
 
+private fun prepareMedia(kind: String, compressed: ByteArray): String {
+    val start = PerfTrace.nowNanos()
+    return Base64.encodeToString(BinaryCompressor.decompress(compressed), Base64.DEFAULT)
+        .also { if (PerfTrace.enabled) PerfTrace.media(kind, compressed.size, PerfTrace.elapsedMs(start)) }
+}
+
 @OptIn(ExperimentalSerializationApi::class)
 class StandardMessageHandler : PayloadHandler {
     override fun canHandle(payloadType: String) = !listOf("SYSTEM", "SEEN", "DELIVERED", "GOODBYE", "BLOCK", "UNBLOCK", "LIVE_AUDIO").contains(payloadType)
@@ -71,8 +78,8 @@ class StandardMessageHandler : PayloadHandler {
         val isEncrypted = payload.isEncrypted
 
         var text = payload.text
-        var imageBase64 = if (isPrivate) null else payload.imageBytes?.let { Base64.encodeToString(BinaryCompressor.decompress(it), Base64.DEFAULT) }
-        var audioBase64 = if (isPrivate) null else payload.audioBytes?.let { Base64.encodeToString(BinaryCompressor.decompress(it), Base64.DEFAULT) }
+        var imageBase64 = if (isPrivate) null else payload.imageBytes?.let { prepareMedia("image", it) }
+        var audioBase64 = if (isPrivate) null else payload.audioBytes?.let { prepareMedia("audio", it) }
         var locationLat = if (isPrivate) null else payload.locationLat
         var locationLng = if (isPrivate) null else payload.locationLng
 

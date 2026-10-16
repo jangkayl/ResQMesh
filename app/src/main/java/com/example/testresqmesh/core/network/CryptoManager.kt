@@ -4,6 +4,7 @@ import android.util.Base64
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 import com.example.testresqmesh.core.utils.AppLogger
+import com.example.testresqmesh.core.utils.PerfTrace
 import java.security.KeyPair
 import java.security.KeyPairGenerator
 import java.security.KeyFactory
@@ -107,6 +108,7 @@ object CryptoManager {
     }
 
     fun decryptHybrid(base64PayloadWithIv: String, base64EncryptedAesKey: String): String? {
+        val start = PerfTrace.nowNanos()
         try {
             // 1. Decrypt the AES Key using OUR RSA Private Key
             val rsaCipher = Cipher.getInstance(RSA_ALGO)
@@ -127,9 +129,11 @@ object CryptoManager {
             aesCipher.init(Cipher.DECRYPT_MODE, aesKey, gcmSpec)
             val decryptedPayloadBytes = aesCipher.doFinal(encryptedPayload)
 
+            if (PerfTrace.enabled) PerfTrace.decrypt(PerfTrace.elapsedMs(start), ok = true)
             return String(decryptedPayloadBytes, Charsets.UTF_8)
         } catch (e: Exception) {
             e.printStackTrace()
+            if (PerfTrace.enabled) PerfTrace.decrypt(PerfTrace.elapsedMs(start), ok = false)
             return null
         }
     }
