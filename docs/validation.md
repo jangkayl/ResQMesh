@@ -32,7 +32,8 @@ This is a qualitative milestone, not a full PASS for every procedure or a measur
 
 ```powershell
 .\gradlew.bat :app:assembleDebug :app:testDebugUnitTest --console=plain
-.\gradlew.bat :app:lintDebug --console=plain
+.\gradlew.bat :app:lintDebug :app:assembleDebugAndroidTest detekt --console=plain
+powershell -ExecutionPolicy Bypass -File .\scripts\ci\check_boundaries.ps1
 powershell -ExecutionPolicy Bypass -File .\scripts\ci\check_docs.ps1
 git diff --check
 ```
@@ -44,6 +45,7 @@ Full October 4–5 audit narratives and APK hashes are in the [October 5 validat
 | Historical snapshot | Recorded evidence |
 | --- | --- |
 | Incident UI follow-up `db2260e`, October 5 | Debug/Android-test builds and Lint (zero errors, 148 warnings); 18 incident UI tests and four 200%-text cases passed on API 37 emulator. |
+| Batch C hygiene, October 17 | Debug/Android-test builds, all JVM tests (including new wire-format and table-name golden tests and Koin `Module.verify`), Lint, detekt (3,176 baselined issues), boundary check (37 allowlisted) and docs pass. Dependency trees identical before/after the catalog move. Phone smoke card pending. |
 | Batch A cleanup, October 16 | 426/426 JVM tests, Lint (0 errors), Android-test compilation; reviewer PASS, auditor APPROVE. Run with `--max-workers=1` and a 1.5 GB heap after out-of-memory daemon crashes on a 7.7 GB machine. User reported all smoke-card steps working on 2026-10-16; APK hash, phone models/API, counts and captures not supplied, and the optional relay step does not close DELIVERY-01. |
 | Reconnect fixture repair (TEST-01), October 5 | 403 tests without exclusions, including 29 reconnect cases and three JVM Base64 checks; production unchanged. |
 | Samsung repair, October 3 | Clean snapshot: 280 unit tests and debug build; Android tests compiled. Earlier 350 isolated tests included unrelated fixtures. See [Samsung card](testing/samsung-send-test-card.md). |
@@ -63,6 +65,7 @@ Original September capture results, paths, Samsung reports, and historical proce
 | [Recovery](testing/bluetooth-recovery-test-card.md) | OFF/ON, isolation, cluster merge, permissions, background and Go offline |
 | [Samsung](testing/samsung-send-test-card.md) | Samsung roles/transports, private receipts and reconnect |
 | [Batch A smoke](testing/batch-a-cleanup-smoke-card.md) | No-behavior-change regression check after the Batch A cleanup |
+| [Batch C smoke](testing/batch-c-hygiene-smoke-card.md) | Startup DI, audio, SOS alert, notification and upgrade-install regression check after Batch C |
 | [SOS/conversations](testing/sos-conversations-test-card.md) | Channel isolation, independent alerts, reconnect terminal state, gestures and UI |
 | [Capstone](plans/capstone-demo-readiness.md) | Reporter/helper roles, ownership, withdrawal/offline revision and demo/release evidence |
 

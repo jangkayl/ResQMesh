@@ -1,6 +1,6 @@
 # Engineering decisions
 
-Last reviewed: 2026-10-16. Baseline: see [status](status.md). These describe accepted choices; source and bounded device evidence prevail.
+Last reviewed: 2026-10-17. Baseline: see [status](status.md). These describe accepted choices; source and bounded device evidence prevail.
 
 ## D1: Reliability before transport expansion
 
@@ -40,7 +40,7 @@ Small work stays in its task; medium work updates status. Only large multi-sessi
 
 ## D10: Deterministic PR gate
 
-CI repeats debug build, unit tests, Lint, docs and diff hygiene. Failed checks block readiness and cannot be waived by AI explanation. PR creation and merge require explicit instruction. Local/CI checks never substitute for physical evidence.
+CI repeats debug build, unit tests, Lint, Android-test compilation, detekt (baselined), architecture-boundary and docs checks, and diff hygiene. Failed checks block readiness and cannot be waived by AI explanation. PR creation and merge require explicit instruction. Local/CI checks never substitute for physical evidence.
 
 ## D11: Mutual direct-link denial, independent local release
 
@@ -95,3 +95,11 @@ Deferred designs are in the [archive index](../archive/docs-superseded-2026-10-0
 ## D23: Preserve behavior during networking decomposition
 
 Structural refactors preserve facade APIs, callback order, generation fences, persistence, queues, routing, crypto and Compose lifetimes, and imply no performance or delivery change. Target cohesive 200–400-line owners and review files above 500; NativeBleManager keeps a reviewed 743-line exception. Phase evidence is archived; results are in [validation](validation.md).
+
+## D24: Private-envelope crypto direction
+
+Keep hybrid encryption. After the demo, version the envelope: RSA-OAEP-SHA256 key wrap under a new Keystore alias and AES-GCM AAD binding version, sender, recipient and message ID, with v1 decryption kept for migration. These add no meaningful latency or size. X25519 agreement plus Ed25519 signatures is the long-term direction (smaller over BLE, authenticated) but needs a protocol migration and API-level review. Until then no authenticated E2EE claim. Plan: [revision plan](plans/code-architecture-revision.md).
+
+## D25: Packages before Gradle modules
+
+Enforce layer boundaries with package moves and `scripts/ci/check_boundaries.ps1`, whose allowlist may only shrink. Extract Gradle modules only after the allowlist reaches zero. Behavior-touching refactors (navigation, data boundary, BLE internals, crypto, release) wait until after the demo freeze.

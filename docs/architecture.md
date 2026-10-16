@@ -1,6 +1,6 @@
 # Architecture
 
-Last reviewed: 2026-10-06. Baseline: see [status](status.md). Source and bounded device evidence prevail.
+Last reviewed: 2026-10-17. Baseline: see [status](status.md). Source and bounded device evidence prevail.
 
 ## System shape and data path
 
@@ -82,3 +82,4 @@ Paths below are under `app/src/main/java/com/example/testresqmesh/`:
 | Incident/SOS state | `data/repository/IncidentSyncCoordinator.kt`, `data/repository/SosRepository.kt`, `data/repository/SosSyncCoordinator.kt` |
 | Presentation | `app/navigation/`, `feature/*/{ui,viewmodel,model}/`, `core/ui/` |
 | Maps/session | `core/map/`, `core/service/` |
+| DI, audio, logging, notifications | `app/di/` (layer modules), `core/audio/`, `core/logging/`, `core/notification/`, `feature/sos/alert/` |

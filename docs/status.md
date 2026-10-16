@@ -1,10 +1,10 @@
 # Current status
 
-Last reviewed: 2026-10-16. Baseline: `a9a27ed` on `main` (also `origin/fix/incident-ui-ux`); docs work continues on `chore/context-routing`. This page owns the baseline, open issues and next actions. Build hashes and test counts live in [validation](validation.md).
+Last reviewed: 2026-10-17. Baseline: `a9a27ed` on `main` (also `origin/fix/incident-ui-ux`); docs work continues on `chore/context-routing`. This page owns the baseline, open issues and next actions. Build hashes and test counts live in [validation](validation.md).
 
 ## Current objective
 
-Prepare for the capstone demo (within two weeks of 2026-10-16) and deployment readiness. Step one is documentation consistency; next is a code best-practice and file-architecture review without behavior changes until approved. UI/UX and mesh concerns are user-reported but not yet described.
+Prepare for the capstone demo (within two weeks of 2026-10-16) and deployment readiness. Documentation consistency is done; the code/architecture review produced the [revision plan](plans/code-architecture-revision.md): behavior-neutral Phase 0 before the demo, behavior-touching phases after the freeze. UI/UX and mesh concerns are user-reported but not yet described.
 
 ## Working by user report
 
@@ -29,13 +29,13 @@ Behavior and source ownership are in [architecture](architecture.md); accepted p
 
 Basic block, incident, SOS and recovery checks have user-reported successes; their adversarial, load and repeated cases remain pending, not known defects. See the [physical checklist](testing/physical-reliability-tests.md).
 
-**Repo hygiene (Phase 0):** the four disabled `*.kt.bak` tests were removed; `scripts/manage_devices.ps1` now lives in `scripts/device/`; refactor-era check scripts and the Figma preview plugin are archived (see the archive index).
+**Batch C hygiene / Phase 0** (branch `refactor/batch-c-hygiene`, stacked on Batch A): golden wire/table tests, leftover cleanup and archiving, catalog-only versions, Koin root in `app/di` split by layer, `core/utils` regrouped, and CI gates (androidTest compile, detekt baseline, boundary check). Local checks pass; the [smoke card](testing/batch-c-hygiene-smoke-card.md) is pending a user run.
 
-**Batch A cleanup** (branch `refactor/batch-a-cleanup`): dead incident UI removed, two thread-safety fixes, swallowed-exception logging, debug-only Logcat and named timer constants. Local checks pass; the user reported all [smoke card](testing/batch-a-cleanup-smoke-card.md) steps working on 2026-10-16 (build hash, models and counts not supplied). Remaining review batches: B crypto/delivery (RSA PKCS#1 padding, unauthenticated private envelopes, decrypt-failure custody retry), C release/CI (R8, signing, androidTest compile in CI, catalog versions, release in-app terminal contents), D architecture (core→data imports, sos→comms coupling, audio in core/utils, 400–500-line screens).
+**Batch A cleanup** (branch `refactor/batch-a-cleanup`): dead incident UI removed, two thread-safety fixes, swallowed-exception logging, debug-only Logcat and named timer constants. Local checks pass; the user reported all [smoke card](testing/batch-a-cleanup-smoke-card.md) steps working on 2026-10-16 (build hash, models and counts not supplied). Remaining review work is phases P1–P6 of the revision plan (crypto/delivery, data boundary, presentation, BLE internals, release/deps, modules).
 
 ## Next actions
 
-1. Decide push/PR for `chore/context-routing` and `refactor/batch-a-cleanup`.
-2. Choose the next review batch (B, C or D); plan before editing code.
+1. Run the [Batch C smoke card](testing/batch-c-hygiene-smoke-card.md); then decide push/PR for `chore/context-routing`, `refactor/batch-a-cleanup` and `refactor/batch-c-hygiene`.
+2. After the demo freeze, plan revision phase P1 or P2 in detail before editing code.
 3. Collect UX-01 and MESH-02 details, then prioritize them with UI-02 and DELIVERY-01.
 4. Work the [capstone plan](plans/capstone-demo-readiness.md) toward the demo, including DEPLOY-01 items needed for installation.
