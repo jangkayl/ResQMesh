@@ -79,6 +79,21 @@ if ($LASTEXITCODE -eq 0 -and $ignoredDocs) {
     $errors.Add('Canonical docs are still ignored by Git.')
 }
 
+$claudePath = Join-Path $root 'CLAUDE.md'
+if (Test-Path -LiteralPath $claudePath -PathType Leaf) {
+    $claudeWords = [regex]::Matches((Get-Content -Raw -LiteralPath $claudePath), '\S+').Count
+    if ($claudeWords -gt 300) {
+        $errors.Add("CLAUDE.md has $claudeWords words; limit is 300")
+    }
+}
+
+foreach ($path in $activeMarkdown) {
+    if ((Split-Path -Leaf $path) -eq 'status.md') { continue }
+    if ((Get-Content -Raw -LiteralPath $path) -match '(?i)source baseline:?\s*`[0-9a-f]{7,}`') {
+        $errors.Add("Baseline commit stamp outside status.md: $([IO.Path]::GetFileName($path))")
+    }
+}
+
 $rows | Format-Table -AutoSize
 
 if ($errors.Count -gt 0) {
