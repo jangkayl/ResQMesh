@@ -2,7 +2,7 @@
 
 Last reviewed: 2026-10-17. Status: Phase 0 measured; Phases 1–4 deferred. Source baseline `a9a27ed`. Reason: user-reported lag when the app opens.
 
-**Phase 0 result:** on two phones, frame and Compose work caused over 90% of main-thread stall time. BLE inbound work was under 3%, and each decrypt took 30–85 ms ([capture](../validation.md)). The offload would not remove the reported lag. Investigate UI rendering first; revisit this plan only if later evidence shows BLE stalls.
+**Phase 0 result:** on two phones, frame and Compose work caused over 90% of main-thread stall time. BLE inbound work was under 3%, and each decrypt took 30–85 ms ([capture](../validation.md)). The offload would not remove the reported lag. A release-like build then felt smooth on both phones, so most of the reported lag was debug-build overhead. Revisit this plan only if later evidence shows BLE stalls.
 
 ## Main-looper dependency map
 

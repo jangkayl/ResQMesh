@@ -79,7 +79,13 @@ Debug APK `43D72C15...` (commit `29f3a22`, no earlier lag fixes) on Samsung SM-P
 | SM-P615 | 310, 34.8 s total, max 1,322 ms | 33.2 s | under 1 s | 6 × 34–85 ms |
 | CPH2127 | 60, 4.4 s total, max 557 ms | 3.8 s | about 0.4 s | 7 × 30–40 ms |
 
-Decrypt is real but minor. The stalls are frame rendering and Compose work, not BLE. Debuggable builds run Compose slower, so release-like evidence is still pending.
+Decrypt is real but minor. The stalls are frame rendering and Compose work, not BLE.
+
+**Release-like follow-up (same day).** The release APK was signed with the local debug key, giving non-debuggable `2AB2CC2F...`, and installed on both phones. The user reports the UI now feels smooth. The frame counters were lost when the app was swiped away, so the comparison uses system logs on the SM-P615:
+- Debug run (about 2 min): 11 skipped-frame events totalling 469 frames, and 10 frames of at least 700 ms (max 1,258 ms).
+- Release run (about 47 s): one startup skip of 34 frames, roughly 0.5 s, and no slow frames after launch.
+
+The CPH2127 log had already rotated. Runs differ in length, and media, SOS, relay and the Bluetooth toggle were not covered.
 
 ## Active physical procedures
 
