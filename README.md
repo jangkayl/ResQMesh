@@ -227,7 +227,7 @@ Reviewed **2026-10-04**; baseline and current evidence are in [status](docs/stat
 
 User-reported successes include four-phone text/receipts, complete notes/SOS, restart/relay recovery, toggles/background, mutual blocking, incident lifecycle/reconciliation, independent SOS cancellation and offline maps. These qualitative reports lack a complete device/count/timing/transport matrix.
 
-**DELIVERY-01 remains open:** some public/private messages or voice notes fail to reach D through A→B→C→D. Cause unknown.
+**DELIVERY-01 is open:** intermittent loss at D over A→B→C→D; see [status](docs/status.md).
 
 Measured scale, latency, range, battery/OEM behavior, accessibility, novice usability and release/upgrade readiness remain pending. Authenticated E2EE, forward secrecy, verified personal identity and guaranteed self-healing/delivery are not claimed. Recorded-note success does not establish live-PTT reliability.
 

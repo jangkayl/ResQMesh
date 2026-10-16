@@ -16,14 +16,14 @@ Report received 2026-10-04; actual test timestamps were not supplied. The user i
 
 | Scenario | User-reported result | Limit |
 | --- | --- | --- |
-| A–B–C–D text, notes and SOS | Successful public/private arrival, returning DELIVERED/READ, complete recorded playback and SOS arrival confirmed | Public/private messages or voice sometimes fail to reach D; DELIVERY-01 remains open |
+| A–B–C–D text, notes and SOS | Successful public/private arrival, returning DELIVERED/READ, complete recorded playback and SOS arrival confirmed | Intermittent loss at D; see [DELIVERY-01](status.md) |
 | Recovery | App restart, relay return and Bluetooth OFF/ON work | Repetition counts, recovery times and callback-race coverage unspecified |
 | Background | Locked/background messaging works | Duration, settings/OEM matrix, process death and battery not established |
 | Blocking | Mutual direct denial, relaying, restart persistence and independent unblock reported working | Protocol loss/retry and exact repeated-card coverage unspecified |
 | Incidents and SOS | Full helper lifecycle/recovery and independent simultaneous-alert cancellation confirmed | Quantitative convergence, load and authority-abuse tests unspecified |
 | Offline maps | Offline map and SOS map display work without internet | Corruption, interrupted update, rollback and storage matrix unconfirmed |
 
-This is a qualitative milestone, not a full PASS for every procedure or a measured delivery rate. Public-key handling, forwarding and blocking are possible explanations suggested by the user for DELIVERY-01, not diagnosed causes.
+This is a qualitative milestone, not a full PASS for every procedure or a measured delivery rate.
 
 ## Local checks and historical milestones
 
@@ -56,7 +56,7 @@ The user deferred intermediate phone gates until the final batch build. October 
 
 The user confirmed **F1–F14 PASS** in the [network card](../archive/docs-superseded-2026-10-16/testing/network-maintainability-test-card.md) on the final APK whose hash starts `1AE82B6C`. The preserved APK rehashes to `1AE82B6CE482EBBF4415E64C4FD74FD103D888104A3790AA8EDCEA979441BFE0`. This covers the card's direct/relay messaging, receipts, notes, recovery, blocking/channels, persistence, incident/SOS, drafts, maps and accessibility scenarios as user-reported results.
 
-Report received October 6; actual test times, phone models/API levels, counts, durations, transport evidence and captures were not supplied. No automated rerun was reported. The four recorded UI-02 emulator failures remain unresolved. Successful reported runs do not close intermittent DELIVERY-01 or establish quantitative reliability.
+Report received October 6; actual test times, phone models/API levels, counts, durations, transport evidence and captures were not supplied. No automated rerun was reported. Reported successes do not close [DELIVERY-01](status.md) or establish quantitative reliability.
 
 | Historical snapshot | Recorded evidence |
 | --- | --- |
@@ -95,4 +95,4 @@ Search application markers and the reported window first: READY/generation, iden
 
 Measure recipient arrival, receipt confirmation and playback separately. Acceptance and hop custody are not recipient delivery. Cross-phone timing needs a common video/clock; unrelated monotonic clocks cannot be subtracted.
 
-For DELIVERY-01, preserve a focused failure report for later analysis. Root-cause investigation and network repair remain outside this maintenance refactor.
+For [DELIVERY-01](status.md), preserve a focused failure report for later analysis. Root-cause investigation and network repair remain outside this maintenance refactor.

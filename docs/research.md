@@ -16,7 +16,7 @@ Source implements native BLE/GATT, optional L2CAP, Protobuf, directed graph rout
 
 On 2026-10-04 the user reported successful A–B–C–D text arrival, private delivery/read receipts, complete recorded playback and SOS arrival on the current APK. Recovery, background, incident lifecycle/sync, independent SOS cancellation, blocking and offline map use were also confirmed qualitatively. See the [candidate and evidence limits](validation.md).
 
-The same report identifies intermittent public/private message or voice loss at D. Successful demonstrations establish capability; they do not establish consistent delivery. DELIVERY-01 remains open, with no diagnosed cause. Do not describe the four-phone chain as a reliable-capacity experiment or infer a success percentage.
+Successful demonstrations establish capability, not consistent delivery; [DELIVERY-01](status.md) is open. Do not describe the four-phone chain as a reliable-capacity experiment or infer a success percentage.
 
 ## Core questions
 

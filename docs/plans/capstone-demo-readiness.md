@@ -8,7 +8,7 @@ This checklist prepares evidence and installation; it does not authorize applica
 
 [Validation](../validation.md) identifies the current October 4 APK and qualitative user-reported four-phone text/receipt/note/SOS success, recovery/toggles/background, mutual blocking, full incident lifecycle/reconciliation, independent SOS cancellation and offline maps.
 
-Intermittent A-to-D message/note loss remains DELIVERY-01, cause unknown. Models/API, repetitions, timings and transport/captures were not supplied. Functional success does not establish every exact test below, novice usability, deployment readiness or pilot completion.
+Intermittent A-to-D loss remains open ([DELIVERY-01](../status.md)). Functional success does not establish every exact test below, novice usability, deployment readiness or pilot completion.
 
 - [ ] Map the approved project objectives to acceptance criteria and the assessment rubric.
 - [ ] Keep the approved title; explain offline communication and incident coordination.
