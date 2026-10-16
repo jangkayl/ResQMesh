@@ -1,4 +1,4 @@
-package com.example.testresqmesh.feature.setup
+package com.example.testresqmesh.feature.setup.data
 
 import org.junit.Assert.assertEquals
 import org.junit.Test

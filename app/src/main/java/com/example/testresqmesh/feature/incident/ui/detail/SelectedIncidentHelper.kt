@@ -21,8 +21,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.testresqmesh.core.ui.theme.ResQTheme
 import com.example.testresqmesh.data.local.entity.IncidentEntity
-import com.example.testresqmesh.feature.incident.viewmodel.IncidentAction
-import com.example.testresqmesh.feature.incident.viewmodel.IncidentPresentation
+import com.example.testresqmesh.feature.incident.model.IncidentAction
+import com.example.testresqmesh.feature.incident.model.IncidentPresentation
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.material3.ExperimentalMaterial3Api
 

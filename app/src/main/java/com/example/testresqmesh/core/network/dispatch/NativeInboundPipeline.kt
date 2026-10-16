@@ -6,7 +6,7 @@ import com.example.testresqmesh.core.model.NodeIdentity
 import com.example.testresqmesh.core.network.ReliableMeshTransfers
 import com.example.testresqmesh.core.network.bluetooth.state.BleLinkRole
 import com.example.testresqmesh.core.network.bluetooth.state.BleStateStore
-import com.example.testresqmesh.core.utils.AppLogger
+import com.example.testresqmesh.core.logging.AppLogger
 import kotlinx.serialization.ExperimentalSerializationApi
 
 /** Inbound gates run at the same call site; only the existing rename/retirement posts are used. */

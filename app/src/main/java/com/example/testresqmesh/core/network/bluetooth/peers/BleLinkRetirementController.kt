@@ -13,7 +13,7 @@ import com.example.testresqmesh.core.network.bluetooth.state.BleLinkRole
 import com.example.testresqmesh.core.network.bluetooth.state.GattTransferCoordinator
 import com.example.testresqmesh.core.network.bluetooth.state.HeartbeatCoordinator
 import com.example.testresqmesh.core.network.bluetooth.state.payloadBytes
-import com.example.testresqmesh.core.utils.AppLogger
+import com.example.testresqmesh.core.logging.AppLogger
 import com.example.testresqmesh.core.network.bluetooth.peers.BlePeerDirectory
 import com.example.testresqmesh.core.network.bluetooth.peers.BleLinkRetirementController
 import com.example.testresqmesh.core.network.bluetooth.session.BleTransportResources

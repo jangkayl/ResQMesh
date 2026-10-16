@@ -44,7 +44,7 @@ import com.example.testresqmesh.R
 import com.example.testresqmesh.core.model.ChatMessage
 import com.example.testresqmesh.core.model.NodeIdentity
 import com.example.testresqmesh.core.ui.theme.Spacing
-import com.example.testresqmesh.core.utils.MediaHelper
+import com.example.testresqmesh.core.audio.MediaHelper
 import com.example.testresqmesh.feature.comms.ui.deliveryLabel
 import com.example.testresqmesh.feature.comms.ui.messageTime
 import kotlin.math.absoluteValue

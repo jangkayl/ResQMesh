@@ -1,7 +1,7 @@
 package com.example.testresqmesh.data.repository
 
 import com.example.testresqmesh.core.network.*
-import com.example.testresqmesh.core.utils.AppLogger
+import com.example.testresqmesh.core.logging.AppLogger
 import com.example.testresqmesh.data.local.entity.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*

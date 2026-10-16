@@ -5,7 +5,7 @@ import com.example.testresqmesh.core.model.ConnectedDevice
 import com.example.testresqmesh.core.model.NodeIdentity
 import com.example.testresqmesh.core.network.MeshPayload
 import com.example.testresqmesh.core.network.MeshNetworkGateway
-import com.example.testresqmesh.core.utils.AppLogger
+import com.example.testresqmesh.core.logging.AppLogger
 import android.util.Base64
 import kotlinx.serialization.encodeToByteArray
 import kotlinx.serialization.protobuf.ProtoBuf

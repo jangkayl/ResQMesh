@@ -17,7 +17,7 @@ import android.os.Looper
 import android.os.ParcelUuid
 import com.example.testresqmesh.core.model.NodeIdentity
 import com.example.testresqmesh.core.network.bluetooth.state.HandshakeRadioGate
-import com.example.testresqmesh.core.utils.AppLogger
+import com.example.testresqmesh.core.logging.AppLogger
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.random.Random

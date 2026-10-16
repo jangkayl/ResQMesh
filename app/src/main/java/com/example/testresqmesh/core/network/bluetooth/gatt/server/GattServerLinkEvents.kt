@@ -9,7 +9,7 @@ import com.example.testresqmesh.core.model.ConnectedDevice
 import com.example.testresqmesh.core.model.NodeIdentity
 import com.example.testresqmesh.core.network.bluetooth.state.BleLinkRole
 import com.example.testresqmesh.core.network.bluetooth.state.BleLinkState
-import com.example.testresqmesh.core.utils.AppLogger
+import com.example.testresqmesh.core.logging.AppLogger
 import java.util.concurrent.ConcurrentLinkedDeque
 import java.util.concurrent.atomic.AtomicBoolean
 import com.example.testresqmesh.core.network.bluetooth.gatt.GattServerHost

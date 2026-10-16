@@ -18,7 +18,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.testresqmesh.core.ui.theme.ResQTheme
-import com.example.testresqmesh.core.utils.MediaHelper
+import com.example.testresqmesh.core.audio.MediaHelper
 import com.example.testresqmesh.data.repository.asMessage
 import com.example.testresqmesh.feature.comms.viewmodel.CommunicationViewModel
 import com.example.testresqmesh.feature.comms.ui.PublicConversationScreen

@@ -1,6 +1,6 @@
 package com.example.testresqmesh.core.map.storage
 
-import com.example.testresqmesh.core.utils.AppLogger
+import com.example.testresqmesh.core.logging.AppLogger
 import org.json.JSONObject
 import java.io.File
 

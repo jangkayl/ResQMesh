@@ -3,7 +3,7 @@ package com.example.testresqmesh.data.repository
 import android.content.Context
 import android.content.SharedPreferences
 import com.example.testresqmesh.core.network.CryptoManager
-import com.example.testresqmesh.core.utils.AppLogger
+import com.example.testresqmesh.core.logging.AppLogger
 import com.example.testresqmesh.data.local.dao.UserDao
 import com.example.testresqmesh.data.local.entity.UserEntity
 import kotlinx.coroutines.flow.Flow

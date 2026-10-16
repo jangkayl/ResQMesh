@@ -4,7 +4,7 @@ import com.example.testresqmesh.core.network.MeshPayload
 import com.example.testresqmesh.core.network.OutboundFrameEvent
 import com.example.testresqmesh.core.network.ReliableMeshTransfers
 import com.example.testresqmesh.core.network.bluetooth.state.BleLink
-import com.example.testresqmesh.core.utils.AppLogger
+import com.example.testresqmesh.core.logging.AppLogger
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.decodeFromByteArray
 import kotlinx.serialization.protobuf.ProtoBuf

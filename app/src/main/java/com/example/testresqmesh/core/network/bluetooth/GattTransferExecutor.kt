@@ -14,7 +14,7 @@ import com.example.testresqmesh.core.network.OutboundFrameEvent
 import com.example.testresqmesh.core.network.TransportDispatchResult
 import com.example.testresqmesh.core.network.bluetooth.state.BleStateStore
 import com.example.testresqmesh.core.network.bluetooth.state.payloadBytes
-import com.example.testresqmesh.core.utils.AppLogger
+import com.example.testresqmesh.core.logging.AppLogger
 import java.util.UUID
 
 /** Executes Android GATT writes/indications while [GattTransferCoordinator] owns flight state. */

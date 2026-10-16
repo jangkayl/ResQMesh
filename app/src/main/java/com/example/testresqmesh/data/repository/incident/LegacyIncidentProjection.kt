@@ -3,7 +3,7 @@ package com.example.testresqmesh.data.repository.incident
 import com.example.testresqmesh.core.model.EntityType
 import com.example.testresqmesh.core.model.EventType
 import com.example.testresqmesh.core.model.IncidentState
-import com.example.testresqmesh.core.utils.AppLogger
+import com.example.testresqmesh.core.logging.AppLogger
 import com.example.testresqmesh.data.local.dao.DomainEventDao
 import com.example.testresqmesh.data.local.dao.IncidentDao
 import com.example.testresqmesh.data.local.AppDatabase

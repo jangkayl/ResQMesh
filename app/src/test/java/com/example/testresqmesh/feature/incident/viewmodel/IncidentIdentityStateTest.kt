@@ -1,5 +1,11 @@
 package com.example.testresqmesh.feature.incident.viewmodel
 
+import com.example.testresqmesh.feature.incident.model.IncidentAction
+import com.example.testresqmesh.feature.incident.model.IncidentDestination
+import com.example.testresqmesh.feature.incident.model.IncidentPresentation
+import com.example.testresqmesh.feature.incident.model.incidentPresentation
+
+
 import androidx.lifecycle.viewModelScope
 import com.example.testresqmesh.core.model.DomainEventEntityFakeDao
 import com.example.testresqmesh.core.model.IncidentEntityFakeDao

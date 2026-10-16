@@ -30,7 +30,7 @@ import com.example.testresqmesh.core.ui.theme.InboxAccentBlue
 import com.example.testresqmesh.core.ui.theme.Spacing
 import com.example.testresqmesh.feature.radar.viewmodel.RadarViewModel
 import com.example.testresqmesh.core.model.NodeIdentity
-import com.example.testresqmesh.core.utils.AppLogger
+import com.example.testresqmesh.core.logging.AppLogger
 import com.example.testresqmesh.core.ui.components.peers.NetworkGraphVisualizer
 import com.example.testresqmesh.core.ui.model.NodeItemData
 import com.example.testresqmesh.core.ui.model.NodeKind

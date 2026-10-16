@@ -17,7 +17,7 @@ import androidx.compose.material3.Text
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import com.example.testresqmesh.core.ui.theme.TestResQMeshTheme
-import com.example.testresqmesh.core.utils.MediaHelper
+import com.example.testresqmesh.core.audio.MediaHelper
 import com.example.testresqmesh.data.repository.SosRepository
 import com.example.testresqmesh.feature.comms.viewmodel.CommunicationViewModel
 import com.example.testresqmesh.feature.sos.ui.SosThreadScreen

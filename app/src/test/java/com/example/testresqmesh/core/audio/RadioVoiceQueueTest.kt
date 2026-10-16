@@ -1,4 +1,4 @@
-package com.example.testresqmesh.core.utils
+package com.example.testresqmesh.core.audio
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse

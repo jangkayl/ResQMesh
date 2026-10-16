@@ -18,8 +18,8 @@ import androidx.compose.ui.unit.sp
 import com.example.testresqmesh.core.ui.theme.Spacing
 import com.example.testresqmesh.core.ui.theme.TacticalBlack
 import com.example.testresqmesh.core.ui.theme.TacticalCarbon
-import com.example.testresqmesh.feature.incident.viewmodel.IncidentDestination
-import com.example.testresqmesh.feature.incident.viewmodel.IncidentMetrics
+import com.example.testresqmesh.feature.incident.model.IncidentDestination
+import com.example.testresqmesh.feature.incident.model.IncidentMetrics
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.material3.ExperimentalMaterial3Api
 

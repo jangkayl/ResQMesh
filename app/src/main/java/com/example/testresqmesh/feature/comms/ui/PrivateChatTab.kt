@@ -8,7 +8,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Modifier
 import com.example.testresqmesh.feature.comms.ui.components.EndOfMeshIndicator
 import com.example.testresqmesh.feature.comms.ui.components.InboxMessageItem
-import com.example.testresqmesh.core.utils.MediaHelper
+import com.example.testresqmesh.core.audio.MediaHelper
 
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue

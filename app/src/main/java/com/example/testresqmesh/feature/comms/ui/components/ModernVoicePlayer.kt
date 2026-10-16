@@ -38,7 +38,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.testresqmesh.R
-import com.example.testresqmesh.core.utils.MediaHelper
+import com.example.testresqmesh.core.audio.MediaHelper
 
 @Composable
 fun ModernVoicePlayer(

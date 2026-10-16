@@ -16,7 +16,7 @@ import com.example.testresqmesh.core.network.OutboundFrameEvent
 import com.example.testresqmesh.core.network.bluetooth.MeshTransportState
 import com.example.testresqmesh.core.model.ScanEvent
 import com.example.testresqmesh.core.network.MeshNetworkGateway
-import com.example.testresqmesh.core.utils.AppLogger
+import com.example.testresqmesh.core.logging.AppLogger
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow

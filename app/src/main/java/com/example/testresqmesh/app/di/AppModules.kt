@@ -11,10 +11,10 @@ import com.example.testresqmesh.core.network.MeshNetworkGateway
 import com.example.testresqmesh.core.network.NativeBleGateway
 import com.example.testresqmesh.core.network.NativeBleManager
 import com.example.testresqmesh.core.service.MeshSessionController
-import com.example.testresqmesh.core.utils.LiveAudioEngine
-import com.example.testresqmesh.core.utils.MediaHelper
-import com.example.testresqmesh.core.utils.NotificationHelper
-import com.example.testresqmesh.core.utils.SosAlertController
+import com.example.testresqmesh.core.audio.LiveAudioEngine
+import com.example.testresqmesh.core.audio.MediaHelper
+import com.example.testresqmesh.core.notification.NotificationHelper
+import com.example.testresqmesh.feature.sos.alert.SosAlertController
 import com.example.testresqmesh.data.local.AppDatabase
 import com.example.testresqmesh.data.location.DefaultLocationClient
 import com.example.testresqmesh.data.repository.BlockRelationshipStore

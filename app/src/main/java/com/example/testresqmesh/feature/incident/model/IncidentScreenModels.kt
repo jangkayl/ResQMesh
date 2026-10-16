@@ -1,4 +1,4 @@
-package com.example.testresqmesh.feature.incident.viewmodel
+package com.example.testresqmesh.feature.incident.model
 
 import com.example.testresqmesh.data.local.entity.UserEntity
 

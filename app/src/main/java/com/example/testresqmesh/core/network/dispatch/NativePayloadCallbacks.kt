@@ -1,7 +1,7 @@
 package com.example.testresqmesh.core.network.dispatch
 
 import com.example.testresqmesh.core.model.NodeIdentity
-import com.example.testresqmesh.core.utils.AppLogger
+import com.example.testresqmesh.core.logging.AppLogger
 import com.example.testresqmesh.core.network.BlockControlEnvelope
 import com.example.testresqmesh.core.network.MeshPayload
 import com.example.testresqmesh.core.network.NativePayloadEvents

@@ -1,4 +1,4 @@
-package com.example.testresqmesh.core.utils
+package com.example.testresqmesh.core.logging
 
 import android.util.Log
 import com.example.testresqmesh.BuildConfig

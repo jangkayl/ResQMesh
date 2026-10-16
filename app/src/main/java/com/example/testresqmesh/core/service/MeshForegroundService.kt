@@ -13,8 +13,8 @@ import androidx.core.app.NotificationCompat
 import com.example.testresqmesh.MainActivity
 import com.example.testresqmesh.R
 import com.example.testresqmesh.core.model.NodeIdentity
-import com.example.testresqmesh.core.utils.AppLogger
-import com.example.testresqmesh.core.utils.TerminalLogCategory
+import com.example.testresqmesh.core.logging.AppLogger
+import com.example.testresqmesh.core.logging.TerminalLogCategory
 import com.example.testresqmesh.data.repository.MeshRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers

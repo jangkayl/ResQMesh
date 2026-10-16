@@ -42,8 +42,8 @@ import com.example.testresqmesh.feature.incident.ui.components.CreateIncidentShe
 import com.example.testresqmesh.feature.incident.ui.components.IncidentDetailSheet
 import com.example.testresqmesh.feature.incident.ui.components.IncidentFilterSheet
 import com.example.testresqmesh.feature.incident.ui.components.TacticalIncidentCard
-import com.example.testresqmesh.feature.incident.viewmodel.AssistanceFilter
-import com.example.testresqmesh.feature.incident.viewmodel.IncidentDestination
+import com.example.testresqmesh.feature.incident.model.AssistanceFilter
+import com.example.testresqmesh.feature.incident.model.IncidentDestination
 import com.example.testresqmesh.feature.incident.viewmodel.IncidentViewModel
 import com.example.testresqmesh.data.repository.IncidentOwnership
 import com.example.testresqmesh.core.ui.model.NodeKind

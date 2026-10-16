@@ -1,5 +1,11 @@
 package com.example.testresqmesh.feature.incident.viewmodel
 
+import com.example.testresqmesh.feature.incident.model.AssistanceFilter
+import com.example.testresqmesh.feature.incident.model.IncidentDestination
+import com.example.testresqmesh.feature.incident.model.IncidentFilterState
+import com.example.testresqmesh.feature.incident.model.IncidentIdentityState
+import com.example.testresqmesh.feature.incident.model.IncidentMetrics
+
 import com.example.testresqmesh.feature.incident.model.incidentMetrics
 import com.example.testresqmesh.feature.incident.model.selectIncidents
 import androidx.lifecycle.ViewModel
@@ -11,7 +17,7 @@ import com.example.testresqmesh.data.local.entity.UserEntity
 import com.example.testresqmesh.data.repository.IncidentRepository
 import com.example.testresqmesh.data.repository.IdentityProvider
 import com.example.testresqmesh.data.repository.IncidentOwnership
-import com.example.testresqmesh.core.utils.AppLogger
+import com.example.testresqmesh.core.logging.AppLogger
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow

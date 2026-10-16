@@ -38,8 +38,8 @@ import com.example.testresqmesh.core.ui.theme.TacticalCarbon
 import com.example.testresqmesh.data.local.entity.DomainEventEntity
 import com.example.testresqmesh.data.local.entity.IncidentEntity
 import com.example.testresqmesh.data.local.entity.IncidentOfferEntity
-import com.example.testresqmesh.feature.incident.viewmodel.IncidentAction
-import com.example.testresqmesh.feature.incident.viewmodel.incidentPresentation
+import com.example.testresqmesh.feature.incident.model.IncidentAction
+import com.example.testresqmesh.feature.incident.model.incidentPresentation
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)

@@ -2,8 +2,8 @@ package com.example.testresqmesh.core.network.bluetooth.admission
 
 import com.example.testresqmesh.core.model.NodeIdentity
 import com.example.testresqmesh.core.network.bluetooth.state.BleStateStore
-import com.example.testresqmesh.core.utils.AppLogger
-import com.example.testresqmesh.core.utils.TerminalLogEntry
+import com.example.testresqmesh.core.logging.AppLogger
+import com.example.testresqmesh.core.logging.TerminalLogEntry
 import com.example.testresqmesh.core.network.bluetooth.BleAdmissionDecision
 import com.example.testresqmesh.core.network.bluetooth.BleAdmissionReason
 import com.example.testresqmesh.core.network.bluetooth.BleConnectStartResult

@@ -4,8 +4,8 @@ import android.content.SharedPreferences
 import com.example.testresqmesh.data.local.dao.UserDao
 import com.example.testresqmesh.data.local.entity.IncidentEntity
 import com.example.testresqmesh.data.local.entity.UserEntity
-import com.example.testresqmesh.feature.incident.viewmodel.incidentPresentation
-import com.example.testresqmesh.feature.incident.viewmodel.isInvolved
+import com.example.testresqmesh.feature.incident.model.incidentPresentation
+import com.example.testresqmesh.feature.incident.model.isInvolved
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.flow.MutableStateFlow

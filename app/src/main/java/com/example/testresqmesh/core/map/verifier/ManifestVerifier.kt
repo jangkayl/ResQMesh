@@ -1,6 +1,6 @@
 package com.example.testresqmesh.core.map.verifier
 
-import com.example.testresqmesh.core.utils.AppLogger
+import com.example.testresqmesh.core.logging.AppLogger
 import java.io.File
 import java.io.FileInputStream
 import java.security.KeyFactory

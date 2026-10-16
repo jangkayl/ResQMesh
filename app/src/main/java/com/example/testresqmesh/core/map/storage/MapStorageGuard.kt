@@ -4,7 +4,7 @@ import android.content.Context
 import android.os.StatFs
 import com.example.testresqmesh.core.map.model.MapPackageManifest
 import com.example.testresqmesh.core.map.model.MapPackageStatus
-import com.example.testresqmesh.core.utils.AppLogger
+import com.example.testresqmesh.core.logging.AppLogger
 import java.io.File
 import java.io.FileOutputStream
 import java.io.InputStream

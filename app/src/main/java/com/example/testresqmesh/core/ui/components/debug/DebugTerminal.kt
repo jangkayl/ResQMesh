@@ -23,11 +23,11 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.testresqmesh.core.utils.AppLogger
-import com.example.testresqmesh.core.utils.TerminalLinkSnapshot
-import com.example.testresqmesh.core.utils.TerminalLogCategory
-import com.example.testresqmesh.core.utils.TerminalLogEntry
-import com.example.testresqmesh.core.utils.TerminalLogLevel
+import com.example.testresqmesh.core.logging.AppLogger
+import com.example.testresqmesh.core.logging.TerminalLinkSnapshot
+import com.example.testresqmesh.core.logging.TerminalLogCategory
+import com.example.testresqmesh.core.logging.TerminalLogEntry
+import com.example.testresqmesh.core.logging.TerminalLogLevel
 import kotlinx.coroutines.launch
 
 private enum class TerminalFilter(val label: String) {

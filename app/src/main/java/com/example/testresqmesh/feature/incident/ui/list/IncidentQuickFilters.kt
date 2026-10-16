@@ -1,6 +1,6 @@
 package com.example.testresqmesh.feature.incident.ui.list
 
-import com.example.testresqmesh.feature.incident.viewmodel.IncidentFilterState
+import com.example.testresqmesh.feature.incident.model.IncidentFilterState
 import androidx.compose.animation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
@@ -8,8 +8,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.graphics.Color
 import com.example.testresqmesh.core.ui.theme.SafetyOrange
 import com.example.testresqmesh.core.ui.theme.SignalRed
-import com.example.testresqmesh.feature.incident.viewmodel.AssistanceFilter
-import com.example.testresqmesh.feature.incident.viewmodel.IncidentDestination
+import com.example.testresqmesh.feature.incident.model.AssistanceFilter
+import com.example.testresqmesh.feature.incident.model.IncidentDestination
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.material3.ExperimentalMaterial3Api
 

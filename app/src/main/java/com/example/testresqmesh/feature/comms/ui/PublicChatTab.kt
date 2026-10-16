@@ -57,7 +57,7 @@ import androidx.compose.material3.rememberModalBottomSheetState
 import com.example.testresqmesh.core.ui.components.feedback.ResQEmptyState
 import com.example.testresqmesh.core.ui.components.layout.ResQAuroraBackground
 import com.example.testresqmesh.core.ui.theme.Spacing
-import com.example.testresqmesh.core.utils.MediaHelper
+import com.example.testresqmesh.core.audio.MediaHelper
 import com.example.testresqmesh.feature.comms.ui.components.ChatBubble
 import com.example.testresqmesh.feature.comms.ui.components.ChatInput
 import com.example.testresqmesh.feature.comms.ui.components.SeenByBottomSheet

@@ -2,7 +2,7 @@ package com.example.testresqmesh.feature.comms.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.testresqmesh.core.utils.MediaHelper
+import com.example.testresqmesh.core.audio.MediaHelper
 import com.example.testresqmesh.core.model.NodeIdentity
 import com.example.testresqmesh.data.repository.MeshRepository
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -13,7 +13,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.launch
 
-import com.example.testresqmesh.core.utils.LiveAudioEngine
+import com.example.testresqmesh.core.audio.LiveAudioEngine
 
 class WalkieTalkieViewModel(
     private val useCases: com.example.testresqmesh.core.domain.usecase.MeshUseCases,

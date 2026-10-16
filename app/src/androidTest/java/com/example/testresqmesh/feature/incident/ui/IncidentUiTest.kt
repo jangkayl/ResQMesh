@@ -27,7 +27,7 @@ import com.example.testresqmesh.feature.incident.ui.components.CreateIncidentShe
 import com.example.testresqmesh.feature.incident.ui.components.IncidentDetailSheet
 import com.example.testresqmesh.feature.incident.ui.components.TacticalHelperOfferCard
 import com.example.testresqmesh.feature.incident.ui.components.TacticalIncidentCard
-import com.example.testresqmesh.feature.incident.viewmodel.HelperPresentation
+import com.example.testresqmesh.feature.incident.model.HelperPresentation
 import com.example.testresqmesh.feature.incident.viewmodel.IncidentViewModel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers

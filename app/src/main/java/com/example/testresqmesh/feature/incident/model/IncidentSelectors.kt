@@ -3,13 +3,13 @@ package com.example.testresqmesh.feature.incident.model
 import com.example.testresqmesh.data.local.entity.IncidentEntity
 import com.example.testresqmesh.data.local.entity.IncidentOfferEntity
 import com.example.testresqmesh.data.local.entity.UserEntity
-import com.example.testresqmesh.feature.incident.viewmodel.IncidentIdentityState
-import com.example.testresqmesh.feature.incident.viewmodel.IncidentMetrics
-import com.example.testresqmesh.feature.incident.viewmodel.IncidentDestination
-import com.example.testresqmesh.feature.incident.viewmodel.IncidentFilterState
-import com.example.testresqmesh.feature.incident.viewmodel.AssistanceFilter
-import com.example.testresqmesh.feature.incident.viewmodel.isInvolved
-import com.example.testresqmesh.feature.incident.viewmodel.displayTitle
+import com.example.testresqmesh.feature.incident.model.IncidentIdentityState
+import com.example.testresqmesh.feature.incident.model.IncidentMetrics
+import com.example.testresqmesh.feature.incident.model.IncidentDestination
+import com.example.testresqmesh.feature.incident.model.IncidentFilterState
+import com.example.testresqmesh.feature.incident.model.AssistanceFilter
+import com.example.testresqmesh.feature.incident.model.isInvolved
+import com.example.testresqmesh.feature.incident.model.displayTitle
 
 internal fun incidentMetrics(incidents: List<IncidentEntity>, identity: IncidentIdentityState, offersMap: Map<String, List<IncidentOfferEntity>>): IncidentMetrics = run {
         val active = incidents.filter { it.status !in setOf("RESOLVED", "CANCELLED") }

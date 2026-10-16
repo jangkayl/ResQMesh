@@ -3,10 +3,10 @@ package com.example.testresqmesh.core.network.bluetooth
 import com.example.testresqmesh.core.model.NodeIdentity
 import com.example.testresqmesh.core.network.MeshPayload
 import kotlinx.serialization.protobuf.ProtoBuf
-import com.example.testresqmesh.core.utils.TerminalLogCategory
+import com.example.testresqmesh.core.logging.TerminalLogCategory
 import com.example.testresqmesh.core.network.ReliableMeshTransfers
 import com.example.testresqmesh.core.network.bluetooth.state.BleStateStore
-import com.example.testresqmesh.core.utils.AppLogger
+import com.example.testresqmesh.core.logging.AppLogger
 import kotlinx.serialization.encodeToByteArray
 
 /** Owns presence counters only. The facade retains link, session and dispatch ownership. */

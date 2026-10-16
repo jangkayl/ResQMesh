@@ -1,4 +1,4 @@
-package com.example.testresqmesh.core.utils
+package com.example.testresqmesh.core.notification
 
 import android.app.NotificationChannel
 import android.app.NotificationManager

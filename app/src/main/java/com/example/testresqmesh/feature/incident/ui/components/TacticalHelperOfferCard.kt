@@ -24,7 +24,7 @@ import com.example.testresqmesh.core.ui.theme.ResQTheme
 import com.example.testresqmesh.core.ui.theme.SafetyOrange
 import com.example.testresqmesh.core.ui.theme.Spacing
 import com.example.testresqmesh.data.local.entity.IncidentOfferEntity
-import com.example.testresqmesh.feature.incident.viewmodel.HelperPresentation
+import com.example.testresqmesh.feature.incident.model.HelperPresentation
 
 @Composable
 fun TacticalHelperOfferCard(

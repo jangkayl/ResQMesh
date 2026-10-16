@@ -10,7 +10,7 @@ import com.example.testresqmesh.core.network.bluetooth.state.BoundedPayloadWrite
 import com.example.testresqmesh.core.network.bluetooth.state.BleStateStore
 import com.example.testresqmesh.core.network.bluetooth.state.MeshFrameCodec
 import com.example.testresqmesh.core.network.bluetooth.state.OutboundQueuePolicy
-import com.example.testresqmesh.core.utils.AppLogger
+import com.example.testresqmesh.core.logging.AppLogger
 import java.io.DataInputStream
 import java.io.DataOutputStream
 import java.util.concurrent.ConcurrentHashMap

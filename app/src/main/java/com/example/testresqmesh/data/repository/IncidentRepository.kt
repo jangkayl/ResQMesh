@@ -6,7 +6,7 @@ import com.example.testresqmesh.data.repository.incident.LegacyIncidentProjectio
 import com.example.testresqmesh.data.repository.incident.LegacyIncidentSync
 import com.example.testresqmesh.core.network.MeshNetworkGateway
 import com.example.testresqmesh.core.network.MeshPayload
-import com.example.testresqmesh.core.utils.AppLogger
+import com.example.testresqmesh.core.logging.AppLogger
 import com.example.testresqmesh.data.local.dao.DomainEventDao
 import com.example.testresqmesh.data.local.dao.IncidentDao
 import com.example.testresqmesh.data.local.dao.IncidentOfferDao

@@ -6,7 +6,7 @@ import com.example.testresqmesh.core.network.bluetooth.state.BleStateStore
 import com.example.testresqmesh.core.network.bluetooth.state.HeartbeatCoordinator
 import com.example.testresqmesh.core.network.bluetooth.state.BleLinkRole
 import com.example.testresqmesh.core.network.bluetooth.state.BleLinkState
-import com.example.testresqmesh.core.utils.AppLogger
+import com.example.testresqmesh.core.logging.AppLogger
 
 /** Runs bounded liveness, stale-link, scan-expiry, and connect-lock recovery policy. */
 class BleLifecycleSupervisor(

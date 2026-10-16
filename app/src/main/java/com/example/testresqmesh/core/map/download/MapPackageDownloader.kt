@@ -7,7 +7,7 @@ import com.example.testresqmesh.core.map.model.MapPackageManifest
 import com.example.testresqmesh.core.map.model.MapPackageStatus
 import com.example.testresqmesh.core.map.storage.MapStorageGuard
 import com.example.testresqmesh.core.map.verifier.ManifestVerifier
-import com.example.testresqmesh.core.utils.AppLogger
+import com.example.testresqmesh.core.logging.AppLogger
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow

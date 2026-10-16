@@ -6,7 +6,7 @@ import android.os.Looper
 import com.example.testresqmesh.core.network.bluetooth.ReadyPayloadSetup
 import com.example.testresqmesh.core.network.bluetooth.state.BleLink
 import com.example.testresqmesh.core.network.bluetooth.state.BleLinkState
-import com.example.testresqmesh.core.utils.AppLogger
+import com.example.testresqmesh.core.logging.AppLogger
 import java.util.concurrent.atomic.AtomicBoolean
 import com.example.testresqmesh.core.network.bluetooth.gatt.GattClientHost
 import com.example.testresqmesh.core.network.bluetooth.gatt.client.notifyScanState

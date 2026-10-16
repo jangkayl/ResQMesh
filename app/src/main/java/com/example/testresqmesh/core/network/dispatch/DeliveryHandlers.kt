@@ -4,7 +4,7 @@ import com.example.testresqmesh.core.network.MeshPayload
 import com.example.testresqmesh.core.network.PayloadDispatcherCallback
 import com.example.testresqmesh.core.network.CryptoManager
 import com.example.testresqmesh.core.model.NodeIdentity
-import com.example.testresqmesh.core.utils.AppLogger
+import com.example.testresqmesh.core.logging.AppLogger
 import kotlinx.serialization.encodeToByteArray
 import kotlinx.serialization.protobuf.ProtoBuf
 import android.util.Base64

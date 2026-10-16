@@ -43,7 +43,7 @@ import com.example.testresqmesh.core.ui.components.feedback.ResQEmptyState
 import com.example.testresqmesh.core.ui.components.layout.ResQAuroraBackground
 import com.example.testresqmesh.core.ui.theme.Spacing
 import com.example.testresqmesh.core.ui.theme.TestResQMeshTheme
-import com.example.testresqmesh.core.utils.MediaHelper
+import com.example.testresqmesh.core.audio.MediaHelper
 import com.example.testresqmesh.feature.comms.viewmodel.CommunicationViewModel
 import java.util.Locale
 

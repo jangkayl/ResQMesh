@@ -21,7 +21,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.example.testresqmesh.core.model.ConversationPolicy
 import com.example.testresqmesh.core.model.NodeIdentity
-import com.example.testresqmesh.core.utils.MediaHelper
+import com.example.testresqmesh.core.audio.MediaHelper
 import com.example.testresqmesh.feature.comms.viewmodel.CommunicationViewModel
 
 @Composable

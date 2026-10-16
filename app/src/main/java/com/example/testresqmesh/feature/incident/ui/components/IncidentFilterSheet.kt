@@ -15,9 +15,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.testresqmesh.core.ui.theme.Spacing
-import com.example.testresqmesh.feature.incident.viewmodel.AssistanceFilter
-import com.example.testresqmesh.feature.incident.viewmodel.IncidentDestination
-import com.example.testresqmesh.feature.incident.viewmodel.IncidentFilterState
+import com.example.testresqmesh.feature.incident.model.AssistanceFilter
+import com.example.testresqmesh.feature.incident.model.IncidentDestination
+import com.example.testresqmesh.feature.incident.model.IncidentFilterState
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable

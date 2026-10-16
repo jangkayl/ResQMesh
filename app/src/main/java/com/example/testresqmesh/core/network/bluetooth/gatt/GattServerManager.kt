@@ -10,7 +10,7 @@ import android.content.pm.PackageManager
 import android.os.Build
 import androidx.core.content.ContextCompat
 import com.example.testresqmesh.core.network.NativeBleManager
-import com.example.testresqmesh.core.utils.AppLogger
+import com.example.testresqmesh.core.logging.AppLogger
 
 class GattServerManager(
     val context: Context,

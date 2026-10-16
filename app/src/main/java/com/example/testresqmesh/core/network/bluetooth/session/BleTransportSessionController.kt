@@ -21,7 +21,7 @@ import com.example.testresqmesh.core.network.bluetooth.BlePeerAdmissionControlle
 import com.example.testresqmesh.core.network.bluetooth.BleRadioController
 import com.example.testresqmesh.core.network.bluetooth.L2capTransport
 import com.example.testresqmesh.core.network.bluetooth.state.HeartbeatCoordinator
-import com.example.testresqmesh.core.utils.AppLogger
+import com.example.testresqmesh.core.logging.AppLogger
 import com.example.testresqmesh.core.network.bluetooth.session.BleTransportResources
 import com.example.testresqmesh.core.network.bluetooth.session.BleTransportSessionController
 import com.example.testresqmesh.core.network.DirectedReceiptQueue

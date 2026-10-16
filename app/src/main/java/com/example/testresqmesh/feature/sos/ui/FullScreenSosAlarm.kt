@@ -47,7 +47,7 @@ import androidx.compose.ui.unit.sp
 import com.example.testresqmesh.core.model.ChatMessage
 import com.example.testresqmesh.core.ui.theme.ResQTheme
 import com.example.testresqmesh.core.ui.theme.Spacing
-import com.example.testresqmesh.core.utils.MediaHelper
+import com.example.testresqmesh.core.audio.MediaHelper
 import kotlin.math.roundToInt
 import kotlin.math.sin
 

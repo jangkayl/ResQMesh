@@ -1,4 +1,4 @@
-package com.example.testresqmesh.core.utils
+package com.example.testresqmesh.core.logging
 
 import org.junit.Assert.assertEquals
 import org.junit.Test

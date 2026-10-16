@@ -23,14 +23,14 @@ import com.example.testresqmesh.feature.setup.ui.IdentitySetupScreen
 import com.example.testresqmesh.feature.setup.ui.FirstLaunchGuideScreen
 import com.example.testresqmesh.feature.setup.ui.PermissionsScreen
 import com.example.testresqmesh.feature.setup.ui.SplashScreen
-import com.example.testresqmesh.feature.setup.FirstLaunchGuideStore
-import com.example.testresqmesh.feature.setup.GuideState
+import com.example.testresqmesh.feature.setup.data.FirstLaunchGuideStore
+import com.example.testresqmesh.feature.setup.data.GuideState
 import com.example.testresqmesh.core.ui.theme.TestResQMeshTheme
 import com.example.testresqmesh.core.ui.theme.AppAppearance
 import com.example.testresqmesh.feature.comms.viewmodel.CommunicationViewModel
 import com.example.testresqmesh.feature.radar.viewmodel.RadarViewModel
 import com.example.testresqmesh.feature.setup.viewmodel.SetupViewModel
-import com.example.testresqmesh.core.utils.MediaHelper
+import com.example.testresqmesh.core.audio.MediaHelper
 import com.example.testresqmesh.core.service.MeshSessionController
 
 import android.bluetooth.BluetoothManager

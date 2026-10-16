@@ -6,7 +6,7 @@ import com.example.testresqmesh.core.model.NodeIdentity
 import com.example.testresqmesh.core.network.bluetooth.MeshTransportState
 import com.example.testresqmesh.core.model.ScanEvent
 import com.example.testresqmesh.core.network.MeshNetworkGateway
-import com.example.testresqmesh.core.utils.AppLogger
+import com.example.testresqmesh.core.logging.AppLogger
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
@@ -231,7 +231,7 @@ internal class MeshPeerCoordinator(
             meshRouter.recalculateKnownNodes(myNodeName, readyConnectedDevices())
             scheduleOutboxFlush()
             AppLogger.event(
-                category = com.example.testresqmesh.core.utils.TerminalLogCategory.ROUTING,
+                category = com.example.testresqmesh.core.logging.TerminalLogCategory.ROUTING,
                 event = "TOPOLOGY_UPDATED",
                 message = "Applied topology version $topologySequence from peer; ${connectedNodes.size} advertised neighbor(s)",
                 peerName = senderName

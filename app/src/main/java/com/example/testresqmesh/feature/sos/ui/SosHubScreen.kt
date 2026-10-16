@@ -30,7 +30,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.testresqmesh.core.model.ConversationPolicy
 import com.example.testresqmesh.core.ui.theme.ResQTheme
-import com.example.testresqmesh.core.utils.MediaHelper
+import com.example.testresqmesh.core.audio.MediaHelper
 import com.example.testresqmesh.feature.comms.viewmodel.CommunicationViewModel
 import com.example.testresqmesh.feature.sos.ui.components.getEmergencyColor
 import com.example.testresqmesh.feature.sos.ui.components.getEmergencyIcon

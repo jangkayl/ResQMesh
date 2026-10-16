@@ -3,7 +3,7 @@ package com.example.testresqmesh.core.network
 import android.util.Base64
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
-import com.example.testresqmesh.core.utils.AppLogger
+import com.example.testresqmesh.core.logging.AppLogger
 import java.security.KeyPair
 import java.security.KeyPairGenerator
 import java.security.KeyFactory

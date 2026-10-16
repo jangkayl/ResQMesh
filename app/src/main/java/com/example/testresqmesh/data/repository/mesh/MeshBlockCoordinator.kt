@@ -10,7 +10,7 @@ import com.example.testresqmesh.core.network.BlockControlKind
 import com.example.testresqmesh.core.network.CryptoManager
 import com.example.testresqmesh.core.network.MeshPayload
 import com.example.testresqmesh.core.network.MeshNetworkGateway
-import com.example.testresqmesh.core.utils.AppLogger
+import com.example.testresqmesh.core.logging.AppLogger
 import android.util.Base64
 import kotlinx.serialization.decodeFromByteArray
 import kotlinx.serialization.encodeToByteArray

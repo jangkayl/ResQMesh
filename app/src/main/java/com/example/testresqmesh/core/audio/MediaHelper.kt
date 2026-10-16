@@ -1,4 +1,4 @@
-package com.example.testresqmesh.core.utils
+package com.example.testresqmesh.core.audio
 
 import android.content.Context
 import android.graphics.Bitmap

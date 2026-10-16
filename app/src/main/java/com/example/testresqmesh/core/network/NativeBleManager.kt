@@ -40,8 +40,8 @@ import com.example.testresqmesh.core.network.bluetooth.state.GattTransferCoordin
 import com.example.testresqmesh.core.network.bluetooth.state.HeartbeatCoordinator
 import com.example.testresqmesh.core.network.bluetooth.state.MeshFrameCodec
 import com.example.testresqmesh.core.network.bluetooth.state.payloadBytes
-import com.example.testresqmesh.core.utils.AppLogger
-import com.example.testresqmesh.core.utils.NotificationHelper
+import com.example.testresqmesh.core.logging.AppLogger
+import com.example.testresqmesh.core.notification.NotificationHelper
 import java.util.UUID
 import kotlinx.serialization.encodeToByteArray
 import kotlinx.serialization.protobuf.ProtoBuf

@@ -1,4 +1,4 @@
-package com.example.testresqmesh.core.utils
+package com.example.testresqmesh.core.audio
 
 /**
  * Ultra-low latency G.711 u-law codec.

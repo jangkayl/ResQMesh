@@ -25,16 +25,16 @@ import com.example.testresqmesh.feature.comms.viewmodel.CommunicationViewModel
 import com.example.testresqmesh.feature.radar.viewmodel.RadarViewModel
 import com.example.testresqmesh.feature.setup.viewmodel.SetupViewModel
 import com.example.testresqmesh.feature.setup.ui.FirstLaunchGuideScreen
-import com.example.testresqmesh.core.utils.MediaHelper
+import com.example.testresqmesh.core.audio.MediaHelper
 import com.example.testresqmesh.core.ui.components.layout.ResQAppShell
 import com.example.testresqmesh.core.ui.components.layout.ResQAuroraBackground
 import com.example.testresqmesh.core.ui.components.layout.ResQDestination
 import androidx.compose.foundation.layout.Box
 import com.example.testresqmesh.core.ui.theme.AppAppearance
 import com.example.testresqmesh.core.ui.theme.ResQMotion
-import com.example.testresqmesh.core.utils.AppLogger
+import com.example.testresqmesh.core.logging.AppLogger
 import androidx.compose.ui.platform.LocalContext
-import com.example.testresqmesh.core.utils.NotificationHelper
+import com.example.testresqmesh.core.notification.NotificationHelper
 
 @Composable
 fun MainContainerScreen(
