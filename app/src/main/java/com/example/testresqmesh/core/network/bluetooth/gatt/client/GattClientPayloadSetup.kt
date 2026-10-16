@@ -9,6 +9,8 @@ import com.example.testresqmesh.core.utils.AppLogger
 import java.util.concurrent.atomic.AtomicBoolean
 import com.example.testresqmesh.core.network.bluetooth.gatt.GattClientHost
 
+private const val L2CAP_CONNECT_TIMEOUT_MS = 10_000L
+
 internal fun createGattClientPayloadSetup(
     manager: GattClientHost,
     epoch: Long,
@@ -36,7 +38,7 @@ internal fun createGattClientPayloadSetup(
                     if (finished.compareAndSet(false, true)) {
                         runCatching { socket.close() }; finishPendingL2capSocket(socket); done(false)
                     }
-                }, 10_000L)
+                }, L2CAP_CONNECT_TIMEOUT_MS)
                 Thread {
                     val connected = runCatching { socket.connect(); true }.getOrDefault(false)
                     handler.post {

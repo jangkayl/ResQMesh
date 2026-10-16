@@ -107,7 +107,7 @@ internal class ReliableMeshTransfers(
             try {
                 val record = TransferRecord(peer, id, id, bytes.size, true, payload.id,
                     payload.targetMessageId.ifBlank { payload.id }, priority,
-                    now() + if (durableRelay) RETENTION_MS else 90_000L, durableRelay)
+                    now() + if (durableRelay) RETENTION_MS else NON_DURABLE_RETENTION_MS, durableRelay)
                 val existing = journal.find(peer, id, true)
                 if (!journal.create(record, bytes)) {
                     if (durableRelay) relayFailures.add(peer to payload.id)
@@ -311,8 +311,8 @@ internal class ReliableMeshTransfers(
     private fun tick() {
         val at = now()
         flights.values.toList().filter { it.record.expiresAt <= at ||
-            (!it.record.durableRelay && it.startedAt == 0L && at - it.queuedAt >= 30_000) ||
-            (!it.record.durableRelay && it.startedAt > 0 && at - it.startedAt >= 60_000) }
+            (!it.record.durableRelay && it.startedAt == 0L && at - it.queuedAt >= QUEUED_STALL_MS) ||
+            (!it.record.durableRelay && it.startedAt > 0 && at - it.startedAt >= STARTED_STALL_MS) }
             .forEach { finish(it, false) }
         journal.prune()
         val retainedIds = journal.snapshot(false).map { it.payloadId }.toSet()
@@ -322,7 +322,7 @@ internal class ReliableMeshTransfers(
         relayFailures.removeAll { it.second !in retainedIds }
         if (!active()) {
             busy = false
-            if (flights.isNotEmpty() || journal.snapshot(false).any { !it.stored }) scheduleTick(60_000L)
+            if (flights.isNotEmpty() || journal.snapshot(false).any { !it.stored }) scheduleTick(TICK_IDLE_MS)
             return
         }
         journal.snapshot(false).filter { it.complete && !it.stored }.forEach(::deliver)
@@ -349,7 +349,7 @@ internal class ReliableMeshTransfers(
                     flight.queryNonce = UUID.randomUUID().toString()
                     perPeer[peer] = (perPeer[peer] ?: 0) + 1
                 }
-                flight.queried = true; flight.waitingStatus = true; flight.queryUntil = at + 30_000L
+                flight.queried = true; flight.waitingStatus = true; flight.queryUntil = at + STATUS_QUERY_MS
                 val queryNonce = flight.queryNonce
                 val query = envelope(PIECE, TransferPiece(flight.record.id, flight.record.digest,
                     flight.record.size, 0, status = true, requestId = queryNonce), peer)
@@ -368,7 +368,7 @@ internal class ReliableMeshTransfers(
                 ?: (count - 1).takeIf { flight.acknowledged.size == count && flight.pending.isEmpty() }
                 ?: return@forEach
             flight.cursor = (index + 1) % count
-            flight.pending[index] = at + 30_000L
+            flight.pending[index] = at + PIECE_RETRY_MS
             flight.attempts[index] = (flight.attempts[index] ?: 0) + 1
             perPeer[peer] = (perPeer[peer] ?: 0) + 1
             val data = flight.bytes.copyOfRange(index * TransferJournal.PIECE_BYTES,
@@ -419,5 +419,11 @@ internal class ReliableMeshTransfers(
         const val WINDOW = 4
         const val ACK_WAIT_MS = 3_000L
         const val RETENTION_MS = 24 * 60 * 60 * 1000L
+        private const val NON_DURABLE_RETENTION_MS = 90_000L
+        private const val QUEUED_STALL_MS = 30_000L
+        private const val STARTED_STALL_MS = 60_000L
+        private const val TICK_IDLE_MS = 60_000L
+        private const val STATUS_QUERY_MS = 30_000L
+        private const val PIECE_RETRY_MS = 30_000L
     }
 }
