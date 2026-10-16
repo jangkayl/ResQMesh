@@ -2,11 +2,10 @@
 
 @AGENTS.md
 
-`AGENTS.md` (imported above) is the canonical router: read-first table, workflows, reliability and physical-device rules. Do not duplicate it here.
+`AGENTS.md` (imported above) is the shared router for all tools. Do not duplicate it here.
 
-Claude-specific adjustments:
+Claude-specific notes:
 
-- Model/effort tables and `fork_turns` rules in parent-folder `Downloads/AGENTS.md` are Codex-only. Use the Claude agents from `~/.claude/CLAUDE.md` (explorer, planner, implementer, reviewer, auditor, researcher) with the same intent: smallest sufficient route, no push/PR without explicit request.
-- Start from `docs/README.md` (one-line "read when" index). For ordinary tasks read only the one or two docs it names.
+- Model tiers: Haiku for routine inspection, Sonnet for standard work, Opus for difficult BLE/concurrency/crypto. Use the global Claude agents (explorer, planner, implementer, reviewer, auditor, researcher) with the same intent: smallest sufficient route, no push/PR without explicit request.
+- The parent-folder `Downloads/AGENTS.md` is Codex-only and does not apply here.
 - Never read `captures/` or `archive/` unless asked; for logs, grep markers in a bounded window.
-- Baseline, open issues and next actions live only in `docs/status.md`; build hashes and test counts only in `docs/validation.md`. Link to them instead of copying.

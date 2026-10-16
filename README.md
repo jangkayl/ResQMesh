@@ -152,7 +152,8 @@ ResQMesh/
 ├── archive/                            # Historical/deferred documentation
 ├── .github/workflows/                  # CI checks
 ├── gradle/                             # Wrapper and dependency catalog
-├── AGENTS.md                           # Task/context routing
+├── AGENTS.md                           # Shared task/context router for all AI tools
+├── CLAUDE.md, GEMINI.md                # Tool entry files that import AGENTS.md
 └── README.md
 ```
 
@@ -223,11 +224,7 @@ Report APK hash, models/API, topology, actual transport, background setting, cou
 
 ## Current progress and known limitations
 
-Reviewed **2026-10-04**; baseline and current evidence are in [status](docs/status.md).
-
-User-reported successes include four-phone text/receipts, complete notes/SOS, restart/relay recovery, toggles/background, mutual blocking, incident lifecycle/reconciliation, independent SOS cancellation and offline maps. These qualitative reports lack a complete device/count/timing/transport matrix.
-
-**DELIVERY-01 is open:** intermittent loss at D over A→B→C→D; see [status](docs/status.md).
+Working prototype with qualitative user-reported phone successes. Current objective, open issues (including intermittent relay loss, DELIVERY-01) and next actions: [status](docs/status.md). Build identity and evidence: [validation](docs/validation.md).
 
 Measured scale, latency, range, battery/OEM behavior, accessibility, novice usability and release/upgrade readiness remain pending. Authenticated E2EE, forward secrecy, verified personal identity and guaranteed self-healing/delivery are not claimed. Recorded-note success does not establish live-PTT reliability.
 
@@ -243,7 +240,7 @@ Measured scale, latency, range, battery/OEM behavior, accessibility, novice usab
 | [UI guidance](docs/ui.md) | Presentation and interaction rules |
 | [Capstone preparation](docs/plans/capstone-demo-readiness.md) | Demo, evidence and installation preparation |
 
-[AGENTS.md](AGENTS.md) routes engineering tasks to minimum context. [Archived material](archive/README.md) preserves superseded plans; it is historical reference. Resource requests, safety check-ins, expanded replication and further transport/repository extraction remain deferred proposals.
+[AGENTS.md](AGENTS.md) routes engineering tasks to minimum context for Codex, Claude Code and Gemini. [Archived material](archive/README.md) preserves superseded plans; it is historical reference. Resource requests, safety check-ins, expanded replication and further transport/repository extraction remain deferred proposals.
 
 ## Contributing
 

@@ -1,6 +1,6 @@
-# ResQMesh Codex guide
+# ResQMesh agent guide
 
-This file routes work. The current user request has priority. Source and relevant physical evidence outrank documentation; correct stale docs in the same authorized change.
+This file routes work for every AI coding tool (Codex reads it directly; `CLAUDE.md` and `GEMINI.md` import it). The current user request has priority. Source and relevant physical evidence outrank documentation; correct stale docs in the same authorized change.
 
 ## Project boundary
 
@@ -32,17 +32,15 @@ Continue the same task for the same unresolved outcome, including failed validat
 
 ## Model and pull-request policy
 
-- Luna/low: routine inspection, summaries, docs checks and mechanical work.
-- Terra/medium: implementation, debugging, planning and review.
-- Sol/low: difficult BLE lifecycle, concurrency, routing, crypto or stubborn failures.
-- Never GPT-6 Astra. Ask before changing the active model.
+- Use the lightest model for routine inspection, summaries and docs checks; a standard model for implementation, debugging, planning and review; the strongest for difficult BLE lifecycle, concurrency, routing, crypto or stubborn failures. Ask before changing the active model.
+- Codex: Luna/low, Terra/medium and Sol/low respectively; never GPT-6 Astra. Other tools map these tiers in their own entry file.
 - Run deterministic checks before AI review; provide relevant diffs/tests/failure excerpts.
 - Never create a PR or merge automatically. Report locally checked readiness and wait for explicit instruction.
 - Failed local/CI checks remain blocking; AI explanation cannot override them.
 
 ## Physical-device boundary
 
-Codex may edit source, run local checks/builds, generate APKs, inspect ADB availability, prepare procedures and analyze existing captures. The user installs, launches, stops, clears and operates physical phones unless explicitly requesting otherwise.
+The agent may edit source, run local checks/builds, generate APKs, inspect ADB availability, prepare procedures and analyze existing captures. The user installs, launches, stops, clears and operates physical phones unless explicitly requesting otherwise.
 
 Device-facing changes end with a card: build identity, devices/setup, exact steps, expected outcomes, failure indicators, markers and report fields. Compilation is separate from executed instrumentation and device behavior.
 

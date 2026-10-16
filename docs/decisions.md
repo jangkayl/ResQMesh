@@ -1,6 +1,6 @@
 # Engineering decisions
 
-Last reviewed: 2026-10-06. Baseline: see [status](status.md). These describe accepted choices; source and bounded device evidence prevail.
+Last reviewed: 2026-10-16. Baseline: see [status](status.md). These describe accepted choices; source and bounded device evidence prevail.
 
 ## D1: Reliability before transport expansion
 
@@ -32,7 +32,7 @@ Persistent origin outboxes and protocol-1 transfer journals are implemented; uni
 
 ## D8: Lightweight context engineering
 
-One root AGENTS router and six canonical documents own current context. Test cards hold procedures; validation owns outcomes. Avoid duplicate CONTEXT/GEMINI routers, ICM stage trees or knowledge graphs. Archived prompts are historical references and never authorize implementation.
+One shared router, `AGENTS.md`, plus six owner documents hold current context; each fact lives in one owner. Tool entry files (`CLAUDE.md`, `GEMINI.md`) only import `AGENTS.md` and add tool-specific notes. Avoid extra routers/indexes, ICM stage trees and knowledge graphs. Archived prompts are historical and never authorize implementation.
 
 ## D9: Planning lifecycle
 
@@ -48,7 +48,7 @@ Stable-ID block requests/ACKs establish denial before direct teardown. Both phon
 
 ## D12: Conservative recovery and cluster bridging
 
-OFF suspends an active session; ON rebuilds it. Go offline cancels recovery; background is opt-in. Preserve healthy routes. A spare third link may bridge an unreachable cluster. Full-capacity reclamation requires idle transport, recent directed alternate paths preserving reachability, owned retirement and 60-second cooldown; otherwise defer.
+Recovery must not destroy healthy routes: Bluetooth OFF suspends and ON rebuilds; Go offline cancels recovery; background is opt-in. A spare link may bridge an unreachable cluster, but reclaiming a full-capacity link requires proof that reachability survives. Mechanics and timers: [architecture](architecture.md).
 
 ## D13: MapLibre and local PMTiles
 
@@ -72,7 +72,7 @@ Node IDs derive from the Keystore public-key hash. Identity/peer-key preferences
 
 ## D18: Leased topology and directed private delivery
 
-Accept empty withdrawals and ignore old topology versions. Private traffic uses stable-ID directed routes, never broadcast fallback. Rejected sends remain retryable; receipt timing follows transfer completion.
+Topology is versioned and leased so stale state cannot restore withdrawn routes. Private traffic uses stable-ID directed routes and never falls back to broadcast; rejected sends stay retryable. Details: [architecture](architecture.md).
 
 ## D19: Reporter-selected lead helper
 
@@ -80,22 +80,18 @@ Stable identity/signing key owns reporter authority and historical names. Report
 
 ## D20: Bounded resumable recorded transfers
 
-Keep three neighbors and GATT setup/fallback with optional L2CAP. Protocol-1 envelopes over 4 KiB use durable 1 KiB pieces, four outstanding per neighbor and 24-hour expiry. Legacy peers retain whole frames. Keep 128-frame/2 MiB bounds, eight control slots/64 KiB reserve and safe priority between frames. Public custody preserves known-peer rosters; custody never proves recipient delivery.
+Large recorded notes must survive disconnects without unbounded memory: protocol-1 envelopes are journaled in resumable pieces with fixed per-neighbor and per-transport bounds, and legacy peers keep whole frames. Custody never proves recipient delivery. Sizes and limits: [architecture](architecture.md).
 
 ## D21: Incident history and projection digests
 
-Immediate broadcasts remain the fast path. On READY, changes and a 30-second ±3-second backstop, compare history/state hashes. Exchange missing original events or rebuild divergent projections. Signed authority, bounded pages, current-peer snapshot ownership and pending dependencies gate completion. Queue acceptance/version equality never proves convergence.
+Broadcasts stay the fast path; periodic history/state digest comparison repairs missed incident events. Signed authority and pending dependencies gate completion, and queue acceptance never proves convergence. Intervals and paging: [architecture](architecture.md).
 
 ## D22: Independent conversation and SOS ownership
 
-Community, Radio and SOS separate history/drafts/unread state. Off-channel Radio stores silently; unscoped history stays hidden. SOS ignores tuning. Sender Back preserves it; receiver silence is local; signed origin-key termination ends it. Retain terminal records and reconcile on reconnect. Sirens stop within 30 seconds; active GATT frames remain non-interruptible. Matching builds are required.
+Community, Radio and SOS keep independent history, drafts and unread state. SOS ownership belongs to the origin key: sender Back preserves it, receiver silence is local, and only signed origin termination ends it, reconciled after reconnect. Matching builds are required. Details: [architecture](architecture.md).
 
-Deferred designs are preserved in the [archive index](../archive/docs-superseded-2026-10-04/README.md); current evidence and failures live in [validation](validation.md) and [status](status.md).
+Deferred designs are in the [archive index](../archive/docs-superseded-2026-10-04/README.md); evidence and failures are in [validation](validation.md) and [status](status.md).
 
 ## D23: Preserve behavior during networking decomposition
 
-Keep facade APIs and shared resource ownership. Use role-specific GATT hosts, synchronous live-listener adapters, a presence publisher and initialization-time repository bindings. Preserve callback/body order, main-handler execution, generation fences, persistence, queues, routing, blocking and protocol values. Validate against a fixed scope and pre-edit snapshot; no performance or delivery-rate improvement is implied. Completed lifecycle/outbox/incident slices retain separate baselines and evidence.
-
-The approved whole-app phases target cohesive 200–400-line owners and review files above 500. Phase 1 extracts ingress/outbound/progress responsibilities; later phases retain local gates and snapshots; the user deferred physical comparison until the final build. Keep one outbox worker/mutex, per-attempt ownership, incident lock order and Compose state/effect lifetime. Preserve historical baselines and use explicit current phase mappings. No library/framework/module migration or behavior redesign is included.
-
-NativeBleManager retains the reviewed 743-line public host/construction exception. Every other original oversized source is below 500; keeping original Compose/lifecycle owners together takes priority over a 400-line ceiling. Four baseline automated navigation failures remain an acceptance gate; final-candidate F1–F14 phone checks are user-reported PASS on October 6.
+Structural refactors preserve facade APIs, callback order, generation fences, persistence, queues, routing, crypto and Compose lifetimes, and imply no performance or delivery change. Target cohesive 200–400-line owners and review files above 500; NativeBleManager keeps a reviewed 743-line exception. Phase evidence is archived; results are in [validation](validation.md).
