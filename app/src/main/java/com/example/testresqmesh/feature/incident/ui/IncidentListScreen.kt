@@ -4,7 +4,6 @@ import com.example.testresqmesh.feature.incident.ui.list.IncidentSearchField
 import com.example.testresqmesh.feature.incident.ui.list.IncidentDestinations
 import com.example.testresqmesh.feature.incident.ui.list.IncidentQuickFilters
 import com.example.testresqmesh.feature.incident.ui.list.IncidentAppliedFilters
-import com.example.testresqmesh.feature.incident.ui.list.QuickFilterChip as QuickFilterChipSection
 import androidx.compose.animation.*
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -467,11 +466,3 @@ fun IncidentListScreen(
         }
     }
 }
-
-@Composable
-internal fun QuickFilterChip(
-    label: String,
-    isSelected: Boolean,
-    accentColor: Color = MaterialTheme.colorScheme.primary,
-    onClick: () -> Unit
-) = QuickFilterChipSection(label, isSelected, accentColor, onClick)
