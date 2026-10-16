@@ -31,4 +31,3 @@ Users install and operate phones. Report PASS/FAIL/UNTESTED for exact steps; the
 - Capture `BLE_RECOVERY` transport state/generation and advertising/scan failures, `BLE_ADMISSION`, READY/CCCD, handshake/lock release, heartbeat timeouts, topology withdrawal/update, queue rejection, and delivery receipts. Inspect only the failure window; do not share message contents or keys.
 - Report APK hash, device matrix, scenario/repetition, OFF/ON/READY timestamps, first recovery and full convergence times, text receipt counts, unexpected disconnects, and capture directory. Mark each scenario PASS/FAIL/UNTESTED.
 - Advance to ten phones only after the two/three/five-phone card passes; repeat startup, merge, toggle, quiet, and simultaneous-sender workloads.
-
