@@ -1,6 +1,8 @@
 # Claude Code notes for ResQMesh
 
-`AGENTS.md` is the canonical router for this repo (read-first table, workflows, reliability and physical-device rules). Do not duplicate it here.
+@AGENTS.md
+
+`AGENTS.md` (imported above) is the canonical router: read-first table, workflows, reliability and physical-device rules. Do not duplicate it here.
 
 Claude-specific adjustments:
 
