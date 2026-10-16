@@ -1,66 +1,39 @@
 # Current status
 
-Last reviewed: 2026-10-06. Branch: `fix/incident-ui-ux`. Source HEAD: `a9a27ed` (whole-app decomposition committed after the last doc review; its effect on these docs is unverified). Docs reflect `db2260e` plus networking maintenance; earlier presentation baseline `2e27013`. This page owns the baseline and open issues.
+Last reviewed: 2026-10-16. Baseline: `a9a27ed` on `main` (also `origin/fix/incident-ui-ux`); docs work continues on `chore/context-routing`. This page owns the baseline, open issues and next actions. Build hashes and test counts live in [validation](validation.md).
 
 ## Current objective
 
-Phases 0–7 source work is complete. The user reports F1–F14 passing on the final candidate; four baseline automated navigation checks still block local acceptance. [Phase plan](../archive/docs-superseded-2026-10-16/plans/network-maintainability-refactor.md), [size/ownership ledger](../archive/docs-superseded-2026-10-16/handoffs/maintainability-size-inventory.md) and [phone card](../archive/docs-superseded-2026-10-16/testing/network-maintainability-test-card.md) separate implementation, reports and unresolved evidence. Existing work is preserved; DELIVERY-01 remains deferred.
+Prepare for the capstone demo (within two weeks of 2026-10-16) and deployment readiness. Step one is documentation consistency; next is a code best-practice and file-architecture review without behavior changes until approved. UI/UX and mesh concerns are user-reported but not yet described.
 
 ## Working by user report
 
-On October 6, the user confirmed F1–F14 as PASS on final APK `1AE82B6C...`. Models, counts, timings and transport coverage remain unspecified. [Validation](validation.md) records this separately from the earlier October 4 APK confirmations:
+The current candidate is the October 6 APK `1AE82B6C...`; the user reports F1–F14 PASS on it, including the incident UI repair cases. Earlier October 4 reports cover four-phone text/receipts/notes/SOS, recovery, background, blocking, incidents and offline maps. Models, counts, timings and transport coverage were not supplied, so these are qualitative results, not measured rates. Details are in [validation](validation.md).
 
-- Successful A–B–C–D public/private text arrival, returning DELIVERED/READ confirmation, complete recorded notes, and SOS delivery.
+## Implemented
 
-- App restart, relay removal/return, Bluetooth OFF/ON, and locked/background messaging.
+Behavior and source ownership are in [architecture](architecture.md); accepted policies are in [decisions](decisions.md). The whole-app maintainability decomposition is merged (NativeBleManager keeps a reviewed 743-line facade exception); its evidence is archived in the [October 16 snapshot](../archive/README.md).
 
-- Mutual direct-link blocking, relay use while blocked, restart persistence, and independent local unblock.
-
-- Incident offers, selection, confirmation, withdrawal/replacement, closure and reconnect synchronization; independent simultaneous SOS cancellation.
-
-- Offline map opening and SOS map display without internet.
-
-These are qualitative reports, not measured rates or proof that every card step passed. Four-phone delivery remains intermittent. Models/API levels, counts, durations, actual GATT/L2CAP use and captures were not supplied for this report.
-
-## Implemented and locally checked
-
-Current source includes generation-owned GATT/L2CAP, three-neighbor admission, directed leased topology, persistent private outbox, recipient receipts, resumable journaled transfers, permanent Keystore identity, opt-in background service, Room 11, signed incident/SOS synchronization, scoped conversations and MapLibre/PMTiles.
-
-**Local checks:** the latest builds, unit/Lint counts, emulator results and APK hashes are owned by [validation](validation.md); status does not repeat them. Four emulator navigation assertions (UI-02) fail on both the saved baseline and the final candidate. TEST-01 (reconnect fixtures) is resolved locally.
-
-**UI repairs (UI-01):** stable-ID helper Chat, accessible filters/search, clear guidance and wrapping controls are implemented; final phone checks are user-reported PASS.
-
-**Local Git delivery:** progress commits live on `fix/incident-ui-ux`; backups, the device script and Figma tools remain untracked. Nothing is pushed.
-
-**Maintainability:** whole-app decomposition is implemented (NativeBleManager keeps a reviewed 743-line facade exception). Phase plan, size ledger and evidence ledger are archived in the [October 16 snapshot](../archive/docs-superseded-2026-10-16/handoffs/maintainability-local-evidence.md); no device execution or DELIVERY-01 investigation occurred in that work.
-
-## Open issue and remaining evidence
+## Open issues
 
 | ID | State | Outstanding work |
 | --- | --- | --- |
-| UI-01 | Follow-up implemented; functional phone pass reported | Final F12–F14 reported PASS. Broader usability/measurement evidence remains unspecified; original baselines are preserved. |
-| UI-02 | Existing local failures; acceptance blocked | Four navigation assertions fail on both saved baseline and final candidate; unchanged sources/tests. See the local evidence ledger. |
-| DELIVERY-01 | User-reported failure; investigation deferred | On A→B→C→D, public/private text or voice sometimes fails to reach D. Cause unknown. Keys, forwarding and blocking are hypotheses only. |
-| TEST-01 | Resolved locally | Unit compilation and 403/403 tests pass, including 29 reconnect cases and three Base64 contract checks. |
-| MEASURE-01 | Evidence pending | Repeated arrival/receipt counts, latency, sustained-load/fallback, late-callback and directed route-withdrawal coverage. |
-| SCALE-01 | Evidence pending | Five/ten-phone controlled matrices, range and capacity measurements. |
+| UX-01 | User-reported concern; details pending | UI/UX issues not yet described. Record screens, steps and screenshots when supplied. |
+| MESH-02 | User-reported concern; details pending | Mesh issues beyond DELIVERY-01 not yet described. Record topology, APK, times and focused captures when supplied. |
+| DELIVERY-01 | User-reported failure; investigation deferred | On A→B→C→D, public/private text or voice sometimes fails to reach D. Cause unknown; keys, forwarding and blocking are hypotheses only. |
+| UI-02 | Local failures; acceptance blocked | Four emulator navigation assertions fail on both the pre-refactor baseline and the current candidate. |
+| DEPLOY-01 | Evidence/work pending (replaces RELEASE-01) | Release signing, upgrade path, install guide, process-death/OEM/background battery matrix, accessibility and novice usability. |
+| MEASURE-01 | Evidence pending | Repeated arrival/receipt counts, latency, sustained load/fallback and route-withdrawal coverage. |
+| SCALE-01 | Evidence pending | Five/ten-phone matrices, range and capacity. |
 | TRUST-01 | Work/evidence pending | First-contact verification and defined identity/security guarantees. |
-| RELEASE-01 | Evidence pending | Process-death/OEM/background battery matrix, upgrade/release signing, accessibility and novice usability. |
 
-Previously listed basic block, incident, SOS and recovery checks now have user-reported successes; their adversarial, load and repeated-measurement cases remain pending rather than known defects. Use the [physical checklist](testing/physical-reliability-tests.md) to distinguish them.
+Basic block, incident, SOS and recovery checks have user-reported successes; their adversarial, load and repeated cases remain pending, not known defects. See the [physical checklist](testing/physical-reliability-tests.md).
 
-## Deferred work and context
-
-Initial extraction results remain historical evidence. Lifecycle, GATT/admission, repository/incident and presentation decomposition is implemented with preserved phase evidence; final acceptance is pending. Stronger repair/replication, resource requests, safety check-ins and location-confidence policies remain proposals. The [dated archive index](../archive/docs-superseded-2026-10-04/README.md) retains their constraints; archived prompts do not authorize implementation.
-
-[Capstone preparation](plans/capstone-demo-readiness.md) remains active; no demo, pilot or deadline completion was confirmed.
+**Untracked local files:** four disabled tests (`*.kt.bak` under `app/src/test`, about 1.7k lines, ignored by Git and with no Git copy), `scripts/manage_devices.ps1` and `tools/figma-resqmesh-preview/` scripts. Triage them in the code review.
 
 ## Next actions
 
-1. Review the size/ownership exception and UI-02 evidence; preserve phase artifacts. Investigate existing navigation failures separately before final local acceptance.
-
-2. Preserve the F1–F14 report; add device/setup/count/timing/transport details when available.
-
-3. Keep DELIVERY-01 deferred until focused investigation is separately authorized; record phone/transport/count/timing evidence when supplied.
-
-4. Complete capstone, release/trust, accessibility and process-death/battery evidence before broader claims.
+1. Finish documentation consistency on `chore/context-routing`; you decide on push/PR.
+2. Run the read-only code best-practice and file-architecture review; propose changes before editing code.
+3. Collect UX-01 and MESH-02 details, then prioritize them with UI-02 and DELIVERY-01.
+4. Work the [capstone plan](plans/capstone-demo-readiness.md) toward the demo, including DEPLOY-01 items needed for installation.

@@ -1,12 +1,12 @@
 # Capstone demo and deployment preparation
 
-Last reviewed: 2026-10-04. Status: active preparation plan. Originally prepared 2026-10-01; demo/pilot dates and completion are unconfirmed.
+Last reviewed: 2026-10-16. Status: active preparation plan. Originally prepared 2026-10-01; demo/pilot dates and completion are unconfirmed.
 
 This checklist prepares evidence and installation; it does not authorize application or network changes.
 
 ## Current achievements and pending preparation
 
-[Validation](../validation.md) identifies the current October 4 APK and qualitative user-reported four-phone text/receipt/note/SOS success, recovery/toggles/background, mutual blocking, full incident lifecycle/reconciliation, independent SOS cancellation and offline maps.
+Demo is due within two weeks of 2026-10-16. [Validation](../validation.md) identifies the current October 6 candidate and its qualitative user-reported results.
 
 Intermittent A-to-D loss remains open ([DELIVERY-01](../status.md)). Functional success does not establish every exact test below, novice usability, deployment readiness or pilot completion.
 

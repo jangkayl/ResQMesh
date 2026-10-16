@@ -1,6 +1,6 @@
 # Capstone research guide
 
-Last reviewed: 2026-10-04. Baseline: see [status](status.md).
+Last reviewed: 2026-10-16. Baseline: see [status](status.md).
 
 Separate defensible research claims from product aspirations. This is not a defense script, a grade prediction or an assertion that a pilot has completed.
 
@@ -14,7 +14,7 @@ Production intent raises the evidence requirement; it does not turn a prototype 
 
 Source implements native BLE/GATT, optional L2CAP, Protobuf, directed graph routing, Room persistence, origin outboxes, resumable transfer journals, Compose, Keystore-based private encryption, signed incident/SOS state and offline MapLibre/PMTiles.
 
-On 2026-10-04 the user reported successful A–B–C–D text arrival, private delivery/read receipts, complete recorded playback and SOS arrival on the current APK. Recovery, background, incident lifecycle/sync, independent SOS cancellation, blocking and offline map use were also confirmed qualitatively. See the [candidate and evidence limits](validation.md).
+User reports (October 4, then F1–F14 on the October 6 candidate) confirm A–B–C–D text, receipts, recorded playback, SOS, recovery, background, incidents, blocking and offline maps qualitatively. Candidate identity and evidence limits: [validation](validation.md).
 
 Successful demonstrations establish capability, not consistent delivery; [DELIVERY-01](status.md) is open. Do not describe the four-phone chain as a reliable-capacity experiment or infer a success percentage.
 
