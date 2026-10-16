@@ -1,6 +1,6 @@
 # Code and architecture revision
 
-Last reviewed: 2026-10-17. Status: active plan. Phase 0 is done locally on `refactor/batch-c-hygiene`; P1–P6 wait until after the capstone demo freeze. Each phase needs its own approval and a detailed plan before any code is edited.
+Last reviewed: 2026-10-17. Status: active plan. Phase 0 is done on `refactor/batch-c-hygiene` (smoke card user-reported PASS 2026-10-17); P1–P6 wait until after the capstone demo freeze. Each phase needs its own approval and a detailed plan before any code is edited.
 
 ## Why
 

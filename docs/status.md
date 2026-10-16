@@ -29,13 +29,13 @@ Behavior and source ownership are in [architecture](architecture.md); accepted p
 
 Basic block, incident, SOS and recovery checks have user-reported successes; their adversarial, load and repeated cases remain pending, not known defects. See the [physical checklist](testing/physical-reliability-tests.md).
 
-**Batch C hygiene / Phase 0** (branch `refactor/batch-c-hygiene`, stacked on Batch A): golden wire/table tests, leftover cleanup and archiving, catalog-only versions, Koin root in `app/di` split by layer, `core/utils` regrouped, and CI gates (androidTest compile, detekt baseline, boundary check). Local checks pass; the [smoke card](testing/batch-c-hygiene-smoke-card.md) is pending a user run.
+**Batch C hygiene / Phase 0** (branch `refactor/batch-c-hygiene`, stacked on Batch A): golden wire/table tests, leftover cleanup and archiving, catalog-only versions, Koin root in `app/di` split by layer, `core/utils` regrouped, and CI gates (androidTest compile, detekt baseline, boundary check). Local checks pass; the user reported all [smoke card](testing/batch-c-hygiene-smoke-card.md) steps working on 2026-10-17 (models and counts not supplied).
 
 **Batch A cleanup** (branch `refactor/batch-a-cleanup`): dead incident UI removed, two thread-safety fixes, swallowed-exception logging, debug-only Logcat and named timer constants. Local checks pass; the user reported all [smoke card](testing/batch-a-cleanup-smoke-card.md) steps working on 2026-10-16 (build hash, models and counts not supplied). Remaining review work is phases P1–P6 of the revision plan (crypto/delivery, data boundary, presentation, BLE internals, release/deps, modules).
 
 ## Next actions
 
-1. Run the [Batch C smoke card](testing/batch-c-hygiene-smoke-card.md); then decide push/PR for `chore/context-routing`, `refactor/batch-a-cleanup` and `refactor/batch-c-hygiene`.
+1. Decide push/PR for `chore/context-routing`, `refactor/batch-a-cleanup` and `refactor/batch-c-hygiene`.
 2. After the demo freeze, plan revision phase P1 or P2 in detail before editing code.
 3. Collect UX-01 and MESH-02 details, then prioritize them with UI-02 and DELIVERY-01.
 4. Work the [capstone plan](plans/capstone-demo-readiness.md) toward the demo, including DEPLOY-01 items needed for installation.

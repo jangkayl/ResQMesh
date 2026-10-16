@@ -1,6 +1,6 @@
 # Batch C hygiene smoke card
 
-Prepared: 2026-10-17. Status: pending user run. Branch `refactor/batch-c-hygiene`.
+Prepared: 2026-10-17. Status: user-reported PASS on 2026-10-17 ("it all works"; models, counts, captures and installed APK hash not supplied; prepared build `f3661cc`, APK `1A734DAF11D53997576C9D0C639C89498DFA1FA19C4CA5B4E5F1DF9D407BA9D3`). Branch `refactor/batch-c-hygiene`.
 
 Batch C is meant to change no runtime behavior. It moves the Koin root and splits it into layer modules, moves audio, logging, notification, SOS-alert, setup and migration files to new packages, and moves dependency versions into the catalog without changing any version. The highest risks are startup DI wiring and eager singleton creation. Wire format and Room table names are guarded by unit tests. This card checks for regressions only.
 
