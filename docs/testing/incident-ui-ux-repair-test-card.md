@@ -1,6 +1,6 @@
 # Incident UI/UX repair test card
 
-Prepared: 2026-10-04. Updated: 2026-10-05. Status: physical cases UNTESTED; bounded emulator fixture outcomes are recorded in [validation](../validation.md). Scope: [Antigravity handover](../handoffs/antigravity-incident-ui-ux-repair.md).
+Prepared: 2026-10-04. Updated: 2026-10-05. Status: physical cases UNTESTED; bounded emulator fixture outcomes are recorded in [validation](../validation.md). Scope: [Antigravity handover](../../archive/docs-superseded-2026-10-16/handoffs/antigravity-incident-ui-ux-repair.md).
 
 ## Build identity and setup
 

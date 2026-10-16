@@ -58,7 +58,7 @@ Incidents use stable reporter/helper authority, signed prerequisites and transac
 
 SosRepository stores signed revisioned snapshots and terminal records atomically. Alert IDs include signing-key namespaces; updates/end require that key. SOS ignores tuning. Creation/end relay urgently with TTL/hop bounds; rejected origin sends remain pending. SosSyncCoordinator reconciles bounded snapshots on READY/changes and every 30 seconds with jitter; confirmation belongs to the named neighbor/snapshot. Receiver silence is local; independent sirens stop within 30 seconds. Sender Back preserves SOS; creation cancellation returns to the hub. Cached timestamps must be positive and under 15 minutes; header fallback time never proves GPS freshness.
 
-Presentation screens retain state/effects/launchers and scopes; visual sections receive explicit values/actions. IncidentSelectors is pure; public model packages and ViewModel flow/sharing operators remain. [Ownership/source inventory](handoffs/maintainability-size-inventory.md) records the facade exception and map lifetime.
+Presentation screens retain state/effects/launchers and scopes; visual sections receive explicit values/actions. IncidentSelectors is pure; public model packages and ViewModel flow/sharing operators remain. [Ownership/source inventory](../archive/docs-superseded-2026-10-16/handoffs/maintainability-size-inventory.md) records the facade exception and map lifetime.
 
 ## Maps, notifications and sessions
 
@@ -66,7 +66,7 @@ MapLibre renders versioned local PMTiles. Signed manifests use P-256 verificatio
 
 MeshSessionController owns start/stop. Opt-in MeshForegroundService is a non-sticky connectedDevice anchor with a silent, debounced notification; no boot receiver or wake lock. Go offline stops radio/service. Unexpected service destruction stops transport; disabled background mode stops on activity destruction except configuration changes.
 
-[Structural scope and remaining candidates](plans/network-maintainability-refactor.md) records completed ownership extractions, final-candidate user-reported phone passes and unresolved automated checks.
+[Structural scope and remaining candidates](../archive/docs-superseded-2026-10-16/plans/network-maintainability-refactor.md) records completed ownership extractions, final-candidate user-reported phone passes and unresolved automated checks.
 
 ## Evidence and source navigation
 

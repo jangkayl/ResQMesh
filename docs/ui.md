@@ -53,10 +53,10 @@ Home peer chips open matching stable-ID Network details. Blocked peers stay in B
 
 The terminal is bounded and session-only. Explicit categories are Connection, Sync, Transport, Routing, Security, System and Alerts. Summaries show endpoint/role/generation/readiness/transport; put heartbeat/relay chatter under Details. Newest first, pause follow while reading, and provide Latest/Sync jumps.
 
-Screen sections live within their features; saveable state, launchers, effects and coroutine scopes stay with original owners. The map canvas owns one MapView/observer/subscription/cleanup. The [size ledger](handoffs/maintainability-size-inventory.md) records ownership; [validation](validation.md) records UI-02's existing navigation failures.
+Screen sections live within their features; saveable state, launchers, effects and coroutine scopes stay with original owners. The map canvas owns one MapView/observer/subscription/cleanup. The [size ledger](../archive/docs-superseded-2026-10-16/handoffs/maintainability-size-inventory.md) records ownership; [validation](validation.md) records UI-02's existing navigation failures.
 
 ## Accessibility and validation
 
 Support both appearances, contrast, targets/labels, empty/error/denied states, small screens, landscape, large text, TalkBack and restoration. Startup errors offer recovery; map setup returns to its SOS. Prevent reminder/header/keyboard overlap and scan-driven flicker.
 
-Functional phone successes are recorded in [validation](validation.md), alongside DELIVERY-01. They do not establish completed accessibility/novice usability, every channel/gesture regression or pressure/fallback scenario. Use the [presentation](testing/structure-organization-test-card.md) and [SOS/conversation](testing/sos-conversations-test-card.md) procedures. Keep measured outcomes in validation rather than adding transcripts here.
+Functional phone successes are recorded in [validation](validation.md), alongside DELIVERY-01. They do not establish completed accessibility/novice usability, every channel/gesture regression or pressure/fallback scenario. Use the [presentation](../archive/docs-superseded-2026-10-16/testing/structure-organization-test-card.md) and [SOS/conversation](testing/sos-conversations-test-card.md) procedures. Keep measured outcomes in validation rather than adding transcripts here.

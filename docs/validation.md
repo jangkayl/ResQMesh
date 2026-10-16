@@ -42,11 +42,11 @@ Full audit narratives, historical APK hashes and original limitations are preser
 
 The committed `db2260e` UI follow-up retains stable-ID helper Chat, accessible selected filters/search, wrapped status and growing helper controls. Debug/Android-test APK builds and Lint passed: zero errors, 148 warnings, three hints. On API 37, eighteen incident UI tests and four focused cases at 200% text passed. These are emulator results; physical execution remains pending under the [UI repair card](testing/incident-ui-ux-repair-test-card.md).
 
-The separately authorized reconnect fixture repair passed all 403 tests without exclusions, including 29 reconnect cases and three JVM Base64 checks. Production/configuration was unchanged; TEST-01 is resolved locally. Historical presentation-guard discrepancies are now accounted for in the [size ledger](handoffs/maintainability-size-inventory.md); its original baseline remains unchanged.
+The separately authorized reconnect fixture repair passed all 403 tests without exclusions, including 29 reconnect cases and three JVM Base64 checks. Production/configuration was unchanged; TEST-01 is resolved locally. Historical presentation-guard discrepancies are now accounted for in the [size ledger](../archive/docs-superseded-2026-10-16/handoffs/maintainability-size-inventory.md); its original baseline remains unchanged.
 
 ### Maintainability refactor, October 5
 
-Immutable source snapshots, reviewed declaration maps, full historical APK identities and phase results are preserved in the [local evidence ledger](handoffs/maintainability-local-evidence.md). Original baseline/presentation modes still describe their historical snapshots; newer phases use their own explicit scopes. Historical full-suite blockers above remain recorded.
+Immutable source snapshots, reviewed declaration maps, full historical APK identities and phase results are preserved in the [local evidence ledger](../archive/docs-superseded-2026-10-16/handoffs/maintainability-local-evidence.md). Original baseline/presentation modes still describe their historical snapshots; newer phases use their own explicit scopes. Historical full-suite blockers above remain recorded.
 
 Phases 0–7 source work is complete. Final debug/instrumentation builds, all 426 JVM tests, Lint and preservation checks pass. Of forty selected emulator cases, 36 pass and four navigation assertions fail; the same four fail on the saved pre-phase APK with unchanged sources/tests (UI-02). Four repeated 200%-font incident cases pass. Exact build identities/results are in the ledger; final local acceptance remains blocked.
 
@@ -54,7 +54,7 @@ The user deferred intermediate phone gates until the final batch build. October 
 
 ### October 6 final-candidate phone report
 
-The user confirmed **F1–F14 PASS** in the [network card](testing/network-maintainability-test-card.md) on the final APK whose hash starts `1AE82B6C`. The preserved APK rehashes to `1AE82B6CE482EBBF4415E64C4FD74FD103D888104A3790AA8EDCEA979441BFE0`. This covers the card's direct/relay messaging, receipts, notes, recovery, blocking/channels, persistence, incident/SOS, drafts, maps and accessibility scenarios as user-reported results.
+The user confirmed **F1–F14 PASS** in the [network card](../archive/docs-superseded-2026-10-16/testing/network-maintainability-test-card.md) on the final APK whose hash starts `1AE82B6C`. The preserved APK rehashes to `1AE82B6CE482EBBF4415E64C4FD74FD103D888104A3790AA8EDCEA979441BFE0`. This covers the card's direct/relay messaging, receipts, notes, recovery, blocking/channels, persistence, incident/SOS, drafts, maps and accessibility scenarios as user-reported results.
 
 Report received October 6; actual test times, phone models/API levels, counts, durations, transport evidence and captures were not supplied. No automated rerun was reported. The four recorded UI-02 emulator failures remain unresolved. Successful reported runs do not close intermittent DELIVERY-01 or establish quantitative reliability.
 
@@ -64,7 +64,7 @@ Report received October 6; actual test times, phone models/API levels, counts, d
 | Voice repair, October 3 | Clean snapshot: 348 unit tests without exclusions, builds, Android-test compilation and Lint. See [voice card](testing/ble-voice-transfer-test-card.md). |
 | SOS UI/storage, October 2 | 248 unit tests plus eleven executed Medium_Phone/API 37 migration/navigation instrumentation tests; later device behavior requires its own evidence. |
 | Bluetooth recovery, October 2 | 266 unit tests, build, Android-test compilation and Lint; see [recovery card](testing/bluetooth-recovery-test-card.md). |
-| Presentation organization, October 4 | Builds, Lint and 24 focused presentation tests; full mixed-workspace suite remained blocked. See [organization card](testing/structure-organization-test-card.md). |
+| Presentation organization, October 4 | Builds, Lint and 24 focused presentation tests; full mixed-workspace suite remained blocked. See [organization card](../archive/docs-superseded-2026-10-16/testing/structure-organization-test-card.md). |
 
 Original September capture results, paths, Samsung reports, and historical procedures remain in [validation before synchronization](../archive/docs-superseded-2026-10-04/evidence/validation-before-sync.md). Older cards and hashes are indexed in the [dated archive](../archive/docs-superseded-2026-10-04/README.md). They identify historical snapshots, not the current candidate.
 
@@ -74,13 +74,11 @@ PR CI runs build/unit tests, Lint, docs and diff hygiene. Failed deterministic c
 
 | Procedure | Coverage |
 | --- | --- |
-| [Networking maintenance](testing/network-maintainability-test-card.md) | Direct/relay messaging, live identity, recovery, blocks, background and incident comparisons after structural extraction |
 | [Physical checklist](testing/physical-reliability-tests.md) | Block/route recovery, identity/receipt guards, ordinary versus segmented traffic, restart custody, load, scale and other feature regressions |
 | [Voice/relay](testing/ble-voice-transfer-test-card.md) | Direct/relay notes, bursts, joining, fallback, recovery and arrival versus confirmation |
 | [Recovery](testing/bluetooth-recovery-test-card.md) | OFF/ON, isolation, cluster merge, permissions, background and Go offline |
 | [Samsung](testing/samsung-send-test-card.md) | Samsung roles/transports, private receipts and reconnect |
 | [SOS/conversations](testing/sos-conversations-test-card.md) | Channel isolation, independent alerts, reconnect terminal state, gestures and UI |
-| [Presentation](testing/structure-organization-test-card.md) | Navigation, drafts/history, notifications, session and appearance regressions |
 | [Capstone](plans/capstone-demo-readiness.md) | Reporter/helper roles, ownership, withdrawal/offline revision and demo/release evidence |
 
 Existing diagnostic APKs are historical candidates. The normal build enables L2CAP; `-PbleL2cap=false` produces a GATT comparison build when separately authorized. Use one matching variant on every participant; log actual transport. An open socket or label does not prove payload transport.

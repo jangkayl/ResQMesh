@@ -4,7 +4,7 @@ Last reviewed: 2026-10-06. Branch: `fix/incident-ui-ux`; networking baseline `db
 
 ## Current objective
 
-Phases 0–7 source work is complete. The user reports F1–F14 passing on the final candidate; four baseline automated navigation checks still block local acceptance. [Phase plan](plans/network-maintainability-refactor.md), [size/ownership ledger](handoffs/maintainability-size-inventory.md) and [phone card](testing/network-maintainability-test-card.md) separate implementation, reports and unresolved evidence. Existing work is preserved; DELIVERY-01 remains deferred.
+Phases 0–7 source work is complete. The user reports F1–F14 passing on the final candidate; four baseline automated navigation checks still block local acceptance. [Phase plan](../archive/docs-superseded-2026-10-16/plans/network-maintainability-refactor.md), [size/ownership ledger](../archive/docs-superseded-2026-10-16/handoffs/maintainability-size-inventory.md) and [phone card](../archive/docs-superseded-2026-10-16/testing/network-maintainability-test-card.md) separate implementation, reports and unresolved evidence. Existing work is preserved; DELIVERY-01 remains deferred.
 
 ## Working by user report
 
@@ -36,7 +36,7 @@ Presentation organization preserves Activity/ViewModel bodies and 217 protected 
 
 **Initial networking maintenance:** extracted handler/gateway ownership, presence, live callbacks, repository bindings and GATT host contracts. That stage passed 411 tests, APK compilation and Lint; its guard preserved 447 unrelated files. No device/emulator execution or DELIVERY-01 investigation occurred.
 
-**Maintainability:** 426 JVM tests, builds, Lint (zero errors) and preservation checks pass. NativeBleManager is 743 lines; GATT managers 133/44, admission 158 and MeshRepository 368. 36/40 selected emulator cases pass; four navigation failures reproduce on the saved baseline. Final phone F1–F14 is user-reported PASS. Baselines, failed attempts and exact hashes belong to the [local evidence ledger](handoffs/maintainability-local-evidence.md).
+**Maintainability:** 426 JVM tests, builds, Lint (zero errors) and preservation checks pass. NativeBleManager is 743 lines; GATT managers 133/44, admission 158 and MeshRepository 368. 36/40 selected emulator cases pass; four navigation failures reproduce on the saved baseline. Final phone F1–F14 is user-reported PASS. Baselines, failed attempts and exact hashes belong to the [local evidence ledger](../archive/docs-superseded-2026-10-16/handoffs/maintainability-local-evidence.md).
 
 ## Open issue and remaining evidence
 
