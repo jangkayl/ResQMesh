@@ -45,7 +45,7 @@ Presentation organization preserves Activity/ViewModel bodies and 217 protected 
 | UI-01 | Follow-up implemented; functional phone pass reported | Final F12–F14 reported PASS. Broader usability/measurement evidence remains unspecified; original baselines are preserved. |
 | UI-02 | Existing local failures; acceptance blocked | Four navigation assertions fail on both saved baseline and final candidate; unchanged sources/tests. See the local evidence ledger. |
 | DELIVERY-01 | User-reported failure; investigation deferred | On A→B→C→D, public/private text or voice sometimes fails to reach D. Cause unknown. Keys, forwarding and blocking are hypotheses only. |
-| PERF-01 | User-reported open lag; Phase 0 measuring | Debug-only `RESQ_PERF` markers before any [inbound offload](plans/ble-main-looper-offload.md). |
+| PERF-01 | User-reported UI/phone lag; cause is UI rendering | Phase 0 markers show frame/Compose stalls dominate; BLE work is minor, so the [inbound offload](plans/ble-main-looper-offload.md) is deferred. Release-build and UI profiling are pending. |
 | TEST-01 | Resolved locally | Unit compilation and 403/403 tests pass, including 29 reconnect cases and three Base64 contract checks. |
 | MEASURE-01 | Evidence pending | Repeated arrival/receipt counts, latency, sustained-load/fallback, late-callback and directed route-withdrawal coverage. |
 | SCALE-01 | Evidence pending | Five/ten-phone controlled matrices, range and capacity measurements. |

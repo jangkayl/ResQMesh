@@ -70,6 +70,17 @@ Original September capture results, paths, Samsung reports, and historical proce
 
 PR CI runs build/unit tests, Lint, docs and diff hygiene. Failed deterministic checks block readiness; CI does not establish physical BLE behavior. PR/merge requires explicit instruction.
 
+### October 17 PERF-01 Phase 0 capture
+
+Debug APK `43D72C15...` (commit `29f3a22`, no earlier lag fixes) on Samsung SM-P615 (Android 13) and OPPO CPH2127 (Android 12). The user ran READY, the open burst of five private texts, and receipts. Relay, SOS, media and the Bluetooth toggle were not run. The user reports UI and whole-phone lag. Each capture covers about three minutes.
+
+| Device | Main-thread dispatches ≥32 ms | Frame/Compose share | BLE inbound share | Decrypt |
+| --- | --- | --- | --- | --- |
+| SM-P615 | 310, 34.8 s total, max 1,322 ms | 33.2 s | under 1 s | 6 × 34–85 ms |
+| CPH2127 | 60, 4.4 s total, max 557 ms | 3.8 s | about 0.4 s | 7 × 30–40 ms |
+
+Decrypt is real but minor. The stalls are frame rendering and Compose work, not BLE. Debuggable builds run Compose slower, so release-like evidence is still pending.
+
 ## Active physical procedures
 
 | Procedure | Coverage |
