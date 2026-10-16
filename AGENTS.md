@@ -64,7 +64,7 @@ Record user reports as such, with supplied build identity. Missing counts, devic
 
 Keep current, historical and deferred material distinct. Update status after relevant work; add meaningful physical results to validation. Preserve historical build identities. Update architecture/decisions for actual behavior/policy changes or factual corrections; avoid transcripts and competing context routers.
 
-Run `powershell -ExecutionPolicy Bypass -File .\scripts\check_docs.ps1` after documentation changes and check diff hygiene.
+Run `powershell -ExecutionPolicy Bypass -File .\scripts\ci\check_docs.ps1` after documentation changes and check diff hygiene.
 
 ## Reliability rules
 

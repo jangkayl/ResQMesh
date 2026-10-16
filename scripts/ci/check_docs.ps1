@@ -1,5 +1,5 @@
 param(
-    [string]$RepositoryRoot = (Join-Path $PSScriptRoot '..')
+    [string]$RepositoryRoot = (Join-Path $PSScriptRoot '../..')
 )
 
 $ErrorActionPreference = 'Stop'

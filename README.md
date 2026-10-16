@@ -208,7 +208,7 @@ Permissions cover Bluetooth discovery/connection, location features, microphone,
 ```powershell
 .\gradlew.bat :app:testDebugUnitTest :app:lintDebug --console=plain
 .\gradlew.bat :app:compileDebugAndroidTestKotlin --console=plain
-powershell -ExecutionPolicy Bypass -File .\scripts\check_docs.ps1
+powershell -ExecutionPolicy Bypass -File .\scripts\ci\check_docs.ps1
 git diff --check
 ```
 

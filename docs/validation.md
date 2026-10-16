@@ -33,7 +33,7 @@ This is a qualitative milestone, not a full PASS for every procedure or a measur
 ```powershell
 .\gradlew.bat :app:assembleDebug :app:testDebugUnitTest --console=plain
 .\gradlew.bat :app:lintDebug --console=plain
-powershell -ExecutionPolicy Bypass -File .\scripts\check_docs.ps1
+powershell -ExecutionPolicy Bypass -File .\scripts\ci\check_docs.ps1
 git diff --check
 ```
 
