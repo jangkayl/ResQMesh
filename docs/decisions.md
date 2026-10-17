@@ -102,4 +102,4 @@ Keep hybrid encryption. After the demo, version the envelope: RSA-OAEP-SHA256 ke
 
 ## D25: Packages before Gradle modules
 
-Enforce layer boundaries with package moves and `scripts/ci/check_boundaries.ps1`, whose allowlist may only shrink. Extract Gradle modules only after the allowlist reaches zero. Behavior-touching refactors (navigation, data boundary, BLE internals, crypto, release) wait until after the demo freeze.
+Enforce layer boundaries with package moves and `scripts/ci/check_boundaries.ps1`, whose allowlist may only shrink. It reached zero on 2026-10-17 ([plan](plans/layer-boundaries.md)). The user approved that subset ahead of the freeze. It uses adapters rather than renamed repositories, String-typed models and `feature-no-data`, and adds use cases only for multi-step flows. Cross-feature rules wait for P3. The project stays one module; other behavior-touching refactors wait until after the demo freeze.

@@ -4,10 +4,10 @@ Last reviewed: 2026-10-17. Baseline: see [status](status.md). Source and bounded
 
 ## System shape and data path
 
-Single-module Kotlin/Compose MVVM uses Room, serialization, Koin, coroutines and existing use cases. Native BLE advertising/scanning and dual-role GATT provide setup/control/fallback; owned L2CAP can carry payloads. Nearby Connections and Wi-Fi Direct are absent.
+Single-module Kotlin/Compose MVVM uses Room, serialization, Koin and coroutines. Features depend only on `core`: `core/model` mirrors of Room rows, `core/domain/repository` interfaces, `core/domain/incident` rules and `core/domain/usecase`. `data` implements the interfaces with thin adapters (`data/repository/adapter`) and maps rows in `data/mapper`. `check_boundaries.ps1` forbids `data.*` in features and `data`/`feature` in core, scanning imports and qualified names, with an empty allowlist. Native BLE advertising/scanning and dual-role GATT provide setup/control/fallback; owned L2CAP can carry payloads. Nearby Connections and Wi-Fi Direct are absent.
 
 ```text
-Compose -> ViewModel/use case -> MeshRepository -> PayloadFactory
+Compose -> ViewModel/use case -> core interface -> data adapter -> MeshRepository -> PayloadFactory
         -> MeshPayload -> NativeBleManager -> READY GATT or owned L2CAP
         -> PayloadDispatcher -> typed handler -> repository/Room/UI
 ```
@@ -80,6 +80,7 @@ Paths below are under `app/src/main/java/com/example/testresqmesh/`:
 | Identity/crypto | `core/network/CryptoManager.kt`, `data/repository/PeerPublicKeyCache.kt` |
 | Routing/persistence | `data/repository/MeshRepository.kt`, `data/repository/MeshRouter.kt`, `data/repository/MessageStore.kt`, `data/local/` |
 | Incident/SOS state | `data/repository/IncidentSyncCoordinator.kt`, `data/repository/SosRepository.kt`, `data/repository/SosSyncCoordinator.kt` |
+| Domain boundary | `core/model/`, `core/domain/{repository,incident,usecase}/`, `data/mapper/`, `data/repository/adapter/` |
 | Presentation | `app/navigation/`, `feature/*/{ui,viewmodel,model}/`, `core/ui/` |
 | Maps/session | `core/map/`, `core/service/` |
 | DI, audio, logging, notifications | `app/di/` (layer modules), `core/audio/`, `core/logging/`, `core/notification/`, `feature/sos/alert/` |

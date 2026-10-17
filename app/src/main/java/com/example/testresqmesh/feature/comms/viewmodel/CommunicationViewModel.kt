@@ -18,7 +18,7 @@ import kotlinx.coroutines.launch
 import com.example.testresqmesh.core.utils.SCAN_UI_THROTTLE_MS
 import com.example.testresqmesh.core.utils.throttleLatest
 import com.example.testresqmesh.core.domain.usecase.messaging.PrivateSendResult
-import com.example.testresqmesh.core.domain.usecase.messaging.SendPrivateMessageUseCase
+import com.example.testresqmesh.core.domain.usecase.messaging.SendPrivateChatMessageUseCase
 import com.example.testresqmesh.core.domain.usecase.sos.RaiseSosUseCase
 
 class CommunicationViewModel(
@@ -27,7 +27,7 @@ class CommunicationViewModel(
     private val sosRepository: com.example.testresqmesh.core.domain.repository.SosAlertRepository,
     private val conversationRepository: com.example.testresqmesh.core.domain.repository.ConversationStateRepository,
     private val raiseSos: RaiseSosUseCase,
-    private val sendPrivate: SendPrivateMessageUseCase
+    private val sendPrivate: SendPrivateChatMessageUseCase
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ChatUiState())

@@ -214,7 +214,7 @@ val domainModule = module {
         )
     }
     single { RaiseSosUseCase(get(), get()) }
-    single { com.example.testresqmesh.core.domain.usecase.messaging.SendPrivateMessageUseCase(get()) }
+    single { com.example.testresqmesh.core.domain.usecase.messaging.SendPrivateChatMessageUseCase(get()) }
 }
 
 /** ViewModels. */

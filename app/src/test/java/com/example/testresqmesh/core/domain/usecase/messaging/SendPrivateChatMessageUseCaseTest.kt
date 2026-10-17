@@ -5,7 +5,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 import java.lang.reflect.Proxy
 
-class SendPrivateMessageUseCaseTest {
+class SendPrivateChatMessageUseCaseTest {
     private val calls = mutableListOf<String>()
 
     private fun repository(sent: Boolean, pendingKey: Boolean): MeshNodeRepository =
@@ -24,20 +24,20 @@ class SendPrivateMessageUseCaseTest {
     @Test
     fun acceptedSendIsSentWithoutKeyLookup() {
         assertEquals(PrivateSendResult.Sent,
-            SendPrivateMessageUseCase(repository(sent = true, pendingKey = true))("bob", "hi", null, null))
+            SendPrivateChatMessageUseCase(repository(sent = true, pendingKey = true))("bob", "hi", null, null))
         assertEquals(listOf("sendPrivateMessage"), calls)
     }
 
     @Test
     fun refusedSendWithPendingKeyChangeNeedsVerification() {
         assertEquals(PrivateSendResult.NeedsKeyVerification,
-            SendPrivateMessageUseCase(repository(sent = false, pendingKey = true))("bob", "hi", null, null))
+            SendPrivateChatMessageUseCase(repository(sent = false, pendingKey = true))("bob", "hi", null, null))
         assertEquals(listOf("sendPrivateMessage", "hasPendingPublicKeyChange"), calls)
     }
 
     @Test
     fun refusedSendWithoutPendingKeyChangeFails() {
         assertEquals(PrivateSendResult.Failed,
-            SendPrivateMessageUseCase(repository(sent = false, pendingKey = false))("bob", "hi", null, null))
+            SendPrivateChatMessageUseCase(repository(sent = false, pendingKey = false))("bob", "hi", null, null))
     }
 }

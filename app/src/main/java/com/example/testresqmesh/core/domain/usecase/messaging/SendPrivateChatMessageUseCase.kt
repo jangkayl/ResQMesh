@@ -14,7 +14,7 @@ sealed interface PrivateSendResult {
  * Sends a private message. The repository fails closed without a trusted usable key; a refused send
  * is classified afterwards so a pending key change prompts verification instead of a generic failure.
  */
-class SendPrivateMessageUseCase(private val repository: MeshNodeRepository) {
+class SendPrivateChatMessageUseCase(private val repository: MeshNodeRepository) {
     operator fun invoke(
         targetName: String,
         text: String,

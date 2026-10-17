@@ -19,7 +19,7 @@ core/network  ->  no data/feature
 - **Mappers** are `data/mapper/*Mappers.kt` functions: `toModel()`, plus `toEntity()` only where the data layer needs it.
 - **Repository interfaces** are in `core/domain/repository/`. Thin adapters in `data/repository/adapter/` wrap the existing repositories, which the user chose over renaming them. `MeshRepository`, `IncidentRepository`, `SosRepository` and all BLE code are not edited.
 - **Incident rules** (`mayPerform`, `nextState`, `isReporter`) move to `core/domain/incident/IncidentRules`. The data-layer `IncidentPolicy` and `IncidentOwnership` delegate to them.
-- **Use cases** are added only for logic-heavy flows: `RaiseSosUseCase`, `EndSosUseCase` and `SendPrivateMessageUseCase`. Existing `MeshUseCases` pass-throughs stay.
+- **Use cases** are added only for logic-heavy flows: `RaiseSosUseCase` and `SendPrivateChatMessageUseCase`. SOS end is one VM call with synchronous guards, so it has none. Existing `MeshUseCases` pass-throughs stay.
 - **Boundary rule:** `feature-no-data` covers all of `data.*`, which the user chose on 2026-10-17. The checker also scans fully-qualified names. The allowlist ends empty.
 - **No cross-feature rule yet.** `sos -> comms` (the shared `CommunicationViewModel`) is P3 work.
 
@@ -34,10 +34,10 @@ Each step compiles and passes its tests on its own and is one commit.
 5. `core/location/LocationClientFactory` for `TacticalLocationCard`, `MapLibreMapCanvas` and `CreateIncidentSheet`. Each keeps today's shared-versus-fresh client choice.
 6. `core/notification/SosAlertNotifier`, implemented by `SosAlertController`. A data adapter implements `SosAlertSink`.
 7. SOS UI. `CommunicationViewModel` uses `SosAlertRepository` and `ConversationStateRepository`. `sosRepository` becomes private, replaced by `isOwnSos` and `sosActivity`. This removes the fully-qualified references in the SOS screens.
-8. Use cases: SOS raise and end (15-minute cached-location freshness, refinement guarded by `isCurrent`), and private send (`Sent`, `NeedsKeyVerification`, `Failed`). The ViewModels keep their UI state and strings.
+8. Use cases: SOS raise (15-minute cached-location freshness, refinement guarded by `isCurrent`), and private send (`Sent`, `NeedsKeyVerification`, `Failed`). The ViewModels keep their UI state and strings.
 9. The incident ViewModel, setup ViewModel and `feature/incident/**` move from entities to models.
 10. Checker hardening: `feature-no-data`, a fully-qualified-name scan, and an empty allowlist.
-11. Docs (architecture, decisions, status, validation) and the layer boundaries smoke card in `docs/testing/`.
+11. Docs (architecture, decisions, status, validation) and the [layer boundaries smoke card](../testing/layer-boundaries-smoke-card.md).
 
 These checks run from step 4 on: `assembleDebug`, `testDebugUnitTest`, `lintDebug`, `detekt`, `assembleDebugAndroidTest`, `check_boundaries.ps1`, `check_docs.ps1` and `git diff --check`.
 
