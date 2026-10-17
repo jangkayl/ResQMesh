@@ -34,8 +34,13 @@ if (-not $adb) {
 # Resolve APK path relative to repo root
 $repoRoot = (Resolve-Path "$PSScriptRoot\..\..").Path
 $apkPath = "$repoRoot\app\build\outputs\apk\debug\app-debug.apk"
+# Read the applicationId from Gradle so a package rename needs no script change.
+$gradleFile = "$repoRoot\app\build.gradle.kts"
 $package = "com.example.testresqmesh"
-$activity = "$package/.MainActivity"
+if (Test-Path $gradleFile) {
+    $idMatch = Select-String -LiteralPath $gradleFile -Pattern 'applicationId\s*=\s*"([^"]+)"' | Select-Object -First 1
+    if ($idMatch) { $package = $idMatch.Matches[0].Groups[1].Value }
+}
 
 function Get-ConnectedDevices {
     $raw = & $adb devices
@@ -56,17 +61,20 @@ function Get-DeduplicatedActiveDevices {
     $active = @($all | Where-Object { $_.Status -eq "device" })
     if ($active.Count -eq 0) { return @() }
 
-    # Group devices by physical IP if present to prevent mDNS alias duplicates
-    $ipDevices = @($active | Where-Object { $_.Id -match "^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}:\d+" })
-    $otherDevices = @($active | Where-Object { $_.Id -notmatch "^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}:\d+" })
-
-    if ($ipDevices.Count -gt 0) {
-        # Filter out mDNS aliases like adb-xxx._adb-tls-connect._tcp that point to same endpoints
-        $filteredOthers = @($otherDevices | Where-Object { $_.Id -notmatch "(_adb-tls-connect|\._tcp|\._adb)" })
-        return @($ipDevices + $filteredOthers)
+    # One phone can appear over USB, Wi-Fi and mDNS aliases; keep one entry per hardware serial.
+    # USB entries (no ':' and no mDNS suffix) sort first, so USB is preferred.
+    $ordered = @($active | Sort-Object { if ($_.Id -match ":|\._tcp|_adb-tls") { 1 } else { 0 } })
+    $seen = @{}
+    $result = @()
+    foreach ($d in $ordered) {
+        $serial = (& $adb -s $d.Id shell getprop ro.serialno 2>$null)
+        $key = if ($serial) { "$serial".Trim() } else { $d.Id }
+        if (-not $seen.ContainsKey($key)) {
+            $seen[$key] = $true
+            $result += $d
+        }
     }
-
-    return $active
+    return $result
 }
 
 function Show-ConnectedDevices {
@@ -153,6 +161,28 @@ function Disconnect-SpecificDevice {
     Write-Host "Invalid selection." -ForegroundColor Red
 }
 
+function Show-BuildIdentity {
+    if (-not (Test-Path $apkPath)) { return }
+    Push-Location $repoRoot
+    try {
+        $commit = (& git rev-parse --short HEAD 2>$null)
+        $branch = (& git rev-parse --abbrev-ref HEAD 2>$null)
+        $dirty = (& git status --porcelain 2>$null)
+    } finally {
+        Pop-Location
+    }
+    $hash = (Get-FileHash -LiteralPath $apkPath -Algorithm SHA256).Hash
+    $built = (Get-Item -LiteralPath $apkPath).LastWriteTime
+    $state = if ($dirty) { " (uncommitted changes present)" } else { "" }
+    Write-Host "`n--- Build identity (record this on the test card) ---" -ForegroundColor Cyan
+    Write-Host "  Package : $package"
+    Write-Host "  Branch  : $branch"
+    Write-Host "  Commit  : $commit$state"
+    Write-Host "  Built   : $built"
+    Write-Host "  SHA-256 : $hash"
+    Write-Host "------------------------------------------------------" -ForegroundColor Cyan
+}
+
 function Ensure-ApkBuilt {
     param([switch]$Force)
     if ($Force -or (-not (Test-Path $apkPath))) {
@@ -160,7 +190,8 @@ function Ensure-ApkBuilt {
         $gradleCmd = if ($env:OS -match "Windows") { ".\gradlew.bat" } else { "./gradlew" }
         Push-Location $repoRoot
         try {
-            & $gradleCmd assembleDebug
+            # Out-Host shows Gradle output without turning it into this function's return value.
+            & $gradleCmd assembleDebug | Out-Host
             if ($LASTEXITCODE -ne 0) {
                 Write-Host "Gradle build failed with exit code $LASTEXITCODE." -ForegroundColor Red
                 return $false
@@ -169,7 +200,29 @@ function Ensure-ApkBuilt {
             Pop-Location
         }
     }
-    return (Test-Path $apkPath)
+    if (-not (Test-Path $apkPath)) { return $false }
+    Show-BuildIdentity
+    return $true
+}
+
+# Asks whether to rebuild; Enter means yes so a stale APK is not installed by accident.
+function Confirm-ApkBuild {
+    $buildChoice = Read-Host "Build latest debug APK before installing? [Y/n] (Press Enter for Yes)"
+    $force = ($buildChoice -eq "" -or $buildChoice -match "^[yY]")
+    if (-not $force -and (Test-Path $apkPath)) {
+        Write-Host "Using the existing APK; it may be older than your current code." -ForegroundColor Yellow
+    }
+    $built = Ensure-ApkBuilt -Force:$force
+    if (-not $built) { Write-Host "Aborting installation due to build failure." -ForegroundColor Red }
+    return $built
+}
+
+# Wakes the screen, starts the launcher activity and reports whether Android accepted it.
+function Start-App {
+    param ([string]$DeviceId)
+    & $adb -s $DeviceId shell input keyevent 224 2>$null | Out-Null
+    $out = (& $adb -s $DeviceId shell monkey -p $package -c android.intent.category.LAUNCHER 1 2>&1) -join "`n"
+    return ($out -match "Events injected: 1")
 }
 
 function Install-App {
@@ -194,30 +247,18 @@ function Install-App {
     Write-Host "     Install succeeded." -ForegroundColor Green
 
     Write-Host "  -> Waking screen & launching ResQMesh..." -ForegroundColor Cyan
-    # Wake screen if sleeping
-    & $adb -s $DeviceId shell input keyevent 224 2>$null | Out-Null
-    # Bring app to foreground
-    & $adb -s $DeviceId shell am start -a android.intent.action.MAIN -c android.intent.category.LAUNCHER -n $activity --activity-brought-to-front 2>$null | Out-Null
-    # Fallback to ensure app is foregrounded
-    & $adb -s $DeviceId shell monkey -p $package -c android.intent.category.LAUNCHER 1 2>$null | Out-Null
-    Write-Host "     Launched successfully on $modelStr." -ForegroundColor Green
+    if (Start-App -DeviceId $DeviceId) {
+        Write-Host "     Launched on $modelStr." -ForegroundColor Green
+    } else {
+        Write-Host "     Installed, but launch was not confirmed on $modelStr; open the app by hand." -ForegroundColor Yellow
+    }
     return $true
 }
 
 function Install-AllDevices {
     Write-Host "`n=== Install & Launch on ALL Devices ===" -ForegroundColor Green
 
-    $buildChoice = Read-Host "Build latest debug APK before installing? [Y/n] (Press Enter for Yes)"
-    if ($buildChoice -eq "" -or $buildChoice -match "^[yY]") {
-        $built = Ensure-ApkBuilt -Force
-        if (-not $built) {
-            Write-Host "Aborting installation due to build failure." -ForegroundColor Red
-            return
-        }
-    } elseif (-not (Test-Path $apkPath)) {
-        $built = Ensure-ApkBuilt -Force
-        if (-not $built) { return }
-    }
+    if (-not (Confirm-ApkBuild)) { return }
 
     Sync-WirelessDevices
 
@@ -255,13 +296,14 @@ function Install-SpecificDevice {
         return
     }
 
-    $selection = Read-Host "Enter the device number to install to (1-$($devs.Count))"
+    Write-Host "Ready devices:" -ForegroundColor Cyan
+    for ($i = 0; $i -lt $active.Count; $i++) { Write-Host "  [$($i + 1)] $($active[$i].Id)" }
+    $selection = Read-Host "Enter the device number to install to (1-$($active.Count))"
     if ($selection -match "^\d+$") {
         $idx = [int]$selection - 1
-        if ($idx -ge 0 -and $idx -lt $devs.Count) {
-            $built = Ensure-ApkBuilt
-            if ($built) {
-                Install-App -DeviceId ([string]$devs[$idx].Id) | Out-Null
+        if ($idx -ge 0 -and $idx -lt $active.Count) {
+            if (Confirm-ApkBuild) {
+                Install-App -DeviceId ([string]$active[$idx].Id) | Out-Null
                 Write-Host "`nDone!" -ForegroundColor Green
             }
             return
@@ -283,11 +325,11 @@ function Launch-AllDevices {
         $m = (& $adb -s $targetId shell getprop ro.product.model 2>$null)
         $mStr = if ($m) { $m.Trim() } else { $targetId }
         Write-Host "Launching ResQMesh on $mStr ($targetId)..." -ForegroundColor Cyan
-        & $adb -s $targetId shell input keyevent 224 2>$null | Out-Null
-        & $adb -s $targetId shell am start -a android.intent.action.MAIN -c android.intent.category.LAUNCHER -n $activity --activity-brought-to-front 2>$null | Out-Null
-        & $adb -s $targetId shell monkey -p $package -c android.intent.category.LAUNCHER 1 2>$null | Out-Null
+        if (-not (Start-App -DeviceId $targetId)) {
+            Write-Host "  Launch not confirmed on $mStr; is the app installed?" -ForegroundColor Yellow
+        }
     }
-    Write-Host "`nResQMesh launched on all devices." -ForegroundColor Green
+    Write-Host "`nLaunch requests sent." -ForegroundColor Green
 }
 
 # --- Interactive Main Loop ---
