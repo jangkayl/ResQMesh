@@ -1,4 +1,4 @@
-# Architecture boundary check. Scans Kotlin import lines under the app main source set.
+# Architecture boundary check. Scans Kotlin imports and fully-qualified references under the app main source set.
 # Fails on any violation not listed in boundary-allowlist.txt and on stale allowlist entries.
 param(
     [string]$RepositoryRoot = (Join-Path $PSScriptRoot '../..')
@@ -14,7 +14,7 @@ $allowlistPath = Join-Path $PSScriptRoot 'boundary-allowlist.txt'
 $rules = @(
     @{ Name = 'core-no-feature-data'; Dir = 'core/'; Forbidden = @("$base.feature.", "$base.data.") }
     @{ Name = 'core-network-no-data-feature'; Dir = 'core/network/'; Forbidden = @("$base.data.", "$base.feature.") }
-    @{ Name = 'feature-no-data-local'; Dir = 'feature/'; Forbidden = @("$base.data.local.") }
+    @{ Name = 'feature-no-data'; Dir = 'feature/'; Forbidden = @("$base.data.") }
     @{ Name = 'data-no-feature'; Dir = 'data/'; Forbidden = @("$base.feature.") }
 )
 
@@ -25,8 +25,10 @@ foreach ($rule in $rules) { $counts[$rule.Name] = 0 }
 $files = Get-ChildItem -LiteralPath $srcRoot -Recurse -File -Filter '*.kt'
 foreach ($file in $files) {
     $rel = $file.FullName.Substring($srcRoot.Length + 1).Replace('\', '/')
-    $imports = Select-String -LiteralPath $file.FullName -Pattern '^\s*import\s+([\w.]+)' |
-        ForEach-Object { $_.Matches[0].Groups[1].Value }
+    # Imports and fully-qualified references on any line except the package declaration.
+    $imports = Select-String -LiteralPath $file.FullName -Pattern '(?<![\w.])com\.example\.testresqmesh(\.\w+)+' -AllMatches |
+        Where-Object { $_.Line -notmatch '^\s*package\s' } |
+        ForEach-Object { $_.Matches } | ForEach-Object { $_.Value } | Sort-Object -Unique
     foreach ($rule in $rules) {
         if (-not $rel.StartsWith($rule.Dir)) { continue }
         foreach ($import in $imports) {
