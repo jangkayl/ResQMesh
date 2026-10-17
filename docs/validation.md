@@ -38,6 +38,8 @@ powershell -ExecutionPolicy Bypass -File .\scripts\ci\check_docs.ps1
 git diff --check
 ```
 
+Signed release APK: copy `keystore.properties.example` to the gitignored `keystore.properties`, point it at a keystore kept outside the repository, then run `.\gradlew.bat :app:assembleRelease`. The output is `app/build/outputs/apk/release/app-release.apk`. Without the file, the release APK is unsigned. Release and debug signatures differ, so switching variants on a phone needs an uninstall, which clears app data.
+
 ## Historical local milestones
 
 Full October 4–5 audit narratives and APK hashes are in the [October 5 validation snapshot](../archive/docs-superseded-2026-10-05/README.md).

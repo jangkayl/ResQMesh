@@ -23,3 +23,6 @@ cebu-*.zip
 *.bak
 
 __pycache__/
+*.jks
+*.keystore
+keystore.properties
