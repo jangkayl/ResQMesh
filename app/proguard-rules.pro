@@ -29,5 +29,9 @@
 -keepclassmembers class edu.cit.resqmesh.** { *** Companion; }
 -keepclasseswithmembers class edu.cit.resqmesh.** { kotlinx.serialization.KSerializer serializer(...); }
 
+# Room: Room.databaseBuilder instantiates AppDatabase_Impl reflectively. R8 full mode
+# (AGP 9 default) drops its no-arg constructor under Room's own `-keep class` rule.
+-keep class * extends androidx.room.RoomDatabase { <init>(); }
+
 # Keep line numbers for crash traces.
 -keepattributes SourceFile,LineNumberTable
