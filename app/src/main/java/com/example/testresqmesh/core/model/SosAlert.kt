@@ -19,3 +19,19 @@ data class SosAlert(
     val eventJson: String,
     val transmission: String
 )
+
+/** One retained SOS revision decoded for the audit history; the UI shows only these fields. */
+data class SosActivity(
+    val eventId: String,
+    val revision: Long,
+    val ended: Boolean,
+    val updatedAt: Long,
+    val latitude: Double?,
+    val accuracyMeters: Float?
+)
+
+/** Chat-list/map representation of an SOS alert. */
+fun SosAlert.toChatMessage() = ChatMessage(
+    id = sosId, senderName = originName, text = "$emergencyType emergency", imageBase64 = null, audioBase64 = null,
+    locationLat = latitude, locationLng = longitude, isMine = false, timestamp = createdAt,
+    isSOS = true, conversationKind = "SOS", sosId = sosId, senderNodeId = originNodeId)

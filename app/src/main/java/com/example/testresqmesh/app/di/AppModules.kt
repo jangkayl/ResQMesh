@@ -1,5 +1,10 @@
 package com.example.testresqmesh.app.di
 
+import com.example.testresqmesh.core.domain.repository.ConversationStateRepository
+import com.example.testresqmesh.core.domain.repository.IncidentFeedRepository
+import com.example.testresqmesh.core.domain.repository.LocalUserRepository
+import com.example.testresqmesh.core.domain.repository.MeshNodeRepository
+import com.example.testresqmesh.core.domain.repository.SosAlertRepository
 import com.example.testresqmesh.core.domain.usecase.*
 import com.example.testresqmesh.core.location.LocationClient
 import com.example.testresqmesh.core.map.download.AndroidConnectivityProvider
@@ -34,6 +39,11 @@ import com.example.testresqmesh.data.repository.RoomSosStore
 import com.example.testresqmesh.data.repository.SosAlertSink
 import com.example.testresqmesh.data.repository.SosRepository
 import com.example.testresqmesh.data.repository.SosStore
+import com.example.testresqmesh.data.repository.adapter.ConversationStateRepositoryAdapter
+import com.example.testresqmesh.data.repository.adapter.IncidentFeedRepositoryAdapter
+import com.example.testresqmesh.data.repository.adapter.LocalUserRepositoryAdapter
+import com.example.testresqmesh.data.repository.adapter.MeshNodeRepositoryAdapter
+import com.example.testresqmesh.data.repository.adapter.SosAlertRepositoryAdapter
 import com.example.testresqmesh.feature.comms.viewmodel.CommunicationViewModel
 import com.example.testresqmesh.feature.comms.viewmodel.WalkieTalkieViewModel
 import com.example.testresqmesh.feature.incident.viewmodel.IncidentViewModel
@@ -148,6 +158,17 @@ val repositoryModule = module {
     }
 }
 
+/** Domain repository interfaces over the existing repositories; lazy, so eager order is unchanged. */
+val adapterModule = module {
+    single<MeshNodeRepository> { MeshNodeRepositoryAdapter(get()) }
+    single<SosAlertRepository> { SosAlertRepositoryAdapter(get(), get<AppCoroutineScope>().scope) }
+    single<IncidentFeedRepository> { IncidentFeedRepositoryAdapter(get()) }
+    single<LocalUserRepository> { LocalUserRepositoryAdapter(get()) }
+    single<ConversationStateRepository> {
+        ConversationStateRepositoryAdapter(get<AppDatabase>().conversationStateDao())
+    }
+}
+
 /** Use cases. */
 val domainModule = module {
     single {
@@ -210,6 +231,7 @@ val appModules = listOf(
     networkModule,
     databaseModule,
     repositoryModule,
+    adapterModule,
     domainModule,
     viewModelModule
 )
