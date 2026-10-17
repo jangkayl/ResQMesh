@@ -1,6 +1,6 @@
 # Startup lag card (PERF-01)
 
-Prepared: 2026-10-17. Status: not yet run. Local checks pass (assemble, all JVM tests, Lint, androidTest compile, detekt, boundary, docs). Prepared from uncommitted work on `refactor/batch-c-hygiene`, debug APK `F06E5C84086E79B9520E888126966DF1704DD7E0929ABBA5568538D2A49378A6`; record the commit once committed.
+Prepared: 2026-10-17. Status: not yet run. Local checks pass (assemble, all JVM tests, Lint, androidTest compile, detekt, boundary, docs). The changes are committed as `3b234bf` on `perf/startup-lag`. Debug APKs built 2026-10-17 into `build/perf01/`: before `65435cd` `1A734DAF11D53997576C9D0C639C89498DFA1FA19C4CA5B4E5F1DF9D407BA9D3`, after `3b234bf` `5846FAD2CBE89851760C70107B8DA45BD41AF38745A9087107FB76BAFFDD6170`. The pre-commit debug APK `F06E5C84…` is superseded.
 
 The user reports that the app feels laggy when opened. Source review found main-thread work at startup and during the first screens. Changes:
 - Splash: 3 s fixed wait cut to 0.8 s. The pulse-border alpha is now read in the draw phase. The logo moved to `drawable-nodpi`.

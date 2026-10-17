@@ -36,7 +36,10 @@ Basic block, incident, SOS and recovery checks have user-reported successes; the
 
 ## Next actions
 
-1. Decide push/PR for `chore/context-routing`, `refactor/batch-a-cleanup` and `refactor/batch-c-hygiene`.
-2. After the demo freeze, plan revision phase P1 or P2 in detail before editing code.
-3. Collect UX-01 and MESH-02 details, then prioritize them with UI-02 and DELIVERY-01.
-4. Work the [capstone plan](plans/capstone-demo-readiness.md) toward the demo, including DEPLOY-01 items needed for installation.
+Deployment target (user-confirmed 2026-10-17): capstone demo first, then a signed sideloaded pilot beta. Play Store is out of scope for now.
+
+1. **Integrate (P0, now):** run the [startup lag card](testing/startup-lag-card.md). Then, on explicit instruction, merge the stack (`chore/context-routing` → `refactor/batch-a-cleanup` → `refactor/batch-c-hygiene` → `perf/startup-lag`) into `main` and build candidate #2 to replace the October 6 APK. That replacement needs a user-reported regression pass.
+2. **Demo freeze (P0, by about 2026-10-28):** repeat the [capstone plan](plans/capstone-demo-readiness.md) critical scenarios five times with counts, and capture A→B→C→D runs for DELIVERY-01 without fixing yet. Prepare the limitations, user guide and backup recording. After the freeze, only separately approved blocker fixes go in.
+3. **Release engineering (P0 for beta, after the demo):** revision-plan P5 subset. That means release signing, the applicationId rename before any beta install, R8 with keep rules and a minified-APK smoke run, a backup policy (`allowBackup` is currently true), and a release build in CI.
+4. **Reliability and trust (P0/P1 before beta):** fix DELIVERY-01, triage UX-01/MESH-02, resolve UI-02, run revision phase P1 crypto (envelope v2) and TRUST-01 first-contact verification, then an audit.
+5. **Beta gate (P1):** run the DEPLOY-01 matrix (upgrade path with migration tests, process death and OEM battery, device support, accessibility and a novice trial), then a small pilot that collects MEASURE-01 counts.
