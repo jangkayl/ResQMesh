@@ -26,7 +26,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.example.testresqmesh.core.ui.theme.ResQTheme
-import com.example.testresqmesh.data.local.entity.SosAlertEntity
+import com.example.testresqmesh.core.model.SosAlert
 
 internal fun formatSosHeaderTime(timestamp: Long): String {
     if (timestamp < 1_000_000_000_000L) {
@@ -42,7 +42,7 @@ internal fun formatSosHeaderTime(timestamp: Long): String {
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 internal fun ExpandedSosHeader(
-    alert: SosAlertEntity,
+    alert: SosAlert,
     categoryColor: Color,
     categoryIcon: ImageVector,
     onMap: () -> Unit,
@@ -313,7 +313,7 @@ internal fun ExpandedSosHeader(
 
 @Composable
 internal fun CompactSosHeader(
-    alert: SosAlertEntity,
+    alert: SosAlert,
     categoryColor: Color,
     categoryIcon: ImageVector,
     onMap: () -> Unit,

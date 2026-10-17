@@ -223,7 +223,7 @@ val viewModelModule = module {
             useCases = get(),
             locationClient = get(),
             sosRepository = get(),
-            conversationDao = get<AppDatabase>().conversationStateDao()
+            conversationRepository = get()
         )
     }
     viewModel { WalkieTalkieViewModel(useCases = get(), mediaHelper = get(), liveAudioEngine = get()) }

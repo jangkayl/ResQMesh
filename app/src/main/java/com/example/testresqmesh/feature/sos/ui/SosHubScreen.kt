@@ -51,8 +51,8 @@ fun SosHubScreen(
     val states by vm.conversationStates.collectAsState()
     BackHandler(onBack = onBack)
 
-    val userOwnsActiveSos = alerts.any { !it.ended && vm.sosRepository.owns(it) }
-    val myActiveSos = alerts.firstOrNull { !it.ended && vm.sosRepository.owns(it) }
+    val userOwnsActiveSos = alerts.any { !it.ended && vm.isOwnSos(it) }
+    val myActiveSos = alerts.firstOrNull { !it.ended && vm.isOwnSos(it) }
     val activeAlerts = remember(alerts) { alerts.filter { !it.ended }.sortedByDescending { it.createdAt } }
     val endedAlerts = remember(alerts) { alerts.filter { it.ended }.sortedByDescending { it.createdAt } }
     val isLight = MaterialTheme.colorScheme.background.luminance() > 0.5f

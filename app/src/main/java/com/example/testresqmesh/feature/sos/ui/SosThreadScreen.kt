@@ -19,7 +19,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.testresqmesh.core.ui.theme.ResQTheme
 import com.example.testresqmesh.core.audio.MediaHelper
-import com.example.testresqmesh.data.repository.asMessage
+import com.example.testresqmesh.core.model.toChatMessage
 import com.example.testresqmesh.feature.comms.viewmodel.CommunicationViewModel
 import com.example.testresqmesh.feature.comms.ui.PublicConversationScreen
 import com.example.testresqmesh.feature.sos.ui.components.CompactSosHeader
@@ -40,7 +40,7 @@ fun SosThreadScreen(
     val alert = alerts.firstOrNull { it.sosId == id }
     var confirmEnd by remember(id) { mutableStateOf(false) }
     var showActivity by remember(id) { mutableStateOf(false) }
-    val activity by remember(id) { vm.sosRepository.events(id) }.collectAsState(initial = emptyList())
+    val activity by remember(id) { vm.sosActivity(id) }.collectAsState(initial = emptyList())
     val leave = { vm.silenceSos(id); onBack() }
     BackHandler(onBack = leave)
 
@@ -71,8 +71,7 @@ fun SosThreadScreen(
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         items(activity, key = { it.eventId }) { row ->
-                            val event = com.example.testresqmesh.data.repository.SosProtocol.json
-                                .decodeFromString<com.example.testresqmesh.data.repository.SosEvent>(row.eventJson)
+                            val event = row
                             Surface(
                                 shape = RoundedCornerShape(10.dp),
                                 color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
@@ -185,12 +184,12 @@ fun SosThreadScreen(
                         categoryIcon = categoryIcon,
                         onMap = {
                             vm.silenceSos(id)
-                            onMap(alert.asMessage())
+                            onMap(alert.toChatMessage())
                         },
                         onEnd = { confirmEnd = true },
                         onSilence = { vm.silenceSos(id) },
                         onActivity = { showActivity = true },
-                        isOwner = vm.sosRepository.owns(alert)
+                        isOwner = vm.isOwnSos(alert)
                     )
                 } else {
                     ExpandedSosHeader(
@@ -199,12 +198,12 @@ fun SosThreadScreen(
                         categoryIcon = categoryIcon,
                         onMap = {
                             vm.silenceSos(id)
-                            onMap(alert.asMessage())
+                            onMap(alert.toChatMessage())
                         },
                         onEnd = { confirmEnd = true },
                         onSilence = { vm.silenceSos(id) },
                         onActivity = { showActivity = true },
-                        isOwner = vm.sosRepository.owns(alert)
+                        isOwner = vm.isOwnSos(alert)
                     )
                 }
             }

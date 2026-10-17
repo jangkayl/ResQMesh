@@ -13,7 +13,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.SharingStarted
-import com.example.testresqmesh.data.repository.asMessage
+import com.example.testresqmesh.core.model.toChatMessage
 import kotlinx.coroutines.launch
 import com.example.testresqmesh.core.utils.SCAN_UI_THROTTLE_MS
 import com.example.testresqmesh.core.utils.throttleLatest
@@ -21,8 +21,8 @@ import com.example.testresqmesh.core.utils.throttleLatest
 class CommunicationViewModel(
     private val useCases: com.example.testresqmesh.core.domain.usecase.MeshUseCases,
     private val locationClient: com.example.testresqmesh.core.location.LocationClient,
-    val sosRepository: com.example.testresqmesh.data.repository.SosRepository,
-    private val conversationDao: com.example.testresqmesh.data.local.dao.ConversationStateDao
+    private val sosRepository: com.example.testresqmesh.core.domain.repository.SosAlertRepository,
+    private val conversationRepository: com.example.testresqmesh.core.domain.repository.ConversationStateRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ChatUiState())
@@ -39,7 +39,8 @@ class CommunicationViewModel(
         .stateIn(viewModelScope, SharingStarted.Eagerly, null)
     val sosAlerts = sosRepository.alerts
     val allPublicMessages = useCases.observePublicMessages.allMessages
-    val conversationStates = conversationDao.observe().stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+    val conversationStates =
+        conversationRepository.observe().stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
     val sosMeshStatus = combine(useCases.observeIsOnline(), useCases.observeConnectedDevices(),
         useCases.observeBlockedDeviceNames()) { active, devices, blocked ->
         com.example.testresqmesh.feature.comms.model.sosMeshStatus(active, devices, blocked)
@@ -53,7 +54,7 @@ class CommunicationViewModel(
 
     val locationStatus: StateFlow<com.example.testresqmesh.core.location.LocationStatus> = locationClient.locationStatus
     
-    val incomingSosAlert = sosRepository.incoming.map { it?.asMessage() }
+    val incomingSosAlert = sosRepository.incoming.map { it?.toChatMessage() }
         .stateIn(viewModelScope, SharingStarted.Eagerly, null)
     
     fun clearSosAlert() {
@@ -66,8 +67,8 @@ class CommunicationViewModel(
         useCases.setChannel(channelId)
     }
 
-    fun draft(key: String, text: String) { viewModelScope.launch { conversationDao.draft(key, text) } }
-    fun read(key: String) { viewModelScope.launch { conversationDao.read(key, System.currentTimeMillis()) } }
+    fun draft(key: String, text: String) { viewModelScope.launch { conversationRepository.saveDraft(key, text) } }
+    fun read(key: String) { viewModelScope.launch { conversationRepository.markRead(key, System.currentTimeMillis()) } }
     fun unread(key: String, messages: List<com.example.testresqmesh.core.model.ChatMessage>): Int {
         val time = conversationStates.value.firstOrNull { it.conversationId == key }?.lastReadAt ?: 0L
         return messages.count { !it.isMine && it.timestamp > time }
@@ -76,6 +77,8 @@ class CommunicationViewModel(
         useCases.sendPublicMessage.conversation(kind, channel, sosId, text, audio)
         draft(com.example.testresqmesh.core.model.ConversationPolicy.key(kind, channel, sosId), "")
     }
+    fun isOwnSos(alert: com.example.testresqmesh.core.model.SosAlert): Boolean = sosRepository.isOwnSos(alert)
+    fun sosActivity(id: String) = sosRepository.sosActivity(id)
     fun silenceSos(id: String) { viewModelScope.launch { sosRepository.silence(id) } }
     fun endSos(id: String) {
         sosLocationGeneration++
