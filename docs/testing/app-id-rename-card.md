@@ -1,6 +1,6 @@
 # App ID rename card
 
-Prepared: 2026-10-17. Status: awaiting user phone run. Branch `chore/app-id-rename`.
+Prepared: 2026-10-17. Status: user-reported PASS on 2026-10-17 ("all passed") on vivo V2424, Samsung SM-P615 and OPPO CPH2127. APK `828FED8D…403E36` was built from `c269739`. adb confirmed the install and old-app removal on the Samsung and OPPO at about 15:32; the vivo was not connected at check time. Per-step notes, counts and the capture folder were not supplied. Branch `chore/app-id-rename`, fast-forwarded into `main`.
 
 The application ID, namespace and Kotlin packages changed from `com.example.testresqmesh` to `edu.cit.resqmesh` (CIT-U). The Room schema folder and the scripts were renamed with them. No logic changed. The golden wire-format tests confirm that no class names travel over BLE, so renamed builds interoperate with each other.
 
