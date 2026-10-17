@@ -17,12 +17,17 @@ import com.example.testresqmesh.core.model.toChatMessage
 import kotlinx.coroutines.launch
 import com.example.testresqmesh.core.utils.SCAN_UI_THROTTLE_MS
 import com.example.testresqmesh.core.utils.throttleLatest
+import com.example.testresqmesh.core.domain.usecase.messaging.PrivateSendResult
+import com.example.testresqmesh.core.domain.usecase.messaging.SendPrivateMessageUseCase
+import com.example.testresqmesh.core.domain.usecase.sos.RaiseSosUseCase
 
 class CommunicationViewModel(
     private val useCases: com.example.testresqmesh.core.domain.usecase.MeshUseCases,
     private val locationClient: com.example.testresqmesh.core.location.LocationClient,
     private val sosRepository: com.example.testresqmesh.core.domain.repository.SosAlertRepository,
-    private val conversationRepository: com.example.testresqmesh.core.domain.repository.ConversationStateRepository
+    private val conversationRepository: com.example.testresqmesh.core.domain.repository.ConversationStateRepository,
+    private val raiseSos: RaiseSosUseCase,
+    private val sendPrivate: SendPrivateMessageUseCase
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ChatUiState())
@@ -154,15 +159,10 @@ class CommunicationViewModel(
         val generation = ++sosLocationGeneration
         viewModelScope.launch {
             try {
-                val cached = locationClient.getLastKnownLocation()
-                val validCachedTime = cached?.time?.takeIf { it > 0 && (System.currentTimeMillis() - it) < 15 * 60 * 1000L }
-                val id = sosRepository.create(sosType, cached?.latitude, cached?.longitude, cached?.accuracy, validCachedTime)
+                val id = raiseSos(sosType)
                 onCreated(id)
-                locationClient.requestPinpointLocation { location ->
-                    if (generation == sosLocationGeneration && location != null) viewModelScope.launch {
-                        val validTime = location.time.takeIf { it > 0 } ?: System.currentTimeMillis()
-                        sosRepository.updateLocation(id, location.latitude, location.longitude, location.accuracy, validTime)
-                    }
+                raiseSos.refineLocation(id, isCurrent = { generation == sosLocationGeneration }) { update ->
+                    viewModelScope.launch { update() }
                 }
             } catch (e: Exception) {
                 if (e is kotlinx.coroutines.CancellationException) throw e
@@ -180,12 +180,11 @@ class CommunicationViewModel(
     }
 
     fun sendPrivateMessage(targetName: String, text: String, imageBase64: String? = null, audioBase64: String? = null): Boolean {
-        val sent = useCases.sendPrivateMessage(targetName, text, imageBase64, audioBase64)
-        if (!sent) {
-            if (useCases.hasPendingPublicKeyChange(targetName)) _pendingKeyVerification.tryEmit(targetName)
-            else reportPrivateSendFailure()
+        return when (sendPrivate(targetName, text, imageBase64, audioBase64)) {
+            PrivateSendResult.Sent -> true
+            PrivateSendResult.NeedsKeyVerification -> { _pendingKeyVerification.tryEmit(targetName); false }
+            PrivateSendResult.Failed -> { reportPrivateSendFailure(); false }
         }
-        return sent
     }
 
     fun acceptPendingPublicKeyChange(targetName: String): Boolean = useCases.acceptPendingPublicKeyChange(targetName)

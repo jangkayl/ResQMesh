@@ -6,6 +6,7 @@ import com.example.testresqmesh.core.domain.repository.LocalUserRepository
 import com.example.testresqmesh.core.domain.repository.MeshNodeRepository
 import com.example.testresqmesh.core.domain.repository.SosAlertRepository
 import com.example.testresqmesh.core.domain.usecase.*
+import com.example.testresqmesh.core.domain.usecase.sos.RaiseSosUseCase
 import com.example.testresqmesh.core.location.LocationClient
 import com.example.testresqmesh.core.location.LocationClientFactory
 import com.example.testresqmesh.core.map.download.AndroidConnectivityProvider
@@ -212,6 +213,8 @@ val domainModule = module {
             observeBlockedDeviceNames = ObserveBlockedDeviceNamesUseCase(get())
         )
     }
+    single { RaiseSosUseCase(get(), get()) }
+    single { com.example.testresqmesh.core.domain.usecase.messaging.SendPrivateMessageUseCase(get()) }
 }
 
 /** ViewModels. */
@@ -223,7 +226,9 @@ val viewModelModule = module {
             useCases = get(),
             locationClient = get(),
             sosRepository = get(),
-            conversationRepository = get()
+            conversationRepository = get(),
+            raiseSos = get(),
+            sendPrivate = get()
         )
     }
     viewModel { WalkieTalkieViewModel(useCases = get(), mediaHelper = get(), liveAudioEngine = get()) }
