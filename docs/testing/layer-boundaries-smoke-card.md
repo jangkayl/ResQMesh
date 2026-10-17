@@ -1,6 +1,6 @@
 # Layer boundaries smoke card
 
-Prepared: 2026-10-17. Status: awaiting user phone run. Branch `refactor/layer-boundaries` ([plan](../plans/layer-boundaries.md)).
+Prepared: 2026-10-17. Status: user-reported PASS on 2026-10-17 ("all passed") on vivo V2424 (API 34), Samsung SM-P615 (API 33) and OPPO CPH2127 (API 31), installed at 14:46–14:47; APK `EB2A86F9…DFE4222` from source `62c62fc` (later commits changed only docs and scripts). Per-step notes, counts and the capture folder were not supplied, and the optional relay step does not close DELIVERY-01. Branch `refactor/layer-boundaries` ([plan](../plans/layer-boundaries.md)).
 
 This change is meant to leave runtime behavior unchanged. Feature screens now read `core/model` copies of Room rows through core repository interfaces and data adapters. Incident rules moved to `core/domain/incident`. SOS raise and private send moved into use cases, the SOS alarm is driven through a core notifier, and location clients come from a factory. No BLE, routing, crypto, wire or Room schema code changed. The highest risks are:
 - Koin wiring at startup

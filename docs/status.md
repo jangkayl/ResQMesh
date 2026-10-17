@@ -30,7 +30,7 @@ Behavior and source ownership are in [architecture](architecture.md); accepted p
 
 Basic block, incident, SOS and recovery checks have user-reported successes; their adversarial, load and repeated cases remain pending, not known defects. See the [physical checklist](testing/physical-reliability-tests.md).
 
-**Layer boundaries / P2 subset** (branch `refactor/layer-boundaries`, user-approved 2026-10-17): behavior-neutral mappers, interfaces, use cases and a zero allowlist ([plan](plans/layer-boundaries.md)). Local checks and review pass; run the [smoke card](testing/layer-boundaries-smoke-card.md) before merging.
+**Layer boundaries / P2 subset** (branch `refactor/layer-boundaries`, user-approved 2026-10-17): behavior-neutral mappers, interfaces, use cases and a zero allowlist ([plan](plans/layer-boundaries.md)). Local checks and review pass; the user reported the [smoke card](testing/layer-boundaries-smoke-card.md) passing on three phones on 2026-10-17. Merge waits for explicit instruction.
 
 **Batch C hygiene / Phase 0** (branch `refactor/batch-c-hygiene`, stacked on Batch A): golden wire/table tests, leftover cleanup and archiving, catalog-only versions, Koin root in `app/di` split by layer, `core/utils` regrouped, and CI gates (androidTest compile, detekt baseline, boundary check). Local checks pass; the user reported all [smoke card](testing/batch-c-hygiene-smoke-card.md) steps working on 2026-10-17 (models and counts not supplied).
 

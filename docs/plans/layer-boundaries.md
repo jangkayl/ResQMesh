@@ -1,6 +1,6 @@
 # Layer boundaries (P2 subset)
 
-Last reviewed: 2026-10-17. Status: active plan on `refactor/layer-boundaries` (from `perf/startup-lag`). The user approved it on 2026-10-17 to start before the demo freeze, on its own branch. The demo candidate stays on the existing stack until this branch passes its phone card.
+Last reviewed: 2026-10-17. Status: complete pending merge on `refactor/layer-boundaries` (from `perf/startup-lag`); smoke card user-reported PASS on 2026-10-17. The user approved it on 2026-10-17 to start before the demo freeze, on its own branch. The demo candidate stays on the existing stack until this branch passes its phone card.
 
 This is the behavior-neutral subset of P2 in the [revision plan](code-architecture-revision.md). Deferred to later P2 work: the gateway `SharedFlow<GatewayEvent>`, `WhileSubscribed`, and the typed connection status.
 
