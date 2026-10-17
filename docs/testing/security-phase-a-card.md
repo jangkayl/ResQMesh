@@ -1,6 +1,6 @@
 # Security Phase A card
 
-Prepared: 2026-10-17. Status: UNTESTED. Covers Phase A of the [security hardening plan](../plans/security-hardening.md): input limits, the received-media cap, the notification router, developer mode in debug builds only, and release R8/backup changes. No wire format changes, so Phase A builds interoperate with current `main` builds.
+Prepared: 2026-10-17. Status: user-reported all steps PASS on 2026-10-17 with release APK `B84ACB1B…EA96` (`42f1660`) on Samsung SM-P615, OPPO CPH2127 and vivo V2424; counts and captures not supplied. Covers Phase A of the [security hardening plan](../plans/security-hardening.md): input limits, the received-media cap, the notification router, developer mode in debug builds only, and release R8/backup changes. No wire format changes, so Phase A builds interoperate with current `main` builds.
 
 ## Build identity
 
