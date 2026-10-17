@@ -35,6 +35,7 @@ data class IncidentLocationSnapshot(
     val accuracyMeters: Float?
 )
 
+/** Mirrors IncidentEntity 1:1; status stays a String so old rows never fail enum decoding. */
 data class Incident(
     val incidentId: String,
     val creatorId: String,
@@ -47,11 +48,31 @@ data class Incident(
     val longitude: Double?,
     val locationCapturedAt: Long?,
     val locationAccuracyMeters: Float?,
-    val status: IncidentState,
+    val status: String,
     val primaryResponderId: String?,
     val primaryResponderName: String?,
     val version: Long,
     val createdAt: Long,
     val updatedAt: Long,
-    val title: String = ""
+    val workflowVersion: Int,
+    val reporterSigningKey: String?,
+    val selectionId: String?,
+    val selectionOfferId: String?,
+    val selectionOfferRevision: Long?,
+    val selectedHelperKey: String?,
+    val selectionConfirmedAt: Long?,
+    val title: String
+)
+
+/** Mirrors IncidentOfferEntity 1:1. */
+data class IncidentOffer(
+    val offerId: String,
+    val incidentId: String,
+    val helperKey: String,
+    val helperNodeId: String,
+    val helperName: String,
+    val note: String,
+    val revision: Long,
+    val withdrawn: Boolean,
+    val updatedAt: Long
 )

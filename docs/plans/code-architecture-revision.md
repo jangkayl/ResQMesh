@@ -50,7 +50,7 @@ These had no obvious current coverage. Port them as real tests in P2:
 - Exit: golden tests updated intentionally, and a mixed-version phone card.
 - X25519/Ed25519 is the long-term direction ([D24](../decisions.md)).
 
-**P2 Data boundary.**
+**P2 Data boundary.** The behavior-neutral subset (interfaces, mappers, use cases and a zero allowlist) is in [layer boundaries](layer-boundaries.md), started 2026-10-17. The gateway events and flow-sharing items stay deferred.
 - Add `MeshRepository`, `IncidentRepository` and `SosRepository` interfaces, plus entity→`core/model` mappers. Shrink the boundary allowlist to zero.
 - Add a `ConversationStateStore` in place of the ViewModel DAO.
 - Replace gateway `on…` slots with `SharedFlow<GatewayEvent>`.

@@ -34,16 +34,18 @@ enum class EventType {
     SAFETY_STATUS_CHANGED
 }
 
-@Serializable
+/** Mirrors DomainEventEntity 1:1; type and status fields stay Strings as stored. */
 data class DomainEvent(
     val eventId: String,
     val entityId: String,
-    val entityType: EntityType,
-    val eventType: EventType,
+    val entityType: String,
+    val eventType: String,
     val actorId: String,
-    val actorName: String = "",
+    val actorName: String,
     val logicalVersion: Long,
     val timestamp: Long,
-    val payloadJson: String = "{}",
-    val signature: String? = null
+    val payloadJson: String,
+    val signature: String?,
+    val applied: Boolean,
+    val validationStatus: String
 )
