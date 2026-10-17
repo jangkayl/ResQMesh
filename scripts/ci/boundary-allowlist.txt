@@ -32,6 +32,5 @@ feature/incident/viewmodel/IncidentViewModel.kt -> com.example.testresqmesh.data
 feature/incident/viewmodel/IncidentViewModel.kt -> com.example.testresqmesh.data.local.entity.IncidentEntity
 feature/incident/viewmodel/IncidentViewModel.kt -> com.example.testresqmesh.data.local.entity.IncidentOfferEntity
 feature/incident/viewmodel/IncidentViewModel.kt -> com.example.testresqmesh.data.local.entity.UserEntity
-feature/sos/alert/SosAlertController.kt -> com.example.testresqmesh.data.local.entity.SosAlertEntity
 feature/sos/ui/components/SosThreadHeader.kt -> com.example.testresqmesh.data.local.entity.SosAlertEntity
 feature/sos/ui/hub/SosDispatchHeader.kt -> com.example.testresqmesh.data.local.entity.SosAlertEntity

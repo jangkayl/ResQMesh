@@ -4,18 +4,18 @@ import android.content.Context
 import android.os.*
 import com.example.testresqmesh.core.audio.MediaHelper
 import com.example.testresqmesh.core.notification.NotificationHelper
-import com.example.testresqmesh.data.local.entity.SosAlertEntity
-import com.example.testresqmesh.data.repository.SosAlertSink
+import com.example.testresqmesh.core.model.SosAlert
+import com.example.testresqmesh.core.notification.SosAlertNotifier
 import kotlinx.coroutines.*
 
 /** App/session owner, independent of visible Compose screens. Timers are per alert. */
 class SosAlertController(context: Context, private val media: MediaHelper,
-    private val notifications: NotificationHelper, private val scope: CoroutineScope) : SosAlertSink {
+    private val notifications: NotificationHelper, private val scope: CoroutineScope) : SosAlertNotifier {
     private val vibrator = if (Build.VERSION.SDK_INT >= 31)
         (context.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as VibratorManager).defaultVibrator
         else @Suppress("DEPRECATION") (context.getSystemService(Context.VIBRATOR_SERVICE) as Vibrator)
     private val ringing = mutableMapOf<String, Job>()
-    override fun received(alert: SosAlertEntity) { scope.launch(Dispatchers.Main.immediate) {
+    override fun received(alert: SosAlert) { scope.launch(Dispatchers.Main.immediate) {
         if (alert.locallySilenced || alert.ended || ringing.containsKey(alert.sosId)) return@launch
         notifications.showSosEmergencyNotification(alert.originName, "${alert.emergencyType} emergency", alert.sosId)
         media.playEmergencySiren()

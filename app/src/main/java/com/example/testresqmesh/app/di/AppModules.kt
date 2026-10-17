@@ -20,6 +20,7 @@ import com.example.testresqmesh.core.service.MeshSessionController
 import com.example.testresqmesh.core.audio.LiveAudioEngine
 import com.example.testresqmesh.core.audio.MediaHelper
 import com.example.testresqmesh.core.notification.NotificationHelper
+import com.example.testresqmesh.core.notification.SosAlertNotifier
 import com.example.testresqmesh.feature.sos.alert.SosAlertController
 import com.example.testresqmesh.data.local.AppDatabase
 import com.example.testresqmesh.data.location.DefaultLocationClient
@@ -46,6 +47,7 @@ import com.example.testresqmesh.data.repository.adapter.IncidentFeedRepositoryAd
 import com.example.testresqmesh.data.repository.adapter.LocalUserRepositoryAdapter
 import com.example.testresqmesh.data.repository.adapter.MeshNodeRepositoryAdapter
 import com.example.testresqmesh.data.repository.adapter.SosAlertRepositoryAdapter
+import com.example.testresqmesh.data.repository.adapter.SosAlertSinkAdapter
 import com.example.testresqmesh.feature.comms.viewmodel.CommunicationViewModel
 import com.example.testresqmesh.feature.comms.viewmodel.WalkieTalkieViewModel
 import com.example.testresqmesh.feature.incident.viewmodel.IncidentViewModel
@@ -132,9 +134,10 @@ val repositoryModule = module {
     single<IdentityProvider> { get<LocalIdentityManager>() }
     single<IncidentEventSigning> { KeystoreIncidentEventSigning() }
     single<SosStore> { RoomSosStore(get()) }
-    single<SosAlertSink> {
+    single<SosAlertNotifier> {
         SosAlertController(androidContext(), get(), get(), get<AppCoroutineScope>().scope)
     }
+    single<SosAlertSink> { SosAlertSinkAdapter(get()) }
     single(createdAtStart = true) {
         SosRepository(
             store = get(),
