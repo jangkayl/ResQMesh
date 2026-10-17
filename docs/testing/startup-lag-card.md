@@ -1,6 +1,6 @@
 # Startup lag card (PERF-01)
 
-Prepared: 2026-10-17. Status: not yet run. Local checks pass (assemble, all JVM tests, Lint, androidTest compile, detekt, boundary, docs). The changes are committed as `3b234bf` on `perf/startup-lag`. Debug APKs built 2026-10-17 into `build/perf01/`: before `65435cd` `1A734DAF11D53997576C9D0C639C89498DFA1FA19C4CA5B4E5F1DF9D407BA9D3`, after `3b234bf` `5846FAD2CBE89851760C70107B8DA45BD41AF38745A9087107FB76BAFFDD6170`. The pre-commit debug APK `F06E5C84…` is superseded.
+Prepared: 2026-10-17. Status: steps 1–3 measured by the agent over adb on one phone (results in [validation](../validation.md)). Steps 4–6 still need the user, and step 5 needs phone B. Local checks pass (assemble, all JVM tests, Lint, androidTest compile, detekt, boundary, docs). The changes are committed as `3b234bf` on `perf/startup-lag`. Debug APKs built 2026-10-17 into `build/perf01/`: before `65435cd` `1A734DAF11D53997576C9D0C639C89498DFA1FA19C4CA5B4E5F1DF9D407BA9D3`, after `3b234bf` `5846FAD2CBE89851760C70107B8DA45BD41AF38745A9087107FB76BAFFDD6170`. The pre-commit debug APK `F06E5C84…` is superseded.
 
 The user reports that the app feels laggy when opened. Source review found main-thread work at startup and during the first screens. Changes:
 - Splash: 3 s fixed wait cut to 0.8 s. The pulse-border alpha is now read in the draw phase. The logo moved to `drawable-nodpi`.
