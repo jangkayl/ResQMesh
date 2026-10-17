@@ -20,8 +20,8 @@ Use phone A (the one where lag was noticed) and phone B, which stays advertising
 
 ## Steps and expected results
 
-1. **Cold start ×3:** run `adb shell am force-stop com.example.testresqmesh`, then `adb shell am start -W -n com.example.testresqmesh/.MainActivity`. Record `TotalTime`. Expect about 2 s less than before, mostly from the splash, and a smoother splash animation.
-2. **Home jank:** run `adb shell dumpsys gfxinfo com.example.testresqmesh reset`, idle on Home for 30 s with B nearby, then run `adb shell dumpsys gfxinfo com.example.testresqmesh`. Record the Janky frames %. Expect it to be lower than before.
+1. **Cold start ×3:** run `adb shell am force-stop edu.cit.resqmesh`, then `adb shell am start -W -n edu.cit.resqmesh/.MainActivity`. Record `TotalTime`. Expect about 2 s less than before, mostly from the splash, and a smoother splash animation.
+2. **Home jank:** run `adb shell dumpsys gfxinfo edu.cit.resqmesh reset`, idle on Home for 30 s with B nearby, then run `adb shell dumpsys gfxinfo edu.cit.resqmesh`. Record the Janky frames %. Expect it to be lower than before.
 3. **Skipped frames:** in the capture, count `Choreographer` `Skipped N frames` lines during launch. Expect fewer, smaller bursts.
 4. **Identity:** open Incidents. Expect the identity and signing controls to leave loading normally. A first-install run should also complete identity setup.
 5. **Mesh regression:** A and B reach READY. Private text A→B is DELIVERED. SOS A→B alarms on B. Radar shows B; the list may update up to 0.4 s later than before.

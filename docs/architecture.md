@@ -72,7 +72,7 @@ MeshSessionController owns start/stop. Opt-in MeshForegroundService is a non-sti
 
 [Validation](validation.md) records user-reported direct/relay, recovery, feature and offline-map successes. Intermittent A-to-D loss remains [DELIVERY-01](status.md); scale, latency, callback/load, security and OEM/battery claims remain bounded.
 
-Paths below are under `app/src/main/java/com/example/testresqmesh/`:
+Paths below are under `app/src/main/java/edu/cit/resqmesh/`:
 
 | Area | Source |
 | --- | --- |

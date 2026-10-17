@@ -109,7 +109,7 @@ ResQMesh/
 │       ├── main/
 │       │   ├── AndroidManifest.xml
 │       │   ├── res/                     # Resources, icons and branding
-│       │   └── java/com/example/testresqmesh/
+│       │   └── java/edu/cit/resqmesh/
 │       │       ├── MainActivity.kt      # Android activity entry point
 │       │       ├── ResqMeshApplication.kt
 │       │       ├── app/navigation/      # App composition and destinations

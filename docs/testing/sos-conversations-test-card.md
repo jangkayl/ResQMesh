@@ -22,8 +22,8 @@ On 2026-10-02, debug build, Android-test build, 248 unit tests, Lint (zero error
 adb -s emulator-5554 install -r app/build/outputs/apk/debug/app-debug.apk
 adb -s emulator-5554 install -r app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
 adb -s emulator-5554 shell settings put secure show_ime_with_hard_keyboard 1
-adb -s emulator-5554 shell am start -W -n com.example.testresqmesh/.MainActivity
-adb -s emulator-5554 shell am instrument -w -r -e class "com.example.testresqmesh.data.local.AppDatabaseMigrationTest,com.example.testresqmesh.feature.sos.SosNavigationTest" com.example.testresqmesh.test/androidx.test.runner.AndroidJUnitRunner
+adb -s emulator-5554 shell am start -W -n edu.cit.resqmesh/.MainActivity
+adb -s emulator-5554 shell am instrument -w -r -e class "edu.cit.resqmesh.data.local.AppDatabaseMigrationTest,edu.cit.resqmesh.feature.sos.SosNavigationTest" edu.cit.resqmesh.test/androidx.test.runner.AndroidJUnitRunner
 ```
 
 Require `OK (11 tests)`; ADB exit zero alone does not establish a pass. A cold run was killed for low memory. The successful final run used 3 GiB emulator RAM, stopped Gradle daemons, and warmed the app before instrumentation. Test windows match the app's edge-to-edge/adjustResize behavior; soft keyboard display is enabled explicitly. Optional screenshots use UIAutomation, avoiding a PixelCopy timeout seen in an earlier attempt. Espresso 3.7.0/AndroidX JUnit 1.3.0 support API 37. Captures: `app/build/sos-ux-final-checks.log`, `app/build/sos-ux-instrumentation-final.log`, `app/build/sos-ux-visuals/`. Recording gestures, audible alerts, and BLE convergence still require the phone steps below.

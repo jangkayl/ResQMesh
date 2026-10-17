@@ -36,7 +36,7 @@ $repoRoot = (Resolve-Path "$PSScriptRoot\..\..").Path
 $apkPath = "$repoRoot\app\build\outputs\apk\debug\app-debug.apk"
 # Read the applicationId from Gradle so a package rename needs no script change.
 $gradleFile = "$repoRoot\app\build.gradle.kts"
-$package = "com.example.testresqmesh"
+$package = "edu.cit.resqmesh"
 if (Test-Path $gradleFile) {
     $idMatch = Select-String -LiteralPath $gradleFile -Pattern 'applicationId\s*=\s*"([^"]+)"' | Select-Object -First 1
     if ($idMatch) { $package = $idMatch.Matches[0].Groups[1].Value }

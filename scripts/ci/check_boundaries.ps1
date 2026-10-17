@@ -6,8 +6,8 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $root = (Resolve-Path -LiteralPath $RepositoryRoot).Path
-$base = 'com.example.testresqmesh'
-$srcRoot = Join-Path $root 'app/src/main/java/com/example/testresqmesh'
+$base = 'edu.cit.resqmesh'
+$srcRoot = Join-Path $root 'app/src/main/java/edu/cit/resqmesh'
 $allowlistPath = Join-Path $PSScriptRoot 'boundary-allowlist.txt'
 
 # Each rule: name, source directory prefix (relative to the package root), forbidden import prefixes.

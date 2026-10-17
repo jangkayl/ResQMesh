@@ -128,7 +128,7 @@ When ready to produce the official signed release artifacts:
     -PackageVersion 1
 ```
 * Extracts package on developer PC (avoiding device-side `unzip` limitations).
-* Pushes files into app sandbox storage via `adb` and `run-as com.example.testresqmesh`.
+* Pushes files into app sandbox storage via `adb` and `run-as edu.cit.resqmesh`.
 * Writes `active_package.json` pointer file.
 * Allows verification of `SosMapScreen` and `OfflineMapSettingsScreen` with internet unavailable. Physical installation/ADB writes require explicit user direction under the repository phone boundary. This synchronization ran none of these commands.
 

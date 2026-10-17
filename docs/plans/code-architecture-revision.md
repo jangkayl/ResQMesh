@@ -75,7 +75,7 @@ These had no obvious current coverage. Port them as real tests in P2:
 
 **P5 Release and dependencies.**
 - R8 with keep rules (serialization, Room, MapLibre) and release signing from environment or local properties.
-- applicationId rename: phones reinstall clean and keys reset.
+- applicationId rename: done early as `edu.cit.resqmesh` on 2026-10-17 ([card](../testing/app-id-rename-card.md)); phones reinstall clean and keys reset.
 - Upgrade one library family per commit: lifecycle/activity/core, then Room 2.7+, then Koin 4.
 - Java 17.
 - Isolated ktlint formatting commit.

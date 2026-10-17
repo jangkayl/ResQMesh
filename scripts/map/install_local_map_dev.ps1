@@ -5,7 +5,7 @@
     Zero-network developer installation helper:
     1. Extracts package zip on the host machine (avoids relying on missing device-side unzip binaries).
     2. Pushes extracted package tree and manifest to device staging in /data/local/tmp/.
-    3. Copies assets into the app sandbox via run-as com.example.testresqmesh.
+    3. Copies assets into the app sandbox via run-as edu.cit.resqmesh.
     4. Writes active_package.json pointer file for immediate offline map activation.
     5. Enables testing SosMapScreen and OfflineMapSettingsScreen in Airplane Mode with zero network calls.
 .PARAMETER PackageZip
@@ -73,7 +73,7 @@ function Invoke-AdbCommand {
     & $adbCmd -s $targetDevice @cmdArgs
 }
 
-$pkgName = "com.example.testresqmesh"
+$pkgName = "edu.cit.resqmesh"
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 
 # 2. Extract package on host machine to avoid device-side unzip dependencies

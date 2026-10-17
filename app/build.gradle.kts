@@ -11,7 +11,7 @@ ksp {
 }
 
 android {
-    namespace = "com.example.testresqmesh"
+    namespace = "edu.cit.resqmesh"
     compileSdk {
         version = release(36) {
             minorApiLevel = 1
@@ -19,7 +19,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.example.testresqmesh"
+        applicationId = "edu.cit.resqmesh"
         minSdk = 24
         targetSdk = 36
         versionCode = 2

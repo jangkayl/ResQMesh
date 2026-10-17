@@ -44,7 +44,7 @@
     <ID>ComplexCondition:MeshInboundMessages.kt$MeshInboundMessages$p.senderNodeId.isBlank() || p.senderNodeId == networkManager.myNodeId || p.id.length !in 1..100 || p.senderName.length !in 1..160 || p.text.length &gt; 8192 || p.isPrivate || p.isEncrypted || p.conversationKind !in setOf("COMMUNITY", "RADIO", "SOS") || p.ttl !in 1..10 || p.relayHopCount !in 0..10</ID>
     <ID>ComplexCondition:MeshOutboundDelivery.kt$MeshOutboundDelivery$targetName == null &amp;&amp; (message.conversationKind.startsWith("LEGACY_") || message.isSOS || (message.conversationKind == "SOS" &amp;&amp; sosRepository?.canReply(message.sosId) != true))</ID>
     <ID>ComplexCondition:MeshPeerCoordinator.kt$MeshPeerCoordinator$existingById == null &amp;&amp; !NodeIdentity.isPlaceholder(device.name) &amp;&amp; (existingByIdentity == null || !networkManager.hasLiveSocket(existingByIdentity.endpointId))</ID>
-    <ID>ComplexCondition:MeshPeerCoordinator.kt$MeshPeerCoordinator$state == com.example.testresqmesh.core.network.bluetooth.MeshTransportState.OFFLINE || state == com.example.testresqmesh.core.network.bluetooth.MeshTransportState.BLUETOOTH_OFF || state == com.example.testresqmesh.core.network.bluetooth.MeshTransportState.PERMISSION_REQUIRED || state == com.example.testresqmesh.core.network.bluetooth.MeshTransportState.ERROR</ID>
+    <ID>ComplexCondition:MeshPeerCoordinator.kt$MeshPeerCoordinator$state == edu.cit.resqmesh.core.network.bluetooth.MeshTransportState.OFFLINE || state == edu.cit.resqmesh.core.network.bluetooth.MeshTransportState.BLUETOOTH_OFF || state == edu.cit.resqmesh.core.network.bluetooth.MeshTransportState.PERMISSION_REQUIRED || state == edu.cit.resqmesh.core.network.bluetooth.MeshTransportState.ERROR</ID>
     <ID>ComplexCondition:NativeBleManager.kt$NativeBleManager$!force &amp;&amp; macAddress != null &amp;&amp; holder != null &amp;&amp; holder != macAddress</ID>
     <ID>ComplexCondition:NativeInboundPipeline.kt$NativeInboundPipeline$!hasReadyEndpoint(endpointId) || !store.links.isIdentityAdmitted(endpointId) || isDeviceBlocked(store.connectedEndpointNames[endpointId].orEmpty()) || peerTransferVersions[peer] != ReliableMeshTransfers.VERSION || payload.targetNodeId.isNotBlank() &amp;&amp; !payload.targetNodeId.equals(myNodeId, true)</ID>
     <ID>ComplexCondition:NativeOutboundDispatcher.kt$NativeOutboundDispatcher$!id.equals(nodeId, true) || !hasReadyEndpoint(endpoint) || NodeIdentity.isPlaceholder(name) || isDeviceBlocked(name)</ID>
@@ -119,13 +119,13 @@
     <ID>CyclomaticComplexMethod:LegacyIncidentProjection.kt$LegacyIncidentProjection$suspend fun applyLegacyProjection(event: DomainEventEntity): Boolean</ID>
     <ID>CyclomaticComplexMethod:LegacyIncidentSync.kt$LegacyIncidentSync$suspend fun handleSyncRequest(endpointId: String, text: String)</ID>
     <ID>CyclomaticComplexMethod:MainActivity.kt$MainActivity$override fun onCreate(savedInstanceState: Bundle?)</ID>
-    <ID>CyclomaticComplexMethod:MainContainerScreen.kt$@Composable fun MainContainerScreen( setupViewModel: SetupViewModel, radarViewModel: RadarViewModel, commsViewModel: CommunicationViewModel, walkieTalkieViewModel: com.example.testresqmesh.feature.comms.viewmodel.WalkieTalkieViewModel, mediaHelper: MediaHelper, appearance: AppAppearance, onAppearanceSelected: (AppAppearance) -&gt; Unit, initialChatNode: String? = null, onClearInitialChatNode: (() -&gt; Unit)? = null, initialViewMap: Boolean = false, initialSosSender: String? = null, initialSosText: String? = null, initialSosId: String? = null, onClearInitialViewMap: (() -&gt; Unit)? = null )</ID>
+    <ID>CyclomaticComplexMethod:MainContainerScreen.kt$@Composable fun MainContainerScreen( setupViewModel: SetupViewModel, radarViewModel: RadarViewModel, commsViewModel: CommunicationViewModel, walkieTalkieViewModel: edu.cit.resqmesh.feature.comms.viewmodel.WalkieTalkieViewModel, mediaHelper: MediaHelper, appearance: AppAppearance, onAppearanceSelected: (AppAppearance) -&gt; Unit, initialChatNode: String? = null, onClearInitialChatNode: (() -&gt; Unit)? = null, initialViewMap: Boolean = false, initialSosSender: String? = null, initialSosText: String? = null, initialSosId: String? = null, onClearInitialViewMap: (() -&gt; Unit)? = null )</ID>
     <ID>CyclomaticComplexMethod:MapLibreMapCanvas.kt$@Composable internal fun MapLibreLocalMapContainer( alertMessage: ChatMessage, state: SosMapViewState.MapReady, onBack: () -&gt; Unit, modifier: Modifier = Modifier )</ID>
     <ID>CyclomaticComplexMethod:MapPackageDownloader.kt$MapPackageDownloader$fun downloadAndInstallPackage( manifestUrl: String, signatureUrl: String, maintainerPublicKey: ByteArray, requireWifi: Boolean = true ): Flow&lt;MapPackageStatus&gt;</ID>
     <ID>CyclomaticComplexMethod:MapStyleValidator.kt$MapStyleValidator$fun resolveStyleForRuntime(packageDir: File, styleFile: File): String</ID>
     <ID>CyclomaticComplexMethod:MapStyleValidator.kt$MapStyleValidator$fun validate(packageDir: File, styleFile: File): ValidationResult</ID>
     <ID>CyclomaticComplexMethod:MeshInboundMessages.kt$MeshInboundMessages$fun onNetworkMessageReceived(endpointId: String, msgId: String, sender: String, text: String, isPrivate: Boolean, isSystem: Boolean, img: String?, audio: String?, lat: Double?, lng: Double?, medium: String, routePath: List&lt;String&gt;, channelId: String): Unit</ID>
-    <ID>CyclomaticComplexMethod:MeshInboundMessages.kt$MeshInboundMessages$private suspend fun receiveConversation(endpoint: String, p: com.example.testresqmesh.core.network.MeshPayload)</ID>
+    <ID>CyclomaticComplexMethod:MeshInboundMessages.kt$MeshInboundMessages$private suspend fun receiveConversation(endpoint: String, p: edu.cit.resqmesh.core.network.MeshPayload)</ID>
     <ID>CyclomaticComplexMethod:MeshOutboundDelivery.kt$MeshOutboundDelivery$private fun awaitPrivateReceipt(messageId: String)</ID>
     <ID>CyclomaticComplexMethod:MeshOutboundDelivery.kt$MeshOutboundDelivery$private suspend fun flushOutbox()</ID>
     <ID>CyclomaticComplexMethod:MeshPeerCoordinator.kt$MeshPeerCoordinator$fun onNetworkDeviceConnected(device: ConnectedDevice): Unit</ID>
@@ -164,7 +164,7 @@
     <ID>CyclomaticComplexMethod:SosSyncCoordinator.kt$SosSyncCoordinator$private suspend fun reconcile(l: Link)</ID>
     <ID>CyclomaticComplexMethod:SosThreadHeader.kt$@Composable internal fun CompactSosHeader( alert: SosAlert, categoryColor: Color, categoryIcon: ImageVector, onMap: () -&gt; Unit, onEnd: () -&gt; Unit, onSilence: () -&gt; Unit, onActivity: () -&gt; Unit, isOwner: Boolean )</ID>
     <ID>CyclomaticComplexMethod:SosThreadHeader.kt$@OptIn(ExperimentalLayoutApi::class) @Composable internal fun ExpandedSosHeader( alert: SosAlert, categoryColor: Color, categoryIcon: ImageVector, onMap: () -&gt; Unit, onEnd: () -&gt; Unit, onSilence: () -&gt; Unit, onActivity: () -&gt; Unit, isOwner: Boolean )</ID>
-    <ID>CyclomaticComplexMethod:SosThreadScreen.kt$@Composable @OptIn(ExperimentalLayoutApi::class) fun SosThreadScreen( vm: CommunicationViewModel, media: MediaHelper, id: String, onBack: () -&gt; Unit, onMap: (com.example.testresqmesh.core.model.ChatMessage) -&gt; Unit )</ID>
+    <ID>CyclomaticComplexMethod:SosThreadScreen.kt$@Composable @OptIn(ExperimentalLayoutApi::class) fun SosThreadScreen( vm: CommunicationViewModel, media: MediaHelper, id: String, onBack: () -&gt; Unit, onMap: (edu.cit.resqmesh.core.model.ChatMessage) -&gt; Unit )</ID>
     <ID>CyclomaticComplexMethod:TacticalHelpOfferSheet.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun TacticalHelpOfferSheet( incidentTitle: String, incidentType: String, initialNote: String, isEditing: Boolean, actionBusy: Boolean, onDismiss: () -&gt; Unit, onSubmit: (String) -&gt; Unit, onWithdraw: (() -&gt; Unit)? = null )</ID>
     <ID>CyclomaticComplexMethod:TacticalHelperOfferCard.kt$@Composable fun TacticalHelperOfferCard( helper: HelperPresentation, onChoose: (() -&gt; Unit)? = null, onEdit: (() -&gt; Unit)? = null, onWithdraw: (() -&gt; Unit)? = null, onDirectChat: (() -&gt; Unit)? = null, modifier: Modifier = Modifier )</ID>
     <ID>CyclomaticComplexMethod:TacticalIncidentCard.kt$@OptIn(ExperimentalLayoutApi::class) @Composable fun TacticalIncidentCard( incident: Incident, onClick: () -&gt; Unit, modifier: Modifier = Modifier, isMine: Boolean = false, isAssignedToMe: Boolean = false, activeOffersCount: Int = 0, hasMyOffer: Boolean = false, confirmedHelperName: String? = null, onAcknowledge: (() -&gt; Unit)? = null, onAssign: (() -&gt; Unit)? = null, onStartResponse: (() -&gt; Unit)? = null, onViewLocation: ((Double, Double) -&gt; Unit)? = null )</ID>
@@ -267,8 +267,8 @@
     <ID>FunctionNaming:IncidentTypeFields.kt$@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class) @Composable internal fun IncidentUrgencyField( selectedUrgency: String?, showErrors: Boolean, urgencyFocusRequester: FocusRequester, onSelectUrgency: (String) -&gt; Unit )</ID>
     <ID>FunctionNaming:LocationAcquisitionBanner.kt$@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class) @Composable internal fun LocationAcquisitionBanner( isAcquiringLocation: Boolean )</ID>
     <ID>FunctionNaming:MainApplicationOverlays.kt$@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class) @Composable internal fun BoxScope.MainApplicationOverlays( isDeveloperMode: Boolean, hasIncomingSos: Boolean, hasMapAlert: Boolean, hasOwnSos: Boolean, isSOSActive: Boolean, publicSendSnackbar: androidx.compose.material3.SnackbarHostState, onToggleTerminal: () -&gt; Unit, onToggleRadar: () -&gt; Unit, onOpenRadar: () -&gt; Unit )</ID>
-    <ID>FunctionNaming:MainContainerScreen.kt$@Composable fun MainContainerScreen( setupViewModel: SetupViewModel, radarViewModel: RadarViewModel, commsViewModel: CommunicationViewModel, walkieTalkieViewModel: com.example.testresqmesh.feature.comms.viewmodel.WalkieTalkieViewModel, mediaHelper: MediaHelper, appearance: AppAppearance, onAppearanceSelected: (AppAppearance) -&gt; Unit, initialChatNode: String? = null, onClearInitialChatNode: (() -&gt; Unit)? = null, initialViewMap: Boolean = false, initialSosSender: String? = null, initialSosText: String? = null, initialSosId: String? = null, onClearInitialViewMap: (() -&gt; Unit)? = null )</ID>
-    <ID>FunctionNaming:MainDestinationContent.kt$@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class) @Composable internal fun MainDestinationContent( targetScreen: ResQDestination, setupViewModel: SetupViewModel, radarViewModel: RadarViewModel, commsViewModel: CommunicationViewModel, walkieTalkieViewModel: com.example.testresqmesh.feature.comms.viewmodel.WalkieTalkieViewModel, mediaHelper: MediaHelper, locationStatus: com.example.testresqmesh.core.location.LocationStatus, activeIncidentCount: Int, criticalIncidentCount: Int, onMessages: () -&gt; Unit, onNetwork: () -&gt; Unit, onPeer: (String) -&gt; Unit, onProfile: () -&gt; Unit, onVoice: () -&gt; Unit, onIncidents: () -&gt; Unit, onChat: (String) -&gt; Unit, onCommunity: () -&gt; Unit, onMap: (Double, Double, String, String) -&gt; Unit, onHistory: () -&gt; Unit, onChat1: (String) -&gt; Unit, onCommunity1: () -&gt; Unit )</ID>
+    <ID>FunctionNaming:MainContainerScreen.kt$@Composable fun MainContainerScreen( setupViewModel: SetupViewModel, radarViewModel: RadarViewModel, commsViewModel: CommunicationViewModel, walkieTalkieViewModel: edu.cit.resqmesh.feature.comms.viewmodel.WalkieTalkieViewModel, mediaHelper: MediaHelper, appearance: AppAppearance, onAppearanceSelected: (AppAppearance) -&gt; Unit, initialChatNode: String? = null, onClearInitialChatNode: (() -&gt; Unit)? = null, initialViewMap: Boolean = false, initialSosSender: String? = null, initialSosText: String? = null, initialSosId: String? = null, onClearInitialViewMap: (() -&gt; Unit)? = null )</ID>
+    <ID>FunctionNaming:MainDestinationContent.kt$@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class) @Composable internal fun MainDestinationContent( targetScreen: ResQDestination, setupViewModel: SetupViewModel, radarViewModel: RadarViewModel, commsViewModel: CommunicationViewModel, walkieTalkieViewModel: edu.cit.resqmesh.feature.comms.viewmodel.WalkieTalkieViewModel, mediaHelper: MediaHelper, locationStatus: edu.cit.resqmesh.core.location.LocationStatus, activeIncidentCount: Int, criticalIncidentCount: Int, onMessages: () -&gt; Unit, onNetwork: () -&gt; Unit, onPeer: (String) -&gt; Unit, onProfile: () -&gt; Unit, onVoice: () -&gt; Unit, onIncidents: () -&gt; Unit, onChat: (String) -&gt; Unit, onCommunity: () -&gt; Unit, onMap: (Double, Double, String, String) -&gt; Unit, onHistory: () -&gt; Unit, onChat1: (String) -&gt; Unit, onCommunity1: () -&gt; Unit )</ID>
     <ID>FunctionNaming:MapCollapsedPreview.kt$@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class) @Composable internal fun MapCollapsedPreview( alertMessage: ChatMessage, telemetry: Pair&lt;String, String&gt;, isSheetExpanded: Boolean, onToggle: () -&gt; Unit )</ID>
     <ID>FunctionNaming:MapDetailRow.kt$@Composable internal fun DetailRow( label: String, value: String )</ID>
     <ID>FunctionNaming:MapExpandedDetails.kt$@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class) @Composable internal fun MapExpandedDetails( state: SosMapViewState.MapReady, alertMessage: ChatMessage, activeTab: CoordinateFormatTab, context: Context, onTabChanged: (CoordinateFormatTab) -&gt; Unit, onEngageNavigation: () -&gt; Unit )</ID>
@@ -379,7 +379,7 @@
     <ID>FunctionNaming:SosMapScreen.kt$@Composable fun SosMapScreen( alertMessage: ChatMessage, onBack: () -&gt; Unit, onInstallMap: () -&gt; Unit = {}, storageGuard: MapStorageGuard? = null )</ID>
     <ID>FunctionNaming:SosThreadHeader.kt$@Composable internal fun CompactSosHeader( alert: SosAlert, categoryColor: Color, categoryIcon: ImageVector, onMap: () -&gt; Unit, onEnd: () -&gt; Unit, onSilence: () -&gt; Unit, onActivity: () -&gt; Unit, isOwner: Boolean )</ID>
     <ID>FunctionNaming:SosThreadHeader.kt$@OptIn(ExperimentalLayoutApi::class) @Composable internal fun ExpandedSosHeader( alert: SosAlert, categoryColor: Color, categoryIcon: ImageVector, onMap: () -&gt; Unit, onEnd: () -&gt; Unit, onSilence: () -&gt; Unit, onActivity: () -&gt; Unit, isOwner: Boolean )</ID>
-    <ID>FunctionNaming:SosThreadScreen.kt$@Composable @OptIn(ExperimentalLayoutApi::class) fun SosThreadScreen( vm: CommunicationViewModel, media: MediaHelper, id: String, onBack: () -&gt; Unit, onMap: (com.example.testresqmesh.core.model.ChatMessage) -&gt; Unit )</ID>
+    <ID>FunctionNaming:SosThreadScreen.kt$@Composable @OptIn(ExperimentalLayoutApi::class) fun SosThreadScreen( vm: CommunicationViewModel, media: MediaHelper, id: String, onBack: () -&gt; Unit, onMap: (edu.cit.resqmesh.core.model.ChatMessage) -&gt; Unit )</ID>
     <ID>FunctionNaming:SplashScreen.kt$@Composable fun SplashScreen(onTimeout: () -&gt; Unit)</ID>
     <ID>FunctionNaming:SplashScreen.kt$@Composable private fun SplashContent(loadingProgress: Float)</ID>
     <ID>FunctionNaming:SplashScreen.kt$@Preview(name = "Splash — dark", showBackground = true, widthDp = 390, heightDp = 844) @Composable private fun SplashScreenDarkPreview()</ID>
@@ -460,7 +460,7 @@
     <ID>LongMethod:LegacyIncidentSync.kt$LegacyIncidentSync$suspend fun handleSyncRequest(endpointId: String, text: String)</ID>
     <ID>LongMethod:LocationAcquisitionBanner.kt$@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class) @Composable internal fun LocationAcquisitionBanner( isAcquiringLocation: Boolean )</ID>
     <ID>LongMethod:MainActivity.kt$MainActivity$override fun onCreate(savedInstanceState: Bundle?)</ID>
-    <ID>LongMethod:MainContainerScreen.kt$@Composable fun MainContainerScreen( setupViewModel: SetupViewModel, radarViewModel: RadarViewModel, commsViewModel: CommunicationViewModel, walkieTalkieViewModel: com.example.testresqmesh.feature.comms.viewmodel.WalkieTalkieViewModel, mediaHelper: MediaHelper, appearance: AppAppearance, onAppearanceSelected: (AppAppearance) -&gt; Unit, initialChatNode: String? = null, onClearInitialChatNode: (() -&gt; Unit)? = null, initialViewMap: Boolean = false, initialSosSender: String? = null, initialSosText: String? = null, initialSosId: String? = null, onClearInitialViewMap: (() -&gt; Unit)? = null )</ID>
+    <ID>LongMethod:MainContainerScreen.kt$@Composable fun MainContainerScreen( setupViewModel: SetupViewModel, radarViewModel: RadarViewModel, commsViewModel: CommunicationViewModel, walkieTalkieViewModel: edu.cit.resqmesh.feature.comms.viewmodel.WalkieTalkieViewModel, mediaHelper: MediaHelper, appearance: AppAppearance, onAppearanceSelected: (AppAppearance) -&gt; Unit, initialChatNode: String? = null, onClearInitialChatNode: (() -&gt; Unit)? = null, initialViewMap: Boolean = false, initialSosSender: String? = null, initialSosText: String? = null, initialSosId: String? = null, onClearInitialViewMap: (() -&gt; Unit)? = null )</ID>
     <ID>LongMethod:MapExpandedDetails.kt$@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class) @Composable internal fun MapExpandedDetails( state: SosMapViewState.MapReady, alertMessage: ChatMessage, activeTab: CoordinateFormatTab, context: Context, onTabChanged: (CoordinateFormatTab) -&gt; Unit, onEngageNavigation: () -&gt; Unit )</ID>
     <ID>LongMethod:MapFallbackContent.kt$@Composable internal fun MaplessSosFallback( alertMessage: ChatMessage, state: SosMapViewState.MaplessFallback, onInstallMap: () -&gt; Unit = {}, modifier: Modifier = Modifier )</ID>
     <ID>LongMethod:MapInstallationProgress.kt$@Composable internal fun InstalledActiveSection( installed: MapPackageStatus.Installed, isUpdateAvailable: Boolean, targetVersion: Int, onUpdate: () -&gt; Unit, onDelete: () -&gt; Unit )</ID>
@@ -516,7 +516,7 @@
     <ID>LongMethod:SosHubScreen.kt$@Composable @OptIn(ExperimentalLayoutApi::class) fun SosHubScreen( vm: CommunicationViewModel, media: MediaHelper, onBack: () -&gt; Unit, onCreate: () -&gt; Unit, onOpen: (String) -&gt; Unit )</ID>
     <ID>LongMethod:SosThreadHeader.kt$@Composable internal fun CompactSosHeader( alert: SosAlert, categoryColor: Color, categoryIcon: ImageVector, onMap: () -&gt; Unit, onEnd: () -&gt; Unit, onSilence: () -&gt; Unit, onActivity: () -&gt; Unit, isOwner: Boolean )</ID>
     <ID>LongMethod:SosThreadHeader.kt$@OptIn(ExperimentalLayoutApi::class) @Composable internal fun ExpandedSosHeader( alert: SosAlert, categoryColor: Color, categoryIcon: ImageVector, onMap: () -&gt; Unit, onEnd: () -&gt; Unit, onSilence: () -&gt; Unit, onActivity: () -&gt; Unit, isOwner: Boolean )</ID>
-    <ID>LongMethod:SosThreadScreen.kt$@Composable @OptIn(ExperimentalLayoutApi::class) fun SosThreadScreen( vm: CommunicationViewModel, media: MediaHelper, id: String, onBack: () -&gt; Unit, onMap: (com.example.testresqmesh.core.model.ChatMessage) -&gt; Unit )</ID>
+    <ID>LongMethod:SosThreadScreen.kt$@Composable @OptIn(ExperimentalLayoutApi::class) fun SosThreadScreen( vm: CommunicationViewModel, media: MediaHelper, id: String, onBack: () -&gt; Unit, onMap: (edu.cit.resqmesh.core.model.ChatMessage) -&gt; Unit )</ID>
     <ID>LongMethod:SplashScreen.kt$@Composable private fun SplashContent(loadingProgress: Float)</ID>
     <ID>LongMethod:TacticalHelpOfferSheet.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun TacticalHelpOfferSheet( incidentTitle: String, incidentType: String, initialNote: String, isEditing: Boolean, actionBusy: Boolean, onDismiss: () -&gt; Unit, onSubmit: (String) -&gt; Unit, onWithdraw: (() -&gt; Unit)? = null )</ID>
     <ID>LongMethod:TacticalHelperOfferCard.kt$@Composable fun TacticalHelperOfferCard( helper: HelperPresentation, onChoose: (() -&gt; Unit)? = null, onEdit: (() -&gt; Unit)? = null, onWithdraw: (() -&gt; Unit)? = null, onDirectChat: (() -&gt; Unit)? = null, modifier: Modifier = Modifier )</ID>
@@ -583,8 +583,8 @@
     <ID>LongParameterList:L2capTransport.kt$L2capTransport$( private val store: BleStateStore, private val handler: Handler, private val hasLiveGattRole: (String) -&gt; Boolean, private val onPayload: (String, ByteArray) -&gt; Unit, private val onPromoteGattWork: (String) -&gt; Unit, private val onSocketLost: (String) -&gt; Unit, private val onWriteFailure: (String, ByteArray) -&gt; Unit, private val onConnected: () -&gt; Unit, private val onFrame: (String, ByteArray, OutboundFrameEvent.Stage) -&gt; Unit = { _, _, _ -&gt; }, private val priorityForPayload: (ByteArray) -&gt; Boolean = { false } )</ID>
     <ID>LongParameterList:LegacyIncidentSync.kt$LegacyIncidentSync$( private val incidentDao: IncidentDao, private val domainEventDao: DomainEventDao, private val networkGateway: MeshNetworkGateway, private val repositoryScope: CoroutineScope, private val applyJson: suspend (String) -&gt; Boolean, private val replay: suspend (String) -&gt; Unit, private val reconcile: (String) -&gt; Unit )</ID>
     <ID>LongParameterList:MainApplicationOverlays.kt$( isDeveloperMode: Boolean, hasIncomingSos: Boolean, hasMapAlert: Boolean, hasOwnSos: Boolean, isSOSActive: Boolean, publicSendSnackbar: androidx.compose.material3.SnackbarHostState, onToggleTerminal: () -&gt; Unit, onToggleRadar: () -&gt; Unit, onOpenRadar: () -&gt; Unit )</ID>
-    <ID>LongParameterList:MainContainerScreen.kt$( setupViewModel: SetupViewModel, radarViewModel: RadarViewModel, commsViewModel: CommunicationViewModel, walkieTalkieViewModel: com.example.testresqmesh.feature.comms.viewmodel.WalkieTalkieViewModel, mediaHelper: MediaHelper, appearance: AppAppearance, onAppearanceSelected: (AppAppearance) -&gt; Unit, initialChatNode: String? = null, onClearInitialChatNode: (() -&gt; Unit)? = null, initialViewMap: Boolean = false, initialSosSender: String? = null, initialSosText: String? = null, initialSosId: String? = null, onClearInitialViewMap: (() -&gt; Unit)? = null )</ID>
-    <ID>LongParameterList:MainDestinationContent.kt$( targetScreen: ResQDestination, setupViewModel: SetupViewModel, radarViewModel: RadarViewModel, commsViewModel: CommunicationViewModel, walkieTalkieViewModel: com.example.testresqmesh.feature.comms.viewmodel.WalkieTalkieViewModel, mediaHelper: MediaHelper, locationStatus: com.example.testresqmesh.core.location.LocationStatus, activeIncidentCount: Int, criticalIncidentCount: Int, onMessages: () -&gt; Unit, onNetwork: () -&gt; Unit, onPeer: (String) -&gt; Unit, onProfile: () -&gt; Unit, onVoice: () -&gt; Unit, onIncidents: () -&gt; Unit, onChat: (String) -&gt; Unit, onCommunity: () -&gt; Unit, onMap: (Double, Double, String, String) -&gt; Unit, onHistory: () -&gt; Unit, onChat1: (String) -&gt; Unit, onCommunity1: () -&gt; Unit )</ID>
+    <ID>LongParameterList:MainContainerScreen.kt$( setupViewModel: SetupViewModel, radarViewModel: RadarViewModel, commsViewModel: CommunicationViewModel, walkieTalkieViewModel: edu.cit.resqmesh.feature.comms.viewmodel.WalkieTalkieViewModel, mediaHelper: MediaHelper, appearance: AppAppearance, onAppearanceSelected: (AppAppearance) -&gt; Unit, initialChatNode: String? = null, onClearInitialChatNode: (() -&gt; Unit)? = null, initialViewMap: Boolean = false, initialSosSender: String? = null, initialSosText: String? = null, initialSosId: String? = null, onClearInitialViewMap: (() -&gt; Unit)? = null )</ID>
+    <ID>LongParameterList:MainDestinationContent.kt$( targetScreen: ResQDestination, setupViewModel: SetupViewModel, radarViewModel: RadarViewModel, commsViewModel: CommunicationViewModel, walkieTalkieViewModel: edu.cit.resqmesh.feature.comms.viewmodel.WalkieTalkieViewModel, mediaHelper: MediaHelper, locationStatus: edu.cit.resqmesh.core.location.LocationStatus, activeIncidentCount: Int, criticalIncidentCount: Int, onMessages: () -&gt; Unit, onNetwork: () -&gt; Unit, onPeer: (String) -&gt; Unit, onProfile: () -&gt; Unit, onVoice: () -&gt; Unit, onIncidents: () -&gt; Unit, onChat: (String) -&gt; Unit, onCommunity: () -&gt; Unit, onMap: (Double, Double, String, String) -&gt; Unit, onHistory: () -&gt; Unit, onChat1: (String) -&gt; Unit, onCommunity1: () -&gt; Unit )</ID>
     <ID>LongParameterList:MapExpandedDetails.kt$( state: SosMapViewState.MapReady, alertMessage: ChatMessage, activeTab: CoordinateFormatTab, context: Context, onTabChanged: (CoordinateFormatTab) -&gt; Unit, onEngageNavigation: () -&gt; Unit )</ID>
     <ID>LongParameterList:MapPackageDetails.kt$( state: OfflineMapUiState, onDownload: () -&gt; Unit, onDownloadCellular: () -&gt; Unit, onCancel: () -&gt; Unit, onDelete: () -&gt; Unit, onRetry: () -&gt; Unit )</ID>
     <ID>LongParameterList:MeshBlockCoordinator.kt$MeshBlockCoordinator$( private val networkManager: MeshNetworkGateway, private val blockStore: BlockRelationshipStore, private val publicKeys: PeerPublicKeyDirectory, private val repositoryScope: CoroutineScope, private val meshRouter: MeshRouter, private val localName: () -&gt; String, private val blockedNames: () -&gt; MutableStateFlow&lt;Set&lt;String&gt;&gt;, private val readyPeers: () -&gt; List&lt;ConnectedDevice&gt; )</ID>
@@ -1605,7 +1605,7 @@
     <ID>MaxLineLength:ChatInput.kt$tint = if (isPopupExpanded) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant</ID>
     <ID>MaxLineLength:CommunicationViewModel.kt$CommunicationViewModel$@androidx.annotation.RequiresPermission(anyOf = ["android.permission.ACCESS_FINE_LOCATION", "android.permission.ACCESS_COARSE_LOCATION"])</ID>
     <ID>MaxLineLength:CommunicationViewModel.kt$CommunicationViewModel$_privateSendErrors.tryEmit("Private message not sent. Waiting for a ready connection and current recipient key.")</ID>
-    <ID>MaxLineLength:CommunicationViewModel.kt$CommunicationViewModel$com.example.testresqmesh.feature.comms.model.SosMeshStatus(com.example.testresqmesh.feature.comms.model.SosMeshState.OFF)</ID>
+    <ID>MaxLineLength:CommunicationViewModel.kt$CommunicationViewModel$edu.cit.resqmesh.feature.comms.model.SosMeshStatus(edu.cit.resqmesh.feature.comms.model.SosMeshState.OFF)</ID>
     <ID>MaxLineLength:CommunicationViewModel.kt$CommunicationViewModel$fun</ID>
     <ID>MaxLineLength:CommunicationViewModel.kt$CommunicationViewModel$if</ID>
     <ID>MaxLineLength:CommunicationViewModel.kt$CommunicationViewModel$sosRepository.updateLocation(id, location.latitude, location.longitude, location.accuracy, validTime)</ID>
@@ -1723,7 +1723,7 @@
     <ID>MaxLineLength:GattClientManager.kt$GattClientManager$fun onSocketLost(endpoint: String)</ID>
     <ID>MaxLineLength:GattClientPayloadSetup.kt$isCurrentReady = { isTransportGenerationCurrent(epoch) &amp;&amp; store.links.isCurrent(link) &amp;&amp; link.state == BleLinkState.READY }</ID>
     <ID>MaxLineLength:GattClientPayloadSetup.kt$isGattIdle = { !store.gattFlights.containsKey(macAddress) &amp;&amp; !store.serverIndications.unresolved(macAddress) &amp;&amp; link.currentOperation == null }</ID>
-    <ID>MaxLineLength:GattClientPayloadSetup.kt$supportsPort = Build.VERSION.SDK_INT &gt;= Build.VERSION_CODES.Q &amp;&amp; com.example.testresqmesh.BuildConfig.BLE_L2CAP_ENABLED</ID>
+    <ID>MaxLineLength:GattClientPayloadSetup.kt$supportsPort = Build.VERSION.SDK_INT &gt;= Build.VERSION_CODES.Q &amp;&amp; edu.cit.resqmesh.BuildConfig.BLE_L2CAP_ENABLED</ID>
     <ID>MaxLineLength:GattL2capAcceptor.kt$GattL2capAcceptor$AppLogger.d("BLE_MESH", "L2CAP CoC not supported on this Android version. Falling back to GATT exclusively.")</ID>
     <ID>MaxLineLength:GattL2capAcceptor.kt$GattL2capAcceptor$ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED</ID>
     <ID>MaxLineLength:GattServerAttributeRequests.kt$GattServerAttributeRequests$AppLogger.d("BLE_MESH", "Link ${link.generation} SERVER ${device.address}: READY CCCD indications enabled")</ID>
@@ -1883,7 +1883,7 @@
     <ID>MaxLineLength:IncidentRepository.kt$IncidentRepository.&lt;no name provided&gt;$override suspend fun ingest(json: JSONObject): IncidentIngestionResult</ID>
     <ID>MaxLineLength:IncidentSelectors.kt$if</ID>
     <ID>MaxLineLength:IncidentSelectors.kt$internal</ID>
-    <ID>MaxLineLength:IncidentStateMachineAndDeduplicationTest.kt$IncidentStateMachineAndDeduplicationTest$"broadcastPriorityPayload", "broadcastPayload" -&gt; com.example.testresqmesh.core.network.BroadcastDispatchResult(emptyMap())</ID>
+    <ID>MaxLineLength:IncidentStateMachineAndDeduplicationTest.kt$IncidentStateMachineAndDeduplicationTest$"broadcastPriorityPayload", "broadcastPayload" -&gt; edu.cit.resqmesh.core.network.BroadcastDispatchResult(emptyMap())</ID>
     <ID>MaxLineLength:IncidentStateMachineAndDeduplicationTest.kt$IncidentStateMachineAndDeduplicationTest$payloadJson = JSONObject().put("incidentType", "Fire").put("title", "Warehouse fire on 2nd floor").toString()</ID>
     <ID>MaxLineLength:IncidentStateMachineAndDeduplicationTest.kt$IncidentStateMachineAndDeduplicationTest$val ack = DomainEventEntity("EVT-ACK-B", id, EntityType.INCIDENT.name, EventType.INCIDENT_ACKNOWLEDGED.name, "USR-BOB", "Bob", 2L, 2000L, "{}")</ID>
     <ID>MaxLineLength:IncidentStateMachineAndDeduplicationTest.kt$IncidentStateMachineAndDeduplicationTest$val assign = DomainEventEntity("EVT-ASSIGN-B", id, EntityType.INCIDENT.name, EventType.INCIDENT_ASSIGNED.name, "USR-BOB", "Bob", 3L, 3000L, JSONObject().put("responderId", "USR-BOB").put("responderName", "Bob").toString())</ID>
@@ -1954,10 +1954,10 @@
     <ID>MaxLineLength:MainActivity.kt$MainActivity$val</ID>
     <ID>MaxLineLength:MainActivity.kt$MainActivity$val coarseLocation = ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED</ID>
     <ID>MaxLineLength:MainActivity.kt$MainActivity$val fineLocation = ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED</ID>
-    <ID>MaxLineLength:MainActivity.kt$MainActivity$val walkieTalkieViewModel: com.example.testresqmesh.feature.comms.viewmodel.WalkieTalkieViewModel = org.koin.androidx.compose.koinViewModel()</ID>
+    <ID>MaxLineLength:MainActivity.kt$MainActivity$val walkieTalkieViewModel: edu.cit.resqmesh.feature.comms.viewmodel.WalkieTalkieViewModel = org.koin.androidx.compose.koinViewModel()</ID>
     <ID>MaxLineLength:MainContainerScreen.kt$MainApplicationOverlays</ID>
     <ID>MaxLineLength:MainContainerScreen.kt$MainDestinationContent</ID>
-    <ID>MaxLineLength:MainContainerScreen.kt$val incidentViewModel: com.example.testresqmesh.feature.incident.viewmodel.IncidentViewModel = org.koin.androidx.compose.koinViewModel()</ID>
+    <ID>MaxLineLength:MainContainerScreen.kt$val incidentViewModel: edu.cit.resqmesh.feature.incident.viewmodel.IncidentViewModel = org.koin.androidx.compose.koinViewModel()</ID>
     <ID>MaxLineLength:MapCatalogConfig.kt$MapPackageCatalogEntry$val description: String = "High-contrast vector road network, waterways, POIs, and emergency infrastructure for Cebu Metropolitan Area and Cebu Province."</ID>
     <ID>MaxLineLength:MapCatalogConfig.kt$MapPackageCatalogEntry.Companion$0x30.toByte()</ID>
     <ID>MaxLineLength:MapCollapsedPreview.kt$imageVector = if (isSheetExpanded) Icons.Default.KeyboardArrowDown else Icons.Default.KeyboardArrowUp</ID>
@@ -1995,7 +1995,7 @@
     <ID>MaxLineLength:MeshBlockCoordinator.kt$MeshBlockCoordinator$if (pending?.operationId != relationship.operationId || pending.status != BlockRelationshipStatus.PENDING_ACK) break</ID>
     <ID>MaxLineLength:MeshBlockCoordinator.kt$MeshBlockCoordinator$is PrivateDeliveryPlanner.Target.Endpoint -&gt; networkManager.sendPriorityPayload(target.endpointId, payloadBytes)</ID>
     <ID>MaxLineLength:MeshBlockCoordinator.kt$MeshBlockCoordinator$private</ID>
-    <ID>MaxLineLength:MeshConversationMedia.kt$MeshConversationMedia$val payloadBytes = kotlinx.serialization.protobuf.ProtoBuf.encodeToByteArray(com.example.testresqmesh.core.network.MeshPayload.serializer(), payload)</ID>
+    <ID>MaxLineLength:MeshConversationMedia.kt$MeshConversationMedia$val payloadBytes = kotlinx.serialization.protobuf.ProtoBuf.encodeToByteArray(edu.cit.resqmesh.core.network.MeshPayload.serializer(), payload)</ID>
     <ID>MaxLineLength:MeshForegroundService.kt$MeshForegroundService$combine</ID>
     <ID>MaxLineLength:MeshFrameCodecTest.kt$MeshFrameCodecTest$assertTrue(MeshFrameCodec.append(ByteArray(0), ByteBuffer.allocate(4).putInt(-1).array()) is MeshFrameCodec.AppendResult.Rejected)</ID>
     <ID>MaxLineLength:MeshInboundMessages.kt$MeshInboundMessages$fun</ID>
@@ -2005,8 +2005,8 @@
     <ID>MaxLineLength:MeshInboundMessages.kt$MeshInboundMessages$message</ID>
     <ID>MaxLineLength:MeshInboundMessages.kt$MeshInboundMessages$networkManager.broadcastDeliveredReceipt(msgId, isPrivate = true, targetId = endpointId, directedReturnRoute = reversedRoute)</ID>
     <ID>MaxLineLength:MeshInboundMessages.kt$MeshInboundMessages$p.conversationKind !in setOf("COMMUNITY", "RADIO", "SOS")</ID>
-    <ID>MaxLineLength:MeshInboundMessages.kt$MeshInboundMessages$val audio = p.audioBytes?.let { Base64.encodeToString(com.example.testresqmesh.core.utils.BinaryCompressor.decompress(it, 2 * 1024 * 1024), Base64.NO_WRAP) }</ID>
-    <ID>MaxLineLength:MeshInboundMessages.kt$MeshInboundMessages$val image = p.imageBytes?.let { Base64.encodeToString(com.example.testresqmesh.core.utils.BinaryCompressor.decompress(it, 2 * 1024 * 1024), Base64.NO_WRAP) }</ID>
+    <ID>MaxLineLength:MeshInboundMessages.kt$MeshInboundMessages$val audio = p.audioBytes?.let { Base64.encodeToString(edu.cit.resqmesh.core.utils.BinaryCompressor.decompress(it, 2 * 1024 * 1024), Base64.NO_WRAP) }</ID>
+    <ID>MaxLineLength:MeshInboundMessages.kt$MeshInboundMessages$val image = p.imageBytes?.let { Base64.encodeToString(edu.cit.resqmesh.core.utils.BinaryCompressor.decompress(it, 2 * 1024 * 1024), Base64.NO_WRAP) }</ID>
     <ID>MaxLineLength:MeshNetworkEventBinder.kt$MeshNetworkCallbacks$val onMessageReceived: (String, String, String, String, Boolean, Boolean, String?, String?, Double?, Double?, String, List&lt;String&gt;, String) -&gt; Unit</ID>
     <ID>MaxLineLength:MeshOutboundDelivery.kt$MeshOutboundDelivery$AppLogger.d("MeshNetwork_E2EE", "PRIVATE_DELIVERED message=$msgId elapsedMs=${android.os.SystemClock.elapsedRealtime()}")</ID>
     <ID>MaxLineLength:MeshOutboundDelivery.kt$MeshOutboundDelivery$AppLogger.d("MeshNetwork_E2EE", "PRIVATE_DISPATCH message=$msgId result=$dispatchResult elapsedMs=${android.os.SystemClock.elapsedRealtime()}")</ID>
@@ -2025,7 +2025,7 @@
     <ID>MaxLineLength:MeshOutboundDelivery.kt$MeshOutboundDelivery$val</ID>
     <ID>MaxLineLength:MeshOutboundDelivery.kt$MeshOutboundDelivery$val directedRouteList = if (readyDevices.isNotEmpty()) meshRouter.findShortestPath(myNodeName, currentTarget, readyDevices) else emptyList()</ID>
     <ID>MaxLineLength:MeshOutboundDelivery.kt$MeshOutboundDelivery$val message = ChatMessage(msgId, myNodeName, text, imageBase64, audioBase64, locationLat, locationLng, true, true, timestamp, isHopped = !isDirect, outboundRoute = directedRouteList)</ID>
-    <ID>MaxLineLength:MeshOutboundDelivery.kt$MeshOutboundDelivery$val transmission = runCatching { ProtoBuf.decodeFromByteArray&lt;com.example.testresqmesh.core.network.MeshPayload&gt;(payloadBytes).id }.getOrNull()</ID>
+    <ID>MaxLineLength:MeshOutboundDelivery.kt$MeshOutboundDelivery$val transmission = runCatching { ProtoBuf.decodeFromByteArray&lt;edu.cit.resqmesh.core.network.MeshPayload&gt;(payloadBytes).id }.getOrNull()</ID>
     <ID>MaxLineLength:MeshOutboundDelivery.kt$MeshOutboundDelivery$}</ID>
     <ID>MaxLineLength:MeshPeerCoordinator.kt$MeshPeerCoordinator$AppLogger.d("BLE_MESH", "Duplicate link to ${device.name}. Keeping newer endpoint ${device.endpointId} in routing view.")</ID>
     <ID>MaxLineLength:MeshPeerCoordinator.kt$MeshPeerCoordinator$AppLogger.d("BLE_MESH", "Duplicate link to ${device.name}. Keeping older endpoint ${existingByIdentity.endpointId} in routing view.")</ID>
@@ -2053,7 +2053,7 @@
     <ID>MaxLineLength:MeshRepository.kt$MeshRepository$private fun onNetworkPublicKeyReceived(senderName: String, senderNodeId: String, key: String): Unit</ID>
     <ID>MaxLineLength:MeshRepository.kt$MeshRepository$private fun onNetworkRoutingTableReceived(senderName: String, senderNodeId: String, connectedNodes: List&lt;String&gt;, connectedNodeIds: List&lt;String&gt;, topologySequence: Long): Unit</ID>
     <ID>MaxLineLength:MeshRepository.kt$MeshRepository$private fun onNetworkTransportStateChanged(state: MeshTransportState): Unit</ID>
-    <ID>MaxLineLength:MeshRepository.kt$MeshRepository$private val _transportState = MutableStateFlow(com.example.testresqmesh.core.network.bluetooth.MeshTransportState.OFFLINE)</ID>
+    <ID>MaxLineLength:MeshRepository.kt$MeshRepository$private val _transportState = MutableStateFlow(edu.cit.resqmesh.core.network.bluetooth.MeshTransportState.OFFLINE)</ID>
     <ID>MaxLineLength:MeshRepository.kt$MeshRepository$val incomingLiveAudioChunk = kotlinx.coroutines.flow.MutableSharedFlow&lt;Pair&lt;String, ByteArray&gt;&gt;(extraBufferCapacity = 100)</ID>
     <ID>MaxLineLength:MeshRouter.kt$MeshRouter$fun</ID>
     <ID>MaxLineLength:MeshRouterStableIdentityTest.kt$MeshRouterStableIdentityTest$"Me#AAAA"</ID>
@@ -2074,7 +2074,7 @@
     <ID>MaxLineLength:ModernGpsStatusCard.kt$LocationStatus.IDLE -&gt; Triple(MaterialTheme.colorScheme.onSurfaceVariant, "Location Idle", "Position will be acquired when sending SOS.")</ID>
     <ID>MaxLineLength:ModernGpsStatusCard.kt$LocationStatus.READY -&gt; Triple(ModernMint, "Location found", "A last known location is available. SOS will request an update.")</ID>
     <ID>MaxLineLength:ModernMeshTopologyCard.kt$Row</ID>
-    <ID>MaxLineLength:ModernUserHeader.kt$com.example.testresqmesh.core.network.bluetooth.MeshTransportState.PERMISSION_REQUIRED.status -&gt; "Permission needed"</ID>
+    <ID>MaxLineLength:ModernUserHeader.kt$edu.cit.resqmesh.core.network.bluetooth.MeshTransportState.PERMISSION_REQUIRED.status -&gt; "Permission needed"</ID>
     <ID>MaxLineLength:NativeBleGateway.kt$NativeBleGateway$override</ID>
     <ID>MaxLineLength:NativeBleGateway.kt$NativeBleGateway$override fun disconnectDirectIdentity(deviceName: String, reason: String)</ID>
     <ID>MaxLineLength:NativeBleGateway.kt$NativeBleGateway$override fun showPrivateMessageNotification(sender: String, text: String)</ID>
@@ -2087,7 +2087,7 @@
     <ID>MaxLineLength:NativeBleManager.kt$NativeBleManager$if (link.role == BleLinkRole.CLIENT) forceGattDisconnect(endpoint, link.gatt) else retireServerLink(link)</ID>
     <ID>MaxLineLength:NativeBleManager.kt$NativeBleManager$isTransportIdle</ID>
     <ID>MaxLineLength:NativeBleManager.kt$NativeBleManager$it.state == BleLinkState.READY &amp;&amp; !it.gattQuarantined &amp;&amp; it.currentOperation == null &amp;&amp; store.activeConnections.containsKey(endpoint)</ID>
-    <ID>MaxLineLength:NativeBleManager.kt$NativeBleManager$private fun markHeartbeatSent(endpoint: String, link: com.example.testresqmesh.core.network.bluetooth.state.BleLink, id: String)</ID>
+    <ID>MaxLineLength:NativeBleManager.kt$NativeBleManager$private fun markHeartbeatSent(endpoint: String, link: edu.cit.resqmesh.core.network.bluetooth.state.BleLink, id: String)</ID>
     <ID>MaxLineLength:NativeBleManager.kt$NativeBleManager$received = { peer, bytes -&gt; handler.post { endpointForPeer(peer)?.let { processBinaryPayload(it, bytes) } } }</ID>
     <ID>MaxLineLength:NativeBleManager.kt$NativeBleManager$response = { peer, bytes -&gt; handler.post { endpointForPeer(peer)?.let { sendRawPayload(it, bytes, true) } } }</ID>
     <ID>MaxLineLength:NativeBleManager.kt$NativeBleManager$val CCC_DESCRIPTOR_UUID = UUID.fromString("00002902-0000-1000-8000-00805F9B34FB") // Standard CCCD (Required for Notifications)</ID>
@@ -2109,7 +2109,7 @@
     <ID>MaxLineLength:NativeInboundPipeline.kt$NativeInboundPipeline$nodeId = NodeIdentity.idOf(payload.senderName) ?: store.endpointNodeIds[endpointId].orEmpty()</ID>
     <ID>MaxLineLength:NativeInboundPipeline.kt$NativeInboundPipeline$val isDirectIdentityPulse = payload.type == "SYSTEM" &amp;&amp; payload.routePath.isEmpty() &amp;&amp; payload.senderName.isNotEmpty()</ID>
     <ID>MaxLineLength:NativeInboundPipeline.kt$NativeInboundPipeline$val isDirectlyConnected = store.activeConnections.containsKey(endpointId) || store.activeServerConnections.containsKey(endpointId)</ID>
-    <ID>MaxLineLength:NativeInboundPipeline.kt$NativeInboundPipeline$val payload = kotlinx.serialization.protobuf.ProtoBuf.decodeFromByteArray(com.example.testresqmesh.core.network.MeshPayload.serializer(), payloadBytes)</ID>
+    <ID>MaxLineLength:NativeInboundPipeline.kt$NativeInboundPipeline$val payload = kotlinx.serialization.protobuf.ProtoBuf.decodeFromByteArray(edu.cit.resqmesh.core.network.MeshPayload.serializer(), payloadBytes)</ID>
     <ID>MaxLineLength:NativeInboundPipelineTest.kt$NativeInboundPipelineTest$senderNodeId = "C003"</ID>
     <ID>MaxLineLength:NativeInboundPipelineTest.kt$NativeInboundPipelineTest.Fixture$fun receive(payload: MeshPayload)</ID>
     <ID>MaxLineLength:NativeOutboundDispatcher.kt$NativeOutboundDispatcher$(p.type == ReliableMeshTransfers.PIECE &amp;&amp; ProtoBuf.decodeFromByteArray&lt;TransferPiece&gt;(p.liveAudioChunk!!).let { it.priority || it.status })</ID>
@@ -2159,7 +2159,7 @@
     <ID>MaxLineLength:OfflineMapViewModel.kt$OfflineMapViewModel$errorMessage = "Insufficient storage space. Need approximately ${(estimatedBytesNeeded / (1024 * 1024))} MB."</ID>
     <ID>MaxLineLength:OutboundFrameReporter.kt$OutboundFrameReporter$AppLogger.d("BLE_TRANSFER", "FRAME_${stage.name} transmission=${event.transmissionId} message=${event.messageId} transport=$transport bytes=${event.bytes} queueMs=${event.queueMs} transferMs=${event.transferMs}")</ID>
     <ID>MaxLineLength:PayloadDispatcher.kt$PayloadDispatcher$(</ID>
-    <ID>MaxLineLength:PayloadDispatcher.kt$PayloadDispatcher$payload.targetNodeId.isBlank() &amp;&amp; com.example.testresqmesh.core.model.NodeIdentity.matches(payload.targetName, callback.getMyDeviceName())</ID>
+    <ID>MaxLineLength:PayloadDispatcher.kt$PayloadDispatcher$payload.targetNodeId.isBlank() &amp;&amp; edu.cit.resqmesh.core.model.NodeIdentity.matches(payload.targetName, callback.getMyDeviceName())</ID>
     <ID>MaxLineLength:PayloadDispatcherCallback.kt$PayloadDispatcherCallback$fun onMessageReceived(endpointId: String, msgId: String, senderName: String, text: String, isPrivate: Boolean, isSystem: Boolean, imageBase64: String?, audioBase64: String?, locationLat: Double?, locationLng: Double?, medium: String, routePath: List&lt;String&gt;, channelId: String)</ID>
     <ID>MaxLineLength:PayloadDispatcherCallback.kt$PayloadDispatcherCallback$fun onRoutingTableReceived(senderName: String, senderNodeId: String, connectedNodes: List&lt;String&gt;, connectedNodeIds: List&lt;String&gt;, topologySequence: Long)</ID>
     <ID>MaxLineLength:PayloadDispatcherCallback.kt$PayloadDispatcherCallback$getConnectedEndpointIdByNodeId(nodeId)?.let { sendDirectPayload(it, payload) } ?: TransportDispatchResult.REJECTED_NOT_READY</ID>
@@ -2186,7 +2186,7 @@
     <ID>MaxLineLength:PresenceHandlers.kt$PingHandler$override</ID>
     <ID>MaxLineLength:PresenceHandlers.kt$SystemPulseHandler$callback.onMessageReceived(endpointId, msgId, sender, "", false, true, null, null, null, null, "LOCAL", emptyList(), payload.channelId)</ID>
     <ID>MaxLineLength:PresenceHandlers.kt$SystemPulseHandler$override</ID>
-    <ID>MaxLineLength:PresenceHandlers.kt$SystemPulseHandler$val senderNodeId = payload.senderNodeId.ifBlank { com.example.testresqmesh.core.model.NodeIdentity.idOf(sender).orEmpty() }</ID>
+    <ID>MaxLineLength:PresenceHandlers.kt$SystemPulseHandler$val senderNodeId = payload.senderNodeId.ifBlank { edu.cit.resqmesh.core.model.NodeIdentity.idOf(sender).orEmpty() }</ID>
     <ID>MaxLineLength:PrivateChatHeader.kt$Row</ID>
     <ID>MaxLineLength:PrivateMessageContent.kt$.</ID>
     <ID>MaxLineLength:PrivateMessageContent.kt$tint = if (mine) Color.White.copy(alpha = 0.85f) else MaterialTheme.colorScheme.primary</ID>
@@ -2245,7 +2245,7 @@
     <ID>MaxLineLength:ProfileSettingsComponents.kt$contentColor = if (selected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface</ID>
     <ID>MaxLineLength:ProfileSettingsComponents.kt$if (selected) Text("Active", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Black, color = MaterialTheme.colorScheme.primary)</ID>
     <ID>MaxLineLength:PublicBroadcastOutboxTest.kt$PublicBroadcastOutboxTest$f.result = BroadcastDispatchResult(mapOf("B" to TransportDispatchResult.ACCEPTED, "C" to TransportDispatchResult.REJECTED_QUEUE_FULL))</ID>
-    <ID>MaxLineLength:PublicBroadcastOutboxTest.kt$PublicBroadcastOutboxTest.Fixture$payloads += kotlinx.serialization.protobuf.ProtoBuf.decodeFromByteArray(com.example.testresqmesh.core.network.MeshPayload.serializer(), args!![0] as ByteArray)</ID>
+    <ID>MaxLineLength:PublicBroadcastOutboxTest.kt$PublicBroadcastOutboxTest.Fixture$payloads += kotlinx.serialization.protobuf.ProtoBuf.decodeFromByteArray(edu.cit.resqmesh.core.network.MeshPayload.serializer(), args!![0] as ByteArray)</ID>
     <ID>MaxLineLength:PublicBroadcastOutboxTest.kt$PublicBroadcastOutboxTest.Fixture$private val prefs = Proxy.newProxyInstance(SharedPreferences::class.java.classLoader, arrayOf(SharedPreferences::class.java)) { _, _, _ -&gt; null } as SharedPreferences</ID>
     <ID>MaxLineLength:PublicBroadcastOutboxTest.kt$PublicBroadcastOutboxTest.Fixture$val</ID>
     <ID>MaxLineLength:PublicBroadcastOutboxTest.kt$PublicBroadcastOutboxTest.Store$override suspend fun markSent(messageId: String)</ID>
@@ -2434,9 +2434,9 @@
     <ID>NestedBlockDepth:MeshInboundMessages.kt$MeshInboundMessages$fun onNetworkMessageReceived(endpointId: String, msgId: String, sender: String, text: String, isPrivate: Boolean, isSystem: Boolean, img: String?, audio: String?, lat: Double?, lng: Double?, medium: String, routePath: List&lt;String&gt;, channelId: String): Unit</ID>
     <ID>NestedBlockDepth:MeshPeerCoordinator.kt$MeshPeerCoordinator$fun onNetworkDeviceScanned(event: ScanEvent): Unit</ID>
     <ID>NestedBlockDepth:NativeInboundPipeline.kt$NativeInboundPipeline$fun processBinaryPayload(endpointId: String, payloadBytes: ByteArray)</ID>
-    <ID>NewLineAtEndOfFile:ExampleInstrumentedTest.kt$com.example.testresqmesh.ExampleInstrumentedTest.kt</ID>
-    <ID>NewLineAtEndOfFile:ExampleUnitTest.kt$com.example.testresqmesh.ExampleUnitTest.kt</ID>
-    <ID>NewLineAtEndOfFile:NodeEntity.kt$com.example.testresqmesh.data.local.entity.NodeEntity.kt</ID>
+    <ID>NewLineAtEndOfFile:ExampleInstrumentedTest.kt$edu.cit.resqmesh.ExampleInstrumentedTest.kt</ID>
+    <ID>NewLineAtEndOfFile:ExampleUnitTest.kt$edu.cit.resqmesh.ExampleUnitTest.kt</ID>
+    <ID>NewLineAtEndOfFile:NodeEntity.kt$edu.cit.resqmesh.data.local.entity.NodeEntity.kt</ID>
     <ID>PrintStackTrace:NotificationHelper.kt$NotificationHelper$e</ID>
     <ID>ReturnCount:BleAdmissionDiagnostics.kt$BleAdmissionDiagnostics$private fun safeNodeLabel(peerName: String, endpoint: String): String</ID>
     <ID>ReturnCount:BleAdvertisementAdmission.kt$BleAdvertisementAdmission$fun handle(advertisement: BleAdvertisement, observed: Boolean)</ID>
@@ -2499,7 +2499,7 @@
     <ID>ReturnCount:MapStyleValidator.kt$MapStyleValidator$private fun hasPbfFiles(dir: File): Boolean</ID>
     <ID>ReturnCount:MeshForegroundService.kt$MeshForegroundService$override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int</ID>
     <ID>ReturnCount:MeshFrameCodec.kt$MeshFrameCodec$fun append(current: ByteArray, chunk: ByteArray): AppendResult</ID>
-    <ID>ReturnCount:MeshInboundMessages.kt$MeshInboundMessages$private suspend fun receiveConversation(endpoint: String, p: com.example.testresqmesh.core.network.MeshPayload)</ID>
+    <ID>ReturnCount:MeshInboundMessages.kt$MeshInboundMessages$private suspend fun receiveConversation(endpoint: String, p: edu.cit.resqmesh.core.network.MeshPayload)</ID>
     <ID>ReturnCount:MeshOutboundDelivery.kt$MeshOutboundDelivery$fun sendPrivateMessage(targetName: String, text: String, imageBase64: String?, audioBase64: String?, locationLat: Double? = null, locationLng: Double? = null): Boolean</ID>
     <ID>ReturnCount:MeshPeerCoordinator.kt$MeshPeerCoordinator$fun recordPeerName(name: String, fromReadyLink: Boolean = false)</ID>
     <ID>ReturnCount:MeshRouter.kt$MeshRouter$@Synchronized fun updateTopology( senderName: String, senderNodeId: String, connectedNodes: List&lt;String&gt;, connectedNodeIds: List&lt;String&gt;, myNodeName: String, topologySequence: Long = 0L ): Boolean</ID>
@@ -2534,7 +2534,7 @@
     <ID>ReturnCount:SetupViewModel.kt$SetupViewModel$fun setDeveloperMode(context: Context, enabled: Boolean, pin: String? = null): Boolean</ID>
     <ID>ReturnCount:SetupViewModel.kt$SetupViewModel$suspend fun checkHardwareAndGoOnline(context: Context, customName: String, nodeTag: String, teamKey: String): MeshStartError?</ID>
     <ID>ReturnCount:SosLifecycleAndSyncTest.kt$SosLifecycleAndSyncTest.Network$fun send(from: Node, to: String, bytes: ByteArray): TransportDispatchResult</ID>
-    <ID>ReturnCount:SosProtocol.kt$internal fun sosTransition(current: com.example.testresqmesh.data.local.entity.SosAlertEntity?, e: SosEvent): SosIngestion</ID>
+    <ID>ReturnCount:SosProtocol.kt$internal fun sosTransition(current: edu.cit.resqmesh.data.local.entity.SosAlertEntity?, e: SosEvent): SosIngestion</ID>
     <ID>ReturnCount:SosSyncCoordinator.kt$SosSyncCoordinator$fun receive(endpoint: String, payload: MeshPayload)</ID>
     <ID>ReturnCount:SosSyncCoordinator.kt$SosSyncCoordinator$private suspend fun reconcile(l: Link)</ID>
     <ID>ReturnCount:TransferAwareConnectPolicy.kt$TransferAwareConnectPolicy$@Synchronized fun defer(peer: String, usableNeighbor: Boolean, busy: Boolean, now: Long): Boolean</ID>
@@ -2718,10 +2718,10 @@
     <ID>WildcardImport:ActiveSosReminder.kt$import androidx.compose.foundation.layout.*</ID>
     <ID>WildcardImport:ActiveSosReminder.kt$import androidx.compose.material3.*</ID>
     <ID>WildcardImport:ActiveSosReminder.kt$import androidx.compose.runtime.*</ID>
-    <ID>WildcardImport:AppModules.kt$import com.example.testresqmesh.core.domain.usecase.*</ID>
+    <ID>WildcardImport:AppModules.kt$import edu.cit.resqmesh.core.domain.usecase.*</ID>
     <ID>WildcardImport:BinaryCompressorTest.kt$import org.junit.Assert.*</ID>
     <ID>WildcardImport:BleHeartbeatDriver.kt$import android.bluetooth.*</ID>
-    <ID>WildcardImport:BleLifecycleSupervisorTest.kt$import com.example.testresqmesh.core.network.bluetooth.state.*</ID>
+    <ID>WildcardImport:BleLifecycleSupervisorTest.kt$import edu.cit.resqmesh.core.network.bluetooth.state.*</ID>
     <ID>WildcardImport:BleLifecycleSupervisorTest.kt$import org.junit.Assert.*</ID>
     <ID>WildcardImport:BleLinkRetirementController.kt$import android.bluetooth.*</ID>
     <ID>WildcardImport:BlePeerDirectory.kt$import android.bluetooth.*</ID>
@@ -2828,8 +2828,8 @@
     <ID>WildcardImport:IncidentAppliedFilters.kt$import androidx.compose.foundation.layout.*</ID>
     <ID>WildcardImport:IncidentAppliedFilters.kt$import androidx.compose.material3.*</ID>
     <ID>WildcardImport:IncidentAppliedFilters.kt$import androidx.compose.runtime.*</ID>
-    <ID>WildcardImport:IncidentAutomaticSyncTest.kt$import com.example.testresqmesh.core.network.*</ID>
-    <ID>WildcardImport:IncidentAutomaticSyncTest.kt$import com.example.testresqmesh.data.local.entity.*</ID>
+    <ID>WildcardImport:IncidentAutomaticSyncTest.kt$import edu.cit.resqmesh.core.network.*</ID>
+    <ID>WildcardImport:IncidentAutomaticSyncTest.kt$import edu.cit.resqmesh.data.local.entity.*</ID>
     <ID>WildcardImport:IncidentAutomaticSyncTest.kt$import kotlinx.coroutines.*</ID>
     <ID>WildcardImport:IncidentAutomaticSyncTest.kt$import kotlinx.coroutines.flow.*</ID>
     <ID>WildcardImport:IncidentAutomaticSyncTest.kt$import kotlinx.coroutines.test.*</ID>
@@ -2898,8 +2898,8 @@
     <ID>WildcardImport:IncidentUiTest.kt$import androidx.compose.runtime.*</ID>
     <ID>WildcardImport:IncidentUiTest.kt$import androidx.compose.ui.test.*</ID>
     <ID>WildcardImport:IncidentWithdrawalTransactionTest.kt$import org.junit.Assert.*</ID>
-    <ID>WildcardImport:KoinModulesVerifyTest.kt$import com.example.testresqmesh.core.domain.usecase.*</ID>
-    <ID>WildcardImport:LinkIdentityAdmissionTest.kt$import com.example.testresqmesh.core.network.bluetooth.state.*</ID>
+    <ID>WildcardImport:KoinModulesVerifyTest.kt$import edu.cit.resqmesh.core.domain.usecase.*</ID>
+    <ID>WildcardImport:LinkIdentityAdmissionTest.kt$import edu.cit.resqmesh.core.network.bluetooth.state.*</ID>
     <ID>WildcardImport:LinkIdentityAdmissionTest.kt$import org.junit.Assert.*</ID>
     <ID>WildcardImport:LiveAudioEngine.kt$import kotlinx.coroutines.*</ID>
     <ID>WildcardImport:LocalIdentityManagerTest.kt$import org.junit.Assert.*</ID>
@@ -3062,7 +3062,7 @@
     <ID>WildcardImport:RadioPlaybackStatus.kt$import androidx.compose.foundation.layout.*</ID>
     <ID>WildcardImport:RadioPlaybackStatus.kt$import androidx.compose.material3.*</ID>
     <ID>WildcardImport:RadioPlaybackStatus.kt$import androidx.compose.runtime.*</ID>
-    <ID>WildcardImport:ReadyIdentityExchangeTest.kt$import com.example.testresqmesh.core.network.bluetooth.state.*</ID>
+    <ID>WildcardImport:ReadyIdentityExchangeTest.kt$import edu.cit.resqmesh.core.network.bluetooth.state.*</ID>
     <ID>WildcardImport:ReadyIdentityExchangeTest.kt$import org.junit.Assert.*</ID>
     <ID>WildcardImport:ReadyPayloadSetupTest.kt$import org.junit.Assert.*</ID>
     <ID>WildcardImport:RecipientReceiptPolicyTest.kt$import org.junit.Assert.*</ID>
@@ -3091,7 +3091,7 @@
     <ID>WildcardImport:SelectedIncidentHelper.kt$import androidx.compose.foundation.layout.*</ID>
     <ID>WildcardImport:SelectedIncidentHelper.kt$import androidx.compose.material3.*</ID>
     <ID>WildcardImport:SelectedIncidentHelper.kt$import androidx.compose.runtime.*</ID>
-    <ID>WildcardImport:ServerDeviceCallbackTest.kt$import com.example.testresqmesh.core.network.bluetooth.state.*</ID>
+    <ID>WildcardImport:ServerDeviceCallbackTest.kt$import edu.cit.resqmesh.core.network.bluetooth.state.*</ID>
     <ID>WildcardImport:ServerDeviceCallbackTest.kt$import org.junit.Assert.*</ID>
     <ID>WildcardImport:ServerIndicationOwnershipTest.kt$import org.junit.Assert.*</ID>
     <ID>WildcardImport:SosAlertController.kt$import android.os.*</ID>
@@ -3100,15 +3100,15 @@
     <ID>WildcardImport:SosCategoryPresentation.kt$import androidx.compose.material3.*</ID>
     <ID>WildcardImport:SosCategoryPresentation.kt$import androidx.compose.runtime.*</ID>
     <ID>WildcardImport:SosDao.kt$import androidx.room.*</ID>
-    <ID>WildcardImport:SosDao.kt$import com.example.testresqmesh.data.local.entity.*</ID>
+    <ID>WildcardImport:SosDao.kt$import edu.cit.resqmesh.data.local.entity.*</ID>
     <ID>WildcardImport:SosDispatchHeader.kt$import androidx.compose.foundation.layout.*</ID>
     <ID>WildcardImport:SosDispatchHeader.kt$import androidx.compose.material3.*</ID>
     <ID>WildcardImport:SosDispatchHeader.kt$import androidx.compose.runtime.*</ID>
     <ID>WildcardImport:SosHubScreen.kt$import androidx.compose.foundation.layout.*</ID>
     <ID>WildcardImport:SosHubScreen.kt$import androidx.compose.material3.*</ID>
     <ID>WildcardImport:SosHubScreen.kt$import androidx.compose.runtime.*</ID>
-    <ID>WildcardImport:SosLifecycleAndSyncTest.kt$import com.example.testresqmesh.core.network.*</ID>
-    <ID>WildcardImport:SosLifecycleAndSyncTest.kt$import com.example.testresqmesh.data.local.entity.*</ID>
+    <ID>WildcardImport:SosLifecycleAndSyncTest.kt$import edu.cit.resqmesh.core.network.*</ID>
+    <ID>WildcardImport:SosLifecycleAndSyncTest.kt$import edu.cit.resqmesh.data.local.entity.*</ID>
     <ID>WildcardImport:SosLifecycleAndSyncTest.kt$import kotlinx.coroutines.*</ID>
     <ID>WildcardImport:SosLifecycleAndSyncTest.kt$import kotlinx.coroutines.flow.*</ID>
     <ID>WildcardImport:SosLifecycleAndSyncTest.kt$import kotlinx.coroutines.test.*</ID>
@@ -3128,14 +3128,14 @@
     <ID>WildcardImport:SosNavigationTest.kt$import androidx.compose.foundation.layout.*</ID>
     <ID>WildcardImport:SosNavigationTest.kt$import androidx.compose.runtime.*</ID>
     <ID>WildcardImport:SosNavigationTest.kt$import androidx.compose.ui.test.*</ID>
-    <ID>WildcardImport:SosNavigationTest.kt$import com.example.testresqmesh.core.ui.components.layout.*</ID>
+    <ID>WildcardImport:SosNavigationTest.kt$import edu.cit.resqmesh.core.ui.components.layout.*</ID>
     <ID>WildcardImport:SosNavigationTest.kt$import org.junit.Assert.*</ID>
-    <ID>WildcardImport:SosRepository.kt$import com.example.testresqmesh.core.network.*</ID>
-    <ID>WildcardImport:SosRepository.kt$import com.example.testresqmesh.data.local.entity.*</ID>
+    <ID>WildcardImport:SosRepository.kt$import edu.cit.resqmesh.core.network.*</ID>
+    <ID>WildcardImport:SosRepository.kt$import edu.cit.resqmesh.data.local.entity.*</ID>
     <ID>WildcardImport:SosRepository.kt$import kotlinx.coroutines.*</ID>
     <ID>WildcardImport:SosRepository.kt$import kotlinx.coroutines.flow.*</ID>
-    <ID>WildcardImport:SosStore.kt$import com.example.testresqmesh.data.local.entity.*</ID>
-    <ID>WildcardImport:SosSyncCoordinator.kt$import com.example.testresqmesh.core.network.*</ID>
+    <ID>WildcardImport:SosStore.kt$import edu.cit.resqmesh.data.local.entity.*</ID>
+    <ID>WildcardImport:SosSyncCoordinator.kt$import edu.cit.resqmesh.core.network.*</ID>
     <ID>WildcardImport:SosSyncCoordinator.kt$import kotlinx.coroutines.*</ID>
     <ID>WildcardImport:SosSyncCoordinator.kt$import kotlinx.coroutines.flow.*</ID>
     <ID>WildcardImport:SosThreadHeader.kt$import androidx.compose.foundation.layout.*</ID>
