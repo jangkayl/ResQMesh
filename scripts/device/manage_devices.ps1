@@ -1,7 +1,7 @@
 <#
 .SYNOPSIS
     Interactive Device Manager for ResQMesh
-    Connect, disconnect, build, install, and launch ResQMesh on Android devices without Android Studio.
+    Connect, disconnect, build, install, launch, clear and uninstall ResQMesh on Android devices without Android Studio.
 #>
 
 $ErrorActionPreference = "Continue"
@@ -33,6 +33,8 @@ if (-not $adb) {
 
 # Resolve APK path relative to repo root
 $repoRoot = (Resolve-Path "$PSScriptRoot\..\..").Path
+# Install options pick the variant; debug stays the default for testing.
+$variant = "debug"
 $apkPath = "$repoRoot\app\build\outputs\apk\debug\app-debug.apk"
 # Read the applicationId from Gradle so a package rename needs no script change.
 $gradleFile = "$repoRoot\app\build.gradle.kts"
@@ -161,6 +163,24 @@ function Disconnect-SpecificDevice {
     Write-Host "Invalid selection." -ForegroundColor Red
 }
 
+# Asks Debug or Release and points $apkPath at that variant; returns $false if release cannot be signed.
+function Select-BuildVariant {
+    $answer = Read-Host "Install which build? [D]ebug / [r]elease (Press Enter for Debug)"
+    if ($answer -match "^[rR]") {
+        if (-not (Test-Path "$repoRoot\keystore.properties")) {
+            Write-Host "keystore.properties is missing, so a release build would be unsigned and cannot install." -ForegroundColor Red
+            Write-Host "Copy keystore.properties.example to keystore.properties and fill in your keystore details." -ForegroundColor Yellow
+            return $false
+        }
+        $script:variant = "release"
+    } else {
+        $script:variant = "debug"
+    }
+    $script:apkPath = "$repoRoot\app\build\outputs\apk\$variant\app-$variant.apk"
+    Write-Host "Using the $variant build." -ForegroundColor Cyan
+    return $true
+}
+
 function Show-BuildIdentity {
     if (-not (Test-Path $apkPath)) { return }
     Push-Location $repoRoot
@@ -176,6 +196,7 @@ function Show-BuildIdentity {
     $state = if ($dirty) { " (uncommitted changes present)" } else { "" }
     Write-Host "`n--- Build identity (record this on the test card) ---" -ForegroundColor Cyan
     Write-Host "  Package : $package"
+    Write-Host "  Variant : $variant"
     Write-Host "  Branch  : $branch"
     Write-Host "  Commit  : $commit$state"
     Write-Host "  Built   : $built"
@@ -186,12 +207,13 @@ function Show-BuildIdentity {
 function Ensure-ApkBuilt {
     param([switch]$Force)
     if ($Force -or (-not (Test-Path $apkPath))) {
-        Write-Host "`nBuilding latest debug APK with Gradle..." -ForegroundColor Cyan
+        Write-Host "`nBuilding latest $variant APK with Gradle..." -ForegroundColor Cyan
         $gradleCmd = if ($env:OS -match "Windows") { ".\gradlew.bat" } else { "./gradlew" }
         Push-Location $repoRoot
         try {
             # Out-Host shows Gradle output without turning it into this function's return value.
-            & $gradleCmd assembleDebug | Out-Host
+            $task = if ($variant -eq "release") { "assembleRelease" } else { "assembleDebug" }
+            & $gradleCmd $task | Out-Host
             if ($LASTEXITCODE -ne 0) {
                 Write-Host "Gradle build failed with exit code $LASTEXITCODE." -ForegroundColor Red
                 return $false
@@ -207,7 +229,7 @@ function Ensure-ApkBuilt {
 
 # Asks whether to rebuild; Enter means yes so a stale APK is not installed by accident.
 function Confirm-ApkBuild {
-    $buildChoice = Read-Host "Build latest debug APK before installing? [Y/n] (Press Enter for Yes)"
+    $buildChoice = Read-Host "Build latest $variant APK before installing? [Y/n] (Press Enter for Yes)"
     $force = ($buildChoice -eq "" -or $buildChoice -match "^[yY]")
     if (-not $force -and (Test-Path $apkPath)) {
         Write-Host "Using the existing APK; it may be older than your current code." -ForegroundColor Yellow
@@ -218,11 +240,18 @@ function Confirm-ApkBuild {
 }
 
 # Wakes the screen, starts the launcher activity and reports whether Android accepted it.
+# Uses am start instead of monkey, because monkey switches auto-rotate back on.
 function Start-App {
     param ([string]$DeviceId)
     & $adb -s $DeviceId shell input keyevent 224 2>$null | Out-Null
-    $out = (& $adb -s $DeviceId shell monkey -p $package -c android.intent.category.LAUNCHER 1 2>&1) -join "`n"
-    return ($out -match "Events injected: 1")
+    $component = (& $adb -s $DeviceId shell cmd package resolve-activity --brief -c android.intent.category.LAUNCHER $package 2>$null |
+        Where-Object { $_ -match "/" } | Select-Object -Last 1)
+    if ($component) {
+        $out = (& $adb -s $DeviceId shell am start -n $component.Trim() 2>&1) -join "`n"
+    } else {
+        $out = (& $adb -s $DeviceId shell am start -a android.intent.action.MAIN -c android.intent.category.LAUNCHER -p $package 2>&1) -join "`n"
+    }
+    return ($out -match "Starting: Intent" -and $out -notmatch "Error")
 }
 
 function Install-App {
@@ -240,6 +269,17 @@ function Install-App {
 
     Write-Host "  -> Installing to $DeviceId ($modelStr)..." -ForegroundColor Cyan
     $installOut = & $adb -s $DeviceId install -r $apkPath 2>&1
+    if ("$installOut" -match "INSTALL_FAILED_UPDATE_INCOMPATIBLE") {
+        # The other variant is signed with a different key; replacing it means uninstalling, which wipes app data.
+        Write-Host "     $modelStr has a build signed with another key (debug vs release)." -ForegroundColor Yellow
+        $confirm = Read-Host "     Type YES to uninstall it (erases node ID, messages and keys) and install the $variant build"
+        if ($confirm -cne "YES") {
+            Write-Host "     Skipped $modelStr." -ForegroundColor DarkGray
+            return $false
+        }
+        & $adb -s $DeviceId uninstall $package 2>&1 | Out-Null
+        $installOut = & $adb -s $DeviceId install -r $apkPath 2>&1
+    }
     if ($LASTEXITCODE -ne 0 -or ($installOut -match "Failure|INSTALL_FAILED")) {
         Write-Host "     Install failed: $installOut" -ForegroundColor Red
         return $false
@@ -258,6 +298,7 @@ function Install-App {
 function Install-AllDevices {
     Write-Host "`n=== Install & Launch on ALL Devices ===" -ForegroundColor Green
 
+    if (-not (Select-BuildVariant)) { return }
     if (-not (Confirm-ApkBuild)) { return }
 
     Sync-WirelessDevices
@@ -302,7 +343,7 @@ function Install-SpecificDevice {
     if ($selection -match "^\d+$") {
         $idx = [int]$selection - 1
         if ($idx -ge 0 -and $idx -lt $active.Count) {
-            if (Confirm-ApkBuild) {
+            if ((Select-BuildVariant) -and (Confirm-ApkBuild)) {
                 Install-App -DeviceId ([string]$active[$idx].Id) | Out-Null
                 Write-Host "`nDone!" -ForegroundColor Green
             }
@@ -332,6 +373,60 @@ function Launch-AllDevices {
     Write-Host "`nLaunch requests sent." -ForegroundColor Green
 }
 
+# Runs one adb package action on every distinct phone after a typed confirmation.
+function Invoke-AllDevicesPackageAction {
+    param (
+        [string]$Title,
+        [string]$Warning,
+        [scriptblock]$Action
+    )
+    Write-Host "`n=== $Title on ALL Devices ===" -ForegroundColor Yellow
+    Sync-WirelessDevices
+    $devs = @(Get-DeduplicatedActiveDevices)
+    if ($devs.Count -eq 0) {
+        Write-Host "No active devices connected." -ForegroundColor Red
+        return
+    }
+
+    Write-Host "Targeting $($devs.Count) distinct active device(s):" -ForegroundColor Cyan
+    foreach ($d in $devs) {
+        $m = (& $adb -s $d.Id shell getprop ro.product.model 2>$null)
+        $mName = if ($m) { $m.Trim() } else { "Unknown" }
+        Write-Host "  $($d.Id) ($mName)" -ForegroundColor DarkCyan
+    }
+    Write-Host $Warning -ForegroundColor Yellow
+    $confirm = Read-Host "Type YES to continue"
+    if ($confirm -cne "YES") {
+        Write-Host "Cancelled." -ForegroundColor DarkGray
+        return
+    }
+
+    $okCount = 0
+    foreach ($d in $devs) {
+        $targetId = [string]$d.Id
+        $out = (& $Action $targetId) -join " "
+        if ($out -match "Success") {
+            Write-Host "  $targetId : done" -ForegroundColor Green
+            $okCount++
+        } else {
+            Write-Host "  $targetId : $out" -ForegroundColor Red
+        }
+    }
+    Write-Host "`n$Title finished on $okCount of $($devs.Count) device(s)." -ForegroundColor Green
+}
+
+function Clear-AllDevicesData {
+    Invoke-AllDevicesPackageAction -Title "Clear $package data" `
+        -Warning "This erases node ID, messages and keys; the app stays installed." `
+        -Action { param($id) & $adb -s $id shell pm clear $package 2>&1 }
+}
+
+function Uninstall-AllDevices {
+    Invoke-AllDevicesPackageAction -Title "Uninstall $package" `
+        -Warning "This removes the app (debug or release) and all its data." `
+        -Action { param($id) & $adb -s $id uninstall $package 2>&1 }
+}
+
 # --- Interactive Main Loop ---
 do {
     Write-Host "`n============================================" -ForegroundColor Green
@@ -341,14 +436,16 @@ do {
     Write-Host " [2] Connect device manually (IP:Port)"
     Write-Host " [3] Disconnect / Remove all devices"
     Write-Host " [4] Disconnect / Remove a specific device"
-    Write-Host " [5] Install APK & Launch on ALL devices"
-    Write-Host " [6] Install APK & Launch on a SPECIFIC device"
+    Write-Host " [5] Install APK (debug/release) & Launch on ALL devices"
+    Write-Host " [6] Install APK (debug/release) & Launch on a SPECIFIC device"
     Write-Host " [7] Launch app on ALL devices (no reinstall)"
     Write-Host " [8] Show connected devices status"
+    Write-Host " [9] Clear app data on ALL devices"
+    Write-Host " [10] Uninstall app (and data) from ALL devices"
     Write-Host " [0] Exit"
     Write-Host "============================================" -ForegroundColor Green
 
-    $choice = Read-Host "Select an option (0-8)"
+    $choice = Read-Host "Select an option (0-10)"
 
     switch ($choice) {
         "1" { Connect-AllMdnsDevices }
@@ -359,7 +456,9 @@ do {
         "6" { Install-SpecificDevice }
         "7" { Launch-AllDevices }
         "8" { Show-ConnectedDevices | Out-Null }
+        "9" { Clear-AllDevicesData }
+        "10" { Uninstall-AllDevices }
         "0" { Write-Host "`nGoodbye!" -ForegroundColor Cyan; break }
-        default { Write-Host "Invalid option. Please choose between 0 and 8." -ForegroundColor Yellow }
+        default { Write-Host "Invalid option. Please choose between 0 and 10." -ForegroundColor Yellow }
     }
 } while ($choice -ne "0")

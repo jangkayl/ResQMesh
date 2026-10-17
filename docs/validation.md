@@ -38,7 +38,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\ci\check_docs.ps1
 git diff --check
 ```
 
-Signed release APK: copy `keystore.properties.example` to the gitignored `keystore.properties`, point it at a keystore kept outside the repository, then run `.\gradlew.bat :app:assembleRelease`. The output is `app/build/outputs/apk/release/app-release.apk`. Without the file, the release APK is unsigned. Release and debug signatures differ, so switching variants on a phone needs an uninstall, which clears app data.
+Signed release APK: copy `keystore.properties.example` to the gitignored `keystore.properties` (keystore kept outside the repository), then run `.\gradlew.bat :app:assembleRelease`; without it the APK is unsigned. Debug and release signatures differ, so switching needs an uninstall, which clears data. `scripts\device\manage_devices.ps1` options 5/6 offer Debug (default) or Release and reinstall a differently signed variant only after a typed `YES`; option 9 clears data and 10 uninstalls everywhere. It launches with `am start` because `monkey` re-enables auto-rotate.
 
 ## Historical local milestones
 
@@ -46,6 +46,7 @@ Full October 4–5 audit narratives and APK hashes are in the [October 5 validat
 
 | Historical snapshot | Recorded evidence |
 | --- | --- |
+| Release signing and device manager, October 17 | Signed release APK verified with apksigner (v2, RSA 2048); script parse and docs checks pass. User reported the updated device manager working on OPPO CPH2127 and Samsung SM-P615. ColorOS refused clear data until Developer options allowed it; uninstall worked. Per-step results, API levels and auto-rotate observations not supplied. |
 | Incident UI follow-up `db2260e`, October 5 | Debug/Android-test builds and Lint (zero errors, 148 warnings); 18 incident UI tests and four 200%-text cases passed on API 37 emulator. |
 | App ID rename (`edu.cit.resqmesh`), October 17 | Clean debug/Android-test builds, 461/461 JVM tests (golden wire tests unchanged), Lint, detekt, boundary and docs checks pass. The APK package was verified with aapt2, and the reviewer found only the intended replacement. User reported all [rename card](testing/app-id-rename-card.md) steps passing on three phones after a fresh install; APK `828FED8D…403E36` from `c269739`. Counts and captures were not supplied. |
 | Layer boundaries (P2 subset), October 17 | Debug/Android-test builds, 461/461 JVM tests (new mapper, `IncidentRules` parity, adapter and use-case tests), Lint, detekt, boundary check (0 allowlisted, with qualified-name scan) and docs pass; reviewer found no behavior regressions. `core/network`, entities and DAOs unchanged. User reported all [smoke card](testing/layer-boundaries-smoke-card.md) steps passing on 2026-10-17 on vivo V2424 (API 34), Samsung SM-P615 (API 33) and OPPO CPH2127 (API 31); APK `EB2A86F9…DFE4222` from source `62c62fc`. Per-step notes, counts and captures not supplied; the optional relay step does not close DELIVERY-01. |
