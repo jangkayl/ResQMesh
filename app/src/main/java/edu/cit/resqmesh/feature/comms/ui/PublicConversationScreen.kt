@@ -1,5 +1,8 @@
 package edu.cit.resqmesh.feature.comms.ui
 
+import edu.cit.resqmesh.core.ui.components.inputs.InputCounter
+import edu.cit.resqmesh.core.security.input.TextPolicy
+import edu.cit.resqmesh.core.security.input.TextField
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -227,15 +230,19 @@ fun PublicConversationScreen(
                         OutlinedTextField(
                             value = input,
                             onValueChange = {
-                                input = it
+                                val capped = TextPolicy.clampLength(it, TextField.MESSAGE)
+                                input = capped
                                 restored = true
-                                vm.draft(key, it)
+                                vm.draft(key, capped)
                             },
                             placeholder = {
                                 Text(if (kind == "RADIO") "Message this Radio channel…" else "Reply to this SOS…")
                             },
                             modifier = Modifier.weight(1f).testTag("conversation_input"),
                             maxLines = if (compactLayout) 2 else 4,
+                            supportingText = if (TextPolicy.showCounter(input.length, TextField.MESSAGE)) {
+                                { InputCounter(input.length, TextField.MESSAGE) }
+                            } else null,
                             shape = RoundedCornerShape(24.dp),
                             colors = OutlinedTextFieldDefaults.colors(
                                 focusedBorderColor = MaterialTheme.colorScheme.primary,

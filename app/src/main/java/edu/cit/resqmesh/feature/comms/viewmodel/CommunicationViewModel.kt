@@ -20,6 +20,9 @@ import edu.cit.resqmesh.core.utils.throttleLatest
 import edu.cit.resqmesh.core.domain.usecase.messaging.PrivateSendResult
 import edu.cit.resqmesh.core.domain.usecase.messaging.SendPrivateChatMessageUseCase
 import edu.cit.resqmesh.core.domain.usecase.sos.RaiseSosUseCase
+import edu.cit.resqmesh.core.security.input.TextField
+import edu.cit.resqmesh.core.security.input.TextPolicy
+import edu.cit.resqmesh.core.security.input.ValidationResult
 
 class CommunicationViewModel(
     private val useCases: edu.cit.resqmesh.core.domain.usecase.MeshUseCases,
@@ -53,6 +56,24 @@ class CommunicationViewModel(
         edu.cit.resqmesh.feature.comms.model.SosMeshStatus(edu.cit.resqmesh.feature.comms.model.SosMeshState.OFF))
     private var sosLocationGeneration = 0L
     private var creatingSos = false
+    private val sendDebouncer = SendDebouncer(SEND_DEBOUNCE_MS) { android.os.SystemClock.elapsedRealtime() }
+
+    private fun mediaKind(image: String?, audio: String?) = when {
+        image != null -> "img"
+        audio != null -> "aud"
+        else -> "txt"
+    }
+
+    /** Returns the sanitized text, or null (with feedback) when it exceeds the message limit. */
+    private fun checkedMessageText(text: String): String? =
+        when (val checked = TextPolicy.validate(text, TextField.MESSAGE)) {
+            is ValidationResult.Valid -> checked.value
+            ValidationResult.Blank -> ""
+            is ValidationResult.TooLong -> {
+                sosErrors.tryEmit("Message is too long (max ${checked.max} characters).")
+                null
+            }
+        }
 
     private val _isAcquiringLocation = MutableStateFlow(false)
     val isAcquiringLocation: StateFlow<Boolean> = _isAcquiringLocation.asStateFlow()
@@ -79,8 +100,13 @@ class CommunicationViewModel(
         return messages.count { !it.isMine && it.timestamp > time }
     }
     fun sendConversation(kind: String, channel: String = "", sosId: String = "", text: String, audio: String? = null) {
-        useCases.sendPublicMessage.conversation(kind, channel, sosId, text, audio)
-        draft(edu.cit.resqmesh.core.model.ConversationPolicy.key(kind, channel, sosId), "")
+        val clean = checkedMessageText(text) ?: return
+        if (!sendDebouncer.tryAcquire("conv:$kind:$channel:$sosId:${mediaKind(null, audio)}")) return
+        // An empty id means the repository refused the message (final length guard): keep the draft.
+        val messageId = useCases.sendPublicMessage.conversation(kind, channel, sosId, clean, audio)
+        if (messageId.isNotEmpty()) {
+            draft(edu.cit.resqmesh.core.model.ConversationPolicy.key(kind, channel, sosId), "")
+        }
     }
     fun isOwnSos(alert: edu.cit.resqmesh.core.model.SosAlert): Boolean = sosRepository.isOwnSos(alert)
     fun sosActivity(id: String) = sosRepository.sosActivity(id)
@@ -140,7 +166,9 @@ class CommunicationViewModel(
     }
 
     fun sendPublicMessage(text: String, imageBase64: String? = null, audioBase64: String? = null) {
-        useCases.sendPublicMessage(text, imageBase64, audioBase64)
+        val clean = checkedMessageText(text) ?: return
+        if (!sendDebouncer.tryAcquire("public:${mediaKind(imageBase64, audioBase64)}")) return
+        useCases.sendPublicMessage(clean, imageBase64, audioBase64)
     }
 
     val publicSendFeedback = kotlinx.coroutines.flow.merge(useCases.sendPublicMessage.feedback, sosErrors)
@@ -179,11 +207,34 @@ class CommunicationViewModel(
         useCases.deleteConversationWith(peerName)
     }
 
-    fun sendPrivateMessage(targetName: String, text: String, imageBase64: String? = null, audioBase64: String? = null): Boolean {
-        return when (sendPrivate(targetName, text, imageBase64, audioBase64)) {
+    /**
+     * Returns true only when the message was sent. A duplicate tap inside the debounce window returns false
+     * without feedback (the caller keeps its draft; the first tap's send is already in flight or done).
+     */
+    fun sendPrivateMessage(
+        targetName: String,
+        text: String,
+        imageBase64: String? = null,
+        audioBase64: String? = null
+    ): Boolean {
+        val key = "private:$targetName:${mediaKind(imageBase64, audioBase64)}"
+        if (sendDebouncer.isBlocked(key)) return false
+        val result = sendPrivate(targetName, text, imageBase64, audioBase64)
+        if (result !is PrivateSendResult.TooLong) sendDebouncer.mark(key)
+        return when (result) {
             PrivateSendResult.Sent -> true
-            PrivateSendResult.NeedsKeyVerification -> { _pendingKeyVerification.tryEmit(targetName); false }
-            PrivateSendResult.Failed -> { reportPrivateSendFailure(); false }
+            PrivateSendResult.NeedsKeyVerification -> {
+                _pendingKeyVerification.tryEmit(targetName)
+                false
+            }
+            PrivateSendResult.Failed -> {
+                reportPrivateSendFailure()
+                false
+            }
+            is PrivateSendResult.TooLong -> {
+                _privateSendErrors.tryEmit("Message is too long (max ${result.max} characters).")
+                false
+            }
         }
     }
 
@@ -272,3 +323,5 @@ class CommunicationViewModel(
         }
     }
 }
+
+private const val SEND_DEBOUNCE_MS = 400L

@@ -1,5 +1,7 @@
 package edu.cit.resqmesh.data.repository.incident
 
+import edu.cit.resqmesh.core.security.input.TextField
+import edu.cit.resqmesh.core.security.input.TextSanitizer
 import edu.cit.resqmesh.core.model.EntityType
 import edu.cit.resqmesh.core.model.EventType
 import edu.cit.resqmesh.core.model.IncidentState
@@ -44,8 +46,18 @@ internal class IncidentCommands(
         locationAccuracyMeters: Float? = null,
         title: String = ""
     ): IncidentEntity {
-        val cleanTitle = title.trim()
-        require(cleanTitle.length <= 80) { "Incident title cannot exceed 80 characters" }
+        val cleanTitle = TextSanitizer.sanitize(title, TextField.INCIDENT_TITLE)
+        require(cleanTitle.length <= TextField.INCIDENT_TITLE.maxLength) {
+            "Incident title cannot exceed ${TextField.INCIDENT_TITLE.maxLength} characters"
+        }
+        val description = TextSanitizer.sanitize(description, TextField.INCIDENT_DESCRIPTION)
+        require(description.length <= TextField.INCIDENT_DESCRIPTION.maxLength) {
+            "Incident description cannot exceed ${TextField.INCIDENT_DESCRIPTION.maxLength} characters"
+        }
+        val areaDescription = TextSanitizer.sanitize(areaDescription, TextField.INCIDENT_AREA)
+        require(areaDescription.length <= TextField.INCIDENT_AREA.maxLength) {
+            "Incident area cannot exceed ${TextField.INCIDENT_AREA.maxLength} characters"
+        }
         val user = identityManager.getOrCreateUser()
         val incidentId = "INC-${UUID.randomUUID().toString().replace("-", "").take(8).uppercase()}"
         val eventId = "EVT-${UUID.randomUUID().toString().replace("-", "").take(8).uppercase()}"

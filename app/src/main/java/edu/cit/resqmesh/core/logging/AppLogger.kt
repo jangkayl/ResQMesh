@@ -12,6 +12,7 @@ import java.util.ArrayDeque
 import java.util.Date
 import java.util.Locale
 
+@Suppress("TooManyFunctions")
 object AppLogger {
     private val lock = Any()
     private val _logs = MutableStateFlow<List<TerminalLogEntry>>(emptyList())
@@ -167,6 +168,13 @@ object AppLogger {
             dirty = false
             _logs.value = emptyList()
         }
+    }
+
+    /** Non-reversible, stable name tag so logs can correlate a peer without exposing the name. */
+    fun redactName(name: String?): String {
+        if (name.isNullOrBlank()) return "<name:none>"
+        val hash = Integer.toHexString(name.trim().lowercase().hashCode())
+        return "<name:${name.trim().first()}…len=${name.trim().length}#$hash>"
     }
 
     // Every endpoint match contains ':', so messages without one cannot match the regex.

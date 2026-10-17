@@ -40,4 +40,11 @@ class SendPrivateChatMessageUseCaseTest {
         assertEquals(PrivateSendResult.Failed,
             SendPrivateChatMessageUseCase(repository(sent = false, pendingKey = false))("bob", "hi", null, null))
     }
+
+    @Test
+    fun overLimitTextIsRejectedWithoutTouchingRepository() {
+        val useCase = SendPrivateChatMessageUseCase(repository(sent = true, pendingKey = false))
+        assertEquals(PrivateSendResult.TooLong(1000), useCase("bob", "x".repeat(1001), null, null))
+        assertEquals(emptyList<String>(), calls)
+    }
 }

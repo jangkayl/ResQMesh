@@ -1,17 +1,18 @@
-<?xml version="1.0" encoding="utf-8"?><!--
-   Sample data extraction rules file; uncomment and customize as necessary.
-   See https://developer.android.com/about/versions/12/backup-restore#xml-changes
-   for details.
--->
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Identity, keys and messages are device-local; exclude everything from backup and device transfer. -->
 <data-extraction-rules>
     <cloud-backup>
-        <include domain="sharedpref" path="."/>
-        <exclude domain="sharedpref" path="resqmesh_prefs.xml"/>
-        <exclude domain="sharedpref" path="resqmesh_peer_public_keys.xml"/>
+        <exclude domain="root" path="."/>
+        <exclude domain="file" path="."/>
+        <exclude domain="database" path="."/>
+        <exclude domain="sharedpref" path="."/>
+        <exclude domain="external" path="."/>
     </cloud-backup>
     <device-transfer>
-        <include domain="sharedpref" path="."/>
-        <exclude domain="sharedpref" path="resqmesh_prefs.xml"/>
-        <exclude domain="sharedpref" path="resqmesh_peer_public_keys.xml"/>
+        <exclude domain="root" path="."/>
+        <exclude domain="file" path="."/>
+        <exclude domain="database" path="."/>
+        <exclude domain="sharedpref" path="."/>
+        <exclude domain="external" path="."/>
     </device-transfer>
 </data-extraction-rules>

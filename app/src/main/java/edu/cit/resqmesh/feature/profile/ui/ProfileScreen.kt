@@ -328,13 +328,13 @@ fun ProfileScreen(
         }
 
         // Section 4: Developer Mode (Conditional / PIN gated)
-        item { SettingsLabel("DEVELOPER TOOLS") }
-        item {
+        if (edu.cit.resqmesh.BuildConfig.DEBUG) item { SettingsLabel("DEVELOPER TOOLS") }
+        if (edu.cit.resqmesh.BuildConfig.DEBUG) item {
             SettingsCard {
                 SettingRow(
                     icon = Icons.Default.Terminal,
                     title = "Developer Debugging Mode",
-                    subtitle = if (isDeveloperMode) "Active (PIN 0000 verified)" else "Locked (Requires PIN 0000)",
+                    subtitle = if (isDeveloperMode) "Active" else "Locked (requires PIN)",
                     onClick = {
                         if (isDeveloperMode) {
                             viewModel.setDeveloperMode(context, false)
@@ -409,7 +409,7 @@ fun ProfileScreen(
                                 pinError = null
                             }
                         },
-                        label = { Text("PIN (0000)") },
+                        label = { Text("PIN") },
                         singleLine = true,
                         isError = pinError != null,
                         supportingText = pinError?.let { { Text(it, color = MaterialTheme.colorScheme.error) } },

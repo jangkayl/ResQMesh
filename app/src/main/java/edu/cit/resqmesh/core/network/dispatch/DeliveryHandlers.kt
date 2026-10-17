@@ -61,6 +61,10 @@ class ReceiptHandler : PayloadHandler {
 
 @OptIn(ExperimentalSerializationApi::class)
 class StandardMessageHandler : PayloadHandler {
+    private companion object {
+        const val ATTACHMENT_UNAVAILABLE = "[Attachment unavailable]"
+    }
+
     override fun canHandle(payloadType: String) = !listOf("SYSTEM", "SEEN", "DELIVERED", "GOODBYE", "BLOCK", "UNBLOCK", "LIVE_AUDIO").contains(payloadType)
 
     override fun handle(endpointId: String, payload: MeshPayload, payloadBytes: ByteArray, callback: PayloadDispatcherCallback) {
@@ -71,20 +75,44 @@ class StandardMessageHandler : PayloadHandler {
         val isEncrypted = payload.isEncrypted
 
         var text = payload.text
-        var imageBase64 = if (isPrivate) null else payload.imageBytes?.let { Base64.encodeToString(BinaryCompressor.decompress(it), Base64.DEFAULT) }
-        var audioBase64 = if (isPrivate) null else payload.audioBytes?.let { Base64.encodeToString(BinaryCompressor.decompress(it), Base64.DEFAULT) }
+        var mediaRejected = false
+        fun inflateMedia(raw: ByteArray?): String? {
+            if (isPrivate || raw == null) return null
+            return when (val r = BinaryCompressor.decompressBounded(raw)) {
+                is BinaryCompressor.BoundedResult.Ok -> Base64.encodeToString(r.bytes, Base64.DEFAULT)
+                is BinaryCompressor.BoundedResult.TooLarge -> {
+                    mediaRejected = true
+                    AppLogger.d("PayloadDispatcher", "MEDIA_REJECT reason=too_large bytes=${r.bytes}")
+                    null
+                }
+                is BinaryCompressor.BoundedResult.Corrupt -> {
+                    mediaRejected = true
+                    AppLogger.d(
+                        "PayloadDispatcher",
+                        "MEDIA_REJECT reason=corrupt bytes=${r.bytes} cause=${r.cause}"
+                    )
+                    null
+                }
+            }
+        }
+        var imageBase64 = inflateMedia(payload.imageBytes)
+        var audioBase64 = inflateMedia(payload.audioBytes)
+        if (mediaRejected) text = if (text.isBlank()) ATTACHMENT_UNAVAILABLE else "$text\n$ATTACHMENT_UNAVAILABLE"
         var locationLat = if (isPrivate) null else payload.locationLat
         var locationLng = if (isPrivate) null else payload.locationLng
 
         if (isPrivate && !isEncrypted) {
-            AppLogger.d("MeshNetwork_E2EE", "Rejected unencrypted private payload from $sender")
+            AppLogger.d("MeshNetwork_E2EE", "Rejected unencrypted private payload from ${AppLogger.redactName(sender)}")
             return
         }
 
         if (isEncrypted) {
-            AppLogger.d("MeshNetwork_E2EE", "INBOUND ENCRYPTED PAYLOAD DETECTED from $sender")
+            AppLogger.d("MeshNetwork_E2EE", "INBOUND ENCRYPTED PAYLOAD DETECTED from ${AppLogger.redactName(sender)}")
         } else {
-            AppLogger.d("MeshNetwork_E2EE", "INBOUND PUBLIC PAYLOAD DETECTED from $sender. No encryption applied.")
+            AppLogger.d(
+                "MeshNetwork_E2EE",
+                "INBOUND PUBLIC PAYLOAD DETECTED from ${AppLogger.redactName(sender)}. No encryption applied."
+            )
         }
 
         val isTarget = payload.targetNodeId.isNotBlank() && payload.targetNodeId.equals(callback.getMyNodeId(), ignoreCase = true) ||
@@ -119,11 +147,18 @@ class StandardMessageHandler : PayloadHandler {
             text = "[ENCRYPTED CONTENT: Routing...]"
             imageBase64 = null
             audioBase64 = null
-            AppLogger.d("MeshNetwork_E2EE", "E2EE ROUTING: Message is for $targetName. Acting as a blind encrypted relay.")
+            AppLogger.d(
+                "MeshNetwork_E2EE",
+                "E2EE ROUTING: Message is for ${AppLogger.redactName(targetName)}. Acting as a blind encrypted relay."
+            )
         }
 
         val medium = callback.getEndpointMedium(endpointId)
-        AppLogger.d("PayloadDispatcher", "ROUTE (Received): Message from [$sender] arrived physically via endpoint [$endpointId] using $medium")
+        AppLogger.d(
+            "PayloadDispatcher",
+            "ROUTE (Received): Message from [${AppLogger.redactName(sender)}] " +
+                "arrived physically via endpoint [$endpointId] using $medium"
+        )
 
         val routePath = payload.routePath.toMutableList()
         val directedRoute = payload.directedRoute
@@ -132,7 +167,11 @@ class StandardMessageHandler : PayloadHandler {
             if (isTarget) {
                 callback.onMessageReceived(endpointId, msgId, sender, text, isPrivate, false, imageBase64, audioBase64, locationLat, locationLng, medium, routePath, payload.channelId)
             } else {
-                AppLogger.d("PayloadDispatcher", "ROUTE (Relay): Forwarding Private message meant for [$targetName] securely across the mesh.")
+                AppLogger.d(
+                    "PayloadDispatcher",
+                    "ROUTE (Relay): Forwarding Private message meant for " +
+                        "[${AppLogger.redactName(targetName)}] securely across the mesh."
+                )
                 routePath.add(callback.getMyDeviceName())
                 val updatedPayload = payload.copy(routePath = routePath)
                 val updatedBytes = ProtoBuf.encodeToByteArray(updatedPayload)

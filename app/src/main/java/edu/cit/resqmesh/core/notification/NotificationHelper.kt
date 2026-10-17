@@ -12,7 +12,7 @@ import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.app.Person
-import edu.cit.resqmesh.MainActivity
+import edu.cit.resqmesh.app.navigation.NotificationRouterActivity
 import edu.cit.resqmesh.R
 import java.util.concurrent.ConcurrentHashMap
 
@@ -87,7 +87,7 @@ class NotificationHelper(private val context: Context) {
         }
 
         // Deep link intent to directly open the specific active chat screen
-        val openChatIntent = Intent(context, MainActivity::class.java).apply {
+        val openChatIntent = Intent(context, NotificationRouterActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
             putExtra("EXTRA_OPEN_CHAT_NODE", senderName)
         }
@@ -146,7 +146,7 @@ class NotificationHelper(private val context: Context) {
     fun showSosEmergencyNotification(senderName: String, messageText: String, sosId: String = "legacy") {
         if (!NotificationManagerCompat.from(context).areNotificationsEnabled()) return
         // Deep link into SOS alarm / map
-        val mainAlarmIntent = Intent(context, MainActivity::class.java).apply {
+        val mainAlarmIntent = Intent(context, NotificationRouterActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
             putExtra("EXTRA_TRIGGER_SOS", true)
             putExtra("EXTRA_SOS_SENDER", senderName)
@@ -161,7 +161,7 @@ class NotificationHelper(private val context: Context) {
         )
 
         // Direct action to jump straight to the tactical SOS map
-        val viewMapIntent = Intent(context, MainActivity::class.java).apply {
+        val viewMapIntent = Intent(context, NotificationRouterActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
             putExtra("EXTRA_VIEW_SOS_MAP", true)
             putExtra("EXTRA_SOS_SENDER", senderName)

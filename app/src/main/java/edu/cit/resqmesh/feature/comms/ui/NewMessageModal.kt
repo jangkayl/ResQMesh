@@ -1,5 +1,6 @@
 package edu.cit.resqmesh.feature.comms.ui
 
+import edu.cit.resqmesh.core.security.input.TextField
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -116,6 +117,7 @@ fun NewMessageModal(
         ResQTextField(
             value = query,
             onValueChange = { query = it },
+            limit = TextField.SEARCH,
             placeholder = stringResource(R.string.new_message_search_placeholder),
             leadingIcon = {
                 Icon(

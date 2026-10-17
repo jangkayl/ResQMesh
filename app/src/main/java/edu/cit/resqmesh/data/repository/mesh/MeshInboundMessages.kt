@@ -7,6 +7,7 @@ import edu.cit.resqmesh.core.network.MeshPayload
 import edu.cit.resqmesh.core.network.MeshNetworkGateway
 import edu.cit.resqmesh.core.logging.AppLogger
 import android.util.Base64
+import edu.cit.resqmesh.core.utils.BinaryCompressor
 import kotlinx.serialization.encodeToByteArray
 import kotlinx.serialization.protobuf.ProtoBuf
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -136,11 +137,13 @@ internal class MeshInboundMessages(
             p.senderName.length !in 1..160 || p.text.length > 8192 || p.isPrivate || p.isEncrypted ||
             p.conversationKind !in setOf("COMMUNITY", "RADIO", "SOS") || p.ttl !in 1..10 || p.relayHopCount !in 0..10) return
         if (p.conversationKind == "RADIO" && p.channelId !in (1..5).map { it.toString() }) return
-        if (p.conversationKind == "SOS" && (p.audioBytes != null || p.imageBytes != null || sosRepository?.canReply(p.sosId) != true)) return
-        if ((p.audioBytes?.size ?: 0) > 2 * 1024 * 1024 || (p.imageBytes?.size ?: 0) > 2 * 1024 * 1024) return
+        val sosBlocked = p.audioBytes != null || p.imageBytes != null || sosRepository?.canReply(p.sosId) != true
+        if (p.conversationKind == "SOS" && sosBlocked) return
+        val maxMedia = BinaryCompressor.MAX_MEDIA_BYTES
+        if ((p.audioBytes?.size ?: 0) > maxMedia || (p.imageBytes?.size ?: 0) > maxMedia) return
         val attachments = runCatching {
-            val audio = p.audioBytes?.let { Base64.encodeToString(edu.cit.resqmesh.core.utils.BinaryCompressor.decompress(it, 2 * 1024 * 1024), Base64.NO_WRAP) }
-            val image = p.imageBytes?.let { Base64.encodeToString(edu.cit.resqmesh.core.utils.BinaryCompressor.decompress(it, 2 * 1024 * 1024), Base64.NO_WRAP) }
+            val audio = p.audioBytes?.let { inflateToBase64(it) }
+            val image = p.imageBytes?.let { inflateToBase64(it) }
             audio to image
         }.getOrElse {
             AppLogger.d("CONVERSATION", "Rejected invalid attachment")
@@ -181,3 +184,6 @@ internal class MeshInboundMessages(
 
     fun rejectPendingPublicKeyChange(peerName: String): Boolean = publicKeys.rejectPendingChange(peerName)
 }
+
+private fun inflateToBase64(bytes: ByteArray): String =
+    Base64.encodeToString(BinaryCompressor.decompress(bytes, BinaryCompressor.MAX_MEDIA_BYTES), Base64.NO_WRAP)

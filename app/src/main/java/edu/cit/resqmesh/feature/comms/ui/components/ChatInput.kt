@@ -1,5 +1,8 @@
 package edu.cit.resqmesh.feature.comms.ui.components
 
+import edu.cit.resqmesh.core.ui.components.inputs.InputCounter
+import edu.cit.resqmesh.core.security.input.TextField
+import edu.cit.resqmesh.core.security.input.TextPolicy
 import edu.cit.resqmesh.feature.comms.ui.components.composer.LocationAcquisitionBanner
 import edu.cit.resqmesh.feature.comms.ui.components.composer.ComposerAttachmentPreview
 import edu.cit.resqmesh.feature.comms.ui.components.composer.ComposerActionPopup
@@ -58,6 +61,7 @@ import edu.cit.resqmesh.core.audio.MediaHelper
  *   with Photo, Location, and Voice actions.
  * - Auto-expanding multi-line text input that morphs its corner radius dynamically.
  */
+@Suppress("FunctionNaming", "LongParameterList", "LongMethod", "CyclomaticComplexMethod")
 @Composable
 fun ChatInput(
     inputText: String,
@@ -74,7 +78,8 @@ fun ChatInput(
     mediaHelper: MediaHelper,
     isAcquiringLocation: Boolean = false,
     replyingTo: ChatMessage? = null,
-    onCancelReply: () -> Unit = {}
+    onCancelReply: () -> Unit = {},
+    maxInputLength: Int = TextField.MESSAGE.maxLength
 ) {
     val context = LocalContext.current
     val haptics = LocalHapticFeedback.current
@@ -421,9 +426,10 @@ fun ChatInput(
                                 .padding(horizontal = 14.dp, vertical = 10.dp),
                             contentAlignment = Alignment.CenterStart
                         ) {
+                            Column(modifier = Modifier.fillMaxWidth()) {
                             BasicTextField(
                                 value = inputText,
-                                onValueChange = onTextChange,
+                                onValueChange = { onTextChange(TextPolicy.clampLength(it, maxInputLength)) },
                                 enabled = true,
                                 modifier = Modifier.fillMaxWidth(),
                                 minLines = 1,
@@ -444,6 +450,8 @@ fun ChatInput(
                                     innerTextField()
                                 }
                             )
+                            InputCounter(inputText.length, TextField.MESSAGE)
+                            }
                         }
                     }
                 }

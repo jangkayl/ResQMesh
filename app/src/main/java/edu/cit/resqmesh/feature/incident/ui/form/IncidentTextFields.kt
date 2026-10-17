@@ -1,5 +1,8 @@
 package edu.cit.resqmesh.feature.incident.ui.form
 
+import edu.cit.resqmesh.core.security.input.TextPolicy
+import edu.cit.resqmesh.core.ui.components.inputs.InputCounter
+import edu.cit.resqmesh.core.security.input.TextField
 import androidx.compose.animation.*
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -42,10 +45,12 @@ internal fun IncidentTitleField(
             .bringIntoViewRequester(titleBringIntoView),
         verticalArrangement = Arrangement.spacedBy(4.dp)
     ) {
-        val isTitleError = showErrors && (title.trim().isEmpty() || title.trim().length > 80)
+        val trimmedTitle = title.trim()
+        val isTitleError = showErrors &&
+            (trimmedTitle.isEmpty() || trimmedTitle.length > TextField.INCIDENT_TITLE.maxLength)
         OutlinedTextField(
             value = title,
-            onValueChange = { onTitleChanged(it) },
+            onValueChange = { onTitleChanged(TextPolicy.clampLength(it, TextField.INCIDENT_TITLE)) },
             label = { Text("Title *") },
             placeholder = { Text("Help moving an injured person") },
             singleLine = true,
@@ -99,11 +104,14 @@ internal fun IncidentDescriptionField(
     ) {
         OutlinedTextField(
             value = description,
-            onValueChange = { onDescriptionChanged(it) },
+            onValueChange = { onDescriptionChanged(TextPolicy.clampLength(it, TextField.INCIDENT_DESCRIPTION)) },
             label = { Text("Description") },
             placeholder = { Text("Describe what happened and the assistance needed.") },
             minLines = 3,
             maxLines = 5,
+            supportingText = if (TextPolicy.showCounter(description.length, TextField.INCIDENT_DESCRIPTION)) {
+                { InputCounter(description.length, TextField.INCIDENT_DESCRIPTION) }
+            } else null,
             colors = incidentTextFieldColors(),
             modifier = Modifier
                 .fillMaxWidth()

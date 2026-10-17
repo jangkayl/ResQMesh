@@ -19,3 +19,15 @@
 # If you keep the line number information, uncomment this to
 # hide the original source file name.
 #-renamesourcefileattribute SourceFile
+
+# kotlinx.serialization: keep generated serializers and companions (wire payloads use protobuf/json).
+-keepattributes *Annotation*, InnerClasses
+-dontnote kotlinx.serialization.AnnotationsKt
+-keepclassmembers class kotlinx.serialization.json.** { *** Companion; }
+-keepclasseswithmembers class kotlinx.serialization.json.** { kotlinx.serialization.KSerializer serializer(...); }
+-keep,includedescriptorclasses class edu.cit.resqmesh.**$$serializer { *; }
+-keepclassmembers class edu.cit.resqmesh.** { *** Companion; }
+-keepclasseswithmembers class edu.cit.resqmesh.** { kotlinx.serialization.KSerializer serializer(...); }
+
+# Keep line numbers for crash traces.
+-keepattributes SourceFile,LineNumberTable

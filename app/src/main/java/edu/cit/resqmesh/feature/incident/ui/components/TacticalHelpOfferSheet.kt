@@ -1,5 +1,6 @@
 package edu.cit.resqmesh.feature.incident.ui.components
 
+import edu.cit.resqmesh.core.security.input.TextField
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -39,7 +40,7 @@ fun TacticalHelpOfferSheet(
     onWithdraw: (() -> Unit)? = null
 ) {
     var localNote by rememberSaveable { mutableStateOf(initialNote) }
-    val isNoteValid = localNote.trim().isNotEmpty() && localNote.trim().length <= 240
+    val isNoteValid = localNote.trim().isNotEmpty() && localNote.trim().length <= TextField.HELP_NOTE.maxLength
     var showError by remember { mutableStateOf(false) }
 
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -133,7 +134,7 @@ fun TacticalHelpOfferSheet(
             OutlinedTextField(
                 value = localNote,
                 onValueChange = {
-                    if (it.length <= 240) {
+                    if (it.length <= TextField.HELP_NOTE.maxLength) {
                         localNote = it
                         if (showError && it.trim().isNotEmpty()) showError = false
                     }
@@ -165,7 +166,7 @@ fun TacticalHelpOfferSheet(
                             )
                         }
                         Text(
-                            text = "${localNote.length} / 240",
+                            text = "${localNote.length} / ${TextField.HELP_NOTE.maxLength}",
                             fontFamily = FontFamily.Monospace,
                             style = MaterialTheme.typography.bodySmall.copy(
                                 fontSize = 11.5.sp,

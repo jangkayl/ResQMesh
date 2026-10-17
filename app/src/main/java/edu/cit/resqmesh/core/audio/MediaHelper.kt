@@ -7,7 +7,7 @@ import android.media.MediaPlayer
 import android.media.MediaRecorder
 import android.os.Build
 import android.util.Base64
-import android.util.Log
+import edu.cit.resqmesh.core.logging.AppLogger
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import java.io.ByteArrayOutputStream
@@ -34,7 +34,7 @@ class MediaHelper(private val context: Context) {
             }
             true
         } catch (e: Exception) {
-            Log.e("MediaHelper", "Failed to start recording", e)
+            AppLogger.d("MediaHelper", "Failed to start recording: ${e.javaClass.simpleName}")
             false
         }
     }
@@ -48,7 +48,7 @@ class MediaHelper(private val context: Context) {
             val audioBytes = audioFile?.readBytes()
             if (audioBytes != null) Base64.encodeToString(audioBytes, Base64.NO_WRAP) else null
         } catch (e: Exception) {
-            Log.e("MediaHelper", "Failed to stop recording", e)
+            AppLogger.d("MediaHelper", "Failed to stop recording: ${e.javaClass.simpleName}")
             null
         }
     }
@@ -152,7 +152,7 @@ class MediaHelper(private val context: Context) {
             _currentlyPlayingAudio.value = base64Audio
             _currentRadioSpeaker.value = if (isRadio) radioQueue.current?.sender else null
         } catch (e: Exception) {
-            Log.e("MediaHelper", "Playback failed", e)
+            AppLogger.d("MediaHelper", "Playback failed: ${e.javaClass.simpleName}")
             releasePlayer()
             if (isRadio) {
                 radioQueue.completeCurrent()

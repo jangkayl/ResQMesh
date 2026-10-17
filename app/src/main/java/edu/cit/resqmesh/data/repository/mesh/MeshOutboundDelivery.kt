@@ -245,10 +245,18 @@ internal class MeshOutboundDelivery(
         }
     }
 
+    /** Final guard: refuses text above the shared message limit. Logs field and length only, never content. */
+    private fun rejectOverLimit(text: String): Boolean {
+        if (text.length <= edu.cit.resqmesh.core.security.input.TextField.MESSAGE.maxLength) return false
+        AppLogger.d("MeshNetwork", "INPUT_REJECT field=MESSAGE len=${text.length}")
+        return true
+    }
+
     fun sendPublicMessage(text: String, imageBase64: String?, audioBase64: String?, locationLat: Double? = null, locationLng: Double? = null, isSOS: Boolean = false, isSOSCancel: Boolean = false,
         conversationKind: String = "COMMUNITY", channelId: String = "", sosId: String = ""): String {
         require(!isSOS && !isSOSCancel) { "SOS lifecycle uses signed SosRepository operations" }
         require(conversationKind in setOf("COMMUNITY", "RADIO", "SOS"))
+        if (rejectOverLimit(text)) return ""
         val messageId = UUID.randomUUID().toString()
         val timestamp = System.currentTimeMillis()
 
@@ -297,6 +305,7 @@ internal class MeshOutboundDelivery(
     }
 
     fun sendPrivateMessage(targetName: String, text: String, imageBase64: String?, audioBase64: String?, locationLat: Double? = null, locationLng: Double? = null): Boolean {
+        if (rejectOverLimit(text)) return false
         val msgId = UUID.randomUUID().toString()
         AppLogger.d("MeshNetwork_E2EE", "PRIVATE_SEND_REQUEST message=$msgId elapsedMs=${android.os.SystemClock.elapsedRealtime()}")
         val timestamp = System.currentTimeMillis()
@@ -331,7 +340,10 @@ internal class MeshOutboundDelivery(
                 messageStore.markPending(msgId)
                 scheduleOutboxFlush()
             }
-            AppLogger.d("MeshNetwork_E2EE", "Private send queued as Pending for $targetName (no immediate route)")
+            AppLogger.d(
+                "MeshNetwork_E2EE",
+                "Private send queued as Pending for ${AppLogger.redactName(targetName)} (no immediate route)"
+            )
             return true
         }
 
@@ -349,7 +361,11 @@ internal class MeshOutboundDelivery(
             targetPubKey = targetPubKey,
             channelId = _currentChannelId.value
         ) }.getOrElse {
-            AppLogger.d("MeshNetwork_E2EE", "Private message to $targetName was not sent: recipient key unavailable or encryption failed")
+            AppLogger.d(
+                "MeshNetwork_E2EE",
+                "Private message to ${AppLogger.redactName(targetName)} was not sent: " +
+                    "recipient key unavailable or encryption failed"
+            )
             return false
         }
 

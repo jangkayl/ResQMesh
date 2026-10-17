@@ -98,7 +98,11 @@ Structural refactors preserve facade APIs, callback order, generation fences, pe
 
 ## D24: Private-envelope crypto direction
 
-Keep hybrid encryption. After the demo, version the envelope: RSA-OAEP-SHA256 key wrap under a new Keystore alias and AES-GCM AAD binding version, sender, recipient and message ID, with v1 decryption kept for migration. These add no meaningful latency or size. X25519 agreement plus Ed25519 signatures is the long-term direction (smaller over BLE, authenticated) but needs a protocol migration and API-level review. Until then no authenticated E2EE claim. Plan: [revision plan](plans/code-architecture-revision.md).
+Keep hybrid encryption. After the demo, version the envelope: RSA-OAEP-SHA256 key wrap under a new Keystore alias and AES-GCM AAD binding version, sender, recipient and message ID, with v1 decryption kept for migration. These add no meaningful latency or size. Superseded on 2026-10-17 by D26: v2 goes straight to X25519 plus Ed25519 through Tink in one wire break. Until it ships, no authenticated E2EE claim; forward secrecy is never claimed.
+
+## D26: Origin-charged limits and a single wire break
+
+The threat model is a malicious nearby phone. Rate limits charge the originating node after dedup and signature checks, never the relay, and per-link limits only shape traffic. User input limits come from one `TextPolicy`. After the freeze, protocol v2 is one coordinated break (every test phone reinstalled together), and later changes stay compatible. Storage uses SQLCipher with a Keystore-wrapped raw key. Plan: [security hardening](plans/security-hardening.md).
 
 ## D25: Packages before Gradle modules
 

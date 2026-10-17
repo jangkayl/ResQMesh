@@ -1,5 +1,8 @@
 package edu.cit.resqmesh.feature.incident.ui.components
 
+import edu.cit.resqmesh.core.security.input.TextPolicy
+import edu.cit.resqmesh.core.ui.components.inputs.InputCounter
+import edu.cit.resqmesh.core.security.input.TextField
 import edu.cit.resqmesh.core.location.LocationClientFactory
 import org.koin.java.KoinJavaComponent
 import edu.cit.resqmesh.feature.incident.ui.form.IncidentCategoryField
@@ -289,7 +292,9 @@ fun CreateIncidentSheet(
                         ) {
                             OutlinedTextField(
                                 value = areaDescription,
-                                onValueChange = { areaDescription = it },
+                                onValueChange = {
+                                    areaDescription = TextPolicy.clampLength(it, TextField.INCIDENT_AREA)
+                                },
                                 label = { Text("Place or landmark (optional)") },
                                 placeholder = { Text("e.g. 2nd Floor, Room 204, North Gate") },
                                 leadingIcon = {
@@ -301,6 +306,11 @@ fun CreateIncidentSheet(
                                     )
                                 },
                                 singleLine = true,
+                                supportingText = if (
+                                    TextPolicy.showCounter(areaDescription.length, TextField.INCIDENT_AREA)
+                                ) {
+                                    { InputCounter(areaDescription.length, TextField.INCIDENT_AREA) }
+                                } else null,
                                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
                                 keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() }),
                                 colors = incidentTextFieldColors(),

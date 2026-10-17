@@ -45,6 +45,8 @@ import edu.cit.resqmesh.core.ui.theme.Spacing
 import edu.cit.resqmesh.core.ui.theme.TestResQMeshTheme
 import edu.cit.resqmesh.core.audio.MediaHelper
 import edu.cit.resqmesh.feature.comms.viewmodel.CommunicationViewModel
+import edu.cit.resqmesh.core.security.input.TextField
+import edu.cit.resqmesh.core.security.input.TextPolicy
 import java.util.Locale
 
 @Composable
@@ -80,6 +82,11 @@ fun ActiveChatScreen(
     var pendingAudio by remember { mutableStateOf<String?>(null) }
     var isRecording by remember { mutableStateOf(false) }
     var replyingToMessage by remember { mutableStateOf<ChatMessage?>(null) }
+    // The quote is bounded (short snippet) and its length is reserved in the composer limit,
+    // so the final text still fits TextField.MESSAGE after the prefix is added.
+    val replyQuotePrefix = remember(replyingToMessage, displayName, photoText, voiceNoteText) {
+        replyingToMessage?.let { quotePrefix(it, displayName, photoText, voiceNoteText) }.orEmpty()
+    }
     var showDeleteDialog by remember { mutableStateOf(false) }
     var showKeyChangeDialog by remember { mutableStateOf(false) }
 
@@ -161,6 +168,7 @@ fun ActiveChatScreen(
                     },
                     replyingTo = replyingToMessage,
                     onCancelReply = { replyingToMessage = null },
+                    maxInputLength = TextField.MESSAGE.maxLength - replyQuotePrefix.length,
                     onSend = {
                         val text = (drafts[conversationName] ?: drafts[name].orEmpty()).trim()
                         val rawMessage = when {
@@ -170,17 +178,8 @@ fun ActiveChatScreen(
                             else -> ""
                         }
                         if (rawMessage.isBlank() && pendingImage == null && pendingAudio == null) return@ChatInput
-                        val finalMessage = if (replyingToMessage != null && rawMessage.isNotBlank()) {
-                            val quoteSender = if (replyingToMessage!!.isMine) "Me" else displayName
-                            val quoteSnippet = when {
-                                replyingToMessage!!.locationLat != null && replyingToMessage!!.locationLng != null -> {
-                                    "📍 Shared Location (%.4f, %.4f)".format(Locale.US, replyingToMessage!!.locationLat, replyingToMessage!!.locationLng)
-                                }
-                                replyingToMessage!!.imageBase64 != null -> photoText
-                                replyingToMessage!!.audioBase64 != null -> voiceNoteText
-                                else -> replyingToMessage!!.text.take(60).ifBlank { "Attachment" }
-                            }
-                            "> $quoteSender: $quoteSnippet\n$rawMessage"
+                        val finalMessage = if (replyQuotePrefix.isNotEmpty() && rawMessage.isNotBlank()) {
+                            replyQuotePrefix + rawMessage
                         } else {
                             rawMessage
                         }
@@ -285,4 +284,21 @@ private fun PrivateChatEmptyPreview() {
             )
         }
     }
+}
+
+
+private const val QUOTE_SNIPPET_MAX = 60
+
+/** Bounded "> sender: snippet" quote line (with trailing newline) prepended to a private reply. */
+private fun quotePrefix(replyTo: ChatMessage, peerName: String, photoText: String, voiceNoteText: String): String {
+    val sender = if (replyTo.isMine) "Me" else peerName
+    val lat = replyTo.locationLat
+    val lng = replyTo.locationLng
+    val snippet = when {
+        lat != null && lng != null -> "📍 Shared Location (%.4f, %.4f)".format(Locale.US, lat, lng)
+        replyTo.imageBase64 != null -> photoText
+        replyTo.audioBase64 != null -> voiceNoteText
+        else -> TextPolicy.clampLength(replyTo.text, QUOTE_SNIPPET_MAX).ifBlank { "Attachment" }
+    }
+    return "> $sender: $snippet\n"
 }

@@ -1,5 +1,6 @@
 package edu.cit.resqmesh.feature.incident.ui.components
 
+import edu.cit.resqmesh.core.security.input.TextField
 import android.text.format.DateUtils
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.Button
@@ -104,9 +105,11 @@ fun HelpWorkflowPanel(
         if (!isReporter && !terminal && !(isSelectedHelper && incident.selectionId != null)) {
             OutlinedTextField(
                 value = note,
-                onValueChange = { if (it.length <= 240) note = it },
+                onValueChange = { if (it.length <= TextField.HELP_NOTE.maxLength) note = it },
                 label = { Text(if (myOffer == null) "Why can you help?" else "Update your offer note") },
-                supportingText = { Text("Self-reported offer • ${note.length}/240 characters") },
+                supportingText = {
+                    Text("Self-reported offer • ${note.length}/${TextField.HELP_NOTE.maxLength} characters")
+                },
                 minLines = 2, maxLines = 4, modifier = Modifier.fillMaxWidth()
             )
             Button(onClick = { onOffer(note) }, enabled = !busy && note.isNotBlank(),

@@ -1,5 +1,7 @@
 package edu.cit.resqmesh.data.repository
 
+import edu.cit.resqmesh.core.security.input.TextField
+import edu.cit.resqmesh.core.security.input.TextSanitizer
 import android.content.Context
 import android.content.SharedPreferences
 import edu.cit.resqmesh.core.network.CryptoManager
@@ -35,7 +37,12 @@ class LocalIdentityManager internal constructor(
     private val mutex = Mutex()
 
     override suspend fun getOrCreateUser(displayName: String?): UserEntity = mutex.withLock {
-        val cleanName = displayName?.trim()?.takeIf { it.isNotBlank() }
+        val cleanName = displayName
+            ?.let { TextSanitizer.sanitize(it, TextField.DISPLAY_NAME) }
+            ?.takeIf { it.isNotBlank() }
+        require(cleanName == null || cleanName.length <= TextField.DISPLAY_NAME.maxLength) {
+            "Display name cannot exceed ${TextField.DISPLAY_NAME.maxLength} characters"
+        }
         val existing = userDao.getLocalUser()
         if (existing != null) {
             val user = if (cleanName != null && existing.displayName != cleanName) {

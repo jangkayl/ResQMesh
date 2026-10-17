@@ -1,5 +1,6 @@
 package edu.cit.resqmesh.feature.incident.ui.components
 
+import edu.cit.resqmesh.core.security.input.TextField
 import edu.cit.resqmesh.feature.incident.ui.coordination.CoordinationStatusBanners
 import android.text.format.DateUtils
 import androidx.compose.animation.*
@@ -346,7 +347,7 @@ fun IncidentCoordinationHub(
                                 onClick = {
                                     val prefix = if (offerNote.isBlank()) "" else "$offerNote, "
                                     val candidate = prefix + capability
-                                    if (candidate.length <= 240) offerNote = candidate
+                                    if (candidate.length <= TextField.HELP_NOTE.maxLength) offerNote = candidate
                                 },
                                 label = { Text(capability, fontSize = 11.sp) }
                             )
@@ -355,7 +356,7 @@ fun IncidentCoordinationHub(
 
                     OutlinedTextField(
                         value = offerNote,
-                        onValueChange = { if (it.length <= 240) offerNote = it },
+                        onValueChange = { if (it.length <= TextField.HELP_NOTE.maxLength) offerNote = it },
                         label = { Text(if (myOffer == null || myOffer.withdrawn) "How can you assist? (Equipment, ETA, training)" else "Update offer note") },
                         placeholder = { Text("e.g. Have trauma kit, 200m away on foot, ETA 3 mins") },
                         supportingText = {
@@ -364,7 +365,10 @@ fun IncidentCoordinationHub(
                                 horizontalArrangement = Arrangement.SpaceBetween
                             ) {
                                 Text("Self-reported offer")
-                                Text("${offerNote.length}/240", fontFamily = FontFamily.Monospace)
+                                Text(
+                                    "${offerNote.length}/${TextField.HELP_NOTE.maxLength}",
+                                    fontFamily = FontFamily.Monospace
+                                )
                             }
                         },
                         minLines = 2,

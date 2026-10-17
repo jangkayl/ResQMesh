@@ -1,5 +1,7 @@
 package edu.cit.resqmesh.feature.incident.ui.list
 
+import edu.cit.resqmesh.core.security.input.TextField
+import edu.cit.resqmesh.core.security.input.TextPolicy
 import androidx.compose.animation.*
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
@@ -76,7 +78,7 @@ internal fun IncidentSearchField(
                     }
                     androidx.compose.foundation.text.BasicTextField(
                         value = searchQuery,
-                        onValueChange = { onSearchChanged(it) },
+                        onValueChange = { onSearchChanged(TextPolicy.clampLength(it, TextField.SEARCH)) },
                         singleLine = true,
                         textStyle = MaterialTheme.typography.bodySmall.copy(
                             fontSize = 12.5.sp,

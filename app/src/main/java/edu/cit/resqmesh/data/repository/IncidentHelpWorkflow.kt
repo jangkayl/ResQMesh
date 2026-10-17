@@ -1,5 +1,7 @@
 package edu.cit.resqmesh.data.repository
 
+import edu.cit.resqmesh.core.security.input.TextField
+import edu.cit.resqmesh.core.security.input.TextSanitizer
 import androidx.room.withTransaction
 import edu.cit.resqmesh.core.model.EntityType
 import edu.cit.resqmesh.core.model.EventType
@@ -58,8 +60,8 @@ class IncidentHelpWorkflow(
 
     suspend fun offerHelp(incidentId: String, note: String): Boolean = mutex.withLock {
         reconcileWithdrawnSelectionLocked(incidentId)
-        val clean = note.trim()
-        if (clean.length !in 1..240) return@withLock false
+        val clean = TextSanitizer.sanitize(note, TextField.HELP_NOTE)
+        if (clean.length !in 1..TextField.HELP_NOTE.maxLength) return@withLock false
         val incident = incidents.getIncidentById(incidentId) ?: return@withLock false
         if (incident.workflowVersion != 2 || incident.status in TERMINAL) return@withLock false
         val user = identity.getOrCreateUser()
@@ -239,13 +241,19 @@ class IncidentHelpWorkflow(
             }.maxOfOrNull { it.logicalVersion } ?: (offer?.revision ?: 0L)
             val byHelper = offers.getByHelper(event.entityId, actorKey)
             val selection = selectionEvent(incident, payload.optString("selectionId"))
+            val offerId = payload.optString("offerId")
+            val fromHelper = event.eventType in OFFER_TYPES && event.actorId != incident.creatorId
+            val wellFormed = offerId.isNotBlank() && payload.optLong("revision") == event.logicalVersion
+            val noteLength = payload.optString("note").trim().length
+            val noteOk = event.eventType != EventType.INCIDENT_OFFER_UPDATED.name ||
+                noteLength in 1..TextField.HELP_NOTE.maxLength
+            val ownedByActor = (offer == null || offer.helperKey == actorKey) &&
+                (byHelper == null || byHelper.offerId == offerId)
+            val validOffer = fromHelper && wellFormed
+            val fieldsOk = noteOk && ownedByActor
             if (event.eventType in HELPER_DECISIONS && selection != null)
                 retainHistoricalDecision(event, incident, selection)
-            else if (event.eventType in OFFER_TYPES && event.actorId != incident.creatorId &&
-                payload.optString("offerId").isNotBlank() && payload.optLong("revision") == event.logicalVersion &&
-                (event.eventType != EventType.INCIDENT_OFFER_UPDATED.name || payload.optString("note").trim().length in 1..240) &&
-                (offer == null || offer.helperKey == actorKey) &&
-                (byHelper == null || byHelper.offerId == payload.optString("offerId"))) {
+            else if (validOffer && fieldsOk) {
                 if (event.logicalVersion > frontier + 1L) { defer(verified = true); return false }
                 if (event.logicalVersion != frontier + 1L) return false
                 if (prior == null) events.insertEvent(event.copy(applied = true, validationStatus = "ACCEPTED"))
@@ -262,10 +270,11 @@ class IncidentHelpWorkflow(
                 val note = payload.optString("note").trim()
                 val revision = payload.optLong("revision")
                 val byHelper = offers.getByHelper(event.entityId, helperKey)
-                if (offerId.isBlank() || note.length !in 1..240 || revision < 1 ||
-                    event.logicalVersion != revision || (offer != null && offer.helperKey != helperKey) ||
-                    (byHelper != null && byHelper.offerId != offerId) ||
-                    event.actorId == incident.creatorId) return false
+                val malformed = offerId.isBlank() || note.length !in 1..TextField.HELP_NOTE.maxLength || revision < 1
+                val foreignOffer = (offer != null && offer.helperKey != helperKey) ||
+                    (byHelper != null && byHelper.offerId != offerId)
+                val versionMismatch = event.logicalVersion != revision || event.actorId == incident.creatorId
+                if (malformed || foreignOffer || versionMismatch) return false
                 if (revision > (byHelper?.revision ?: 0L) + 1L) {
                     defer(verified = true)
                     return false

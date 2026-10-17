@@ -54,7 +54,10 @@ class SetupViewModel(
 
     fun initDeveloperMode(context: Context) {
         val prefs = context.getSharedPreferences("resqmesh_prefs", Context.MODE_PRIVATE)
-        _isDeveloperModeEnabled.value = prefs.getBoolean("developer_mode_enabled", false)
+        _isDeveloperModeEnabled.value = DeveloperModePolicy.isEnabled(
+            edu.cit.resqmesh.BuildConfig.DEBUG,
+            prefs.getBoolean("developer_mode_enabled", false)
+        )
         _isLongRangeProfile.value = prefs.getBoolean("mesh_profile_long_range", true)
     }
 
@@ -68,7 +71,7 @@ class SetupViewModel(
 
     fun setDeveloperMode(context: Context, enabled: Boolean, pin: String? = null): Boolean {
         if (enabled) {
-            if (pin != "0000") return false
+            if (!DeveloperModePolicy.acceptsPin(edu.cit.resqmesh.BuildConfig.DEBUG, pin)) return false
             context.getSharedPreferences("resqmesh_prefs", Context.MODE_PRIVATE)
                 .edit()
                 .putBoolean("developer_mode_enabled", true)

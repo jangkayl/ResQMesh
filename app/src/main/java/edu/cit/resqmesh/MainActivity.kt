@@ -17,6 +17,10 @@ import androidx.compose.ui.Modifier
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.launch
+import edu.cit.resqmesh.app.navigation.NavigationRequest
+import edu.cit.resqmesh.app.navigation.NavigationRequestBus
 import org.koin.android.ext.android.inject
 import edu.cit.resqmesh.app.navigation.MainContainerScreen
 import edu.cit.resqmesh.feature.setup.ui.IdentitySetupScreen
@@ -59,24 +63,18 @@ class MainActivity : ComponentActivity() {
     private val pendingSosText = mutableStateOf<String?>(null)
     private val pendingSosId = mutableStateOf<String?>(null)
 
-    private fun handleIntentExtras(intent: android.content.Intent?) {
-        if (intent == null) return
-        pendingSosId.value = intent.getStringExtra("EXTRA_SOS_ID")
-        if (intent.getBooleanExtra("EXTRA_TRIGGER_SOS", false)) {
-            sosDeepLinkTriggered.value = true
-            pendingSosSender.value = intent.getStringExtra("EXTRA_SOS_SENDER")
-            pendingSosText.value = intent.getStringExtra("EXTRA_SOS_TEXT")
-            pendingViewMap.value = true
-        }
-        if (intent.getBooleanExtra("EXTRA_VIEW_SOS_MAP", false)) {
-            pendingViewMap.value = true
-            pendingSosSender.value = intent.getStringExtra("EXTRA_SOS_SENDER")
-            pendingSosText.value = intent.getStringExtra("EXTRA_SOS_TEXT")
-            sosDeepLinkTriggered.value = true
-        }
-        val chatNode = intent.getStringExtra("EXTRA_OPEN_CHAT_NODE")
-        if (!chatNode.isNullOrBlank()) {
-            pendingChatNode.value = chatNode
+    // Deep links arrive only through NavigationRequestBus (posted by the non-exported
+    // NotificationRouterActivity); extras on incoming intents are deliberately ignored.
+    private fun handleRequest(request: NavigationRequest) {
+        when (request) {
+            is NavigationRequest.OpenSos -> {
+                pendingSosId.value = request.sosId
+                pendingSosSender.value = request.sender
+                pendingSosText.value = request.text
+                pendingViewMap.value = request.viewMap
+                sosDeepLinkTriggered.value = true
+            }
+            is NavigationRequest.OpenChat -> pendingChatNode.value = request.nodeId
         }
     }
 
@@ -90,8 +88,10 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
-        handleIntentExtras(intent)
-        
+        lifecycleScope.launch {
+            NavigationRequestBus.requests.collect(::handleRequest)
+        }
+
         // Let Compose handle window insets (stops bottom nav bar from being pushed up by keyboard)
         androidx.core.view.WindowCompat.setDecorFitsSystemWindows(window, false)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
@@ -294,8 +294,4 @@ class MainActivity : ComponentActivity() {
         super.onDestroy()
     }
 
-    override fun onNewIntent(intent: android.content.Intent?) {
-        super.onNewIntent(intent)
-        handleIntentExtras(intent)
-    }
 }

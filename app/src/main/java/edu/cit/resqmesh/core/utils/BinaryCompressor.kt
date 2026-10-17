@@ -27,4 +27,46 @@ object BinaryCompressor {
         }
         return bos.toByteArray()
     }
+
+    const val MAX_MEDIA_BYTES = 2 * 1024 * 1024
+
+    sealed interface BoundedResult {
+        class Ok(val bytes: ByteArray) : BoundedResult
+        /** Output exceeded the cap; [bytes] is the amount inflated when aborted. */
+        class TooLarge(val bytes: Int) : BoundedResult
+        class Corrupt(val bytes: Int, val cause: String? = null) : BoundedResult
+    }
+
+    /** Inflates in chunks, aborting once output exceeds [maxOutputBytes]; never throws on bad input. */
+    fun decompressBounded(compressedData: ByteArray, maxOutputBytes: Int = MAX_MEDIA_BYTES): BoundedResult {
+        require(maxOutputBytes >= 0)
+        val bos = ByteArrayOutputStream()
+        var exceeded: Int? = null
+        var ioError: java.io.IOException? = null
+        try {
+            GZIPInputStream(ByteArrayInputStream(compressedData)).use {
+                exceeded = inflateInto(it, bos, maxOutputBytes)
+            }
+        } catch (e: java.io.IOException) {
+            ioError = e
+        }
+        val over = exceeded
+        return when {
+            ioError != null -> BoundedResult.Corrupt(bos.size(), ioError.javaClass.simpleName)
+            over != null -> BoundedResult.TooLarge(over)
+            else -> BoundedResult.Ok(bos.toByteArray())
+        }
+    }
+
+    /** Copies [input] into [bos]; returns the would-be size when the cap is exceeded, else null. */
+    private fun inflateInto(input: java.io.InputStream, bos: ByteArrayOutputStream, maxOutputBytes: Int): Int? {
+        val buffer = ByteArray(8192)
+        var count = input.read(buffer)
+        while (count >= 0) {
+            if (count > maxOutputBytes - bos.size()) return bos.size() + count
+            bos.write(buffer, 0, count)
+            count = input.read(buffer)
+        }
+        return null
+    }
 }

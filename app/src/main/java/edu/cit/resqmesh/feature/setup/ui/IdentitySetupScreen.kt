@@ -1,5 +1,6 @@
 package edu.cit.resqmesh.feature.setup.ui
 
+import edu.cit.resqmesh.core.security.input.TextField
 import android.os.Build
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateDpAsState
@@ -335,6 +336,7 @@ fun IdentitySetupContent(
                 label = stringResource(R.string.identity_name_label),
                 placeholder = stringResource(R.string.identity_name_placeholder),
                 leadingIcon = { Icon(Icons.Outlined.Person, contentDescription = null) },
+                limit = TextField.DISPLAY_NAME,
                 isError = isNameInvalid,
                 errorMessage = if (isNameInvalid) stringResource(R.string.identity_name_error) else null
             )
