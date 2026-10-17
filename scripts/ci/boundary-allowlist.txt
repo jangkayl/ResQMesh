@@ -2,9 +2,6 @@
 # Format: path relative to app/src/main/java/com/example/testresqmesh -> imported FQN, sorted.
 # This list may only shrink: fix a violation and delete its line. The check fails on
 # new violations and on stale entries, so do not add lines to waive new code.
-core/domain/usecase/MeshUseCases.kt -> com.example.testresqmesh.data.repository.MeshRepository
-core/service/MeshForegroundService.kt -> com.example.testresqmesh.data.repository.MeshRepository
-core/service/MeshSessionController.kt -> com.example.testresqmesh.data.repository.MeshRepository
 core/ui/components/location/TacticalLocationCard.kt -> com.example.testresqmesh.data.location.DefaultLocationClient
 feature/incident/model/IncidentPresentation.kt -> com.example.testresqmesh.data.local.entity.DomainEventEntity
 feature/incident/model/IncidentPresentation.kt -> com.example.testresqmesh.data.local.entity.IncidentEntity

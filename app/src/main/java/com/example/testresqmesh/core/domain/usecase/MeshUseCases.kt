@@ -4,7 +4,7 @@ import com.example.testresqmesh.core.model.ChatMessage
 import com.example.testresqmesh.core.model.ConnectedDevice
 import com.example.testresqmesh.core.model.KnownNode
 import com.example.testresqmesh.core.model.ScannedDevice
-import com.example.testresqmesh.data.repository.MeshRepository
+import com.example.testresqmesh.core.domain.repository.MeshNodeRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -44,55 +44,55 @@ data class MeshUseCases(
     val observeBlockedDeviceNames: ObserveBlockedDeviceNamesUseCase
 )
 
-class StartNodeUseCase(private val repository: MeshRepository) {
+class StartNodeUseCase(private val repository: MeshNodeRepository) {
     operator fun invoke(customName: String, nodeTag: String, teamKey: String, nodeId: String) {
         repository.startNode(customName, nodeTag, teamKey, nodeId)
     }
 }
 
-class StopNodeUseCase(private val repository: MeshRepository) {
+class StopNodeUseCase(private val repository: MeshNodeRepository) {
     operator fun invoke() {
         repository.stopNode()
     }
 }
 
-class SetChannelUseCase(private val repository: MeshRepository) {
+class SetChannelUseCase(private val repository: MeshNodeRepository) {
     operator fun invoke(channelId: String) {
         repository.setChannel(channelId)
     }
 }
 
-class DisconnectDeviceUseCase(private val repository: MeshRepository) {
+class DisconnectDeviceUseCase(private val repository: MeshNodeRepository) {
     operator fun invoke(endpointId: String) {
         repository.disconnectDevice(endpointId)
     }
 }
 
-class BlockDeviceUseCase(private val repository: MeshRepository) {
+class BlockDeviceUseCase(private val repository: MeshNodeRepository) {
     operator fun invoke(deviceName: String) {
         repository.blockDevice(deviceName)
     }
 }
 
-class UnblockDeviceUseCase(private val repository: MeshRepository) {
+class UnblockDeviceUseCase(private val repository: MeshNodeRepository) {
     operator fun invoke(deviceName: String) {
         repository.unblockDevice(deviceName)
     }
 }
 
-class ForceConnectUseCase(private val repository: MeshRepository) {
+class ForceConnectUseCase(private val repository: MeshNodeRepository) {
     operator fun invoke(endpointId: String, endpointName: String) {
         repository.forceConnect(endpointId, endpointName)
     }
 }
 
-class RescanUseCase(private val repository: MeshRepository) {
+class RescanUseCase(private val repository: MeshNodeRepository) {
     operator fun invoke() {
         repository.rescan()
     }
 }
 
-class SendPublicMessageUseCase(private val repository: MeshRepository) {
+class SendPublicMessageUseCase(private val repository: MeshNodeRepository) {
     fun conversation(kind: String, channel: String, sosId: String, text: String, audio: String? = null): String =
         repository.sendPublicMessage(text, null, audio, conversationKind = kind, channelId = channel, sosId = sosId)
     val feedback: SharedFlow<String> get() = repository.publicSendFeedback
@@ -101,100 +101,100 @@ class SendPublicMessageUseCase(private val repository: MeshRepository) {
     }
 }
 
-class SendPrivateMessageUseCase(private val repository: MeshRepository) {
+class SendPrivateMessageUseCase(private val repository: MeshNodeRepository) {
     operator fun invoke(targetName: String, text: String, imageBase64: String?, audioBase64: String?, locationLat: Double? = null, locationLng: Double? = null): Boolean =
         repository.sendPrivateMessage(targetName, text, imageBase64, audioBase64, locationLat, locationLng)
 }
 
-class HasPendingPublicKeyChangeUseCase(private val repository: MeshRepository) {
+class HasPendingPublicKeyChangeUseCase(private val repository: MeshNodeRepository) {
     operator fun invoke(peerName: String): Boolean = repository.hasPendingPublicKeyChange(peerName)
 }
 
-class AcceptPendingPublicKeyChangeUseCase(private val repository: MeshRepository) {
+class AcceptPendingPublicKeyChangeUseCase(private val repository: MeshNodeRepository) {
     operator fun invoke(peerName: String): Boolean = repository.acceptPendingPublicKeyChange(peerName)
 }
 
-class RejectPendingPublicKeyChangeUseCase(private val repository: MeshRepository) {
+class RejectPendingPublicKeyChangeUseCase(private val repository: MeshNodeRepository) {
     operator fun invoke(peerName: String): Boolean = repository.rejectPendingPublicKeyChange(peerName)
 }
 
-class DeleteConversationWithUseCase(private val repository: MeshRepository) {
+class DeleteConversationWithUseCase(private val repository: MeshNodeRepository) {
     operator fun invoke(peerName: String) {
         repository.deleteConversationWith(peerName)
     }
 }
 
-class BroadcastLiveAudioChunkUseCase(private val repository: MeshRepository) {
+class BroadcastLiveAudioChunkUseCase(private val repository: MeshNodeRepository) {
     operator fun invoke(chunk: ByteArray) {
         repository.broadcastLiveAudioChunk(chunk)
     }
 }
 
-class BroadcastSeenReceiptUseCase(private val repository: MeshRepository) {
+class BroadcastSeenReceiptUseCase(private val repository: MeshNodeRepository) {
     operator fun invoke(messageId: String, isPrivate: Boolean, targetName: String? = null) {
         repository.broadcastSeenReceipt(messageId, isPrivate, targetName)
     }
 }
 
-class ClearSosAlertUseCase(private val repository: MeshRepository) {
+class ClearSosAlertUseCase(private val repository: MeshNodeRepository) {
     operator fun invoke() {
         repository.clearSosAlert()
     }
 }
 
-class ObserveConnectionStatusUseCase(private val repository: MeshRepository) {
+class ObserveConnectionStatusUseCase(private val repository: MeshNodeRepository) {
     operator fun invoke(): StateFlow<String> = repository.connectionStatus
 }
 
-class ObserveIsOnlineUseCase(private val repository: MeshRepository) {
+class ObserveIsOnlineUseCase(private val repository: MeshNodeRepository) {
     operator fun invoke(): StateFlow<Boolean> = repository.isOnline
 }
 
-class ObserveCurrentChannelIdUseCase(private val repository: MeshRepository) {
+class ObserveCurrentChannelIdUseCase(private val repository: MeshNodeRepository) {
     operator fun invoke(): StateFlow<String> = repository.currentChannelId
 }
 
-class ObserveConnectedDevicesUseCase(private val repository: MeshRepository) {
+class ObserveConnectedDevicesUseCase(private val repository: MeshNodeRepository) {
     operator fun invoke(): StateFlow<List<ConnectedDevice>> = repository.connectedDevices
 }
 
-class ObserveScannedDevicesUseCase(private val repository: MeshRepository) {
+class ObserveScannedDevicesUseCase(private val repository: MeshNodeRepository) {
     operator fun invoke(): StateFlow<List<ScannedDevice>> = repository.scannedDevices
 }
 
-class ObserveIncomingSosAlertUseCase(private val repository: MeshRepository) {
+class ObserveIncomingSosAlertUseCase(private val repository: MeshNodeRepository) {
     operator fun invoke(): StateFlow<ChatMessage?> = repository.incomingSosAlert
 }
 
-class ObserveIncomingVoiceMessageUseCase(private val repository: MeshRepository) {
+class ObserveIncomingVoiceMessageUseCase(private val repository: MeshNodeRepository) {
     operator fun invoke(): SharedFlow<ChatMessage> = repository.incomingVoiceMessage
 }
 
-class ObserveIncomingLiveAudioChunkUseCase(private val repository: MeshRepository) {
+class ObserveIncomingLiveAudioChunkUseCase(private val repository: MeshNodeRepository) {
     operator fun invoke(): SharedFlow<Pair<String, ByteArray>> = repository.incomingLiveAudioChunk
 }
 
-class ObserveKnownNodesUseCase(private val repository: MeshRepository) {
+class ObserveKnownNodesUseCase(private val repository: MeshNodeRepository) {
     operator fun invoke(): StateFlow<List<KnownNode>> = repository.knownNodes
 }
 
-class ObserveTopologyUseCase(private val repository: MeshRepository) {
+class ObserveTopologyUseCase(private val repository: MeshNodeRepository) {
     operator fun invoke(): StateFlow<Map<String, Set<String>>> = repository.topology
 }
 
-class ObservePublicMessagesUseCase(private val repository: MeshRepository) {
+class ObservePublicMessagesUseCase(private val repository: MeshNodeRepository) {
     val allMessages: StateFlow<List<ChatMessage>> get() = repository.allPublicMessages
     operator fun invoke(): StateFlow<List<ChatMessage>> = repository.publicMessages
 }
 
-class ObservePrivateMessagesUseCase(private val repository: MeshRepository) {
+class ObservePrivateMessagesUseCase(private val repository: MeshNodeRepository) {
     operator fun invoke(): StateFlow<Map<String, List<ChatMessage>>> = repository.privateMessages
 }
 
-class ObservePeerNamesUseCase(private val repository: MeshRepository) {
+class ObservePeerNamesUseCase(private val repository: MeshNodeRepository) {
     operator fun invoke(): StateFlow<Map<String, String>> = repository.peerNames
 }
 
-class ObserveBlockedDeviceNamesUseCase(private val repository: MeshRepository) {
+class ObserveBlockedDeviceNamesUseCase(private val repository: MeshNodeRepository) {
     operator fun invoke(): StateFlow<Set<String>> = repository.blockedDeviceNames
 }

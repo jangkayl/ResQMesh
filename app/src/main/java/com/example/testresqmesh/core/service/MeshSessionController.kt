@@ -3,18 +3,18 @@ package com.example.testresqmesh.core.service
 import android.content.Context
 import android.content.Intent
 import androidx.core.content.ContextCompat
-import com.example.testresqmesh.data.repository.MeshRepository
+import com.example.testresqmesh.core.domain.repository.MeshNodeRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
 /**
  * Single owner for user-requested mesh session start/stop and its foreground-service anchor.
- * Transport and routing remain owned by [MeshRepository].
+ * Transport and routing remain owned by the mesh repository.
  */
 class MeshSessionController(
     context: Context,
-    private val repository: MeshRepository
+    private val repository: MeshNodeRepository
 ) {
     private val appContext = context.applicationContext
     private val preferences = appContext.getSharedPreferences(PREFERENCES_NAME, Context.MODE_PRIVATE)

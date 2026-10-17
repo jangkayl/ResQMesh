@@ -15,7 +15,7 @@ import com.example.testresqmesh.R
 import com.example.testresqmesh.core.model.NodeIdentity
 import com.example.testresqmesh.core.logging.AppLogger
 import com.example.testresqmesh.core.logging.TerminalLogCategory
-import com.example.testresqmesh.data.repository.MeshRepository
+import com.example.testresqmesh.core.domain.repository.MeshNodeRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -27,7 +27,7 @@ import kotlinx.coroutines.launch
 import org.koin.android.ext.android.inject
 
 class MeshForegroundService : Service() {
-    private val repository: MeshRepository by inject()
+    private val repository: MeshNodeRepository by inject()
     private val sessionController: MeshSessionController by inject()
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private var notificationJob: Job? = null
