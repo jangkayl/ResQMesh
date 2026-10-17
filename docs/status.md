@@ -41,8 +41,8 @@ Basic block, incident, SOS and recovery checks have user-reported successes; the
 
 Deployment target (user-confirmed 2026-10-17): capstone demo first, then a signed sideloaded pilot beta. Play Store is out of scope for now.
 
-1. **Candidate #2 (P0, now):** release `B84ACB1B…` from `42f1660` replaces the October 6 APK ([validation](validation.md)). Run part 1 of the [demo freeze card](testing/demo-freeze-card.md) (startup and mesh check).
-2. **Demo freeze (P0, by about 2026-10-28):** run parts 2–4 of that card: five repeats with counts, rehearsal, backup recording, and DELIVERY-01 captures without fixing. The [limitations](demo/known-limitations.md) and [user guide](demo/user-guide.md) are drafted. After the freeze, only separately approved blocker fixes go in.
+1. **Candidate #2 (P0, done):** release `B84ACB1B…` from `42f1660` replaces the October 6 APK; [demo freeze card](testing/demo-freeze-card.md) parts 1–2 user-reported working (counts not supplied).
+2. **Demo freeze (P0, by about 2026-10-28):** run parts 3–4: rehearsal, backup recording and DELIVERY-01 captures without fixing. The [limitations](demo/known-limitations.md) and [user guide](demo/user-guide.md) are drafted. After the freeze, only separately approved blocker fixes go in.
 3. **Release engineering (P0 for beta, after the demo):** revision-plan P5 subset. R8 and backup-off are local (SEC-01); a minified smoke run and CI release build remain.
 4. **Reliability and trust (P0/P1 before beta):** fix DELIVERY-01, triage UX-01/MESH-02, resolve UI-02, run SEC-01 phases B–E (these replace envelope v2 and TRUST-01 verification), then an audit.
 5. **Beta gate (P1):** run the DEPLOY-01 matrix (upgrade path with migration tests, process death and OEM battery, device support, accessibility and a novice trial), then a small pilot that collects MEASURE-01 counts.

@@ -6,10 +6,10 @@ Local checks, executed instrumentation, user reports and analyzed captures are d
 
 ## Current candidate (#2, October 17)
 
-- APK SHA-256: `B84ACB1B3D6576ED9E081236DD23EC792DD3B445F4A5BA93A869FB52D6B2EA96` (release, R8, version 1.0.1/code 2, Room 11), built from `42f1660` on `main`. The agent confirmed by adb that the same hash is installed on Samsung SM-P615 (API 33), OPPO CPH2127 (API 31) and vivo V2424 (API 34).
+- APK SHA-256: `B84ACB1B3D6576ED9E081236DD23EC792DD3B445F4A5BA93A869FB52D6B2EA96` (release, R8, version 1.0.1/code 2, Room 11), built from `42f1660` on `main`. adb confirmed this hash on Samsung SM-P615 (API 33), OPPO CPH2127 (API 31) and vivo V2424 (API 34).
 - The first R8 release crashed at startup (`AppDatabase_Impl()` removed); `42f1660` adds a keep rule.
-- On 2026-10-17 the user reported all nine [security Phase A card](testing/security-phase-a-card.md) steps PASS on those phones. Counts, times and captures were not supplied. The full local gate and `minifyReleaseWithR8` pass.
-- Previous candidate: the October 6 debug APK `1AE82B6C…41BFE0` (`a9a27ed`). The user reported **F1–F14 PASS** in the [network card](../archive/docs-superseded-2026-10-16/testing/network-maintainability-test-card.md), which also covered the [incident UI repair card](../archive/docs-superseded-2026-10-16/testing/incident-ui-ux-repair-test-card.md). 426 JVM tests passed and 36 of 40 emulator cases (UI-02). No models, counts or captures were supplied. Successes do not close [DELIVERY-01](status.md).
+- On 2026-10-17 the user reported all nine [security Phase A card](testing/security-phase-a-card.md) steps PASS on those phones. The user then reported [demo freeze](testing/demo-freeze-card.md) part 1 (startup, not timed) and part 2 (D1–D8) as working; the five-repeat counts, times and captures were not supplied. The local gate passes.
+- Previous candidate: the October 6 debug APK `1AE82B6C…41BFE0` (`a9a27ed`). The user reported **F1–F14 PASS** in the [network card](../archive/docs-superseded-2026-10-16/testing/network-maintainability-test-card.md), which also covered the [incident UI repair card](../archive/docs-superseded-2026-10-16/testing/incident-ui-ux-repair-test-card.md). 36 of 40 emulator cases passed (UI-02). Successes do not close [DELIVERY-01](status.md).
 
 Phase snapshots, declaration maps and historical APK identities are in the [local evidence ledger](../archive/docs-superseded-2026-10-16/handoffs/maintainability-local-evidence.md).
 
