@@ -1,5 +1,7 @@
 package com.example.testresqmesh.core.ui.components.location
 
+import com.example.testresqmesh.core.location.LocationClientFactory
+import org.koin.java.KoinJavaComponent
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
@@ -33,7 +35,6 @@ import com.example.testresqmesh.core.location.LocationClient
 import com.example.testresqmesh.core.ui.theme.ResQTheme
 import com.example.testresqmesh.core.ui.theme.SignalRed
 import com.example.testresqmesh.core.ui.theme.Spacing
-import com.example.testresqmesh.data.location.DefaultLocationClient
 import java.util.Locale
 import kotlin.math.roundToInt
 
@@ -49,8 +50,8 @@ fun TacticalLocationCard(
 ) {
     val context = LocalContext.current
     val locationClient = remember {
-        runCatching { org.koin.java.KoinJavaComponent.getKoin().getOrNull<LocationClient>() }.getOrNull()
-            ?: DefaultLocationClient(context)
+        runCatching { KoinJavaComponent.getKoin().getOrNull<LocationClient>() }.getOrNull()
+            ?: KoinJavaComponent.getKoin().get<LocationClientFactory>().create()
     }
 
     var myLocation by remember { mutableStateOf<Location?>(null) }

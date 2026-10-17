@@ -1,5 +1,7 @@
 package com.example.testresqmesh.feature.incident.ui.components
 
+import com.example.testresqmesh.core.location.LocationClientFactory
+import org.koin.java.KoinJavaComponent
 import com.example.testresqmesh.feature.incident.ui.form.IncidentCategoryField
 import com.example.testresqmesh.feature.incident.ui.form.IncidentUrgencyField
 import com.example.testresqmesh.feature.incident.ui.form.IncidentTitleField
@@ -44,7 +46,6 @@ import androidx.core.content.ContextCompat
 import com.example.testresqmesh.core.ui.theme.ResQTheme
 import com.example.testresqmesh.core.ui.theme.SafetyOrange
 import com.example.testresqmesh.core.ui.theme.Spacing
-import com.example.testresqmesh.data.location.DefaultLocationClient
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -57,7 +58,7 @@ fun CreateIncidentSheet(
     isSubmitting: Boolean = false
 ) {
     val context = LocalContext.current
-    val locationClient = remember { DefaultLocationClient(context) }
+    val locationClient = remember { KoinJavaComponent.getKoin().get<LocationClientFactory>().create() }
 
     var title by rememberSaveable { mutableStateOf("") }
     var description by rememberSaveable { mutableStateOf("") }

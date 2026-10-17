@@ -7,6 +7,7 @@ import com.example.testresqmesh.core.domain.repository.MeshNodeRepository
 import com.example.testresqmesh.core.domain.repository.SosAlertRepository
 import com.example.testresqmesh.core.domain.usecase.*
 import com.example.testresqmesh.core.location.LocationClient
+import com.example.testresqmesh.core.location.LocationClientFactory
 import com.example.testresqmesh.core.map.download.AndroidConnectivityProvider
 import com.example.testresqmesh.core.map.download.ConnectivityProvider
 import com.example.testresqmesh.core.map.download.MapPackageDownloader
@@ -22,6 +23,7 @@ import com.example.testresqmesh.core.notification.NotificationHelper
 import com.example.testresqmesh.feature.sos.alert.SosAlertController
 import com.example.testresqmesh.data.local.AppDatabase
 import com.example.testresqmesh.data.location.DefaultLocationClient
+import com.example.testresqmesh.data.location.DefaultLocationClientFactory
 import com.example.testresqmesh.data.repository.BlockRelationshipStore
 import com.example.testresqmesh.data.repository.IdentityProvider
 import com.example.testresqmesh.data.repository.IncidentEventSigning
@@ -74,6 +76,7 @@ val platformModule = module {
     single { MediaHelper(androidContext()) }
     single { NotificationHelper(androidContext()) }
     single<LocationClient> { DefaultLocationClient(androidContext()) }
+    single<LocationClientFactory> { DefaultLocationClientFactory(androidContext()) }
 
     // Offline map package management
     single { MapStorageGuard(androidContext()) }

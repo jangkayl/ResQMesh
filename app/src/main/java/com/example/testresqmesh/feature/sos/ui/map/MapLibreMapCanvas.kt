@@ -1,5 +1,7 @@
 package com.example.testresqmesh.feature.sos.ui.map
 
+import com.example.testresqmesh.core.location.LocationClientFactory
+import org.koin.java.KoinJavaComponent
 import android.location.Location
 import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
@@ -41,7 +43,6 @@ import com.example.testresqmesh.core.model.ChatMessage
 import com.example.testresqmesh.core.ui.theme.ResQTheme
 import com.example.testresqmesh.core.ui.theme.SignalRed
 import com.example.testresqmesh.core.ui.theme.Spacing
-import com.example.testresqmesh.data.location.DefaultLocationClient
 import org.maplibre.android.MapLibre
 import org.maplibre.android.annotations.IconFactory
 import org.maplibre.android.annotations.Marker
@@ -75,8 +76,8 @@ internal fun MapLibreLocalMapContainer(
     val lifecycleOwner = LocalLifecycleOwner.current
 
     val locationClient = remember {
-        runCatching { org.koin.java.KoinJavaComponent.getKoin().getOrNull<LocationClient>() }.getOrNull()
-            ?: DefaultLocationClient(context)
+        runCatching { KoinJavaComponent.getKoin().getOrNull<LocationClient>() }.getOrNull()
+            ?: KoinJavaComponent.getKoin().get<LocationClientFactory>().create()
     }
 
     var myLocation by remember { mutableStateOf<Location?>(null) }
