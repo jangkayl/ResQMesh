@@ -16,6 +16,9 @@ import com.example.testresqmesh.data.local.entity.UserEntity
 import com.example.testresqmesh.data.repository.IdentityProvider
 import com.example.testresqmesh.data.repository.IncidentEventSigning
 import com.example.testresqmesh.data.repository.IncidentRepository
+import com.example.testresqmesh.data.mapper.toModel
+import com.example.testresqmesh.data.repository.adapter.IncidentFeedRepositoryAdapter
+import com.example.testresqmesh.data.repository.adapter.LocalUserRepositoryAdapter
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.cancel
@@ -35,15 +38,18 @@ class IncidentIdentityStateTest {
         override suspend fun getUserId() = user.value.userId
         override fun getDeviceId() = user.value.deviceId
     }
-    private val incident = IncidentEntity("i", "r", "Original", "Medical", "Serious", "Need help", "School",
+    private val incidentEntity = IncidentEntity("i", "r", "Original", "Medical", "Serious", "Need help", "School",
         status = "OPEN", primaryResponderId = null, primaryResponderName = null, version = 1,
         createdAt = 1, updatedAt = 1, workflowVersion = 2, reporterSigningKey = "rk")
+
+    private val incident = incidentEntity.toModel()
 
     @Test fun renameAndReturningToIncidentKeepReactiveReporterControlsAndMembership() = runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
         val dao = IncidentEntityFakeDao()
-        dao.insertOrUpdate(incident)
-        val vm = IncidentViewModel(repository(dao, signer(), this), identity, StandardTestDispatcher(testScheduler))
+        dao.insertOrUpdate(incidentEntity)
+        val vm = IncidentViewModel(IncidentFeedRepositoryAdapter(repository(dao, signer(), this)),
+            LocalUserRepositoryAdapter(identity), StandardTestDispatcher(testScheduler))
         try {
             assertTrue(vm.identityState.value.loading)
             backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { vm.filteredIncidents.collect {} }
@@ -75,14 +81,15 @@ class IncidentIdentityStateTest {
     @Test fun signingFailureShowsErrorAndRetryRestoresControlsWithoutIdentityChange() = runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
         val dao = IncidentEntityFakeDao()
-        dao.insertOrUpdate(incident)
+        dao.insertOrUpdate(incidentEntity)
         var available = false
         val signing = object : IncidentEventSigning {
             override val publicKey: String get() { check(available); return "rk" }
             override fun sign(event: DomainEventEntity) = "signature"
             override fun verify(event: DomainEventEntity, publicKey: String) = true
         }
-        val vm = IncidentViewModel(repository(dao, signing, this), identity, StandardTestDispatcher(testScheduler))
+        val vm = IncidentViewModel(IncidentFeedRepositoryAdapter(repository(dao, signing, this)),
+            LocalUserRepositoryAdapter(identity), StandardTestDispatcher(testScheduler))
         try {
             runCurrent()
             assertFalse(vm.identityState.value.loading)

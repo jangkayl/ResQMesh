@@ -1,12 +1,14 @@
 package com.example.testresqmesh.feature.incident.model
 
 import com.example.testresqmesh.core.model.EventType
-import com.example.testresqmesh.data.local.entity.DomainEventEntity
-import com.example.testresqmesh.data.local.entity.IncidentEntity
-import com.example.testresqmesh.data.local.entity.IncidentOfferEntity
-import com.example.testresqmesh.data.repository.IncidentPolicy
-import com.example.testresqmesh.data.repository.IncidentOwnership
+import com.example.testresqmesh.core.model.DomainEvent
+import com.example.testresqmesh.core.model.Incident
+import com.example.testresqmesh.core.model.IncidentOffer
+import com.example.testresqmesh.core.domain.incident.IncidentRules
 import org.json.JSONObject
+
+fun Incident.isReporter(userId: String?, signingKey: String?): Boolean =
+    IncidentRules.isReporter(creatorId, workflowVersion, reporterSigningKey, userId, signingKey)
 
 enum class IncidentAction(val label: String) {
     OFFER("Offer help"), EDIT_OFFER("Edit offer"), REVIEW("Review helpers"),
@@ -17,7 +19,7 @@ enum class IncidentAction(val label: String) {
     START("Start responding"), RELEASE("Release assignment")
 }
 
-data class HelperPresentation(val offer: IncidentOfferEntity, val label: String, val isMe: Boolean,
+data class HelperPresentation(val offer: IncidentOffer, val label: String, val isMe: Boolean,
     val canChoose: Boolean, val canEditOffer: Boolean = false)
 
 data class IncidentPresentation(
@@ -28,20 +30,20 @@ data class IncidentPresentation(
     val primary: IncidentAction?,
     val secondary: List<IncidentAction>,
     val helpers: List<HelperPresentation>,
-    val selectedOffer: IncidentOfferEntity?,
+    val selectedOffer: IncidentOffer?,
     val warning: String?,
-    val myOffer: IncidentOfferEntity?,
+    val myOffer: IncidentOffer?,
     val nextStep: String = ""
 )
 
-fun IncidentEntity.displayTitle(): String = when {
+fun Incident.displayTitle(): String = when {
     title.isNotBlank() -> title.trim()
     areaDescription.isNotBlank() -> "$incidentType · $areaDescription"
     else -> "$incidentType emergency"
 }
 
 fun helperSummary(
-    offers: List<IncidentOfferEntity>,
+    offers: List<IncidentOffer>,
     confirmedHelperName: String?,
     hasMyOffer: Boolean
 ): String {
@@ -55,18 +57,18 @@ fun helperSummary(
     return if (hasMyOffer && confirmedHelperName == null) "$base · You offered help" else base
 }
 
-fun isInvolved(incident: IncidentEntity, offers: List<IncidentOfferEntity>, userId: String?, key: String?): Boolean {
+fun isInvolved(incident: Incident, offers: List<IncidentOffer>, userId: String?, key: String?): Boolean {
     val withdrawnSelection = incident.status !in setOf("RESOLVED", "CANCELLED") &&
         offers.any { it.offerId == incident.selectionOfferId && it.withdrawn }
-    return IncidentOwnership.isReporter(incident, userId, key) || (userId != null && (
+    return incident.isReporter(userId, key) || (userId != null && (
         !withdrawnSelection && incident.primaryResponderId == userId)) ||
         (key != null && (!withdrawnSelection && incident.selectedHelperKey == key ||
             offers.any { it.helperKey == key && !it.withdrawn }))
 }
 
 /** Affordances mirror existing authority; repositories still validate every mutation. */
-fun incidentPresentation(incident: IncidentEntity, offers: List<IncidentOfferEntity>, userId: String?, key: String?,
-    events: List<DomainEventEntity> = emptyList(), identityLoading: Boolean = userId == null,
+fun incidentPresentation(incident: Incident, offers: List<IncidentOffer>, userId: String?, key: String?,
+    events: List<DomainEvent> = emptyList(), identityLoading: Boolean = userId == null,
     identityError: String? = null): IncidentPresentation {
     // Room's incident and offer flows can emit separately. Never render a withdrawn helper
     // as selected while the repaired incident projection is reaching the screen.
@@ -77,7 +79,7 @@ fun incidentPresentation(incident: IncidentEntity, offers: List<IncidentOfferEnt
             selectionOfferRevision = null, selectedHelperKey = null, selectionConfirmedAt = null,
             primaryResponderId = null, primaryResponderName = null), offers, userId, key, events, identityLoading, identityError)
     }
-    val reporter = IncidentOwnership.isReporter(incident, userId, key)
+    val reporter = incident.isReporter(userId, key)
     val reporterAuthority = reporter
     val identityProblem = when {
         identityLoading -> "Checking your identity…"
@@ -136,7 +138,10 @@ fun incidentPresentation(incident: IncidentEntity, offers: List<IncidentOfferEnt
             else -> IncidentAction.OFFER
         }
     } else {
-        fun allowed(type: EventType) = userId != null && IncidentPolicy.mayPerform(incident, type.name, userId)
+        fun allowed(type: EventType) = userId != null &&
+            IncidentRules.mayPerform(
+                incident.status, incident.creatorId, incident.primaryResponderId, type.name, userId
+            )
         if (allowed(EventType.INCIDENT_CANCELLED)) secondary += IncidentAction.CANCEL
         if (allowed(EventType.INCIDENT_ASSIGNMENT_RELEASED)) secondary += IncidentAction.RELEASE
         if (allowed(EventType.INCIDENT_ACKNOWLEDGED)) secondary += IncidentAction.ACKNOWLEDGE
@@ -148,7 +153,7 @@ fun incidentPresentation(incident: IncidentEntity, offers: List<IncidentOfferEnt
         }
     }
     val helpers = offers.filter { !it.withdrawn }.sortedWith(
-        compareByDescending<IncidentOfferEntity> { it.offerId == incident.selectionOfferId }
+        compareByDescending<IncidentOffer> { it.offerId == incident.selectionOfferId }
             .thenByDescending { key != null && it.helperKey == key }
             .thenByDescending { it.updatedAt }.thenBy { it.offerId }
     ).map { offer ->

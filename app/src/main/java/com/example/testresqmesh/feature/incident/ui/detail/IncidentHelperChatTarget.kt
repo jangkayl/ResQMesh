@@ -5,8 +5,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import com.example.testresqmesh.core.model.NodeIdentity
-import com.example.testresqmesh.data.local.entity.IncidentOfferEntity
+import com.example.testresqmesh.core.model.IncidentOffer
 
-internal fun helperChatTarget(offer: IncidentOfferEntity): String? =
+internal fun helperChatTarget(offer: IncidentOffer): String? =
     offer.helperNodeId.trim().takeIf { it.isNotEmpty() }
         ?.let { NodeIdentity.compose(offer.helperName, it) }

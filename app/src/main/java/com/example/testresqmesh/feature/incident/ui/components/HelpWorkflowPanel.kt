@@ -16,16 +16,16 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.example.testresqmesh.data.local.entity.IncidentEntity
-import com.example.testresqmesh.data.local.entity.IncidentOfferEntity
-import com.example.testresqmesh.data.local.entity.DomainEventEntity
+import com.example.testresqmesh.core.model.Incident
+import com.example.testresqmesh.core.model.IncidentOffer
+import com.example.testresqmesh.core.model.DomainEvent
 import org.json.JSONObject
 
 @Composable
 fun HelpWorkflowPanel(
-    incident: IncidentEntity,
-    offers: List<IncidentOfferEntity>,
-    events: List<DomainEventEntity>,
+    incident: Incident,
+    offers: List<IncidentOffer>,
+    events: List<DomainEvent>,
     localUserId: String?,
     localSigningKey: String?,
     leadReachability: String,

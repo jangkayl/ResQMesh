@@ -41,7 +41,7 @@ import com.example.testresqmesh.core.ui.theme.TacticalBlack
 import com.example.testresqmesh.core.ui.theme.TacticalCarbon
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.height
-import com.example.testresqmesh.data.local.entity.IncidentEntity
+import com.example.testresqmesh.core.model.Incident
 import com.example.testresqmesh.feature.incident.model.displayTitle
 
 internal fun incidentCategoryIcon(incidentType: String): ImageVector = when (incidentType.trim().lowercase()) {
@@ -56,7 +56,7 @@ internal fun incidentCategoryIcon(incidentType: String): ImageVector = when (inc
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun TacticalIncidentCard(
-    incident: IncidentEntity,
+    incident: Incident,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     isMine: Boolean = false,

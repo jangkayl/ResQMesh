@@ -19,7 +19,11 @@ import com.example.testresqmesh.core.network.MeshNetworkGateway
 import com.example.testresqmesh.data.local.AppDatabase
 import com.example.testresqmesh.core.ui.theme.TestResQMeshTheme
 import com.example.testresqmesh.data.local.entity.IncidentEntity
-import com.example.testresqmesh.data.local.entity.IncidentOfferEntity
+import com.example.testresqmesh.core.model.IncidentOffer
+import com.example.testresqmesh.core.model.Incident
+import com.example.testresqmesh.data.mapper.toModel
+import com.example.testresqmesh.data.repository.adapter.IncidentFeedRepositoryAdapter
+import com.example.testresqmesh.data.repository.adapter.LocalUserRepositoryAdapter
 import com.example.testresqmesh.data.local.entity.UserEntity
 import com.example.testresqmesh.data.repository.IdentityProvider
 import com.example.testresqmesh.data.repository.IncidentRepository
@@ -56,7 +60,7 @@ class IncidentUiTest {
         database?.close()
     }
 
-    private val incident = IncidentEntity(
+    private val incidentEntity = IncidentEntity(
         incidentId = "i",
         creatorId = "r",
         creatorName = "Ana",
@@ -74,7 +78,8 @@ class IncidentUiTest {
         reporterSigningKey = "rk",
         title = "Help moving an injured person"
     )
-    private val offer = IncidentOfferEntity(
+    private val incident = incidentEntity.toModel()
+    private val offer = IncidentOffer(
         offerId = "offer",
         incidentId = "i",
         helperKey = "hk",
@@ -88,10 +93,10 @@ class IncidentUiTest {
 
     @Composable
     private fun Detail(
-        value: IncidentEntity = incident,
+        value: Incident = incident,
         user: String = "h",
         key: String = "hk",
-        offers: List<IncidentOfferEntity> = emptyList(),
+        offers: List<IncidentOffer> = emptyList(),
         message: String? = null,
         onOffer: (String) -> Unit = {},
         onSelectLead: (String) -> Unit = {},
@@ -378,9 +383,10 @@ class IncidentUiTest {
             .allowMainThreadQueries().build()
         database = db
         runBlocking {
-            db.incidentDao().insertOrUpdate(incident.copy(incidentId = "critical", severity = "Critical", title = "Critical request"))
-            db.incidentDao().insertOrUpdate(incident.copy(incidentId = "serious", title = "Serious request"))
-            db.incidentDao().insertOrUpdate(incident.copy(incidentId = "moderate", severity = "Moderate", title = "Moderate request"))
+            val dao = db.incidentDao(); val e = incidentEntity
+            dao.insertOrUpdate(e.copy(incidentId = "critical", severity = "Critical", title = "Critical request"))
+            dao.insertOrUpdate(e.copy(incidentId = "serious", title = "Serious request"))
+            dao.insertOrUpdate(e.copy(incidentId = "moderate", severity = "Moderate", title = "Moderate request"))
         }
         val user = UserEntity("visitor", "AB12", "Visitor", null, 1)
         val identity = object : IdentityProvider {
@@ -395,10 +401,11 @@ class IncidentUiTest {
             check(method.name.startsWith("set")) { "Unexpected transport operation: ${method.name}" }
             null
         } as MeshNetworkGateway
-        val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-        repositoryScope = scope
-        val vm = IncidentViewModel(IncidentRepository(db.incidentDao(), db.domainEventDao(), identity,
-            gateway, scope), identity)
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO).also { repositoryScope = it }
+        val repo = IncidentFeedRepositoryAdapter(
+            IncidentRepository(db.incidentDao(), db.domainEventDao(), identity, gateway, scope)
+        )
+        val vm = IncidentViewModel(repo, LocalUserRepositoryAdapter(identity))
         rule.runOnIdle { viewModelStore.put("incident", vm) }
         rule.setContent {
             TestResQMeshTheme(darkTheme = false) {
@@ -454,7 +461,8 @@ class IncidentUiTest {
         // Confirmation never implies En Route travel
         rule.onAllNodesWithText("En Route").assertCountEquals(0)
         // Terminal state displays read-only next step without active action
-        rule.onNodeWithText("This incident has been marked resolved on this phone.").performScrollTo().assertIsDisplayed()
+        rule.onNodeWithText("This incident has been marked resolved on this phone.")
+            .performScrollTo().assertIsDisplayed()
         rule.onAllNodesWithText("Confirm I can help").assertCountEquals(0)
     }
 
@@ -556,7 +564,10 @@ class IncidentUiTest {
             selectionOfferId = offer.offerId, selectedHelperKey = offer.helperKey, selectionOfferRevision = 1)
         rule.setContent {
             TestResQMeshTheme {
-                Detail(value = selectedIncident, user = "r", key = "rk", offers = listOf(offer), onDirectChat = { target = it })
+                Detail(
+                    value = selectedIncident, user = "r", key = "rk", offers = listOf(offer),
+                    onDirectChat = { target = it }
+                )
             }
         }
         rule.onAllNodesWithText("Miguel")[0].performScrollTo().performClick()

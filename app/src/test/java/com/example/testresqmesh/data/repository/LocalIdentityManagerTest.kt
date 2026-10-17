@@ -6,6 +6,7 @@ import com.example.testresqmesh.data.local.entity.IncidentEntity
 import com.example.testresqmesh.data.local.entity.UserEntity
 import com.example.testresqmesh.feature.incident.model.incidentPresentation
 import com.example.testresqmesh.feature.incident.model.isInvolved
+import com.example.testresqmesh.data.mapper.toModel
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -54,8 +55,8 @@ class LocalIdentityManagerTest {
         listOf("OPEN", "AWAITING_HELPER", "RESPONDING").forEach { status ->
             val incident = report.copy(status = status)
             assertTrue(IncidentOwnership.isReporter(incident, renamed.userId, "signing-key"))
-            assertTrue(isInvolved(incident, emptyList(), renamed.userId, "signing-key"))
-            assertTrue(incidentPresentation(incident, emptyList(), renamed.userId, "signing-key").isReporter)
+            assertTrue(isInvolved(incident.toModel(), emptyList(), renamed.userId, "signing-key"))
+            assertTrue(incidentPresentation(incident.toModel(), emptyList(), renamed.userId, "signing-key").isReporter)
             assertEquals("Kyle", incident.creatorName)
             assertFalse(IncidentOwnership.isReporter(incident, "another-user", "signing-key"))
             assertFalse(IncidentOwnership.isReporter(incident, renamed.userId, "other-key"))

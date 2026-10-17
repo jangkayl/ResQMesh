@@ -26,16 +26,16 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.testresqmesh.core.ui.theme.ResQTheme
 import com.example.testresqmesh.core.ui.theme.Spacing
-import com.example.testresqmesh.data.local.entity.DomainEventEntity
-import com.example.testresqmesh.data.local.entity.IncidentEntity
-import com.example.testresqmesh.data.local.entity.IncidentOfferEntity
+import com.example.testresqmesh.core.model.DomainEvent
+import com.example.testresqmesh.core.model.Incident
+import com.example.testresqmesh.core.model.IncidentOffer
 import org.json.JSONObject
 
 @Composable
 fun IncidentCoordinationHub(
-    incident: IncidentEntity,
-    offers: List<IncidentOfferEntity>,
-    events: List<DomainEventEntity>,
+    incident: Incident,
+    offers: List<IncidentOffer>,
+    events: List<DomainEvent>,
     localUserId: String?,
     localSigningKey: String?,
     leadReachability: String,

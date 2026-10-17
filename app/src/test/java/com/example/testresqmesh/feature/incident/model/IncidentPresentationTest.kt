@@ -1,16 +1,19 @@
 package com.example.testresqmesh.feature.incident.model
 
+import com.example.testresqmesh.core.model.DomainEvent
+import com.example.testresqmesh.core.model.Incident
+import com.example.testresqmesh.core.model.IncidentOffer
 import com.example.testresqmesh.data.local.entity.DomainEventEntity
 import com.example.testresqmesh.data.local.entity.IncidentEntity
-import com.example.testresqmesh.data.local.entity.IncidentOfferEntity
+import com.example.testresqmesh.data.mapper.toModel
 import org.junit.Assert.*
 import org.junit.Test
 
 class IncidentPresentationTest {
     private val incident = IncidentEntity("i", "r", "Reporter", "Medical", "Serious", "Description", "School",
         status = "OPEN", primaryResponderId = null, primaryResponderName = null, version = 1,
-        createdAt = 1, updatedAt = 1, workflowVersion = 2, reporterSigningKey = "rk")
-    private val b = IncidentOfferEntity("b", "i", "bk", "bn", "Miguel", "I have a first-aid kit", 1, false, 2)
+        createdAt = 1, updatedAt = 1, workflowVersion = 2, reporterSigningKey = "rk").toModel()
+    private val b = IncidentOffer("b", "i", "bk", "bn", "Miguel", "I have a first-aid kit", 1, false, 2)
     private val c = b.copy(offerId = "c", helperKey = "ck", helperName = "Clara", updatedAt = 3)
     private fun selected(status: String = "AWAITING_HELPER") = incident.copy(status = status,
         selectionId = "selection", selectionOfferId = "b", selectedHelperKey = "bk", selectionOfferRevision = 1)
@@ -111,7 +114,7 @@ class IncidentPresentationTest {
     }
     @Test fun removedSelectionExplainsTheChangeToTheFormerHelper() {
         val selected = DomainEventEntity("selected", "i", "INCIDENT", "INCIDENT_LEAD_SELECTED", "r", "Reporter", 2, 2,
-            "{\"selectionId\":\"s\",\"helperKey\":\"bk\"}", applied = true)
+            "{\"selectionId\":\"s\",\"helperKey\":\"bk\"}", applied = true).toModel()
         val revoked = selected.copy(eventId = "revoked", eventType = "INCIDENT_LEAD_REVOKED",
             payloadJson = "{\"selectionId\":\"s\"}")
         val view = incidentPresentation(incident, listOf(b), "b", "bk", listOf(selected, revoked))

@@ -1,8 +1,8 @@
 package com.example.testresqmesh.feature.incident.model
 
-import com.example.testresqmesh.data.local.entity.IncidentEntity
-import com.example.testresqmesh.data.local.entity.IncidentOfferEntity
-import com.example.testresqmesh.data.local.entity.UserEntity
+import com.example.testresqmesh.core.model.Incident
+import com.example.testresqmesh.core.model.IncidentOffer
+import com.example.testresqmesh.core.model.MeshUser
 import com.example.testresqmesh.feature.incident.model.IncidentIdentityState
 import com.example.testresqmesh.feature.incident.model.IncidentMetrics
 import com.example.testresqmesh.feature.incident.model.IncidentDestination
@@ -11,7 +11,7 @@ import com.example.testresqmesh.feature.incident.model.AssistanceFilter
 import com.example.testresqmesh.feature.incident.model.isInvolved
 import com.example.testresqmesh.feature.incident.model.displayTitle
 
-internal fun incidentMetrics(incidents: List<IncidentEntity>, identity: IncidentIdentityState, offersMap: Map<String, List<IncidentOfferEntity>>): IncidentMetrics = run {
+internal fun incidentMetrics(incidents: List<Incident>, identity: IncidentIdentityState, offersMap: Map<String, List<IncidentOffer>>): IncidentMetrics = run {
         val active = incidents.filter { it.status !in setOf("RESOLVED", "CANCELLED") }
         val history = incidents.filter { it.status in setOf("RESOLVED", "CANCELLED") }
         val localKey = identity.signingKey
@@ -26,7 +26,7 @@ internal fun incidentMetrics(incidents: List<IncidentEntity>, identity: Incident
         )
 }
 
-internal fun selectIncidents(incidents: List<IncidentEntity>, user: UserEntity?, offersMap: Map<String, List<IncidentOfferEntity>>, currentDest: IncidentDestination, currentFilters: IncidentFilterState, query: String, localKey: String?): List<IncidentEntity> = run {
+internal fun selectIncidents(incidents: List<Incident>, user: MeshUser?, offersMap: Map<String, List<IncidentOffer>>, currentDest: IncidentDestination, currentFilters: IncidentFilterState, query: String, localKey: String?): List<Incident> = run {
         incidents.filter { incident ->
             // 1. Destination filter
             val matchesDest = when (currentDest) {
@@ -87,10 +87,10 @@ internal fun selectIncidents(incidents: List<IncidentEntity>, user: UserEntity?,
         }.sortedWith(
             if (currentDest == IncidentDestination.HISTORY) {
                 // History: latest update descending, stable ID
-                compareByDescending<IncidentEntity> { it.updatedAt }.thenBy { it.incidentId }
+                compareByDescending<Incident> { it.updatedAt }.thenBy { it.incidentId }
             } else {
                 // Active / My activity: urgency descending, latest update, stable ID
-                compareByDescending<IncidentEntity> {
+                compareByDescending<Incident> {
                     when (it.severity.lowercase()) {
                         "critical" -> 3
                         "serious" -> 2

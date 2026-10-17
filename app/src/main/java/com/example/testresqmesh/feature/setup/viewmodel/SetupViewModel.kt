@@ -17,7 +17,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
-import com.example.testresqmesh.data.repository.IdentityProvider
+import com.example.testresqmesh.core.domain.repository.LocalUserRepository
 import com.example.testresqmesh.core.service.MeshSessionController
 import com.example.testresqmesh.core.model.NodeIdentity
 
@@ -25,7 +25,7 @@ data class MeshStartError(val message: String, val needsAppPermission: Boolean =
 
 class SetupViewModel(
     private val useCases: com.example.testresqmesh.core.domain.usecase.MeshUseCases,
-    private val identityProvider: IdentityProvider,
+    private val identityProvider: LocalUserRepository,
     private val meshSessionController: MeshSessionController
 ) : ViewModel() {
 

@@ -17,18 +17,18 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.testresqmesh.core.ui.theme.ResQTheme
-import com.example.testresqmesh.data.local.entity.IncidentEntity
-import com.example.testresqmesh.data.local.entity.IncidentOfferEntity
+import com.example.testresqmesh.core.model.Incident
+import com.example.testresqmesh.core.model.IncidentOffer
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.material3.ExperimentalMaterial3Api
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 internal fun CoordinationStatusBanners(
-    incident: IncidentEntity,
+    incident: Incident,
     isReporter: Boolean,
     isSelectedHelper: Boolean,
-    selectedOffer: IncidentOfferEntity?,
+    selectedOffer: IncidentOffer?,
     actionMessage: String?,
     wasRevoked: Boolean
 ) {

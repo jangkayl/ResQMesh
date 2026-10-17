@@ -1,6 +1,6 @@
 package com.example.testresqmesh.feature.incident.model
 
-import com.example.testresqmesh.data.local.entity.UserEntity
+import com.example.testresqmesh.core.model.MeshUser
 
 enum class IncidentDestination(val label: String) {
     ACTIVE("Active"),
@@ -48,7 +48,7 @@ data class IncidentMetrics(
 )
 
 data class IncidentIdentityState(
-    val user: UserEntity? = null,
+    val user: MeshUser? = null,
     val signingKey: String? = null,
     val loading: Boolean = true,
     val error: String? = null

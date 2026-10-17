@@ -21,7 +21,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.testresqmesh.data.local.entity.IncidentEntity
+import com.example.testresqmesh.core.model.Incident
 import com.example.testresqmesh.feature.incident.model.IncidentPresentation
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -29,7 +29,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 internal fun IncidentIntroduction(
-    incident: IncidentEntity,
+    incident: Incident,
     presentation: IncidentPresentation,
     actionMessage: String?,
     urgencyColor: Color

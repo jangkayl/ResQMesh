@@ -35,9 +35,9 @@ import com.example.testresqmesh.core.ui.theme.ResQTheme
 import com.example.testresqmesh.core.ui.theme.Spacing
 import com.example.testresqmesh.core.ui.theme.TacticalBlack
 import com.example.testresqmesh.core.ui.theme.TacticalCarbon
-import com.example.testresqmesh.data.local.entity.DomainEventEntity
-import com.example.testresqmesh.data.local.entity.IncidentEntity
-import com.example.testresqmesh.data.local.entity.IncidentOfferEntity
+import com.example.testresqmesh.core.model.DomainEvent
+import com.example.testresqmesh.core.model.Incident
+import com.example.testresqmesh.core.model.IncidentOffer
 import com.example.testresqmesh.feature.incident.model.IncidentAction
 import com.example.testresqmesh.feature.incident.model.incidentPresentation
 import kotlinx.coroutines.launch
@@ -45,10 +45,10 @@ import kotlinx.coroutines.launch
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun IncidentDetailSheet(
-    incident: IncidentEntity,
-    events: List<DomainEventEntity>,
+    incident: Incident,
+    events: List<DomainEvent>,
     localUserId: String?,
-    offers: List<IncidentOfferEntity>,
+    offers: List<IncidentOffer>,
     localSigningKey: String?,
     leadReachability: String,
     actionBusy: Boolean,

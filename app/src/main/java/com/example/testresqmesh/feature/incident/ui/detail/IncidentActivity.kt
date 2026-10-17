@@ -18,7 +18,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.testresqmesh.core.ui.theme.Spacing
-import com.example.testresqmesh.data.local.entity.DomainEventEntity
+import com.example.testresqmesh.core.model.DomainEvent
 import org.json.JSONObject
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -26,7 +26,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 internal fun IncidentActivity(
-    appliedEvents: List<DomainEventEntity>,
+    appliedEvents: List<DomainEvent>,
     showActivitySection: Boolean,
     onToggle: () -> Unit
 ) {

@@ -2,33 +2,3 @@
 # Format: path relative to app/src/main/java/com/example/testresqmesh -> imported FQN, sorted.
 # This list may only shrink: fix a violation and delete its line. The check fails on
 # new violations and on stale entries, so do not add lines to waive new code.
-feature/incident/model/IncidentPresentation.kt -> com.example.testresqmesh.data.local.entity.DomainEventEntity
-feature/incident/model/IncidentPresentation.kt -> com.example.testresqmesh.data.local.entity.IncidentEntity
-feature/incident/model/IncidentPresentation.kt -> com.example.testresqmesh.data.local.entity.IncidentOfferEntity
-feature/incident/model/IncidentScreenModels.kt -> com.example.testresqmesh.data.local.entity.UserEntity
-feature/incident/model/IncidentSelectors.kt -> com.example.testresqmesh.data.local.entity.IncidentEntity
-feature/incident/model/IncidentSelectors.kt -> com.example.testresqmesh.data.local.entity.IncidentOfferEntity
-feature/incident/model/IncidentSelectors.kt -> com.example.testresqmesh.data.local.entity.UserEntity
-feature/incident/ui/components/HelpWorkflowPanel.kt -> com.example.testresqmesh.data.local.entity.DomainEventEntity
-feature/incident/ui/components/HelpWorkflowPanel.kt -> com.example.testresqmesh.data.local.entity.IncidentEntity
-feature/incident/ui/components/HelpWorkflowPanel.kt -> com.example.testresqmesh.data.local.entity.IncidentOfferEntity
-feature/incident/ui/components/IncidentCoordinationHub.kt -> com.example.testresqmesh.data.local.entity.DomainEventEntity
-feature/incident/ui/components/IncidentCoordinationHub.kt -> com.example.testresqmesh.data.local.entity.IncidentEntity
-feature/incident/ui/components/IncidentCoordinationHub.kt -> com.example.testresqmesh.data.local.entity.IncidentOfferEntity
-feature/incident/ui/components/IncidentDetailSheet.kt -> com.example.testresqmesh.data.local.entity.DomainEventEntity
-feature/incident/ui/components/IncidentDetailSheet.kt -> com.example.testresqmesh.data.local.entity.IncidentEntity
-feature/incident/ui/components/IncidentDetailSheet.kt -> com.example.testresqmesh.data.local.entity.IncidentOfferEntity
-feature/incident/ui/components/TacticalHelperOfferCard.kt -> com.example.testresqmesh.data.local.entity.IncidentOfferEntity
-feature/incident/ui/components/TacticalIncidentCard.kt -> com.example.testresqmesh.data.local.entity.IncidentEntity
-feature/incident/ui/coordination/CoordinationStatusBanners.kt -> com.example.testresqmesh.data.local.entity.IncidentEntity
-feature/incident/ui/coordination/CoordinationStatusBanners.kt -> com.example.testresqmesh.data.local.entity.IncidentOfferEntity
-feature/incident/ui/detail/IncidentActivity.kt -> com.example.testresqmesh.data.local.entity.DomainEventEntity
-feature/incident/ui/detail/IncidentHelperChatTarget.kt -> com.example.testresqmesh.data.local.entity.IncidentOfferEntity
-feature/incident/ui/detail/IncidentIntroduction.kt -> com.example.testresqmesh.data.local.entity.IncidentEntity
-feature/incident/ui/detail/IncidentLocationGuidance.kt -> com.example.testresqmesh.data.local.entity.IncidentEntity
-feature/incident/ui/detail/IncidentPrimaryActions.kt -> com.example.testresqmesh.data.local.entity.IncidentEntity
-feature/incident/ui/detail/SelectedIncidentHelper.kt -> com.example.testresqmesh.data.local.entity.IncidentEntity
-feature/incident/viewmodel/IncidentViewModel.kt -> com.example.testresqmesh.data.local.entity.DomainEventEntity
-feature/incident/viewmodel/IncidentViewModel.kt -> com.example.testresqmesh.data.local.entity.IncidentEntity
-feature/incident/viewmodel/IncidentViewModel.kt -> com.example.testresqmesh.data.local.entity.IncidentOfferEntity
-feature/incident/viewmodel/IncidentViewModel.kt -> com.example.testresqmesh.data.local.entity.UserEntity

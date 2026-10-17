@@ -10,13 +10,13 @@ import com.example.testresqmesh.feature.incident.model.incidentMetrics
 import com.example.testresqmesh.feature.incident.model.selectIncidents
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.testresqmesh.data.local.entity.DomainEventEntity
-import com.example.testresqmesh.data.local.entity.IncidentEntity
-import com.example.testresqmesh.data.local.entity.IncidentOfferEntity
-import com.example.testresqmesh.data.local.entity.UserEntity
-import com.example.testresqmesh.data.repository.IncidentRepository
-import com.example.testresqmesh.data.repository.IdentityProvider
-import com.example.testresqmesh.data.repository.IncidentOwnership
+import com.example.testresqmesh.core.model.DomainEvent
+import com.example.testresqmesh.core.model.Incident
+import com.example.testresqmesh.core.model.IncidentOffer
+import com.example.testresqmesh.core.model.MeshUser
+import com.example.testresqmesh.core.domain.repository.IncidentFeedRepository
+import com.example.testresqmesh.core.domain.repository.LocalUserRepository
+import com.example.testresqmesh.feature.incident.model.isReporter
 import com.example.testresqmesh.core.logging.AppLogger
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -30,31 +30,30 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.withContext
 
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 
 class IncidentViewModel(
-    private val incidentRepository: IncidentRepository,
-    private val identityManager: IdentityProvider,
+    private val incidentRepository: IncidentFeedRepository,
+    private val identityManager: LocalUserRepository,
     private val cryptoDispatcher: CoroutineDispatcher = Dispatchers.Default
 ) : ViewModel() {
 
-    val activeIncidents: StateFlow<List<IncidentEntity>> = incidentRepository.getActiveIncidents()
+    val activeIncidents: StateFlow<List<Incident>> = incidentRepository.getActiveIncidents()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    val allIncidents: StateFlow<List<IncidentEntity>> = incidentRepository.getAllIncidents()
+    val allIncidents: StateFlow<List<Incident>> = incidentRepository.getAllIncidents()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     private val _identityState = MutableStateFlow(IncidentIdentityState())
     val identityState: StateFlow<IncidentIdentityState> = _identityState.asStateFlow()
-    val localUser: StateFlow<UserEntity?> = identityState.map { it.user }
+    val localUser: StateFlow<MeshUser?> = identityState.map { it.user }
         .stateIn(viewModelScope, SharingStarted.Eagerly, null)
     private var identityJob: Job? = null
 
-    val allActiveOffers: StateFlow<List<IncidentOfferEntity>> = (incidentRepository.observeAllActiveOffers() ?: flowOf(emptyList()))
+    val allActiveOffers: StateFlow<List<IncidentOffer>> = incidentRepository.observeAllActiveOffers()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    val offersByIncident: StateFlow<Map<String, List<IncidentOfferEntity>>> = allActiveOffers
+    val offersByIncident: StateFlow<Map<String, List<IncidentOffer>>> = allActiveOffers
         .map { list -> list.groupBy { it.incidentId } }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyMap())
 
@@ -86,7 +85,7 @@ class IncidentViewModel(
         incidentMetrics(incidents, identity, offersMap)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), IncidentMetrics())
 
-    val filteredIncidents: StateFlow<List<IncidentEntity>> = combine(
+    val filteredIncidents: StateFlow<List<Incident>> = combine(
         allIncidents,
         identityState,
         offersByIncident,
@@ -95,11 +94,11 @@ class IncidentViewModel(
         _searchQuery
     ) { args: Array<Any?> ->
         @Suppress("UNCHECKED_CAST")
-        val incidents = args[0] as List<IncidentEntity>
+        val incidents = args[0] as List<Incident>
         val identity = args[1] as IncidentIdentityState
         val user = identity.user
         @Suppress("UNCHECKED_CAST")
-        val offersMap = args[2] as Map<String, List<IncidentOfferEntity>>
+        val offersMap = args[2] as Map<String, List<IncidentOffer>>
         val currentDest = args[3] as IncidentDestination
         val currentFilters = args[4] as IncidentFilterState
         val query = (args[5] as? String).orEmpty().trim().lowercase()
@@ -135,13 +134,13 @@ class IncidentViewModel(
         _filters.value = IncidentFilterState()
     }
 
-    private val _selectedIncident = MutableStateFlow<IncidentEntity?>(null)
-    val selectedIncident: StateFlow<IncidentEntity?> = _selectedIncident.asStateFlow()
+    private val _selectedIncident = MutableStateFlow<Incident?>(null)
+    val selectedIncident: StateFlow<Incident?> = _selectedIncident.asStateFlow()
 
-    private val _incidentEvents = MutableStateFlow<List<DomainEventEntity>>(emptyList())
-    val incidentEvents: StateFlow<List<DomainEventEntity>> = _incidentEvents.asStateFlow()
-    private val _offers = MutableStateFlow<List<IncidentOfferEntity>>(emptyList())
-    val offers: StateFlow<List<IncidentOfferEntity>> = _offers.asStateFlow()
+    private val _incidentEvents = MutableStateFlow<List<DomainEvent>>(emptyList())
+    val incidentEvents: StateFlow<List<DomainEvent>> = _incidentEvents.asStateFlow()
+    private val _offers = MutableStateFlow<List<IncidentOffer>>(emptyList())
+    val offers: StateFlow<List<IncidentOffer>> = _offers.asStateFlow()
     val localSigningKey: String? get() = identityState.value.signingKey
     private val _actionMessage = MutableStateFlow<String?>(null)
     val actionMessage: StateFlow<String?> = _actionMessage.asStateFlow()
@@ -159,7 +158,7 @@ class IncidentViewModel(
                     "OWNERSHIP_CHECK incident=${incident.incidentId} loading=${identity.loading} " +
                         "userIdMatches=${identity.user?.userId == incident.creatorId} " +
                         "signingKeyMatches=${identity.signingKey != null && identity.signingKey == incident.reporterSigningKey} " +
-                        "reporter=${IncidentOwnership.isReporter(incident, identity.user?.userId, identity.signingKey)}")
+                        "reporter=${incident.isReporter(identity.user?.userId, identity.signingKey)}")
             }
         }
     }
@@ -188,7 +187,7 @@ class IncidentViewModel(
         }
     }
 
-    fun selectIncident(incident: IncidentEntity?) {
+    fun selectIncident(incident: Incident?) {
         selectedIncidentJob?.cancel()
         selectedEventsJob?.cancel()
         selectedOffersJob?.cancel()
@@ -207,7 +206,7 @@ class IncidentViewModel(
                 }
             }
             selectedOffersJob = viewModelScope.launch {
-                (incidentRepository.observeOffersForIncident(incident.incidentId) ?: flowOf(emptyList())).collect {
+                incidentRepository.observeOffersForIncident(incident.incidentId).collect {
                     _offers.value = it
                 }
             }
@@ -227,7 +226,7 @@ class IncidentViewModel(
         locationCapturedAt: Long? = null,
         locationAccuracyMeters: Float? = null,
         title: String = "",
-        onSuccess: (IncidentEntity) -> Unit = {},
+        onSuccess: (Incident) -> Unit = {},
         onFailure: () -> Unit = {}
     ) {
         viewModelScope.launch {

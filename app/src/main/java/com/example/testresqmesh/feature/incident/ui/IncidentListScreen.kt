@@ -45,7 +45,7 @@ import com.example.testresqmesh.feature.incident.ui.components.TacticalIncidentC
 import com.example.testresqmesh.feature.incident.model.AssistanceFilter
 import com.example.testresqmesh.feature.incident.model.IncidentDestination
 import com.example.testresqmesh.feature.incident.viewmodel.IncidentViewModel
-import com.example.testresqmesh.data.repository.IncidentOwnership
+import com.example.testresqmesh.feature.incident.model.isReporter
 import com.example.testresqmesh.core.ui.model.NodeKind
 import com.example.testresqmesh.core.ui.peers.classifyRadarNodes
 import com.example.testresqmesh.core.ui.model.RadarUiState
@@ -327,7 +327,7 @@ fun IncidentListScreen(
                     )
                 ) {
                     items(filteredIncidents, key = { it.incidentId }) { incident ->
-                        val isMine = IncidentOwnership.isReporter(incident, localUser?.userId, identity.signingKey)
+                        val isMine = incident.isReporter(localUser?.userId, identity.signingKey)
                         val isAssignedToMe = localUser?.userId != null && localUser!!.userId == incident.primaryResponderId
                         val incidentOffers = offersByIncident[incident.incidentId].orEmpty()
                         val activeOffersCount = incidentOffers.count { !it.withdrawn }
