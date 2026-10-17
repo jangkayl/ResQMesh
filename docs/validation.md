@@ -32,7 +32,10 @@ This is a qualitative milestone, not a full PASS for every procedure or a measur
 .\gradlew.bat :app:lintDebug --console=plain
 powershell -ExecutionPolicy Bypass -File .\scripts\check_docs.ps1
 git diff --check
+.\gradlew.bat :app:assembleBenchmark --console=plain
 ```
+
+Judge speed only on the debug-signed, non-debuggable benchmark APK, which installs over debug builds. Never distribute it.
 
 Earlier mixed-workspace unit compilation was blocked by the untracked reconnect fixture. Its separately authorized repair is recorded below. No Android suite or physical tests ran for the documentation-only synchronization.
 

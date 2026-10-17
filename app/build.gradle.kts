@@ -42,6 +42,13 @@ android {
                 "proguard-rules.pro"
             )
         }
+        create("benchmark") {
+            // Release-like local performance checks. Debug signing installs over debug builds and
+            // keeps app data; never distribute this variant.
+            initWith(getByName("release"))
+            signingConfig = signingConfigs.getByName("debug")
+            matchingFallbacks += listOf("release")
+        }
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
