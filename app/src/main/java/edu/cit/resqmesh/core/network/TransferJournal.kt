@@ -51,11 +51,7 @@ internal class TransferJournal(private val root: File, private val now: () -> Lo
         prune()
         if (find(record.peer, record.id, record.outgoing) != null) return true
         val pending = records.values.filter { it.outgoing == record.outgoing && !it.stored }
-        val ordinary = pending.filterNot { it.priority }
-        val control = pending.filter { it.priority }
-        if (pending.size >= 128 || (!record.priority && ordinary.size >= 120) ||
-            (!record.priority && ordinary.sumOf { it.size.toLong() } + record.size > MAX_BYTES) ||
-            (record.priority && control.sumOf { it.size.toLong() } + record.size > 64 * 1024)) return false
+        if (poolFull(record, pending) || peerOverQuota(record, pending)) return false
         val directory = directory(record)
         directory.mkdirs()
         try {
@@ -63,6 +59,32 @@ internal class TransferJournal(private val root: File, private val now: () -> Lo
             write(record)
         } catch (failure: IOException) { removeDirectory(directory); throw failure }
         return true
+    }
+
+    /**
+     * One remote peer may hold at most [PEER_SHARE_PERCENT]% of the inbound pool, in entries and bytes, so a
+     * single neighbor cannot starve the rest. Our own outbound transfers are exempt. A peer with nothing
+     * pending is always allowed one transfer so a single large frame can still arrive.
+     */
+    fun peerOverQuota(record: TransferRecord): Boolean = peerOverQuota(record, records.values.filter {
+        it.outgoing == record.outgoing && !it.stored
+    })
+
+    private fun poolFull(record: TransferRecord, pending: List<TransferRecord>): Boolean {
+        val ordinary = pending.filterNot { it.priority }
+        val lane = if (record.priority) pending.filter { it.priority } else ordinary
+        val laneBytes = lane.sumOf { it.size.toLong() } + record.size
+        val laneFull = if (record.priority) laneBytes > CONTROL_BYTES else ordinary.size >= 120 || laneBytes > MAX_BYTES
+        return pending.size >= MAX_PENDING || laneFull
+    }
+
+    private fun peerOverQuota(record: TransferRecord, pending: List<TransferRecord>): Boolean {
+        val own = if (record.outgoing) emptyList() else pending.filter { it.peer == record.peer }
+        val lane = own.filter { it.priority == record.priority }
+        val laneLimit = (if (record.priority) CONTROL_BYTES else MAX_BYTES).toLong() * PEER_SHARE_PERCENT / PERCENT
+        // A peer with nothing pending always gets one transfer so a single large frame can still arrive.
+        return own.isNotEmpty() && (own.size >= MAX_PENDING * PEER_SHARE_PERCENT / PERCENT ||
+            lane.sumOf { it.size.toLong() } + record.size > laneLimit)
     }
 
     fun payload(record: TransferRecord): ByteArray = File(directory(record), "payload").readBytes()
@@ -124,6 +146,10 @@ internal class TransferJournal(private val root: File, private val now: () -> Lo
     companion object {
         const val PIECE_BYTES = 1024
         const val MAX_BYTES = 2 * 1024 * 1024
+        const val MAX_PENDING = 128
+        const val CONTROL_BYTES = 64 * 1024
+        const val PEER_SHARE_PERCENT = 25
+        private const val PERCENT = 100
         fun pieceCount(size: Int) = (size + PIECE_BYTES - 1) / PIECE_BYTES
         fun hash(bytes: ByteArray): String = MessageDigest.getInstance("SHA-256").digest(bytes)
             .joinToString("") { "%02x".format(it.toInt() and 255) }

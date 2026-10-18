@@ -36,6 +36,29 @@ class TransferJournalTest {
         assertTrue(journal.create(record(100, id = "receipt").copy(priority = true)))
     }
 
+    @Test fun onePeerIsCappedAtItsShareOfEntries() {
+        val journal = TransferJournal(temporary.newFolder()) { 1000 }
+        val limit = TransferJournal.MAX_PENDING * TransferJournal.PEER_SHARE_PERCENT / 100
+        repeat(limit) { assertTrue(journal.create(record(1, id = "a$it"))) }
+        assertFalse(journal.create(record(1, id = "over")))
+        assertTrue(journal.create(record(1, id = "b").copy(peer = "other")))
+    }
+
+    @Test fun onePeerIsCappedAtItsShareOfBytesButMayStartOneLargeTransfer() {
+        val journal = TransferJournal(temporary.newFolder()) { 1000 }
+        val share = TransferJournal.MAX_BYTES / 4
+        assertTrue(journal.create(record(share, id = "a")))
+        assertFalse(journal.create(record(1, id = "b")))
+        assertTrue(journal.create(record(1, id = "c").copy(peer = "other")))
+        assertTrue(TransferJournal(temporary.newFolder()) { 1000 }.create(record(TransferJournal.MAX_BYTES)))
+    }
+
+    @Test fun peerQuotaDoesNotApplyToOutboundTransfers() {
+        val journal = TransferJournal(temporary.newFolder()) { 1000 }
+        val limit = TransferJournal.MAX_PENDING * TransferJournal.PEER_SHARE_PERCENT / 100
+        repeat(limit + 5) { assertTrue(journal.create(record(1, outgoing = true, id = "o$it"), ByteArray(1))) }
+    }
+
     @Test fun expiryReleasesPayloadAndReservation() {
         var time = 1000L; val journal = TransferJournal(temporary.newFolder()) { time }
         val record = record(outgoing = true).copy(expiresAt = 2000)

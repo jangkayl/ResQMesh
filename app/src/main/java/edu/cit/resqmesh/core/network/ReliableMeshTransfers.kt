@@ -223,8 +223,13 @@ internal class ReliableMeshTransfers(
             if (record != null && (record.digest != packet.digest || record.size != packet.size)) return@execute
             if (record == null) {
                 record = TransferRecord(peer, packet.transferId, packet.digest, packet.size, false, "", "",
-                    packet.priority, now() + RETENTION_MS)
-                if (!journal.create(record)) { log("TRANSFER_OVERFLOW direction=inbound"); return@execute }
+                    // Priority is peer-supplied: only a frame that fits the control budget may claim it.
+                    packet.priority && packet.size <= TransferJournal.CONTROL_BYTES, now() + RETENTION_MS)
+                if (!journal.create(record)) {
+                    val quota = if (journal.peerOverQuota(record)) " reason=peer_quota peer=$peer" else ""
+                    log("TRANSFER_OVERFLOW direction=inbound$quota")
+                    return@execute
+                }
             }
             if (!record.stored) journal.putPiece(record, packet.index, packet.bytes)
             if (!record.complete && (0 until TransferJournal.pieceCount(record.size)).all { journal.hasPiece(record, it) }) {

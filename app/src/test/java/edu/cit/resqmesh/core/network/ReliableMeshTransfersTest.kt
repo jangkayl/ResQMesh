@@ -88,6 +88,19 @@ class ReliableMeshTransfersTest {
         assertFalse(b.arrived.any { it.type == "DELIVERED" })
     }
 
+    @Test fun flooderCannotOpenMoreInboundTransfersThanItsShare() {
+        val w = World(); val b = w.Node("B")
+        repeat(40) { n ->
+            val id = n.toString(16).padStart(64, '0')
+            val piece = TransferPiece(id, id, 2048, 0, ByteArray(1024))
+            val envelope = MeshPayload(id = "w$n", type = ReliableMeshTransfers.PIECE,
+                liveAudioChunk = ProtoBuf.encodeToByteArray(piece))
+            b.engine.receive("A", envelope)
+        }
+        val refused = b.logs.count { it.contains("reason=peer_quota") }
+        assertEquals(40 - TransferJournal.MAX_PENDING * TransferJournal.PEER_SHARE_PERCENT / 100, refused)
+    }
+
     @Test fun freshTransferAndFirstReadinessSendDataWithoutAStatusRoundTrip() {
         val w = World(); val a = w.Node("A"); val b = w.Node("B", online = false)
         a.engine.offer("B", w.payload(), false)
