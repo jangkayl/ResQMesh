@@ -1,6 +1,6 @@
 # Demo freeze card
 
-Prepared: 2026-10-17. Status: on 2026-10-17 the user reported part 1 (startup not timed) and part 2 (D1–D8 ×5) working on candidate #2; tally counts not supplied. Parts 3–4 pending. Covers status next actions 1 (candidate #2 startup and mesh check) and 2 (five repeats with counts, DELIVERY-01 captures, recorded backup) before the demo freeze (about 2026-10-28). This card collects evidence only: no fixes go in unless the user separately approves a demo-blocking one.
+Prepared: 2026-10-17. Status: on 2026-10-17 the user reported part 1 (startup not timed) and part 2 (D1–D8 ×5) working on candidate #2; tally counts not supplied. The user later reported parts 3–4 (rehearsal, backup recording, debug captures) done; durations, video name, capture folder and miss times not supplied. Covers status next actions 1 (candidate #2 startup and mesh check) and 2 (five repeats with counts, DELIVERY-01 captures, recorded backup) before the demo freeze (about 2026-10-28). This card collects evidence only: no fixes go in unless the user separately approves a demo-blocking one.
 
 ## Build identity
 
