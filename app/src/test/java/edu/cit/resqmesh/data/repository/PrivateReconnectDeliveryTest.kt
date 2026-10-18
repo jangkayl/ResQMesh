@@ -135,6 +135,7 @@ class PrivateReconnectDeliveryTest {
             } as SharedPreferences
         }
         val keys = PeerPublicKeyDirectory(prefs).also {
+            it.keyBindsToNodeId = { _, _ -> true }
             if (trusted) it.observe("Bob#B001", "B001", firstKey)
         }
         val network = Proxy.newProxyInstance(MeshNetworkGateway::class.java.classLoader, arrayOf(MeshNetworkGateway::class.java)) { _, method, args ->

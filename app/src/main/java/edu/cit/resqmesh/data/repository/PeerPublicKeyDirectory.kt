@@ -2,7 +2,9 @@ package edu.cit.resqmesh.data.repository
 
 import android.content.Context
 import android.content.SharedPreferences
+import android.util.Base64
 import edu.cit.resqmesh.core.model.NodeIdentity
+import edu.cit.resqmesh.core.network.bluetooth.DirectIdentityPolicy
 import java.security.MessageDigest
 import org.json.JSONArray
 import org.json.JSONObject
@@ -14,7 +16,13 @@ import org.json.JSONObject
 class PeerPublicKeyDirectory(private val preferences: SharedPreferences) {
     constructor(context: Context) : this(context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE))
 
+    /** INVALID_IDENTITY covers both an inconsistent node-id claim and a key that fails the id/RSA binding. */
     enum class Observation { TRUSTED, UNCHANGED, KEY_CHANGE_PENDING, INVALID_IDENTITY }
+
+    /** Replaceable in JVM tests, where android.util.Base64 and real RSA identities are unavailable. */
+    internal var keyBindsToNodeId: (nodeId: String, publicKey: String) -> Boolean = { nodeId, key ->
+        DirectIdentityPolicy.keyMatchesNodeId(nodeId, key) { Base64.decode(it, Base64.DEFAULT) }
+    }
 
     private data class Entry(
         val nodeId: String,
@@ -31,6 +39,8 @@ class PeerPublicKeyDirectory(private val preferences: SharedPreferences) {
     @Synchronized fun observe(peerName: String, advertisedNodeId: String, publicKey: String): Observation {
         val nodeId = stableId(peerName, advertisedNodeId) ?: return Observation.INVALID_IDENTITY
         if (publicKey.isBlank()) return Observation.INVALID_IDENTITY
+        // Only keys bound to the stable node ID (SHA-256 prefix, RSA >= 2048) may be pinned or proposed.
+        if (!keyBindsToNodeId(nodeId, publicKey)) return Observation.INVALID_IDENTITY
         val now = System.currentTimeMillis()
         val current = entries[nodeId]
         if (current == null) {

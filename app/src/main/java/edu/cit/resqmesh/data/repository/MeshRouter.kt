@@ -1,5 +1,7 @@
 package edu.cit.resqmesh.data.repository
 
+import edu.cit.resqmesh.core.logging.AppLogger
+import edu.cit.resqmesh.core.logging.TerminalLogCategory
 import edu.cit.resqmesh.core.model.ConnectedDevice
 import edu.cit.resqmesh.core.model.KnownNode
 import edu.cit.resqmesh.core.model.NodeIdentity
@@ -43,6 +45,15 @@ class MeshRouter {
         val previousSequence = topologySequences[stableSender]
         if (topologySequence > 0L) {
             if (previousSequence != null && topologySequence <= previousSequence) return false
+            if (previousSequence != null && topologySequence - previousSequence > MAX_SEQUENCE_JUMP) {
+                AppLogger.event(
+                    category = TerminalLogCategory.ROUTING,
+                    event = "TOPO_REJECT",
+                    message = "TOPO_REJECT reason=seq_jump node=$stableSender",
+                    peerName = senderName
+                )
+                return false
+            }
             topologySequences[stableSender] = topologySequence
         } else if (previousSequence != null) {
             // Once versioned advertisements are seen, a delayed legacy pulse cannot overwrite them.
@@ -310,5 +321,12 @@ class MeshRouter {
 
     companion object {
         const val TOPOLOGY_EXPIRY_MS = 90_000L
+
+        /**
+         * Sequences are wall-clock-ms seeded plus one per snapshot, so a restart within the 90 s
+         * lease jumps forward by roughly the downtime in ms. Longer gaps drop the stored value.
+         * 5 minutes leaves margin for clock skew while bounding how far a forged value can ratchet.
+         */
+        const val MAX_SEQUENCE_JUMP = 300_000L
     }
 }
