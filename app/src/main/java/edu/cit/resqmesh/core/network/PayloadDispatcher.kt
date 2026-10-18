@@ -4,6 +4,7 @@ import edu.cit.resqmesh.core.network.dispatch.BlockAckHandler
 import edu.cit.resqmesh.core.network.dispatch.BlockRequestHandler
 import edu.cit.resqmesh.core.network.dispatch.LegacyBlockControlHandler
 import edu.cit.resqmesh.core.network.dispatch.GoodbyeHandler
+import edu.cit.resqmesh.core.network.dispatch.InboundPayloadValidator
 import edu.cit.resqmesh.core.network.dispatch.LiveAudioHandler
 import edu.cit.resqmesh.core.network.dispatch.PayloadHandler
 import edu.cit.resqmesh.core.network.dispatch.ReceiptHandler
@@ -14,6 +15,7 @@ import edu.cit.resqmesh.core.logging.AppLogger
 import edu.cit.resqmesh.core.logging.TerminalLogCategory
 import edu.cit.resqmesh.core.logging.TerminalLogLevel
 import kotlinx.serialization.decodeFromByteArray
+import kotlinx.serialization.encodeToByteArray
 import kotlinx.serialization.protobuf.ProtoBuf
 import kotlinx.serialization.ExperimentalSerializationApi
 
@@ -22,7 +24,10 @@ import edu.cit.resqmesh.core.network.dispatch.EventSyncRequestHandler
 import edu.cit.resqmesh.core.network.dispatch.EventSyncResponseHandler
 
 @OptIn(ExperimentalSerializationApi::class)
-class PayloadDispatcher(private val callback: PayloadDispatcherCallback) {
+class PayloadDispatcher(
+    private val callback: PayloadDispatcherCallback,
+    private val validator: InboundPayloadValidator = InboundPayloadValidator()
+) {
 
     private val handlers: List<PayloadHandler> = listOf(
         SystemPulseHandler(),
@@ -39,10 +44,26 @@ class PayloadDispatcher(private val callback: PayloadDispatcherCallback) {
         StandardMessageHandler()
     )
 
-    fun dispatch(endpointId: String, payloadBytes: ByteArray) {
+    fun dispatch(endpointId: String, rawBytes: ByteArray) {
         try {
-            val payload = ProtoBuf.decodeFromByteArray<MeshPayload>(payloadBytes)
-            
+            val decoded = ProtoBuf.decodeFromByteArray<MeshPayload>(rawBytes)
+            val payload = when (val verdict = validator.validate(decoded)) {
+                is InboundPayloadValidator.Result.Rejected -> {
+                    AppLogger.event(
+                        category = TerminalLogCategory.SECURITY,
+                        event = "INBOUND_REJECT",
+                        message = "INBOUND_REJECT type=${decoded.type.take(32)} reason=${verdict.reason}",
+                        level = TerminalLogLevel.WARN,
+                        tag = "PAYLOAD_DISPATCHER",
+                        endpoint = endpointId
+                    )
+                    return
+                }
+                is InboundPayloadValidator.Result.Accepted -> verdict.payload
+            }
+            // Relay handlers forward the raw bytes, so a clamped TTL must be re-encoded.
+            val payloadBytes = if (payload === decoded) rawBytes else ProtoBuf.encodeToByteArray(payload)
+
             // 1. DUPLICATE MESSAGE CHECK (THE BOUNCER)
             if (payload.id.isEmpty()) return
             // SOS validates signatures before dedup/relay. Conversation storage owns durable

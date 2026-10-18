@@ -175,7 +175,8 @@ class NativeBleManager(val context: Context) : NativePayloadEvents {
         broadcast = { bytes, excluded -> broadcastPayload(bytes, excluded) },
         disconnect = ::disconnectFromEndpoint,
         privateNotification = notificationHelper::showPrivateMessageNotification,
-        sosNotification = notificationHelper::showSosEmergencyNotification
+        sosNotification = notificationHelper::showSosEmergencyNotification,
+        admittedNodeId = { endpoint -> nodeIdForEndpoint(endpoint)?.takeIf { store.links.isIdentityAdmitted(endpoint) } }
     )
 
     private fun forwardPrivatePayload(nodeId: String, payload: ByteArray): TransportDispatchResult {

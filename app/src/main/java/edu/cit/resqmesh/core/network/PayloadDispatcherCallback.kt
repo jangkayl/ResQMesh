@@ -10,6 +10,8 @@ interface PayloadDispatcherCallback {
     fun getConnectedEndpointIdByName(name: String): String?
     fun getConnectedEndpointIdByNodeId(nodeId: String): String?
     fun getStpNeighbors(): Set<String>
+    /** Stable node id bound to [endpointId] once its direct identity exchange completed, else null. */
+    fun getAdmittedNodeId(endpointId: String): String? = null
 
     fun sendDirectPayload(endpointId: String, payload: ByteArray): TransportDispatchResult
     fun sendPriorityPayload(endpointId: String, payload: ByteArray): TransportDispatchResult

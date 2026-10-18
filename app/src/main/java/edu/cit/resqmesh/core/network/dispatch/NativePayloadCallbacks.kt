@@ -23,7 +23,8 @@ internal class NativePayloadCallbacks(
     private val broadcast: (ByteArray, String?) -> Unit,
     private val disconnect: (String) -> Unit,
     private val privateNotification: (String, String) -> Unit,
-    private val sosNotification: (String, String) -> Unit
+    private val sosNotification: (String, String) -> Unit,
+    private val admittedNodeId: (String) -> String? = { null }
 ) : PayloadDispatcherCallback {
     override fun onConversationMessage(endpointId: String, payload: MeshPayload) {
         events.onConversationMessage?.invoke(endpointId, payload)
@@ -39,6 +40,8 @@ internal class NativePayloadCallbacks(
     override fun getConnectedEndpointIdByNodeId(nodeId: String) = endpointForPeer(nodeId)
     override fun hasPendingCustody(payloadId: String) = pendingCustody(payloadId)
     override fun forwardPrivatePayload(nodeId: String, payload: ByteArray) = forwardPrivate(nodeId, payload)
+
+    override fun getAdmittedNodeId(endpointId: String) = admittedNodeId(endpointId)
 
     override fun getStpNeighbors(): Set<String> {
         return events.stpNeighborsProvider?.invoke() ?: emptySet()
