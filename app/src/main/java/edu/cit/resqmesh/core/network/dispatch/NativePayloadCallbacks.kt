@@ -6,12 +6,13 @@ import edu.cit.resqmesh.core.network.BlockControlEnvelope
 import edu.cit.resqmesh.core.network.MeshPayload
 import edu.cit.resqmesh.core.network.NativePayloadEvents
 import edu.cit.resqmesh.core.network.PayloadDispatcherCallback
+import edu.cit.resqmesh.core.network.dedup.ExpiringIdCache
 import edu.cit.resqmesh.core.network.TransportDispatchResult
 
 /** Synchronous payload-to-application adapter. Reads current listeners and identity at invocation. */
 internal class NativePayloadCallbacks(
     private val events: NativePayloadEvents,
-    private val seenMessageIds: () -> MutableSet<String>,
+    private val seenIds: () -> ExpiringIdCache,
     private val endpointForPeer: (String) -> String?,
     private val pendingCustody: (String) -> Boolean,
     private val forwardPrivate: (String, ByteArray) -> TransportDispatchResult,
@@ -34,7 +35,7 @@ internal class NativePayloadCallbacks(
     }
     override fun getMyDeviceName() = events.myDeviceName
     override fun getMyNodeId() = events.myNodeId
-    override fun getSeenMessageIds() = seenMessageIds()
+    override fun getSeenIdCache() = seenIds()
     override fun getEndpointMedium(endpointId: String) = "Persistent BLE Mesh"
     override fun getConnectedEndpointIdByName(name: String) = NodeIdentity.idOf(name)?.let(endpointForPeer)
     override fun getConnectedEndpointIdByNodeId(nodeId: String) = endpointForPeer(nodeId)

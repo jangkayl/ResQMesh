@@ -3,6 +3,7 @@ package edu.cit.resqmesh.core.network.bluetooth.state
 import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothGatt
 import android.bluetooth.BluetoothSocket
+import edu.cit.resqmesh.core.network.dedup.ExpiringIdCache
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ConcurrentLinkedDeque
 import java.util.concurrent.CopyOnWriteArraySet
@@ -20,7 +21,7 @@ class BleStateStore {
     val links = BleLinkRegistry()
     val connectedEndpointIds = CopyOnWriteArraySet<String>()
     val connectedEndpointNames = ConcurrentHashMap<String, String>()
-    val seenMessageIds = CopyOnWriteArraySet<String>()
+    val seenMessageIds = ExpiringIdCache()
     
     val isNodeActive = AtomicBoolean(false)
     val isConnecting = AtomicBoolean(false)

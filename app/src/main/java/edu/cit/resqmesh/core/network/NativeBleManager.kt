@@ -163,7 +163,7 @@ class NativeBleManager(val context: Context) : NativePayloadEvents {
 
     val payloadDispatcherCallback: PayloadDispatcherCallback = NativePayloadCallbacks(
         events = this,
-        seenMessageIds = { store.seenMessageIds },
+        seenIds = { store.seenMessageIds },
         endpointForPeer = ::endpointForPeer,
         pendingCustody = ::hasPendingCustody,
         forwardPrivate = ::forwardPrivatePayload,

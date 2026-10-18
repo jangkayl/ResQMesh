@@ -192,7 +192,7 @@ internal class NativeOutboundDispatcher(
     fun cacheOutgoingMessageId(payloadBytes: ByteArray) {
         try {
             val payload = ProtoBuf.decodeFromByteArray<MeshPayload>(payloadBytes)
-            if (payload.id.isNotEmpty()) store.seenMessageIds.add(payload.id)
+            if (payload.id.isNotEmpty()) store.seenMessageIds.markSeen(payload.id)
         } catch (e: Exception) { AppLogger.d("BLE_MESH", "outgoing message id cache decode ignored: ${e.javaClass.simpleName}") }
     }
 

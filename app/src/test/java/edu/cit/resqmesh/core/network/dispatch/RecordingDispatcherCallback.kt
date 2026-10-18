@@ -10,7 +10,7 @@ internal class RecordingDispatcherCallback(
     val myName: String = "Relay [TAG]#B001",
     val myId: String = "B001"
 ) : PayloadDispatcherCallback {
-    val seen = mutableSetOf<String>()
+    var seen = edu.cit.resqmesh.core.network.dedup.ExpiringIdCache()
     val admitted = mutableMapOf<String, String>()
     val goodbyes = mutableListOf<String>()
     val broadcasts = mutableListOf<Pair<ByteArray, String?>>()
@@ -23,7 +23,7 @@ internal class RecordingDispatcherCallback(
     override fun onSosPacket(endpointId: String, payload: MeshPayload) { sosPackets += payload }
     override fun getMyDeviceName() = myName
     override fun getMyNodeId() = myId
-    override fun getSeenMessageIds(): MutableSet<String> = seen
+    override fun getSeenIdCache() = seen
     override fun getAdmittedNodeId(endpointId: String) = admitted[endpointId]
     override fun getEndpointMedium(endpointId: String) = "BLE"
     override fun getConnectedEndpointIdByName(name: String): String? = null

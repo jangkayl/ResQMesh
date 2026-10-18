@@ -48,7 +48,7 @@ class InboundPayloadValidatorTest {
         val dispatcher = PayloadDispatcher(cb)
         val bad = MeshPayload(id = "m1", type = "MESSAGE", senderName = "Alice#A001", text = "t".repeat(InboundPayloadValidator.MAX_TEXT + 1))
         dispatcher.dispatch("ep", ProtoBuf.encodeToByteArray(MeshPayload.serializer(), bad))
-        assertTrue(cb.received.isEmpty()); assertTrue(cb.seen.isEmpty())
+        assertTrue(cb.received.isEmpty()); assertEquals(0, cb.seen.size)
     }
 
     @Test fun goodbyeFromAdmittedPeerDisconnectsAndIsNotRelayed() {

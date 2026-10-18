@@ -77,19 +77,12 @@ class PayloadDispatcher(
                 return
             }
             val msgId = payload.id
-            val seenMessageIds = callback.getSeenMessageIds()
 
             val localPrivate = payload.type == "MESSAGE" && payload.isPrivate && payload.isEncrypted &&
                 (payload.targetNodeId.equals(callback.getMyNodeId(), ignoreCase = true) && payload.targetNodeId.isNotBlank() ||
                     payload.targetNodeId.isBlank() && edu.cit.resqmesh.core.model.NodeIdentity.matches(payload.targetName, callback.getMyDeviceName()))
             // The recipient store deduplicates private rows, then replays lost receipts.
-            if (seenMessageIds.contains(msgId) && !localPrivate && !callback.hasPendingCustody(msgId)) return
-            seenMessageIds.add(msgId)
-            if (seenMessageIds.size > 500) {
-                seenMessageIds.firstOrNull()?.let { oldest ->
-                    seenMessageIds.remove(oldest)
-                }
-            }
+            if (!callback.getSeenIdCache().markSeen(msgId) && !localPrivate && !callback.hasPendingCustody(msgId)) return
 
             val sender = payload.senderName
             if (sender == callback.getMyDeviceName()) return

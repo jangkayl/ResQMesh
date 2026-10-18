@@ -19,13 +19,13 @@ class HybridPrivateRoutingTest {
     ) : PayloadDispatcherCallback {
         val directPayloads = mutableListOf<Pair<String, ByteArray>>()
         val priorityPayloads = mutableListOf<Pair<String, ByteArray>>()
-        val seen = mutableSetOf<String>()
+        val seen = edu.cit.resqmesh.core.network.dedup.ExpiringIdCache()
         val broadcastPayloads = mutableListOf<Pair<ByteArray, String?>>()
         val endpointMap = mutableMapOf<String, String>()
 
         override fun getMyDeviceName() = myName
         override fun getMyNodeId() = myId
-        override fun getSeenMessageIds(): MutableSet<String> = seen
+        override fun getSeenIdCache() = seen
         override fun getEndpointMedium(endpointId: String) = "BLE"
         override fun getConnectedEndpointIdByName(name: String) = endpointMap[name]
         override fun getConnectedEndpointIdByNodeId(nodeId: String) = endpointMap[nodeId]
