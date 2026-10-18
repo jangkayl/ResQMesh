@@ -195,22 +195,20 @@ internal class GattClientCallback(
                 if (!owns(gatt, "notification")) return
                 val value = capturedValue ?: return
                 val now = System.currentTimeMillis()
-                if (now - link.lastGattChunkAt > 5000 && link.receiveBuffer.isNotEmpty()) {
+                if (now - link.lastGattChunkAt > 5000 && !link.receiveBuffer.isEmpty()) {
                     AppLogger.d("BLE_MESH", "Client Buffer timeout! Clearing corrupted chunk buffer for $macAddress")
-                    link.receiveBuffer = byteArrayOf()
+                    link.receiveBuffer.clear()
                 }
                 link.lastGattChunkAt = now
                 store.connectionInteractionTimes[macAddress] = now
                 link.lastInteractionAt = now
 
-                when (val result = MeshFrameCodec.append(link.receiveBuffer, value)) {
+                when (val result = link.receiveBuffer.append(value)) {
                     is MeshFrameCodec.AppendResult.Accepted -> {
                         result.payloads.forEach { processBinaryPayload(macAddress, it) }
-                        link.receiveBuffer = result.remainder
                     }
                     is MeshFrameCodec.AppendResult.Rejected -> {
                         AppLogger.d("BLE_MESH", "Rejected malformed CLIENT frame from $macAddress: ${result.reason}")
-                        link.receiveBuffer = byteArrayOf()
                     }
                 }
 

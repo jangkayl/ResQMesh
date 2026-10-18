@@ -169,22 +169,20 @@ internal class GattServerAttributeRequests(
                     value?.let {
                         val macAddress = device.address
                         val now = System.currentTimeMillis()
-                        if (now - receivingLink.lastGattChunkAt > 5000 && receivingLink.receiveBuffer.isNotEmpty()) {
+                        if (now - receivingLink.lastGattChunkAt > 5000 && !receivingLink.receiveBuffer.isEmpty()) {
                             AppLogger.d("BLE_MESH", "Server Buffer timeout! Clearing corrupted chunk buffer for $macAddress")
-                            receivingLink.receiveBuffer = byteArrayOf()
+                            receivingLink.receiveBuffer.clear()
                         }
                         receivingLink.lastGattChunkAt = now
                         store.connectionInteractionTimes[macAddress] = now
                         store.links.current(macAddress, BleLinkRole.SERVER)?.takeIf { it.serverDevice?.address == device.address }?.lastInteractionAt = now
 
-                        when (val result = MeshFrameCodec.append(receivingLink.receiveBuffer, it)) {
+                        when (val result = receivingLink.receiveBuffer.append(it)) {
                             is MeshFrameCodec.AppendResult.Accepted -> {
                                 result.payloads.forEach { payload -> processBinaryPayload(macAddress, payload) }
-                                receivingLink.receiveBuffer = result.remainder
                             }
                             is MeshFrameCodec.AppendResult.Rejected -> {
                                 AppLogger.d("BLE_MESH", "Rejected malformed SERVER frame from $macAddress: ${result.reason}")
-                                receivingLink.receiveBuffer = byteArrayOf()
                             }
                         }
                     }

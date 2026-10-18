@@ -35,7 +35,7 @@ class BleLink(
     @Volatile var identityAdmitted: Boolean = false
     /** A timed-out ATT operation cannot be reused even if the sibling L2CAP channel works. */
     @Volatile var gattQuarantined: Boolean = false
-    var receiveBuffer: ByteArray = byteArrayOf()
+    val receiveBuffer = MeshFrameCodec.Reassembler()
     var lastGattChunkAt: Long = 0L
 
     val handshakeOwner: String get() = "${role.name.lowercase(java.util.Locale.ROOT)}:$endpoint:$generation"
