@@ -17,6 +17,7 @@ internal class GattServerCallback(
         }
     }
     override fun onConnectionStateChange(device: BluetoothDevice, status: Int, newState: Int) {
+        if (newState == BluetoothProfile.STATE_DISCONNECTED) attributes.onDeviceDisconnected(device.address)
         links.onConnectionStateChange(device, status, newState)
     }
     override fun onDescriptorWriteRequest(device: BluetoothDevice, requestId: Int, descriptor: BluetoothGattDescriptor, preparedWrite: Boolean, responseNeeded: Boolean, offset: Int, value: ByteArray?) {
@@ -38,6 +39,10 @@ internal class GattServerCallback(
         characteristic: BluetoothGattCharacteristic
     ) {
         attributes.onCharacteristicReadRequest(device, requestId, offset, characteristic)
+    }
+
+    override fun onExecuteWrite(device: BluetoothDevice, requestId: Int, execute: Boolean) {
+        attributes.onExecuteWrite(device, requestId, execute)
     }
 
     override fun onCharacteristicWriteRequest(
