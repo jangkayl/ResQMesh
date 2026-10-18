@@ -6,6 +6,7 @@ import edu.cit.resqmesh.data.repository.incident.LegacyIncidentProjection
 import edu.cit.resqmesh.data.repository.incident.LegacyIncidentSync
 import edu.cit.resqmesh.core.network.MeshNetworkGateway
 import edu.cit.resqmesh.core.network.MeshPayload
+import edu.cit.resqmesh.core.network.ratelimit.SingleFlightGate
 import edu.cit.resqmesh.core.logging.AppLogger
 import edu.cit.resqmesh.data.local.dao.DomainEventDao
 import edu.cit.resqmesh.data.local.dao.IncidentDao
@@ -58,6 +59,9 @@ class IncidentRepository(
     private val projection: LegacyIncidentProjection = createLegacyIncidentProjection()
     private val legacySync: LegacyIncidentSync = createLegacyIncidentSync()
 
+    // Each domain event is distinct data, so a few may queue per link; overflow is recovered by anti-entropy.
+    private val domainEventGate = SingleFlightGate("DOMAIN_EVENT", maxQueued = 16)
+    private val syncRequestGate = SingleFlightGate("EVENT_SYNC_REQ")
     private val syncCoordinator = readyPeerEvents?.let {
         IncidentSyncCoordinator(networkGateway, it, syncStore, repositoryScope, ::startLegacyReconciliationWithPeer)
     }
@@ -74,19 +78,23 @@ class IncidentRepository(
         }
         networkGateway.onDomainEvent = { endpointId, payload ->
             repositoryScope.launch {
-                val result = ingestIncomingEventJson(payload.text)
-                if (result == IncidentIngestionResult.APPLIED) {
-                    forwardAcceptedDomainEvent(payload, endpointId)
+                domainEventGate.run(endpointId) {
+                    val result = ingestIncomingEventJson(payload.text)
+                    if (result == IncidentIngestionResult.APPLIED) {
+                        forwardAcceptedDomainEvent(payload, endpointId)
+                    }
+                    val incidentId = runCatching { JSONObject(payload.text).optString("entityId") }.getOrDefault("")
+                    replayPendingForIncident(incidentId)
                 }
-                val incidentId = runCatching { JSONObject(payload.text).optString("entityId") }.getOrDefault("")
-                replayPendingForIncident(incidentId)
             }
         }
         networkGateway.onEventSyncRequest = { endpointId, payload ->
             repositoryScope.launch {
-                if (runCatching { JSONObject(payload.text).optInt("protocol") == 2 }.getOrDefault(false))
-                    syncCoordinator?.receive(endpointId, payload)
-                else handleSyncRequest(endpointId, payload.text)
+                syncRequestGate.run(endpointId) {
+                    if (runCatching { JSONObject(payload.text).optInt("protocol") == 2 }.getOrDefault(false))
+                        syncCoordinator?.receive(endpointId, payload)
+                    else handleSyncRequest(endpointId, payload.text)
+                }
             }
         }
         networkGateway.onEventSyncResponse = { endpointId, payload ->

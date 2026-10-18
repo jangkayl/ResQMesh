@@ -5,6 +5,7 @@ import edu.cit.resqmesh.core.model.ConnectedDevice
 import edu.cit.resqmesh.core.model.NodeIdentity
 import edu.cit.resqmesh.core.network.MeshPayload
 import edu.cit.resqmesh.core.network.MeshNetworkGateway
+import edu.cit.resqmesh.core.network.ratelimit.ReceiptReplayLimiter
 import edu.cit.resqmesh.core.logging.AppLogger
 import android.util.Base64
 import edu.cit.resqmesh.core.utils.BinaryCompressor
@@ -21,6 +22,7 @@ import edu.cit.resqmesh.data.repository.PeerPublicKeyDirectory
 import edu.cit.resqmesh.data.repository.PrivateDeliveryPlanner
 import edu.cit.resqmesh.data.repository.PrivateMessageInsert
 
+@Suppress("TooManyFunctions")
 internal class MeshInboundMessages(
     private val networkManager: MeshNetworkGateway,
     private val messageStore: MessageStore,
@@ -37,6 +39,7 @@ internal class MeshInboundMessages(
     private val observeName: (String, Boolean) -> Unit,
     private val outboxMutex: Mutex
 ) {
+    private val receiptReplays = ReceiptReplayLimiter()
     private val myNodeName get() = localName()
     private fun readyConnectedDevices() = readyPeers()
     private fun recordPeerName(name: String, fromReadyLink: Boolean = false) = observeName(name, fromReadyLink)
@@ -74,24 +77,15 @@ internal class MeshInboundMessages(
                     senderNodeId = NodeIdentity.idOf(sender).orEmpty()
                 )
                 if (isPrivate) {
-                    repositoryScope.launch {
-                        val inserted = messageStore.saveIncomingPrivateIfAbsent(message)
-                        if (inserted == PrivateMessageInsert.REJECTED) return@launch
-                        AppLogger.d("MeshNetwork_E2EE", "PRIVATE_STORED message=$msgId insertion=$inserted")
-                        val reversedRoute = routePath.reversed().toMutableList()
-                        if (reversedRoute.isEmpty()) reversedRoute.add(sender)
-                        if (!NodeIdentity.matches(reversedRoute.first(), myNodeName)) reversedRoute.add(0, myNodeName)
-                        networkManager.broadcastDeliveredReceipt(msgId, isPrivate = true, targetId = endpointId, directedReturnRoute = reversedRoute)
-                        if (inserted == PrivateMessageInsert.DUPLICATE && messageStore.incomingPrivateWasSeen(msgId)) {
-                            networkManager.broadcastSeenReceipt(msgId, true, endpointId, reversedRoute)
-                        }
-                        if (inserted == PrivateMessageInsert.INSERTED) networkManager.showPrivateMessageNotification(sender, text)
-                    }
+                    repositoryScope.launch { receivePrivate(endpointId, message, routePath) }
                 } else {
                     repositoryScope.launch {
-                        if (!messageStore.contains(msgId)) messageStore.save(message, targetName = null)
+                        val duplicate = messageStore.contains(msgId)
+                        if (!duplicate) messageStore.save(message, targetName = null)
                         networkManager.markPayloadStored(msgId)
-                        networkManager.broadcastDeliveredReceipt(msgId, isPrivate = false)
+                        if (!duplicate || receiptReplays.allow(sender, msgId)) {
+                            networkManager.broadcastDeliveredReceipt(msgId, isPrivate = false)
+                        }
                     }
 
                     if (message.isSOS) {
@@ -110,6 +104,30 @@ internal class MeshInboundMessages(
         } else if (!isSystem && !isPrivate) {
             // Our own broadcast row already exists when a duplicate returns by another path.
             networkManager.markPayloadStored(msgId)
+        }
+    }
+
+    private suspend fun receivePrivate(endpointId: String, message: ChatMessage, routePath: List<String>) {
+        val msgId = message.id
+        val sender = message.senderName
+        val inserted = messageStore.saveIncomingPrivateIfAbsent(message)
+        if (inserted == PrivateMessageInsert.REJECTED) return
+        AppLogger.d("MeshNetwork_E2EE", "PRIVATE_STORED message=$msgId insertion=$inserted")
+        val reversedRoute = routePath.reversed().toMutableList()
+        if (reversedRoute.isEmpty()) reversedRoute.add(sender)
+        if (!NodeIdentity.matches(reversedRoute.first(), myNodeName)) reversedRoute.add(0, myNodeName)
+        val duplicate = inserted == PrivateMessageInsert.DUPLICATE
+        if (!duplicate || receiptReplays.allow(sender, msgId)) {
+            networkManager.broadcastDeliveredReceipt(
+                msgId, isPrivate = true, targetId = endpointId, directedReturnRoute = reversedRoute
+            )
+        }
+        val replaySeen = duplicate && messageStore.incomingPrivateWasSeen(msgId)
+        if (replaySeen && receiptReplays.allow(sender, "seen:$msgId")) {
+            networkManager.broadcastSeenReceipt(msgId, true, endpointId, reversedRoute)
+        }
+        if (inserted == PrivateMessageInsert.INSERTED) {
+            networkManager.showPrivateMessageNotification(sender, message.text)
         }
     }
 
@@ -161,7 +179,9 @@ internal class MeshInboundMessages(
                 fresh = true
             }
         }
-        networkManager.broadcastDeliveredReceipt(p.id, isPrivate = false)
+        if (fresh || receiptReplays.allow(p.senderNodeId, p.id)) {
+            networkManager.broadcastDeliveredReceipt(p.id, isPrivate = false)
+        }
         if (!fresh && !networkManager.hasPendingCustody(p.id)) return
         if (fresh) recordPeerName(p.senderName)
         if (fresh) message?.takeIf { it.conversationKind == "RADIO" && it.audioBase64 != null }?.let { incomingVoiceMessage.tryEmit(it) }

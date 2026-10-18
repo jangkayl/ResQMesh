@@ -107,6 +107,10 @@ class SosRepository(
             log("SOS_EVENT", "rejected id=${e.sosId.take(100)}")
             return@withLock SosIngestion.REJECTED
         }
+        if (SosProtocol.futureDated(e, now())) {
+            log("SOS_EVENT", "INBOUND_REJECT type=SOS_EVENT reason=future_created_at id=${e.sosId.take(100)}")
+            return@withLock SosIngestion.REJECTED
+        }
         val previouslyKnown = store.alert(e.sosId) != null
         val result = apply(e, pending = false)
         if (result == SosIngestion.APPLIED) {

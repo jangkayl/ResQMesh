@@ -236,7 +236,7 @@ class PrivateReconnectDeliveryTest {
         f.pendingRelayCustody = false
         f.network.onConversationMessage!!.invoke("ingress", packet); runCurrent()
         assertEquals(2, f.forwards.size)
-        assertEquals(3, f.receipts.size)
+        assertEquals(2, f.receipts.size)
     }
 
     @Test fun trackedReceiptDeadlineStartsOnlyAfterFullOriginTransmission() = runTest {
