@@ -71,4 +71,22 @@ class InboundRateLimitTest {
         send("relay", chat("c1", "C001"))
         assertTrue("c1" in cb.received)
     }
+
+    @Test fun droppedPayloadCanBeRetriedWithSameIdAfterRefill() {
+        send("relay", chat("a0", "A001")); send("relay", chat("a1", "A001"))
+        send("relay", chat("retry", "A001")) // over burst: dropped, must not be remembered
+        assertEquals(listOf("a0", "a1"), cb.received)
+        assertEquals(false, cb.seen.contains("retry"))
+        now += 60_000 // one chat token refills
+        send("relay", chat("retry", "A001"))
+        assertEquals(listOf("a0", "a1", "retry"), cb.received)
+    }
+
+    @Test fun pingAndPongAreNeverOriginLimited() {
+        repeat(100) {
+            send("ep", MeshPayload(id = "HB:$it", type = "PING", senderName = "N#A001"))
+        }
+        repeat(3) { send("ep", chat("c$it", "A001")) }
+        assertEquals(listOf("c0", "c1"), cb.received)
+    }
 }

@@ -20,7 +20,6 @@ class InboundOriginGate(
     private val admittedIds = ExpiringIdCache(clock = clock)
     private val knownSosIds = ExpiringIdCache(clock = clock)
     private val dropLog = RateLimitedLog(logIntervalMs, clock)
-    private val cooldownLog = RateLimitedLog(logIntervalMs, clock)
 
     /** True when [payload] may continue to its handler. */
     fun admit(endpointId: String, payload: MeshPayload, myNodeId: String): Boolean {
@@ -48,7 +47,7 @@ class InboundOriginGate(
         decision: OriginRateLimiter.Decision
     ) {
         val short = origin.take(SHORT_ID)
-        if (decision == OriginRateLimiter.Decision.CoolingDown && cooldownLog.shouldLog(origin)) {
+        if (decision == OriginRateLimiter.Decision.CooldownStarted) {
             log("RL_COOLDOWN", payload, trafficClass, short, endpointId)
         } else if (dropLog.shouldLog("$origin/$trafficClass")) {
             log("RL_DROP", payload, trafficClass, short, endpointId)
@@ -81,7 +80,8 @@ class InboundOriginGate(
             if (payload.sosId.isEmpty() || !knownSosIds.contains(payload.sosId)) TrafficClass.SOS_NEW
             else TrafficClass.SOS_UPDATE
         "SOS_SYNC_REQ", "EVENT_SYNC_REQ" -> TrafficClass.SYNC_REQUEST
-        "SYSTEM", "PING", "PONG" -> TrafficClass.PRESENCE
+        // PING/PONG are per-link liveness probes (link shaping only), not origin presence.
+        "SYSTEM" -> TrafficClass.PRESENCE
         else -> TrafficClass.OTHER
     }
 

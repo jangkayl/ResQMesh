@@ -47,23 +47,26 @@ class PayloadDispatcher(
         StandardMessageHandler()
     )
 
+    private fun validated(endpointId: String, decoded: MeshPayload): MeshPayload? =
+        when (val verdict = validator.validate(decoded)) {
+            is InboundPayloadValidator.Result.Accepted -> verdict.payload
+            is InboundPayloadValidator.Result.Rejected -> {
+                AppLogger.event(
+                    category = TerminalLogCategory.SECURITY,
+                    event = "INBOUND_REJECT",
+                    message = "INBOUND_REJECT type=${decoded.type.take(MAX_TYPE_LOG)} reason=${verdict.reason}",
+                    level = TerminalLogLevel.WARN,
+                    tag = "PAYLOAD_DISPATCHER",
+                    endpoint = endpointId
+                )
+                null
+            }
+        }
+
     fun dispatch(endpointId: String, payloadBytes: ByteArray) {
         try {
             val decoded = ProtoBuf.decodeFromByteArray<MeshPayload>(payloadBytes)
-            val payload = when (val verdict = validator.validate(decoded)) {
-                is InboundPayloadValidator.Result.Rejected -> {
-                    AppLogger.event(
-                        category = TerminalLogCategory.SECURITY,
-                        event = "INBOUND_REJECT",
-                        message = "INBOUND_REJECT type=${decoded.type.take(MAX_TYPE_LOG)} reason=${verdict.reason}",
-                        level = TerminalLogLevel.WARN,
-                        tag = "PAYLOAD_DISPATCHER",
-                        endpoint = endpointId
-                    )
-                    return
-                }
-                is InboundPayloadValidator.Result.Accepted -> verdict.payload
-            }
+            val payload = validated(endpointId, decoded) ?: return
             // Relay handlers forward the raw bytes, so a clamped TTL must be re-encoded.
             val relayBytes = if (payload === decoded) payloadBytes else ProtoBuf.encodeToByteArray(payload)
 
@@ -87,12 +90,14 @@ class PayloadDispatcher(
                 (payload.targetNodeId.equals(callback.getMyNodeId(), ignoreCase = true) && payload.targetNodeId.isNotBlank() ||
                     payload.targetNodeId.isBlank() && edu.cit.resqmesh.core.model.NodeIdentity.matches(payload.targetName, callback.getMyDeviceName()))
             // The recipient store deduplicates private rows, then replays lost receipts.
-            val firstSighting = callback.getSeenIdCache().markSeen(msgId)
-            if (!firstSighting && !localPrivate && !callback.hasPendingCustody(msgId)) return
+            val seenBefore = callback.getSeenIdCache().contains(msgId)
+            if (seenBefore && !localPrivate && !callback.hasPendingCustody(msgId)) return
 
             val sender = payload.senderName
             if (sender == callback.getMyDeviceName()) return
             if (!originGate.admit(endpointId, payload, callback.getMyNodeId())) return
+            // Only admitted ids are remembered, so a rate-limited payload can be retried with the same id.
+            callback.getSeenIdCache().markSeen(msgId)
 
             // 2. STRATEGY ROUTING LOGIC
             val handler = handlers.firstOrNull { it.canHandle(payload.type) }

@@ -10,7 +10,8 @@ class OriginRateLimiter(
     private val policy: RateLimitPolicy = RateLimitPolicy(),
     private val clock: () -> Long = System::currentTimeMillis
 ) {
-    enum class Decision { Allowed, Dropped, CoolingDown }
+    /** [CooldownStarted] is returned once, by the violation that starts a cooldown; later blocks are [CoolingDown]. */
+    enum class Decision { Allowed, Dropped, CoolingDown, CooldownStarted }
 
     private val buckets = BoundedLruMap<String, MutableMap<TrafficClass, TokenBucket>>(policy.maxTrackedOrigins)
     private val penalties = PenaltyBox(
@@ -19,11 +20,13 @@ class OriginRateLimiter(
 
     fun check(originNodeId: String, trafficClass: TrafficClass): Decision {
         val spec = policy.bucketSpec(trafficClass)
+        if (spec == null) return Decision.Allowed
+        // SOS classes are only ever limited by their own buckets: a cooldown earned elsewhere never blocks them.
+        val isSos = trafficClass == TrafficClass.SOS_NEW || trafficClass == TrafficClass.SOS_UPDATE
         return when {
-            spec == null -> Decision.Allowed
-            penalties.isCoolingDown(originNodeId) -> Decision.CoolingDown
+            !isSos && penalties.isCoolingDown(originNodeId) -> Decision.CoolingDown
             tryConsume(originNodeId, trafficClass, spec) -> Decision.Allowed
-            penalties.recordViolation(originNodeId) -> Decision.CoolingDown
+            penalties.recordViolation(originNodeId) -> Decision.CooldownStarted
             else -> Decision.Dropped
         }
     }

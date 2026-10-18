@@ -48,7 +48,7 @@ class RateLimitTest {
         repeat(10) { assertEquals(Decision.Allowed, limiter.check("o", TrafficClass.CHAT)) }
         assertEquals(Decision.Dropped, limiter.check("o", TrafficClass.CHAT))
         assertEquals(Decision.Dropped, limiter.check("o", TrafficClass.CHAT))
-        assertEquals(Decision.CoolingDown, limiter.check("o", TrafficClass.CHAT))
+        assertEquals(Decision.CooldownStarted, limiter.check("o", TrafficClass.CHAT))
         assertEquals(Decision.CoolingDown, limiter.check("o", TrafficClass.PRESENCE))
         now += 60_000
         assertEquals(Decision.Allowed, limiter.check("o", TrafficClass.CHAT))
@@ -91,5 +91,36 @@ class RateLimitTest {
         assertTrue(shaper.admit("L", 256 * 1024))
         shaper.forget("L")
         assertTrue(shaper.admit("L", 256 * 1024))
+    }
+}
+
+class SosCooldownTest {
+    private var now = 0L
+    private val policy = RateLimitPolicy(chatBurst = 1.0, sosNewBurst = 1.0, sosUpdateBurst = 1.0)
+    private val limiter = OriginRateLimiter(policy) { now }
+
+    private fun coolDown(origin: String) {
+        limiter.check(origin, TrafficClass.CHAT)
+        repeat(2) { limiter.check(origin, TrafficClass.CHAT) }
+        assertEquals(Decision.CooldownStarted, limiter.check(origin, TrafficClass.CHAT))
+    }
+
+    @Test fun cooldownFromOtherClassesNeverBlocksSos() {
+        coolDown("o")
+        assertEquals(Decision.CoolingDown, limiter.check("o", TrafficClass.PRESENCE))
+        assertEquals(Decision.Allowed, limiter.check("o", TrafficClass.SOS_NEW))
+        assertEquals(Decision.Allowed, limiter.check("o", TrafficClass.SOS_UPDATE))
+        // SOS still obeys its own buckets while cooling down.
+        assertEquals(Decision.Dropped, limiter.check("o", TrafficClass.SOS_NEW))
+    }
+
+    @Test fun sosViolationsCountTowardCooldownThatOnlyBlocksOtherClasses() {
+        assertEquals(Decision.Allowed, limiter.check("o", TrafficClass.SOS_NEW))
+        assertEquals(Decision.Dropped, limiter.check("o", TrafficClass.SOS_NEW))
+        assertEquals(Decision.Dropped, limiter.check("o", TrafficClass.SOS_NEW))
+        assertEquals(Decision.CooldownStarted, limiter.check("o", TrafficClass.SOS_NEW))
+        assertEquals(Decision.CoolingDown, limiter.check("o", TrafficClass.CHAT))
+        now += 120_000
+        assertEquals(Decision.Allowed, limiter.check("o", TrafficClass.SOS_NEW))
     }
 }
