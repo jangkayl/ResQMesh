@@ -63,45 +63,15 @@ class BleRadioController(
 
     private fun parseAdvertisement(result: ScanResult) {
         val bytes = result.scanRecord?.getManufacturerSpecificData(MANUFACTURER_ID) ?: return
-        val encoded = String(bytes, Charsets.UTF_8).replace("\u0000", "").trim()
-        val parts = encoded.split("|")
-        val score: String
-        val connections: Int
-        val displayName: String
-        val nodeId: String
-        when {
-            parts.size >= 4 -> {
-                score = parts[0]
-                connections = parts[1].toIntOrNull() ?: -1
-                nodeId = parts[2].trim().uppercase()
-                displayName = parts.drop(3).joinToString("|")
-            }
-            parts.size == 3 -> {
-                score = parts[0]
-                connections = parts[1].toIntOrNull() ?: -1
-                displayName = parts[2]
-                nodeId = NodeIdentity.idOf(displayName).orEmpty()
-            }
-            else -> {
-                AppLogger.d(
-                    "BLE_MESH",
-                    "Scanner: Ignored alien device ${result.device.address}. Invalid signature: $encoded"
-                )
-                return
-            }
+        val advertisement = BleAdvertisementParser.parse(result.device.address, bytes)
+        if (advertisement == null) {
+            AppLogger.d("BLE_MESH", "Scanner: Ignored malformed advertisement from ${result.device.address}")
+            return
         }
-        val peerName = if (nodeId.isNotEmpty()) {
-            NodeIdentity.compose(displayName, nodeId)
-        } else {
-            displayName.trim()
-        }
-        if (peerName.isEmpty()) return
         lastValidAdvertisementAt = System.currentTimeMillis()
         recoveryAttempts = 0
         scheduleRecoveryCheck()
-        onAdvertisement(
-            BleAdvertisement(result.device.address, peerName, nodeId, score, connections)
-        )
+        onAdvertisement(advertisement)
     }
 
     fun startAdvertising(
