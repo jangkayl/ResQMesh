@@ -22,13 +22,14 @@ import edu.cit.resqmesh.core.logging.AppLogger
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.decodeFromByteArray
 import kotlinx.serialization.protobuf.ProtoBuf
+import edu.cit.resqmesh.core.utils.collections.BoundedLruMap
 
 /** Outbound coordination only; the existing engines, handler and state store are shared. */
 @OptIn(ExperimentalSerializationApi::class)
 internal class NativeOutboundDispatcher(
     private val store: BleStateStore,
     private val handler: Handler,
-    private val peerTransferVersions: Map<String, Int>,
+    private val peerTransferVersions: BoundedLruMap<String, Int>,
     private val nodeIdForEndpoint: (String) -> String?,
     private val hasReadyEndpoint: (String) -> Boolean,
     private val isDeviceBlocked: (String) -> Boolean,

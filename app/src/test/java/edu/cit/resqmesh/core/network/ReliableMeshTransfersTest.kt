@@ -88,6 +88,14 @@ class ReliableMeshTransfersTest {
         assertFalse(b.arrived.any { it.type == "DELIVERED" })
     }
 
+    @Test fun trackedMessageStateStaysBoundedUnderPayloadIdChurn() {
+        val w = World(); val a = w.Node("A")
+        repeat(3000) { a.engine.relayTargets("payload$it", setOf("B")) }
+        // The oldest rosters were evicted, so the first id is recomputed from the current roster.
+        assertEquals(setOf("C"), a.engine.relayTargets("payload0", setOf("C")))
+        assertEquals(setOf("B"), a.engine.relayTargets("payload2999", setOf("C")))
+    }
+
     @Test fun flooderCannotOpenMoreInboundTransfersThanItsShare() {
         val w = World(); val b = w.Node("B")
         repeat(40) { n ->

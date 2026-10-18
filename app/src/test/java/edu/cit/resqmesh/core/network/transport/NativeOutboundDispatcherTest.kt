@@ -22,7 +22,7 @@ class NativeOutboundDispatcherTest {
         val dispatcher = NativeOutboundDispatcher(
             store = store,
             handler = Handler(),
-            peerTransferVersions = emptyMap(),
+            peerTransferVersions = edu.cit.resqmesh.core.utils.collections.BoundedLruMap(16),
             nodeIdForEndpoint = { "B002" },
             hasReadyEndpoint = { true },
             isDeviceBlocked = { false },

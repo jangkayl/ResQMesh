@@ -7,6 +7,7 @@ import edu.cit.resqmesh.core.network.ReliableMeshTransfers
 import edu.cit.resqmesh.core.network.bluetooth.state.BleLinkRole
 import edu.cit.resqmesh.core.network.bluetooth.state.BleStateStore
 import edu.cit.resqmesh.core.logging.AppLogger
+import edu.cit.resqmesh.core.utils.collections.BoundedLruMap
 import kotlinx.serialization.ExperimentalSerializationApi
 
 /** Inbound gates run at the same call site; only the existing rename/retirement posts are used. */
@@ -14,7 +15,7 @@ import kotlinx.serialization.ExperimentalSerializationApi
 internal class NativeInboundPipeline(
     private val store: BleStateStore,
     private val handler: Handler,
-    private val peerTransferVersions: MutableMap<String, Int>,
+    private val peerTransferVersions: BoundedLruMap<String, Int>,
     private val generation: () -> Long,
     private val nodeIdentity: () -> String,
     private val isTransportGenerationCurrent: (Long) -> Boolean,

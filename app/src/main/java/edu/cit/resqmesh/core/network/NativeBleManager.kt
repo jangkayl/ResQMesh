@@ -191,7 +191,7 @@ class NativeBleManager(
 
     val payloadDispatcher = PayloadDispatcher(payloadDispatcherCallback, originGate = guards.origins)
     val handler = Handler(Looper.getMainLooper())
-    private val peerTransferVersions = java.util.concurrent.ConcurrentHashMap<String, Int>()
+    private val peerTransferVersions = store.peerTransferVersions
     private val transferIo = java.util.concurrent.Executors.newSingleThreadExecutor { task ->
         Thread(task, "ResQMesh-transfer-journal").apply { isDaemon = true }
     }
