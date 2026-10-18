@@ -416,7 +416,7 @@ class NativeBleManager(
         if (specScore > 999) specScore = 999
         if (specScore < 0) specScore = 0
 
-        return String.format("%03d%s", specScore, myHex.take(2)) // e.g. "0889F", sorts by Specs, breaks ties with Hex
+        return edu.cit.resqmesh.core.network.bluetooth.BleAdvertisementParser.formatScore(specScore, myHex.take(2)) // e.g. "0889F", sorts by Specs, breaks ties with Hex
     }
 
     fun scheduleAdvertisingUpdate(delayMs: Long = 1000L) = sessionController.scheduleAdvertisingUpdate(delayMs)

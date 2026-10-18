@@ -106,7 +106,9 @@ class BleRadioController(
         val nodeId = NodeIdentity.idOf(deviceName) ?: fallbackNodeId
         val prefix = "$electionScore|$directConnections|$nodeId|"
         val remainingBytes = (MAX_ADVERT_PAYLOAD_BYTES - prefix.toByteArray().size).coerceAtLeast(0)
-        val displayName = truncateToBytes(NodeIdentity.displayNameOf(deviceName), remainingBytes)
+        val displayName = truncateToBytes(
+            BleAdvertisementParser.advertisedName(NodeIdentity.displayNameOf(deviceName)), remainingBytes
+        )
         val manufacturerData = (prefix + displayName).toByteArray().let { bytes ->
             if (bytes.size <= MAX_ADVERT_PAYLOAD_BYTES) bytes
             else bytes.copyOf(MAX_ADVERT_PAYLOAD_BYTES)

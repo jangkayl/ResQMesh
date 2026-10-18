@@ -26,7 +26,7 @@ class BleAdvertisementParserTest {
         listOf(
             "", "garbage", "0889F|2", "889F|2|A1B2|Bob", "0889F|x|A1B2|Bob", "0889F|-1|A1B2|Bob",
             "0889F|99|A1B2|Bob", "0889F|2|A1B|Bob", "0889F|2|A1B2C|Bob", "0889F|2|ZZZZ|Bob",
-            "0889F|2|A1B2|", "0889F|2|A1B2|Bo\u0001b", "0889F|2|A1B2|Bo#b", "0889F|1|Bob#XYZ"
+            "0889F|2|A1B2|Bo\u0001b", "0889F|2|A1B2|Bo#b", "0889F|1|Bob#XYZ"
         ).forEach { assertNull(it, parse(it)) }
         assertNull(BleAdvertisementParser.parse("AA:BB", null))
         assertNull(BleAdvertisementParser.parse("AA:BB", ByteArray(27) { 'a'.code.toByte() }))
@@ -37,5 +37,34 @@ class BleAdvertisementParserTest {
         val bytes = "0889F|2|A1B2|Abé".toByteArray().let { it.copyOf(it.size - 1) }
         assertNotNull(BleAdvertisementParser.parse("AA:BB", bytes))
         assertEquals("Ab#A1B2", BleAdvertisementParser.parse("AA:BB", bytes)!!.peerName)
+    }
+
+    @Test fun emptyDisplayNameIsAcceptedWhenTheNodeIdIsKnown() {
+        val ad = parse("0889F|2|A1B2|")!!
+        assertEquals("#A1B2", ad.peerName)
+        assertEquals("A1B2", ad.nodeId)
+        assertNull(parse("0889F|2|"))
+    }
+
+    @Test fun encoderNameSanitizationMatchesWhatTheParserAccepts() {
+        listOf("Bob", "a#b", "#lead", "tab\u0001ed", "  spaced  ", "###", "Ünï").forEach { raw ->
+            val sent = BleAdvertisementParser.advertisedName(raw)
+            val ad = parse("0889F|2|A1B2|$sent")
+            assertNotNull("name=$raw sent=$sent", ad)
+            if (sent.isEmpty()) assertEquals("#A1B2", ad!!.peerName)
+            else assertEquals(sent, edu.cit.resqmesh.core.model.NodeIdentity.displayNameOf(ad!!.peerName))
+        }
+        assertEquals("ab", BleAdvertisementParser.advertisedName("a#b"))
+    }
+
+    @Test fun scoreUsesAsciiDigitsInAnyLocale() {
+        val previous = java.util.Locale.getDefault()
+        try {
+            java.util.Locale.setDefault(java.util.Locale.forLanguageTag("ar-EG-u-nu-arab"))
+            assertEquals("0889F", BleAdvertisementParser.formatScore(88, "9F"))
+            assertNotNull(parse(BleAdvertisementParser.formatScore(88, "9F") + "|2|A1B2|Bob"))
+        } finally {
+            java.util.Locale.setDefault(previous)
+        }
     }
 }

@@ -22,7 +22,7 @@ internal object BleAdvertisementParser {
         val connections = connections(parts[1]) ?: return null
         val rawName = if (parts.size >= FULL_PARTS) parts.drop(MIN_PARTS).joinToString("|") else parts[2]
         val nodeId = nodeId(parts, rawName) ?: return null
-        val displayName = displayName(rawName) ?: return null
+        val displayName = displayName(rawName, allowEmpty = nodeId.isNotEmpty()) ?: return null
         val peerName = if (nodeId.isNotEmpty()) NodeIdentity.compose(displayName, nodeId) else displayName
         BleAdvertisement(endpoint, peerName, nodeId, score, connections)
     }.getOrNull()
@@ -36,10 +36,18 @@ internal object BleAdvertisementParser {
         text.takeIf { it.length in 1..MAX_CONNECTION_DIGITS && it.all { c -> c in '0'..'9' } }
             ?.toIntOrNull()?.takeIf { it <= MAX_CONNECTIONS }
 
-    private fun displayName(rawName: String): String? {
+    /** ASCII digits regardless of the device locale (e.g. ar-EG would otherwise emit Arabic-Indic digits). */
+    fun formatScore(specScore: Int, hex: String): String = String.format(java.util.Locale.ROOT, "%03d%s", specScore, hex)
+
+    /** Name as the encoder must send it: no character the strict [parse] would refuse (empty is allowed). */
+    fun advertisedName(displayName: String): String =
+        displayName.filter { !it.isISOControl() && it != REPLACEMENT && it != '#' }.trim()
+
+    private fun displayName(rawName: String, allowEmpty: Boolean): String? {
         // The byte cap can cut a multi-byte character; drop only that trailing replacement.
         val name = NodeIdentity.displayNameOf(rawName.trimEnd(REPLACEMENT)).trim()
-        val valid = name.isNotEmpty() && name.length <= MAX_NAME_CHARS &&
+        // An empty name is fine when the node id identifies the peer (the UI falls back to "#ID").
+        val valid = (name.isNotEmpty() || allowEmpty) && name.length <= MAX_NAME_CHARS &&
             name.none { it.isISOControl() || it == REPLACEMENT || it == '#' }
         return name.takeIf { valid }
     }

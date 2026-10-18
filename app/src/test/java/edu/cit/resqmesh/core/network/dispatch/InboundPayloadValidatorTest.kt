@@ -31,6 +31,14 @@ class InboundPayloadValidatorTest {
         assertEquals(10, accepted(MeshPayload(id = "a", relayHopCount = 500)).relayHopCount)
     }
 
+    @Test fun frameSizedVoiceCiphertextIsNotRejectedForLength() {
+        // ~1.1 MiB of audio, JSON/base64 then encrypted/base64 again: well above the old 1 MiB char cap.
+        val encrypted = "e".repeat(1_900_000)
+        accepted(MeshPayload(id = "v", isPrivate = true, isEncrypted = true, encryptedData = encrypted))
+        accepted(MeshPayload(id = "t", text = "t".repeat(1_900_000)))
+        assertTrue(rejected(MeshPayload(id = "e", encryptedData = "e".repeat(InboundPayloadValidator.MAX_ENCRYPTED + 1))))
+    }
+
     @Test fun oversizedFieldsAreRejected() {
         assertTrue(rejected(MeshPayload(id = "x".repeat(129))))
         assertTrue(rejected(MeshPayload(id = "a", senderName = "n".repeat(129))))

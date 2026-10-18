@@ -1,6 +1,7 @@
 package edu.cit.resqmesh.core.network.dispatch
 
 import edu.cit.resqmesh.core.network.MeshPayload
+import edu.cit.resqmesh.core.network.bluetooth.state.MeshFrameCodec
 import edu.cit.resqmesh.core.utils.BinaryCompressor
 
 /**
@@ -64,9 +65,13 @@ class InboundPayloadValidator {
         const val MAX_NAME = 128
         const val MAX_TAG = 64
         const val MAX_KEY = 8_192
-        /** Incident sync pages and SOS sync responses ride in [MeshPayload.text]. */
-        const val MAX_TEXT = 512 * 1024
-        const val MAX_ENCRYPTED = 1024 * 1024
+        /**
+         * Text and ciphertext are capped by the frame size: anything that fits one frame must not be
+         * refused for length (a private voice note is base64 audio in JSON, encrypted and base64 again,
+         * about 1.8x its raw size). Incident sync pages and SOS sync responses also ride in [MeshPayload.text].
+         */
+        const val MAX_TEXT = MeshFrameCodec.MAX_PAYLOAD_BYTES
+        const val MAX_ENCRYPTED = MeshFrameCodec.MAX_PAYLOAD_BYTES
         const val MAX_LIST = 256
     }
 }
