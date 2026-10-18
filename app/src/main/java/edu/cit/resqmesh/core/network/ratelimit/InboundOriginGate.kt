@@ -1,6 +1,7 @@
 package edu.cit.resqmesh.core.network.ratelimit
 
 import edu.cit.resqmesh.core.logging.AppLogger
+import edu.cit.resqmesh.core.logging.LogFields
 import edu.cit.resqmesh.core.logging.TerminalLogCategory
 import edu.cit.resqmesh.core.logging.TerminalLogLevel
 import edu.cit.resqmesh.core.model.NodeIdentity
@@ -27,21 +28,32 @@ class InboundOriginGate(
     /** True when [payload] may continue to its handler. [admittedNodeId] is the link's admitted peer id, if known. */
     fun admit(endpointId: String, payload: MeshPayload, myNodeId: String, admittedNodeId: String? = null): Boolean {
         val origin = originOf(payload, endpointId)
-        val exempt = myNodeId.isNotBlank() && origin.equals(myNodeId, ignoreCase = true) ||
-            payload.id.isNotEmpty() && admittedIds.contains(payload.id)
-        if (exempt) return true
         val trafficClass = classify(payload)
-        if (trafficClass == TrafficClass.OTHER) return true
         val direct = isDirect(payload)
-        if (direct && !admittedNodeId.isNullOrBlank() && !admittedNodeId.equals(origin, ignoreCase = true)) {
-            logMismatch(endpointId, payload)
-            return false
+        return when {
+            trafficClass == TrafficClass.OTHER || isExempt(origin, payload, myNodeId) -> true
+            direct && !admittedNodeId.isNullOrBlank() && !admittedNodeId.equals(origin, ignoreCase = true) -> {
+                logMismatch(endpointId, payload)
+                false
+            }
+            // A direct payload from the link's admitted peer is authenticated by the link; anything
+            // else is only a claim and is tracked per ingress endpoint.
+            else -> charge(endpointId, payload, origin, trafficClass, direct && !admittedNodeId.isNullOrBlank())
         }
-        // A direct payload from the link's admitted peer is authenticated by the link; anything else
-        // is only a claim and is tracked per ingress endpoint.
-        val verified = direct && !admittedNodeId.isNullOrBlank()
-        val key = if (verified) origin else "$origin@$endpointId"
-        val decision = limiter.check(key, trafficClass)
+    }
+
+    private fun isExempt(origin: String, payload: MeshPayload, myNodeId: String) =
+        myNodeId.isNotBlank() && origin.equals(myNodeId, ignoreCase = true) ||
+            payload.id.isNotEmpty() && admittedIds.contains(payload.id)
+
+    private fun charge(
+        endpointId: String,
+        payload: MeshPayload,
+        origin: String,
+        trafficClass: TrafficClass,
+        authenticated: Boolean
+    ): Boolean {
+        val decision = limiter.check(if (authenticated) origin else "$origin@$endpointId", trafficClass)
         val allowed = decision == OriginRateLimiter.Decision.Allowed
         if (allowed) {
             if (payload.id.isNotEmpty()) admittedIds.markSeen(payload.id)
@@ -50,6 +62,7 @@ class InboundOriginGate(
         }
         return allowed
     }
+
 
     /**
      * Charges the SOS bucket of a signature-verified event. [signingKeyPrefix] is derived from the
@@ -70,13 +83,14 @@ class InboundOriginGate(
 
     /** Hop count 0 and no relay appended to the route (only the origin itself): received from the origin. */
     private fun isDirect(payload: MeshPayload) = payload.relayHopCount == 0 &&
-        (payload.routePath.isEmpty() || payload.routePath.size == 1 && NodeIdentity.matches(payload.routePath[0], payload.senderName))
+        (payload.routePath.isEmpty() ||
+            payload.routePath.size == 1 && NodeIdentity.matches(payload.routePath[0], payload.senderName))
 
     private fun logMismatch(endpointId: String, payload: MeshPayload) =
         AppLogger.event(
             category = TerminalLogCategory.SECURITY,
             event = "INBOUND_REJECT",
-            message = "INBOUND_REJECT type=${payload.type.take(MAX_TYPE_LOG)} reason=origin_mismatch",
+            message = "INBOUND_REJECT type=${LogFields.type(payload.type)} reason=origin_mismatch",
             level = TerminalLogLevel.WARN,
             tag = "PAYLOAD_DISPATCHER",
             endpoint = endpointId
@@ -101,7 +115,7 @@ class InboundOriginGate(
         AppLogger.event(
             category = TerminalLogCategory.SECURITY,
             event = marker,
-            message = "$marker type=${type.take(MAX_TYPE_LOG)} class=$trafficClass origin=$origin",
+            message = "$marker type=${LogFields.type(type)} class=$trafficClass origin=$origin",
             level = TerminalLogLevel.WARN,
             tag = "PAYLOAD_DISPATCHER",
             endpoint = endpointId
@@ -123,7 +137,6 @@ class InboundOriginGate(
     private companion object {
         const val SOS_EVENT = "SOS_EVENT"
         const val SHORT_ID = 8
-        const val MAX_TYPE_LOG = 32
         const val LOG_INTERVAL_MS = 5_000L
     }
 }

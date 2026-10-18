@@ -102,7 +102,9 @@ class SosLifecycleAndSyncTest {
             override suspend fun getUserId() = id
             override fun getDeviceId() = id
         }
-        val repo = SosRepository(store, signing, identity, gateway, peers, network.scope, sink, now = { 1000 }, originGate = gate)
+        val repo = SosRepository(
+            store, signing, identity, gateway, peers, network.scope, sink, now = { 1000 }, originGate = gate
+        )
         init { network.nodes[id] = this }
     }
 

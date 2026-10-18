@@ -14,6 +14,7 @@ import edu.cit.resqmesh.core.network.dispatch.StandardMessageHandler
 import edu.cit.resqmesh.core.network.dispatch.SystemPulseHandler
 import edu.cit.resqmesh.core.network.dispatch.PingHandler
 import edu.cit.resqmesh.core.logging.AppLogger
+import edu.cit.resqmesh.core.logging.LogFields
 import edu.cit.resqmesh.core.logging.TerminalLogCategory
 import edu.cit.resqmesh.core.logging.TerminalLogLevel
 import kotlinx.serialization.decodeFromByteArray
@@ -54,7 +55,7 @@ class PayloadDispatcher(
                 AppLogger.event(
                     category = TerminalLogCategory.SECURITY,
                     event = "INBOUND_REJECT",
-                    message = "INBOUND_REJECT type=${decoded.type.take(MAX_TYPE_LOG)} reason=${verdict.reason}",
+                    message = "INBOUND_REJECT type=${LogFields.type(decoded.type)} reason=${verdict.reason}",
                     level = TerminalLogLevel.WARN,
                     tag = "PAYLOAD_DISPATCHER",
                     endpoint = endpointId
@@ -125,9 +126,5 @@ class PayloadDispatcher(
                 endpoint = endpointId
             )
         }
-    }
-
-    private companion object {
-        const val MAX_TYPE_LOG = 32
     }
 }

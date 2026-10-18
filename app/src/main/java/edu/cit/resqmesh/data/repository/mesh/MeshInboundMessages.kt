@@ -22,7 +22,7 @@ import edu.cit.resqmesh.data.repository.PeerPublicKeyDirectory
 import edu.cit.resqmesh.data.repository.PrivateDeliveryPlanner
 import edu.cit.resqmesh.data.repository.PrivateMessageInsert
 
-@Suppress("TooManyFunctions")
+@Suppress("TooManyFunctions", "LongParameterList")
 internal class MeshInboundMessages(
     private val networkManager: MeshNetworkGateway,
     private val messageStore: MessageStore,
@@ -37,9 +37,10 @@ internal class MeshInboundMessages(
     private val localName: () -> String,
     private val readyPeers: () -> List<ConnectedDevice>,
     private val observeName: (String, Boolean) -> Unit,
-    private val outboxMutex: Mutex
+    private val outboxMutex: Mutex,
+    clock: () -> Long = System::currentTimeMillis
 ) {
-    private val receiptReplays = ReceiptReplayLimiter()
+    private val receiptReplays = ReceiptReplayLimiter(clock = clock)
     private val myNodeName get() = localName()
     private fun readyConnectedDevices() = readyPeers()
     private fun recordPeerName(name: String, fromReadyLink: Boolean = false) = observeName(name, fromReadyLink)

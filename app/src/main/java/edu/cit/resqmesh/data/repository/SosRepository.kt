@@ -14,6 +14,7 @@ import kotlinx.serialization.protobuf.ProtoBuf
 import java.util.UUID
 
 @OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
+@Suppress("LongParameterList") // the origin gate joins the existing injected collaborators
 class SosRepository(
     private val store: SosStore, private val signing: IncidentEventSigning,
     private val identity: IdentityProvider, private val gateway: MeshNetworkGateway,
@@ -42,7 +43,10 @@ class SosRepository(
                 if (payload.text.toByteArray().size > 8_192 || payload.ttl !in 1..10 || payload.relayHopCount !in 0..10) continue
                 val e = runCatching { SosProtocol.json.decodeFromString<SosEvent>(payload.text) }.getOrNull()
                     ?: continue
-                if (!SosProtocol.envelopeMatches(payload, e)) { log("SOS_EVENT", "INBOUND_REJECT type=SOS_EVENT reason=envelope_mismatch"); continue }
+                if (!SosProtocol.envelopeMatches(payload, e)) {
+                    log("SOS_EVENT", "INBOUND_REJECT type=SOS_EVENT reason=envelope_mismatch")
+                    continue
+                }
                 val result = ingest(e, live = true, endpoint = endpoint)
                 if (result == SosIngestion.APPLIED && payload.ttl > 1 && payload.relayHopCount < 10) {
                     val forwarded = payload.copy(ttl = payload.ttl - 1, relayHopCount = payload.relayHopCount + 1)
@@ -115,11 +119,7 @@ class SosRepository(
             return@withLock SosIngestion.REJECTED
         }
         val previouslyKnown = store.alert(e.sosId) != null
-        // Only a verified event charges a bucket, keyed by its signing key; duplicates are free.
-        if (endpoint != null && originGate != null && store.event(e.eventId) == null &&
-            !originGate.admitVerifiedSos(endpoint, SosProtocol.prefix(e.signingKey), !previouslyKnown)) {
-            return@withLock SosIngestion.REJECTED
-        }
+        if (rateLimited(e, endpoint, previouslyKnown)) return@withLock SosIngestion.REJECTED
         val result = apply(e, pending = false)
         if (result == SosIngestion.APPLIED) {
             changes.tryEmit(Unit)
@@ -131,6 +131,12 @@ class SosRepository(
             }
         }
         result
+    }
+
+    /** Only a verified, not yet stored event from a link charges its signing key's bucket; duplicates are free. */
+    private suspend fun rateLimited(e: SosEvent, endpoint: String?, previouslyKnown: Boolean): Boolean {
+        if (endpoint == null || originGate == null || store.event(e.eventId) != null) return false
+        return !originGate.admitVerifiedSos(endpoint, SosProtocol.prefix(e.signingKey), !previouslyKnown)
     }
 
     private suspend fun apply(e: SosEvent, pending: Boolean): SosIngestion {

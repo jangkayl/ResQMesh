@@ -1,6 +1,6 @@
 # Security hardening plan
 
-Approved by the user on 2026-10-17. Status: Phase A implemented locally; phases B–E wait for the demo freeze to end. Tracked as SEC-01 in [status](../status.md).
+Approved by the user on 2026-10-17. Status: Phase A user-reported PASS. Phase B was implemented locally on 2026-10-18 on branch `feat/security-phase-b`, with no device evidence yet. Phases C–E wait for the demo freeze to end. Tracked as SEC-01 in [status](../status.md).
 
 ## Threat model
 
@@ -44,6 +44,22 @@ The attacker is a malicious nearby phone: a modified app or BLE tool that floods
 - **Key and topology checks:** `MeshRouter` rejects sequence jumps beyond a window, and `PeerPublicKeyDirectory` pins only keys that pass `DirectIdentityPolicy.validate`.
 - **Advertisements:** parsed strictly, and a node ID claimed in an advertisement can't evict a link before that identity is admitted.
 
+As built, these changed from the outline:
+
+- SOS limits are charged after the SOS signature verifies, keyed by the signing-key prefix, not the claimed sender.
+- A direct payload whose origin differs from the link's admitted identity is rejected.
+- Relayed traffic is limited per origin and ingress link, so a spoof on one link can't throttle the victim on another.
+- A cooldown never blocks SOS.
+- PING, PONG, PIECE and ACK are shaped per link only.
+- Topology sequences more than 10 min ahead of the local clock are rejected.
+- Validator text and ciphertext caps equal the frame cap, so long voice notes still fit.
+
+Open limits:
+
+- Node IDs are 16-bit prefixes, so key pinning only filters malformed keys until Phase D/E.
+- Re-raising an SOS within 2 min from the same key is dropped at relays.
+- A peer whose clock runs more than 10 min fast has its topology ignored.
+
 ## Phase C: storage (after the freeze)
 
 - SQLCipher through `SupportOpenHelperFactory`, keyed with 32 random bytes wrapped by a Keystore AES-GCM key and passed as a raw key (no slow key derivation). A one-time `sqlcipher_export` migration converts the existing plaintext database.
@@ -71,4 +87,4 @@ The attacker is a malicious nearby phone: a modified app or BLE tool that floods
 - Each phase step is one Conventional Commit.
 - After each step: targeted unit tests (JVM, fake clock; Tink with cleartext test keysets). After each phase: the full D10 gate.
 - An auditor reviews dependency, manifest and crypto steps.
-- Each phase has a phone card. Phase A: [security Phase A card](../testing/security-phase-a-card.md).
+- Each phase has a phone card. Phase A: [security Phase A card](../testing/security-phase-a-card.md). Phase B: [security Phase B card](../testing/security-phase-b-card.md).

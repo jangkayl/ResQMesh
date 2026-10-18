@@ -36,7 +36,8 @@ class InboundPayloadValidatorTest {
         val encrypted = "e".repeat(1_900_000)
         accepted(MeshPayload(id = "v", isPrivate = true, isEncrypted = true, encryptedData = encrypted))
         accepted(MeshPayload(id = "t", text = "t".repeat(1_900_000)))
-        assertTrue(rejected(MeshPayload(id = "e", encryptedData = "e".repeat(InboundPayloadValidator.MAX_ENCRYPTED + 1))))
+        val tooLong = "e".repeat(InboundPayloadValidator.MAX_ENCRYPTED + 1)
+        assertTrue(rejected(MeshPayload(id = "e", encryptedData = tooLong)))
     }
 
     @Test fun oversizedFieldsAreRejected() {

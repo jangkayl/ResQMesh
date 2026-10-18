@@ -169,26 +169,25 @@ class PeerPublicKeyDirectoryTest {
     }
 
     @Test
-    fun boundKeyIsPinnedAndReloadedAndLegacyEntriesStillLoad() {
+    fun boundKeyIsPinnedAndReloadedAndInvalidStoredPinIsDropped() {
         val prefs = FakeSharedPreferences()
         val (id, key) = rsaKeyWithId(2048)
 
         val observed = realDirectory(prefs).observe("Bob#$id", id, key)
         assertEquals(PeerPublicKeyDirectory.Observation.TRUSTED, observed)
-        // A pre-existing entry with a non-conforming key is still loaded, not discarded.
+        // A stored pin that fails the id/key binding is dropped at load, the valid pin is kept.
         lenientDirectory(prefs).observe("Old#B001", "B001", "LEGACY")
         val reloaded = realDirectory(prefs)
         assertEquals(key, reloaded.trustedKey("Bob#$id"))
-        assertEquals("LEGACY", reloaded.trustedKey("Old#B001"))
+        assertNull(reloaded.trustedKey("Old#B001"))
+        assertNull(realDirectory(prefs).trustedKey("Old#B001")) // and stays dropped after being persisted
     }
 
     private fun lenientDirectory(prefs: SharedPreferences) =
-        PeerPublicKeyDirectory(prefs).also { it.keyBindsToNodeId = { _, _ -> true } }
+        PeerPublicKeyDirectory(prefs) { _, _ -> true }
 
-    private fun realDirectory(prefs: SharedPreferences) = PeerPublicKeyDirectory(prefs).also {
-        it.keyBindsToNodeId = { nodeId, key ->
-            DirectIdentityPolicy.keyMatchesNodeId(nodeId, key) { java.util.Base64.getDecoder().decode(it) }
-        }
+    private fun realDirectory(prefs: SharedPreferences) = PeerPublicKeyDirectory(prefs) { nodeId, key ->
+        DirectIdentityPolicy.keyMatchesNodeId(nodeId, key) { java.util.Base64.getDecoder().decode(it) }
     }
 
     private fun rsaKeyWithId(bits: Int): Pair<String, String> {

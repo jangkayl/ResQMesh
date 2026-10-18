@@ -36,8 +36,9 @@ internal object BleAdvertisementParser {
         text.takeIf { it.length in 1..MAX_CONNECTION_DIGITS && it.all { c -> c in '0'..'9' } }
             ?.toIntOrNull()?.takeIf { it <= MAX_CONNECTIONS }
 
-    /** ASCII digits regardless of the device locale (e.g. ar-EG would otherwise emit Arabic-Indic digits). */
-    fun formatScore(specScore: Int, hex: String): String = String.format(java.util.Locale.ROOT, "%03d%s", specScore, hex)
+    /** Election score such as "0889F" (specs, then hex tie-break), in ASCII digits whatever the device locale. */
+    fun formatScore(specScore: Int, hex: String): String =
+        String.format(java.util.Locale.ROOT, "%03d%s", specScore, hex)
 
     /** Name as the encoder must send it: no character the strict [parse] would refuse (empty is allowed). */
     fun advertisedName(displayName: String): String =

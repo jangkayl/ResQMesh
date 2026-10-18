@@ -29,7 +29,8 @@ object DirectIdentityPolicy {
         val key = KeyFactory.getInstance("RSA").generatePublic(X509EncodedKeySpec(decode(publicKey))) as? RSAPublicKey
             ?: return@runCatching false
         if (key.modulus.bitLength() < 2048) return@runCatching false
-        val derived = MessageDigest.getInstance("SHA-256").digest(key.encoded).take(2).joinToString("") { "%02X".format(java.util.Locale.ROOT, it) }
+        val derived = MessageDigest.getInstance("SHA-256").digest(key.encoded).take(2)
+            .joinToString("") { "%02X".format(java.util.Locale.ROOT, it) }
         nodeId.uppercase() == derived
     }.getOrDefault(false)
 

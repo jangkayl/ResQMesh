@@ -44,26 +44,7 @@ class MeshRouter(private val clock: () -> Long = System::currentTimeMillis) {
         if (stableSender.isBlank()) return false
         val previousSequence = topologySequences[stableSender]
         if (topologySequence > 0L) {
-            // Sequences are seeded from wall-clock ms, so one far in the future would pin the ratchet forever.
-            if (topologySequence > clock() + SosProtocol.MAX_FUTURE_SKEW_MS) {
-                AppLogger.event(
-                    category = TerminalLogCategory.ROUTING,
-                    event = "TOPO_REJECT",
-                    message = "TOPO_REJECT reason=seq_future node=$stableSender",
-                    peerName = senderName
-                )
-                return false
-            }
-            if (previousSequence != null && topologySequence <= previousSequence) return false
-            if (previousSequence != null && topologySequence - previousSequence > MAX_SEQUENCE_JUMP) {
-                AppLogger.event(
-                    category = TerminalLogCategory.ROUTING,
-                    event = "TOPO_REJECT",
-                    message = "TOPO_REJECT reason=seq_jump node=$stableSender",
-                    peerName = senderName
-                )
-                return false
-            }
+            if (!sequenceAcceptable(senderName, stableSender, topologySequence, previousSequence, clock())) return false
             topologySequences[stableSender] = topologySequence
         } else if (previousSequence != null) {
             // Once versioned advertisements are seen, a delayed legacy pulse cannot overwrite them.
@@ -339,4 +320,34 @@ class MeshRouter(private val clock: () -> Long = System::currentTimeMillis) {
          */
         const val MAX_SEQUENCE_JUMP = 300_000L
     }
+}
+
+private const val STALE = "stale"
+
+/**
+ * Sequences are seeded from wall-clock ms, so one beyond the local clock plus the allowed skew would
+ * pin the ratchet forever; a jump beyond [MeshRouter.MAX_SEQUENCE_JUMP] of the last accepted one is refused too.
+ */
+private fun sequenceAcceptable(
+    senderName: String,
+    stableSender: String,
+    sequence: Long,
+    previous: Long?,
+    now: Long
+): Boolean {
+    val reason = when {
+        sequence > now + SosProtocol.MAX_FUTURE_SKEW_MS -> "seq_future"
+        previous != null && sequence <= previous -> STALE
+        previous != null && sequence - previous > MeshRouter.MAX_SEQUENCE_JUMP -> "seq_jump"
+        else -> null
+    }
+    if (reason != null && reason != STALE) {
+        AppLogger.event(
+            category = TerminalLogCategory.ROUTING,
+            event = "TOPO_REJECT",
+            message = "TOPO_REJECT reason=$reason node=$stableSender",
+            peerName = AppLogger.redactName(senderName)
+        )
+    }
+    return reason == null
 }
