@@ -43,4 +43,15 @@ class LinkShapingTest {
         repeat(1000) { assertFalse(guards.admitChunk("ep/client", 10)) }
         assertEquals(0L, guards.streamDelayMs("fresh/l2cap", 1))
     }
+
+    @Test fun framesPerSecondDropIsPerLinkWithoutCooldownAndRefills() {
+        val guards = InboundGuards(RateLimitPolicy(), { now })
+        repeat(64) { assertTrue(guards.admitFrame("ep/frames")) }
+        assertFalse(guards.admitFrame("ep/frames"))
+        assertTrue(guards.admitFrame("other/frames"))
+        now += 1000 // no cooldown, only refill
+        assertTrue(guards.admitFrame("ep/frames"))
+        // Chunk bytes stay independent of the frame budget.
+        assertTrue(guards.admitChunk("ep/frames", 512))
+    }
 }

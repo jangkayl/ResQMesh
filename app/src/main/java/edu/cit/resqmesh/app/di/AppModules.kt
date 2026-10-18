@@ -151,7 +151,8 @@ val repositoryModule = module {
             gateway = get(),
             peers = get(),
             scope = get<AppCoroutineScope>().scope,
-            sink = get()
+            sink = get(),
+            originGate = get<InboundGuards>().origins
         )
     }
     single(createdAtStart = true) {

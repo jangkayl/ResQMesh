@@ -17,8 +17,9 @@ class InboundRateLimitTest {
     private var now = 0L
     private val cb = RecordingDispatcherCallback(myName = "Me#B001", myId = "B001")
     private val policy = RateLimitPolicy(chatBurst = 2.0, chatPerMin = 1.0)
+    private val gate = InboundOriginGate(OriginRateLimiter(policy) { now }, { now })
     private val dispatcher = PayloadDispatcher(
-        cb, originGate = InboundOriginGate(OriginRateLimiter(policy) { now }, { now })
+        cb, originGate = gate
     )
 
     private fun send(relay: String, p: MeshPayload) =
@@ -53,15 +54,6 @@ class InboundRateLimitTest {
         assertEquals(6, cb.received.count { it.startsWith("o") })
     }
 
-    @Test fun redeliveredSosCopiesAreNotChargedAgainAndUpdatesAreSeparateFromNew() {
-        fun sos(id: String, sosId: String) = MeshPayload(
-            id = id, type = "SOS_EVENT", senderName = "N#A001", senderNodeId = "A001", sosId = sosId, ttl = 5
-        )
-        repeat(8) { send("r1", sos("e1", "S1")) } // flooded copies of the same event
-        send("r1", sos("e2", "S1")) // update of a known SOS
-        send("r1", sos("e3", "S2")) // second NEW SOS inside 2 minutes -> dropped
-        assertEquals(listOf("e1", "e1", "e1", "e1", "e1", "e1", "e1", "e1", "e2"), cb.sosPackets.map { it.id })
-    }
 
     @Test fun presenceFromBusyRelayDoesNotAffectOtherOriginsChat() {
         repeat(20) {
@@ -88,5 +80,39 @@ class InboundRateLimitTest {
         }
         repeat(3) { send("ep", chat("c$it", "A001")) }
         assertEquals(listOf("c0", "c1"), cb.received)
+    }
+
+    private fun relayed(id: String, originId: String) = chat(id, originId).copy(
+        relayHopCount = 1, ttl = 3, routePath = listOf("N#$originId", "R#R001")
+    )
+
+    @Test fun sosEventsSkipTheOriginGateSoForgeriesNeverChargeTheVictim() {
+        fun sos(id: String, sosId: String) = MeshPayload(
+            id = id, type = "SOS_EVENT", senderName = "N#A001", senderNodeId = "A001", sosId = sosId, ttl = 5
+        )
+        repeat(8) { send("r1", sos("e$it", "S$it")) } // forged flood claiming the victim
+        assertEquals(8, cb.sosPackets.size)
+        // The victim's real, signature-verified SOS bucket is untouched.
+        assertTrue(gate.admitVerifiedSos("r1", "SOS-victim-", true))
+        assertEquals(false, gate.admitVerifiedSos("r1", "SOS-victim-", true)) // burst of one new SOS
+        assertTrue(gate.admitVerifiedSos("r1", "SOS-other-", true))
+    }
+
+    @Test fun directPayloadMustMatchTheLinksAdmittedNode() {
+        cb.admitted["ep1"] = "A001"
+        send("ep1", chat("spoof", "C001"))
+        send("ep1", chat("real", "A001"))
+        assertEquals(listOf("real"), cb.received)
+    }
+
+    @Test fun spoofedRelayedTrafficOnOneLinkDoesNotThrottleTheVictimOnAnother() {
+        repeat(6) { send("linkX", relayed("x$it", "A001")) } // 2 allowed, then violations -> cooldown on linkX only
+        send("linkX", relayed("x-later", "A001"))
+        send("linkY", relayed("y0", "A001"))
+        send("linkY", relayed("y1", "A001"))
+        assertEquals(listOf("x0", "x1", "y0", "y1"), cb.received)
+        // The relay itself is never put into cooldown: unrelated origins over linkX still pass.
+        send("linkX", relayed("c0", "C001"))
+        assertTrue("c0" in cb.received)
     }
 }

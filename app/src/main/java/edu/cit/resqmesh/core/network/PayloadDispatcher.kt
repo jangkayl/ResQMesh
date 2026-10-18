@@ -63,6 +63,9 @@ class PayloadDispatcher(
             }
         }
 
+    private fun admit(endpointId: String, payload: MeshPayload) =
+        originGate.admit(endpointId, payload, callback.getMyNodeId(), callback.getAdmittedNodeId(endpointId))
+
     fun dispatch(endpointId: String, payloadBytes: ByteArray) {
         try {
             val decoded = ProtoBuf.decodeFromByteArray<MeshPayload>(payloadBytes)
@@ -75,12 +78,13 @@ class PayloadDispatcher(
             // SOS validates signatures before dedup/relay. Conversation storage owns durable
             // dedup so duplicate retries can still receive receipts after a lost acknowledgement.
             if (payload.type in setOf("SOS_EVENT", "SOS_SYNC_REQ", "SOS_SYNC_RES")) {
-                if (!originGate.admit(endpointId, payload, callback.getMyNodeId())) return
+                // SOS_EVENT is rate limited by SosRepository once its signature verified.
+                if (payload.type != "SOS_EVENT" && !admit(endpointId, payload)) return
                 callback.onSosPacket(endpointId, payload)
                 return
             }
             if (payload.type == "CONVERSATION") {
-                if (!originGate.admit(endpointId, payload, callback.getMyNodeId())) return
+                if (!admit(endpointId, payload)) return
                 callback.onConversationMessage(endpointId, payload)
                 return
             }
@@ -95,7 +99,7 @@ class PayloadDispatcher(
 
             val sender = payload.senderName
             if (sender == callback.getMyDeviceName()) return
-            if (!originGate.admit(endpointId, payload, callback.getMyNodeId())) return
+            if (!admit(endpointId, payload)) return
             // Only admitted ids are remembered, so a rate-limited payload can be retried with the same id.
             callback.getSeenIdCache().markSeen(msgId)
 

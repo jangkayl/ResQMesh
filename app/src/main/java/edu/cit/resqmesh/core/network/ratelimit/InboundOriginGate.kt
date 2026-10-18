@@ -8,9 +8,13 @@ import edu.cit.resqmesh.core.network.MeshPayload
 import edu.cit.resqmesh.core.network.dedup.ExpiringIdCache
 
 /**
- * Applies [OriginRateLimiter] to decoded payloads, keyed by the payload's ORIGIN node (not the relay
- * that forwarded it). Re-deliveries of an already admitted payload id are not charged again, so
- * flooded copies of one SOS or a retried chat message cannot push a legitimate origin into cooldown.
+ * Applies [OriginRateLimiter] to decoded payloads, keyed by the payload's claimed ORIGIN node (not
+ * the relay that forwarded it). Origin claims are unauthenticated, so a payload received directly
+ * from its origin must match the link's admitted node id, and everything else is keyed by
+ * (origin, ingress endpoint): a forger on one link only spends buckets and penalties of that link.
+ * Re-deliveries of an already admitted payload id are not charged again.
+ *
+ * SOS_EVENT is never charged here; [admitVerifiedSos] charges it after the signature verified.
  */
 class InboundOriginGate(
     private val limiter: OriginRateLimiter,
@@ -18,26 +22,65 @@ class InboundOriginGate(
     logIntervalMs: Long = LOG_INTERVAL_MS
 ) {
     private val admittedIds = ExpiringIdCache(clock = clock)
-    private val knownSosIds = ExpiringIdCache(clock = clock)
     private val dropLog = RateLimitedLog(logIntervalMs, clock)
 
-    /** True when [payload] may continue to its handler. */
-    fun admit(endpointId: String, payload: MeshPayload, myNodeId: String): Boolean {
+    /** True when [payload] may continue to its handler. [admittedNodeId] is the link's admitted peer id, if known. */
+    fun admit(endpointId: String, payload: MeshPayload, myNodeId: String, admittedNodeId: String? = null): Boolean {
         val origin = originOf(payload, endpointId)
         val exempt = myNodeId.isNotBlank() && origin.equals(myNodeId, ignoreCase = true) ||
             payload.id.isNotEmpty() && admittedIds.contains(payload.id)
         if (exempt) return true
         val trafficClass = classify(payload)
-        val decision = limiter.check(origin, trafficClass)
+        if (trafficClass == TrafficClass.OTHER) return true
+        val direct = isDirect(payload)
+        if (direct && !admittedNodeId.isNullOrBlank() && !admittedNodeId.equals(origin, ignoreCase = true)) {
+            logMismatch(endpointId, payload)
+            return false
+        }
+        // A direct payload from the link's admitted peer is authenticated by the link; anything else
+        // is only a claim and is tracked per ingress endpoint.
+        val verified = direct && !admittedNodeId.isNullOrBlank()
+        val key = if (verified) origin else "$origin@$endpointId"
+        val decision = limiter.check(key, trafficClass)
         val allowed = decision == OriginRateLimiter.Decision.Allowed
-        if (allowed) recordAdmitted(payload) else logDrop(endpointId, payload, origin, trafficClass, decision)
+        if (allowed) {
+            if (payload.id.isNotEmpty()) admittedIds.markSeen(payload.id)
+        } else {
+            logDrop(endpointId, payload, origin, trafficClass, decision)
+        }
         return allowed
     }
 
-    private fun recordAdmitted(payload: MeshPayload) {
-        if (payload.id.isNotEmpty()) admittedIds.markSeen(payload.id)
-        if (payload.type == SOS_EVENT && payload.sosId.isNotEmpty()) knownSosIds.markSeen(payload.sosId)
+    /**
+     * Charges the SOS bucket of a signature-verified event. [signingKeyPrefix] is derived from the
+     * signing key, so it cannot be claimed by anyone who does not hold the key.
+     */
+    fun admitVerifiedSos(endpointId: String, signingKeyPrefix: String, isNewAlert: Boolean): Boolean {
+        val trafficClass = if (isNewAlert) TrafficClass.SOS_NEW else TrafficClass.SOS_UPDATE
+        val decision = limiter.check(signingKeyPrefix, trafficClass)
+        if (decision == OriginRateLimiter.Decision.Allowed) return true
+        val short = signingKeyPrefix.take(SHORT_ID)
+        if (decision == OriginRateLimiter.Decision.CooldownStarted) {
+            log("RL_COOLDOWN", SOS_EVENT, trafficClass, short, endpointId)
+        } else if (dropLog.shouldLog("$signingKeyPrefix/$trafficClass")) {
+            log("RL_DROP", SOS_EVENT, trafficClass, short, endpointId)
+        }
+        return false
     }
+
+    /** Hop count 0 and no relay appended to the route (only the origin itself): received from the origin. */
+    private fun isDirect(payload: MeshPayload) = payload.relayHopCount == 0 &&
+        (payload.routePath.isEmpty() || payload.routePath.size == 1 && NodeIdentity.matches(payload.routePath[0], payload.senderName))
+
+    private fun logMismatch(endpointId: String, payload: MeshPayload) =
+        AppLogger.event(
+            category = TerminalLogCategory.SECURITY,
+            event = "INBOUND_REJECT",
+            message = "INBOUND_REJECT type=${payload.type.take(MAX_TYPE_LOG)} reason=origin_mismatch",
+            level = TerminalLogLevel.WARN,
+            tag = "PAYLOAD_DISPATCHER",
+            endpoint = endpointId
+        )
 
     private fun logDrop(
         endpointId: String,
@@ -48,23 +91,17 @@ class InboundOriginGate(
     ) {
         val short = origin.take(SHORT_ID)
         if (decision == OriginRateLimiter.Decision.CooldownStarted) {
-            log("RL_COOLDOWN", payload, trafficClass, short, endpointId)
-        } else if (dropLog.shouldLog("$origin/$trafficClass")) {
-            log("RL_DROP", payload, trafficClass, short, endpointId)
+            log("RL_COOLDOWN", payload.type, trafficClass, short, endpointId)
+        } else if (dropLog.shouldLog("$origin@$endpointId/$trafficClass")) {
+            log("RL_DROP", payload.type, trafficClass, short, endpointId)
         }
     }
 
-    private fun log(
-        marker: String,
-        payload: MeshPayload,
-        trafficClass: TrafficClass,
-        origin: String,
-        endpointId: String
-    ) =
+    private fun log(marker: String, type: String, trafficClass: TrafficClass, origin: String, endpointId: String) =
         AppLogger.event(
             category = TerminalLogCategory.SECURITY,
             event = marker,
-            message = "$marker type=${payload.type.take(MAX_TYPE_LOG)} class=$trafficClass origin=$origin",
+            message = "$marker type=${type.take(MAX_TYPE_LOG)} class=$trafficClass origin=$origin",
             level = TerminalLogLevel.WARN,
             tag = "PAYLOAD_DISPATCHER",
             endpoint = endpointId
@@ -76,12 +113,10 @@ class InboundOriginGate(
 
     private fun classify(payload: MeshPayload): TrafficClass = when (payload.type) {
         "MESSAGE", "CONVERSATION" -> TrafficClass.CHAT
-        SOS_EVENT ->
-            if (payload.sosId.isEmpty() || !knownSosIds.contains(payload.sosId)) TrafficClass.SOS_NEW
-            else TrafficClass.SOS_UPDATE
         "SOS_SYNC_REQ", "EVENT_SYNC_REQ" -> TrafficClass.SYNC_REQUEST
         // PING/PONG are per-link liveness probes (link shaping only), not origin presence.
         "SYSTEM" -> TrafficClass.PRESENCE
+        // SOS_EVENT is charged after signature verification (admitVerifiedSos).
         else -> TrafficClass.OTHER
     }
 

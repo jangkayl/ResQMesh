@@ -31,6 +31,9 @@ object SosProtocol {
      * clock is refused; it would otherwise sort ahead of real alerts indefinitely.
      */
     const val MAX_FUTURE_SKEW_MS = 10 * 60 * 1000L
+    /** The relayed envelope must carry exactly the identifiers of the signed inner event. */
+    fun envelopeMatches(p: edu.cit.resqmesh.core.network.MeshPayload, e: SosEvent) =
+        p.sosId == e.sosId && p.id == e.eventId && p.senderNodeId.equals(e.originNodeId, ignoreCase = true)
     fun futureDated(e: SosEvent, now: Long): Boolean = e.createdAt > now + MAX_FUTURE_SKEW_MS
     fun valid(e: SosEvent): Boolean = e.sosId.startsWith(prefix(e.signingKey)) &&
         e.sosId.length in 65..100 && e.eventId.length in 1..100 && e.originNodeId.length in 1..100 &&

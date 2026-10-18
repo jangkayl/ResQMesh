@@ -14,7 +14,7 @@ import kotlinx.coroutines.launch
 
 import java.util.concurrent.ConcurrentHashMap
 
-class MeshRouter {
+class MeshRouter(private val clock: () -> Long = System::currentTimeMillis) {
     private val networkGraph = ConcurrentHashMap<String, Set<String>>()
     /** Private routes use only stable node IDs; [networkGraph] remains display-oriented for UI/STP. */
     private val stableRouteGraph = ConcurrentHashMap<String, Set<String>>()
@@ -44,6 +44,16 @@ class MeshRouter {
         if (stableSender.isBlank()) return false
         val previousSequence = topologySequences[stableSender]
         if (topologySequence > 0L) {
+            // Sequences are seeded from wall-clock ms, so one far in the future would pin the ratchet forever.
+            if (topologySequence > clock() + SosProtocol.MAX_FUTURE_SKEW_MS) {
+                AppLogger.event(
+                    category = TerminalLogCategory.ROUTING,
+                    event = "TOPO_REJECT",
+                    message = "TOPO_REJECT reason=seq_future node=$stableSender",
+                    peerName = senderName
+                )
+                return false
+            }
             if (previousSequence != null && topologySequence <= previousSequence) return false
             if (previousSequence != null && topologySequence - previousSequence > MAX_SEQUENCE_JUMP) {
                 AppLogger.event(

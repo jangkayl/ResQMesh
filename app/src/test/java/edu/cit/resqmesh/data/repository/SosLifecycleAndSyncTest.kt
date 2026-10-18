@@ -7,6 +7,7 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.test.*
 import kotlinx.serialization.decodeFromByteArray
+import kotlinx.serialization.encodeToString
 import kotlinx.serialization.protobuf.ProtoBuf
 import org.junit.Assert.*
 import org.junit.Test
@@ -66,7 +67,10 @@ class SosLifecycleAndSyncTest {
             return TransportDispatchResult.ACCEPTED
         }
     }
-    private class Node(val id: String, val network: Network, store: MemoryStore = MemoryStore()) {
+    private class Node(
+        val id: String, val network: Network, store: MemoryStore = MemoryStore(),
+        gate: edu.cit.resqmesh.core.network.ratelimit.InboundOriginGate? = null
+    ) {
         val store = store
         val links = mutableMapOf<String, Long>()
         val peers = MeshReadyPeerEvents()
@@ -98,8 +102,31 @@ class SosLifecycleAndSyncTest {
             override suspend fun getUserId() = id
             override fun getDeviceId() = id
         }
-        val repo = SosRepository(store, signing, identity, gateway, peers, network.scope, sink, now = { 1000 })
+        val repo = SosRepository(store, signing, identity, gateway, peers, network.scope, sink, now = { 1000 }, originGate = gate)
         init { network.nodes[id] = this }
+    }
+
+    @Test fun forgedSosNeverChargesAndMismatchedEnvelopeIsRejected() = runTest {
+        val net = Network(backgroundScope)
+        val gate = edu.cit.resqmesh.core.network.ratelimit.InboundOriginGate(
+            edu.cit.resqmesh.core.network.ratelimit.OriginRateLimiter())
+        val a = Node("A", net); val b = Node("B", net, gate = gate)
+        val id = a.repo.create("Medical")
+        val real = SosProtocol.json.decodeFromString<SosEvent>(a.store.alert(id)!!.eventJson)
+        fun envelope(event: SosEvent, node: String = event.originNodeId) = MeshPayload(
+            id = event.eventId, type = "SOS_EVENT", text = SosProtocol.json.encodeToString(event),
+            senderNodeId = node, sosId = event.sosId, ttl = 5)
+        // Forged copies claiming the victim, with an invalid signature, must not spend the victim bucket.
+        repeat(5) { b.gateway.onSosPacket?.invoke("X", envelope(real.copy(eventId = "f$it", signature = "bad"))) }
+        // A genuine event wrapped in an envelope that names another sender is refused.
+        b.gateway.onSosPacket?.invoke("X", envelope(real, node = "EVIL"))
+        runCurrent()
+        assertNull(b.store.alert(id))
+        b.gateway.onSosPacket?.invoke("X", envelope(real))
+        runCurrent()
+        assertNotNull(b.store.alert(id))
+        // The verified event charged its own key bucket: a second new alert from the same key is limited.
+        assertFalse(gate.admitVerifiedSos("X", SosProtocol.prefix(real.signingKey), true))
     }
 
     @Test fun cancellationBeforeCreateCannotResurrectAndLateLocationIsIgnored() = runTest {

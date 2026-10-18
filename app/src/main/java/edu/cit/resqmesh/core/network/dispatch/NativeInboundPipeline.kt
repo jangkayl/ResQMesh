@@ -56,6 +56,9 @@ internal class NativeInboundPipeline(
                 reliableTransfers.receive(peer, payload)
                 return
             }
+            // PIECE/ACK frames returned above: a 2 MiB transfer is ~2048 one-KiB pieces, far above 64 frames/s,
+            // and their volume is already bounded by the bytes/s budget and the transfer window.
+            if (!store.guards.admitFrame("$endpointId/frames")) return
             onDeviceLivenessChanged?.invoke(endpointId, true)
             if (payload.type != "PONG") removeHeartbeat(endpointId)
 

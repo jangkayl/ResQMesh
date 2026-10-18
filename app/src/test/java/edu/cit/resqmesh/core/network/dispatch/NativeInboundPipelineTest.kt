@@ -43,6 +43,12 @@ class NativeInboundPipelineTest {
         fun receive(payload: MeshPayload) = pipeline.processBinaryPayload("endpoint", ProtoBuf.encodeToByteArray(payload))
     }
 
+    @Test fun frameFloodOnOneLinkIsDroppedAfterTheFramesPerSecondBudget() {
+        val f = Fixture()
+        repeat(100) { f.receive(MeshPayload(id = "p$it", type = "PING")) }
+        assertTrue(f.calls.count { it == "dispatch" } in 64..66)
+    }
+
     @Test fun obsoleteTransportCannotDispatchOrTouchTheJournal() {
         val f = Fixture()
         f.current = false

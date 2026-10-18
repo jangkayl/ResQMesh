@@ -209,4 +209,14 @@ class MeshRouterStableIdentityTest {
         assertTrue(router.updateTopology(relay, "BBBB", emptyList(), emptyList(), me,
             topologySequence = start + 60_000 + MeshRouter.MAX_SEQUENCE_JUMP))
     }
+
+    @Test fun sequenceBeyondClockSkewIsRejectedButRestartsStillWork() {
+        var now = 1_000_000_000L
+        val router = MeshRouter { now }
+        fun update(seq: Long) = router.updateTopology("Relay#BBBB", "BBBB", emptyList(), emptyList(), "Me#AAAA", seq)
+        assertFalse(update(now + SosProtocol.MAX_FUTURE_SKEW_MS + 1)) // would pin the ratchet far ahead
+        assertTrue(update(now + 1_000)) // within skew, e.g. a seed taken from a slightly fast clock
+        now += 10_000
+        assertTrue(update(now + 1_500)) // later pulses keep advancing
+    }
 }

@@ -1,6 +1,7 @@
 package edu.cit.resqmesh.data.repository
 
 import edu.cit.resqmesh.core.network.*
+import edu.cit.resqmesh.core.network.ratelimit.InboundOriginGate
 import edu.cit.resqmesh.core.logging.AppLogger
 import edu.cit.resqmesh.data.local.entity.*
 import kotlinx.coroutines.*
@@ -17,7 +18,8 @@ class SosRepository(
     private val store: SosStore, private val signing: IncidentEventSigning,
     private val identity: IdentityProvider, private val gateway: MeshNetworkGateway,
     private val peers: MeshReadyPeerEvents, private val scope: CoroutineScope,
-    private val sink: SosAlertSink, private val now: () -> Long = System::currentTimeMillis
+    private val sink: SosAlertSink, private val now: () -> Long = System::currentTimeMillis,
+    private val originGate: InboundOriginGate? = null
 ) {
     private val mutex = Mutex()
     private val inbound = kotlinx.coroutines.channels.Channel<Pair<String, MeshPayload>>(64)
@@ -40,7 +42,8 @@ class SosRepository(
                 if (payload.text.toByteArray().size > 8_192 || payload.ttl !in 1..10 || payload.relayHopCount !in 0..10) continue
                 val e = runCatching { SosProtocol.json.decodeFromString<SosEvent>(payload.text) }.getOrNull()
                     ?: continue
-                val result = ingest(e, live = true)
+                if (!SosProtocol.envelopeMatches(payload, e)) { log("SOS_EVENT", "INBOUND_REJECT type=SOS_EVENT reason=envelope_mismatch"); continue }
+                val result = ingest(e, live = true, endpoint = endpoint)
                 if (result == SosIngestion.APPLIED && payload.ttl > 1 && payload.relayHopCount < 10) {
                     val forwarded = payload.copy(ttl = payload.ttl - 1, relayHopCount = payload.relayHopCount + 1)
                     val dispatch = gateway.broadcastPriorityPayload(ProtoBuf.encodeToByteArray(forwarded), endpoint)
@@ -102,7 +105,7 @@ class SosRepository(
         dispatch(signed)
     }
 
-    suspend fun ingest(e: SosEvent, live: Boolean = false): SosIngestion = mutex.withLock {
+    suspend fun ingest(e: SosEvent, live: Boolean = false, endpoint: String? = null): SosIngestion = mutex.withLock {
         if (!SosProtocol.valid(e) || !signing.verify(e.signingEvent(), e.signingKey)) {
             log("SOS_EVENT", "rejected id=${e.sosId.take(100)}")
             return@withLock SosIngestion.REJECTED
@@ -112,6 +115,11 @@ class SosRepository(
             return@withLock SosIngestion.REJECTED
         }
         val previouslyKnown = store.alert(e.sosId) != null
+        // Only a verified event charges a bucket, keyed by its signing key; duplicates are free.
+        if (endpoint != null && originGate != null && store.event(e.eventId) == null &&
+            !originGate.admitVerifiedSos(endpoint, SosProtocol.prefix(e.signingKey), !previouslyKnown)) {
+            return@withLock SosIngestion.REJECTED
+        }
         val result = apply(e, pending = false)
         if (result == SosIngestion.APPLIED) {
             changes.tryEmit(Unit)

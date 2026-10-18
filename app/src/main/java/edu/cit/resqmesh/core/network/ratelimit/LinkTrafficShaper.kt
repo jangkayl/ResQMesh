@@ -34,6 +34,9 @@ class LinkTrafficShaper(
         state.bytes.tryConsume(bytes.toDouble())
     }
 
+    /** Charges one decoded frame to the frames/s budget only (bytes are charged per chunk or read). */
+    fun admitFrame(linkKey: String): Boolean = synchronized(links) { state(linkKey).frames.tryConsume() }
+
     /** Charges a raw chunk to the byte budget. False while the link is in debt (chunk not charged). */
     fun admitChunk(linkKey: String, bytes: Int): Boolean = synchronized(links) {
         val budget = state(linkKey).bytes

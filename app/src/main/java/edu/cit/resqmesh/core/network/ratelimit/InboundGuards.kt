@@ -27,6 +27,13 @@ class InboundGuards(
         return delay
     }
 
+    /** Charges one completed decoded frame of the link; false means drop it. No cooldown is ever applied. */
+    fun admitFrame(linkKey: String): Boolean {
+        val admitted = shaper.admitFrame(linkKey)
+        if (!admitted) logShape(linkKey, "drop_frame")
+        return admitted
+    }
+
     private fun logShape(linkKey: String, action: String) {
         if (!shapeLog.shouldLog(linkKey)) return
         AppLogger.event(
