@@ -28,6 +28,20 @@ class TokenBucket(
         return tokens
     }
 
+    /** Charges [amount] even when that overdraws the bucket; the balance then refills back past zero. */
+    @Synchronized
+    fun consumeWithDebt(amount: Double) {
+        refill()
+        tokens -= amount
+    }
+
+    /** Milliseconds until a negative balance is repaid (0 when not in debt). */
+    @Synchronized
+    fun debtMs(): Long {
+        refill()
+        return if (tokens >= 0.0 || refillPerMs <= 0.0) 0L else Math.ceil(-tokens / refillPerMs).toLong()
+    }
+
     private fun refill() {
         val now = clock()
         val elapsed = now - lastRefill

@@ -194,6 +194,10 @@ internal class GattClientCallback(
             fun handleCallback() {
                 if (!owns(gatt, "notification")) return
                 val value = capturedValue ?: return
+                if (!store.guards.admitChunk("$macAddress/client", value.size)) {
+                    link.receiveBuffer.clear()
+                    return
+                }
                 val now = System.currentTimeMillis()
                 if (now - link.lastGattChunkAt > 5000 && !link.receiveBuffer.isEmpty()) {
                     AppLogger.d("BLE_MESH", "Client Buffer timeout! Clearing corrupted chunk buffer for $macAddress")

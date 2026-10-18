@@ -14,6 +14,8 @@ import org.junit.Test
 class InboundPayloadValidatorTest {
     private val validator = InboundPayloadValidator()
 
+    private fun encode(p: MeshPayload) = ProtoBuf.encodeToByteArray(MeshPayload.serializer(), p)
+
     private fun rejected(p: MeshPayload) = validator.validate(p) is InboundPayloadValidator.Result.Rejected
     private fun accepted(p: MeshPayload) = (validator.validate(p) as InboundPayloadValidator.Result.Accepted).payload
 
@@ -39,14 +41,19 @@ class InboundPayloadValidatorTest {
     }
 
     @Test fun limitsAreInclusive() {
-        val p = MeshPayload(id = "x".repeat(128), text = "t".repeat(InboundPayloadValidator.MAX_TEXT), routePath = List(256) { "n" })
+        val p = MeshPayload(
+            id = "x".repeat(128), text = "t".repeat(InboundPayloadValidator.MAX_TEXT), routePath = List(256) { "n" }
+        )
         assertSame(p, accepted(p))
     }
 
     @Test fun dispatcherDropsRejectedPayloadsBeforeHandlers() {
         val cb = RecordingDispatcherCallback()
         val dispatcher = PayloadDispatcher(cb)
-        val bad = MeshPayload(id = "m1", type = "MESSAGE", senderName = "Alice#A001", text = "t".repeat(InboundPayloadValidator.MAX_TEXT + 1))
+        val bad = MeshPayload(
+            id = "m1", type = "MESSAGE", senderName = "Alice#A001",
+            text = "t".repeat(InboundPayloadValidator.MAX_TEXT + 1)
+        )
         dispatcher.dispatch("ep", ProtoBuf.encodeToByteArray(MeshPayload.serializer(), bad))
         assertTrue(cb.received.isEmpty()); assertEquals(0, cb.seen.size)
     }
@@ -62,8 +69,8 @@ class InboundPayloadValidatorTest {
     @Test fun goodbyeFromOtherIdentityOrUnadmittedLinkIsIgnored() {
         val cb = RecordingDispatcherCallback().apply { admitted["ep"] = "A001" }
         val dispatcher = PayloadDispatcher(cb)
-        dispatcher.dispatch("ep", ProtoBuf.encodeToByteArray(MeshPayload.serializer(), MeshPayload(id = "g1", type = "GOODBYE", senderName = "Eve#E001")))
-        dispatcher.dispatch("other", ProtoBuf.encodeToByteArray(MeshPayload.serializer(), MeshPayload(id = "g2", type = "GOODBYE", senderName = "Alice#A001")))
+        dispatcher.dispatch("ep", encode(MeshPayload(id = "g1", type = "GOODBYE", senderName = "Eve#E001")))
+        dispatcher.dispatch("other", encode(MeshPayload(id = "g2", type = "GOODBYE", senderName = "Alice#A001")))
         assertTrue(cb.goodbyes.isEmpty()); assertTrue(cb.broadcasts.isEmpty())
     }
 }

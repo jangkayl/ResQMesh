@@ -39,6 +39,7 @@ import edu.cit.resqmesh.core.network.bluetooth.state.GattTransfer
 import edu.cit.resqmesh.core.network.bluetooth.state.GattTransferCoordinator
 import edu.cit.resqmesh.core.network.bluetooth.state.HeartbeatCoordinator
 import edu.cit.resqmesh.core.network.bluetooth.state.MeshFrameCodec
+import edu.cit.resqmesh.core.network.ratelimit.InboundGuards
 import edu.cit.resqmesh.core.network.bluetooth.state.payloadBytes
 import edu.cit.resqmesh.core.logging.AppLogger
 import edu.cit.resqmesh.core.notification.NotificationHelper
@@ -47,13 +48,16 @@ import kotlinx.serialization.encodeToByteArray
 import kotlinx.serialization.protobuf.ProtoBuf
 
 @SuppressLint("MissingPermission")
-class NativeBleManager(val context: Context) : NativePayloadEvents {
+class NativeBleManager(
+    val context: Context,
+    guards: InboundGuards = InboundGuards()
+) : NativePayloadEvents {
     var onOutboundFrame: ((OutboundFrameEvent) -> Unit)? = null
     override var onConversationMessage: ((String, MeshPayload) -> Unit)? = null
     override var onSosPacket: ((String, MeshPayload) -> Unit)? = null
     val gattServerManager = edu.cit.resqmesh.core.network.bluetooth.gatt.GattServerManager(context, this)
     val gattClientManager = edu.cit.resqmesh.core.network.bluetooth.gatt.GattClientManager(context, this)
-    val store = edu.cit.resqmesh.core.network.bluetooth.state.BleStateStore()
+    val store = edu.cit.resqmesh.core.network.bluetooth.state.BleStateStore(guards)
     private val peerDirectory = BlePeerDirectory(store, ::isDeviceBlocked)
     var onDeviceConnected: ((ConnectedDevice) -> Unit)? = null
     var onDeviceDisconnected: ((String) -> Unit)? = null
@@ -176,14 +180,16 @@ class NativeBleManager(val context: Context) : NativePayloadEvents {
         disconnect = ::disconnectFromEndpoint,
         privateNotification = notificationHelper::showPrivateMessageNotification,
         sosNotification = notificationHelper::showSosEmergencyNotification,
-        admittedNodeId = { endpoint -> nodeIdForEndpoint(endpoint)?.takeIf { store.links.isIdentityAdmitted(endpoint) } }
+        admittedNodeId = { endpoint ->
+            nodeIdForEndpoint(endpoint)?.takeIf { store.links.isIdentityAdmitted(endpoint) }
+        }
     )
 
     private fun forwardPrivatePayload(nodeId: String, payload: ByteArray): TransportDispatchResult {
         return outboundDispatcher.forwardPrivatePayload(nodeId, payload)
     }
 
-    val payloadDispatcher = PayloadDispatcher(payloadDispatcherCallback)
+    val payloadDispatcher = PayloadDispatcher(payloadDispatcherCallback, originGate = guards.origins)
     val handler = Handler(Looper.getMainLooper())
     private val peerTransferVersions = java.util.concurrent.ConcurrentHashMap<String, Int>()
     private val transferIo = java.util.concurrent.Executors.newSingleThreadExecutor { task ->

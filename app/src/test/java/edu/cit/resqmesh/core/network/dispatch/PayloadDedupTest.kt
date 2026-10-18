@@ -15,7 +15,8 @@ class PayloadDedupTest {
     private val cb = RecordingDispatcherCallback()
     private val dispatcher = PayloadDispatcher(cb)
 
-    private fun send(p: MeshPayload) = dispatcher.dispatch("ep", ProtoBuf.encodeToByteArray(MeshPayload.serializer(), p))
+    private fun send(p: MeshPayload) =
+        dispatcher.dispatch("ep", ProtoBuf.encodeToByteArray(MeshPayload.serializer(), p))
     private fun chat(id: String) = MeshPayload(id = id, type = "MESSAGE", senderName = "Alice#A001", text = "hi")
 
     @Test fun duplicateIdIsDroppedUntilExpiry() {

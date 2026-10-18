@@ -5,6 +5,8 @@ import edu.cit.resqmesh.core.network.dispatch.BlockRequestHandler
 import edu.cit.resqmesh.core.network.dispatch.LegacyBlockControlHandler
 import edu.cit.resqmesh.core.network.dispatch.GoodbyeHandler
 import edu.cit.resqmesh.core.network.dispatch.InboundPayloadValidator
+import edu.cit.resqmesh.core.network.ratelimit.InboundGuards
+import edu.cit.resqmesh.core.network.ratelimit.InboundOriginGate
 import edu.cit.resqmesh.core.network.dispatch.LiveAudioHandler
 import edu.cit.resqmesh.core.network.dispatch.PayloadHandler
 import edu.cit.resqmesh.core.network.dispatch.ReceiptHandler
@@ -26,7 +28,8 @@ import edu.cit.resqmesh.core.network.dispatch.EventSyncResponseHandler
 @OptIn(ExperimentalSerializationApi::class)
 class PayloadDispatcher(
     private val callback: PayloadDispatcherCallback,
-    private val validator: InboundPayloadValidator = InboundPayloadValidator()
+    private val validator: InboundPayloadValidator = InboundPayloadValidator(),
+    private val originGate: InboundOriginGate = InboundGuards().origins
 ) {
 
     private val handlers: List<PayloadHandler> = listOf(
@@ -44,15 +47,15 @@ class PayloadDispatcher(
         StandardMessageHandler()
     )
 
-    fun dispatch(endpointId: String, rawBytes: ByteArray) {
+    fun dispatch(endpointId: String, payloadBytes: ByteArray) {
         try {
-            val decoded = ProtoBuf.decodeFromByteArray<MeshPayload>(rawBytes)
+            val decoded = ProtoBuf.decodeFromByteArray<MeshPayload>(payloadBytes)
             val payload = when (val verdict = validator.validate(decoded)) {
                 is InboundPayloadValidator.Result.Rejected -> {
                     AppLogger.event(
                         category = TerminalLogCategory.SECURITY,
                         event = "INBOUND_REJECT",
-                        message = "INBOUND_REJECT type=${decoded.type.take(32)} reason=${verdict.reason}",
+                        message = "INBOUND_REJECT type=${decoded.type.take(MAX_TYPE_LOG)} reason=${verdict.reason}",
                         level = TerminalLogLevel.WARN,
                         tag = "PAYLOAD_DISPATCHER",
                         endpoint = endpointId
@@ -62,17 +65,19 @@ class PayloadDispatcher(
                 is InboundPayloadValidator.Result.Accepted -> verdict.payload
             }
             // Relay handlers forward the raw bytes, so a clamped TTL must be re-encoded.
-            val payloadBytes = if (payload === decoded) rawBytes else ProtoBuf.encodeToByteArray(payload)
+            val relayBytes = if (payload === decoded) payloadBytes else ProtoBuf.encodeToByteArray(payload)
 
             // 1. DUPLICATE MESSAGE CHECK (THE BOUNCER)
             if (payload.id.isEmpty()) return
             // SOS validates signatures before dedup/relay. Conversation storage owns durable
             // dedup so duplicate retries can still receive receipts after a lost acknowledgement.
             if (payload.type in setOf("SOS_EVENT", "SOS_SYNC_REQ", "SOS_SYNC_RES")) {
+                if (!originGate.admit(endpointId, payload, callback.getMyNodeId())) return
                 callback.onSosPacket(endpointId, payload)
                 return
             }
             if (payload.type == "CONVERSATION") {
+                if (!originGate.admit(endpointId, payload, callback.getMyNodeId())) return
                 callback.onConversationMessage(endpointId, payload)
                 return
             }
@@ -82,14 +87,16 @@ class PayloadDispatcher(
                 (payload.targetNodeId.equals(callback.getMyNodeId(), ignoreCase = true) && payload.targetNodeId.isNotBlank() ||
                     payload.targetNodeId.isBlank() && edu.cit.resqmesh.core.model.NodeIdentity.matches(payload.targetName, callback.getMyDeviceName()))
             // The recipient store deduplicates private rows, then replays lost receipts.
-            if (!callback.getSeenIdCache().markSeen(msgId) && !localPrivate && !callback.hasPendingCustody(msgId)) return
+            val firstSighting = callback.getSeenIdCache().markSeen(msgId)
+            if (!firstSighting && !localPrivate && !callback.hasPendingCustody(msgId)) return
 
             val sender = payload.senderName
             if (sender == callback.getMyDeviceName()) return
+            if (!originGate.admit(endpointId, payload, callback.getMyNodeId())) return
 
             // 2. STRATEGY ROUTING LOGIC
             val handler = handlers.firstOrNull { it.canHandle(payload.type) }
-            handler?.handle(endpointId, payload, payloadBytes, callback)
+            handler?.handle(endpointId, payload, relayBytes, callback)
                 ?: AppLogger.event(
                     category = TerminalLogCategory.SYSTEM,
                     event = "PAYLOAD_REJECTED",
@@ -109,5 +116,9 @@ class PayloadDispatcher(
                 endpoint = endpointId
             )
         }
+    }
+
+    private companion object {
+        const val MAX_TYPE_LOG = 32
     }
 }

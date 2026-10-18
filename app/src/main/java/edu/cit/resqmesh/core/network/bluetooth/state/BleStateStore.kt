@@ -4,12 +4,13 @@ import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothGatt
 import android.bluetooth.BluetoothSocket
 import edu.cit.resqmesh.core.network.dedup.ExpiringIdCache
+import edu.cit.resqmesh.core.network.ratelimit.InboundGuards
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ConcurrentLinkedDeque
 import java.util.concurrent.CopyOnWriteArraySet
 import java.util.concurrent.atomic.AtomicBoolean
 
-class BleStateStore {
+class BleStateStore(val guards: InboundGuards = InboundGuards()) {
     fun retireServerOwnership(link: BleLink, releaseOwner: (String) -> Unit): Boolean {
         if (link.role != BleLinkRole.SERVER || !links.retire(link, releaseOwner)) return false
         activeServerConnections.remove(link.endpoint)

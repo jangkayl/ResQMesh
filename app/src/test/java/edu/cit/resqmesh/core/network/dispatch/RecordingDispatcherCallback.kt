@@ -6,6 +6,7 @@ import edu.cit.resqmesh.core.network.PayloadDispatcherCallback
 import edu.cit.resqmesh.core.network.TransportDispatchResult
 
 /** Minimal [PayloadDispatcherCallback] that records the outcomes dispatcher tests assert on. */
+@Suppress("EmptyFunctionBlock", "MaxLineLength")
 internal class RecordingDispatcherCallback(
     val myName: String = "Relay [TAG]#B001",
     val myId: String = "B001"

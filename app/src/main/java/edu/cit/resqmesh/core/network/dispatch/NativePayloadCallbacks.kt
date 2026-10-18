@@ -10,6 +10,7 @@ import edu.cit.resqmesh.core.network.dedup.ExpiringIdCache
 import edu.cit.resqmesh.core.network.TransportDispatchResult
 
 /** Synchronous payload-to-application adapter. Reads current listeners and identity at invocation. */
+@Suppress("LongParameterList")
 internal class NativePayloadCallbacks(
     private val events: NativePayloadEvents,
     private val seenIds: () -> ExpiringIdCache,

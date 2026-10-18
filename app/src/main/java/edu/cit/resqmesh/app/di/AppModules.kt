@@ -17,6 +17,8 @@ import edu.cit.resqmesh.core.map.verifier.ManifestVerifier
 import edu.cit.resqmesh.core.network.MeshNetworkGateway
 import edu.cit.resqmesh.core.network.NativeBleGateway
 import edu.cit.resqmesh.core.network.NativeBleManager
+import edu.cit.resqmesh.core.network.ratelimit.InboundGuards
+import edu.cit.resqmesh.core.network.ratelimit.RateLimitPolicy
 import edu.cit.resqmesh.core.service.MeshSessionController
 import edu.cit.resqmesh.core.audio.LiveAudioEngine
 import edu.cit.resqmesh.core.audio.MediaHelper
@@ -103,7 +105,9 @@ val platformModule = module {
 
 /** BLE transport. */
 val networkModule = module {
-    single { NativeBleManager(androidContext()) }
+    single { RateLimitPolicy() }
+    single { InboundGuards(get(), System::currentTimeMillis) }
+    single { NativeBleManager(androidContext(), get()) }
     single<MeshNetworkGateway> { NativeBleGateway(get()) }
 }
 

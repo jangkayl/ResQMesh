@@ -125,6 +125,10 @@ class L2capTransport(
                 val reader = L2capFrameReader(
                     socket.inputStream,
                     onFrameStarted = { watchdog.frameStarted(System.currentTimeMillis()) },
+                    onChunk = { count ->
+                        val delay = store.guards.streamDelayMs("$endpoint/l2cap", count)
+                        if (delay > 0) Thread.sleep(delay)
+                    },
                     onProgress = {
                         val now = System.currentTimeMillis()
                         watchdog.progress(now)

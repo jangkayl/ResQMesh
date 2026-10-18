@@ -54,7 +54,9 @@ class L2capReadWatchdog(private val timeoutMs: Long = READ_TIMEOUT_MS) {
 class L2capFrameReader(
     private val input: InputStream,
     private val onFrameStarted: () -> Unit = {},
-    private val onProgress: () -> Unit = {}
+    private val onProgress: () -> Unit = {},
+    /** Called with the size of every raw read; may block to apply back-pressure. */
+    private val onChunk: (Int) -> Unit = {}
 ) {
     sealed interface Header {
         data class Length(val value: Int) : Header
@@ -86,6 +88,7 @@ class L2capFrameReader(
             if (count < 0) throw EOFException()
             if (!isOwned()) return null
             offset += count
+            onChunk(count)
             onProgress()
         }
         return payload
@@ -100,6 +103,7 @@ class L2capFrameReader(
             if (count < 0) throw EOFException()
             if (!isOwned()) return false
             remaining -= count
+            onChunk(count)
             onProgress()
         }
         return true

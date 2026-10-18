@@ -26,22 +26,26 @@ class InboundPayloadValidator {
         )
     }
 
-    private fun rejection(p: MeshPayload): String? {
-        val oversizedString = idFields(p).any { it.length > MAX_ID } ||
+    private fun rejection(p: MeshPayload): String? = when {
+        stringsTooLong(p) -> "string_too_long"
+        listFields(p).any { it.size > MAX_LIST } -> "list_too_long"
+        listFields(p).any { list -> list.any { it.length > MAX_NAME } } -> "list_item_too_long"
+        bytesTooLong(p) -> "bytes_too_long"
+        else -> null
+    }
+
+    private fun stringsTooLong(p: MeshPayload): Boolean =
+        idFields(p).any { it.length > MAX_ID } ||
             nameFields(p).any { it.length > MAX_NAME } ||
             listOf(p.type, p.channelId, p.conversationKind, p.identityExchangeId).any { it.length > MAX_TAG } ||
-            p.publicKey.length > MAX_KEY || p.text.length > MAX_TEXT ||
+            textTooLong(p)
+
+    private fun textTooLong(p: MeshPayload): Boolean =
+        p.publicKey.length > MAX_KEY || p.text.length > MAX_TEXT ||
             (p.encryptedData?.length ?: 0) > MAX_ENCRYPTED || (p.encryptedKey?.length ?: 0) > MAX_KEY
-        return when {
-            oversizedString -> "string_too_long"
-            listFields(p).any { it.size > MAX_LIST } -> "list_too_long"
-            listFields(p).any { list -> list.any { it.length > MAX_NAME } } -> "list_item_too_long"
-            (p.imageBytes?.size ?: 0) > BinaryCompressor.MAX_MEDIA_BYTES ||
-                (p.audioBytes?.size ?: 0) > BinaryCompressor.MAX_MEDIA_BYTES ||
-                (p.liveAudioChunk?.size ?: 0) > BinaryCompressor.MAX_MEDIA_BYTES -> "bytes_too_long"
-            else -> null
-        }
-    }
+
+    private fun bytesTooLong(p: MeshPayload): Boolean =
+        listOf(p.imageBytes, p.audioBytes, p.liveAudioChunk).any { (it?.size ?: 0) > BinaryCompressor.MAX_MEDIA_BYTES }
 
     private fun idFields(p: MeshPayload) = listOf(
         p.id, p.targetMessageId, p.senderNodeId, p.targetNodeId, p.sosId

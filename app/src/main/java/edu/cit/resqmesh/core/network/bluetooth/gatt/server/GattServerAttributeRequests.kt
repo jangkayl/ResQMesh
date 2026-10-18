@@ -230,6 +230,10 @@ internal class GattServerAttributeRequests(
 
     private fun deliverWrite(device: BluetoothDevice, receivingLink: BleLink, value: ByteArray) {
         val macAddress = device.address
+        if (!store.guards.admitChunk("$macAddress/server", value.size)) {
+            receivingLink.receiveBuffer.clear()
+            return
+        }
         val now = System.currentTimeMillis()
         if (now - receivingLink.lastGattChunkAt > 5000 && !receivingLink.receiveBuffer.isEmpty()) {
             AppLogger.d("BLE_MESH", "Server Buffer timeout! Clearing corrupted chunk buffer for $macAddress")
