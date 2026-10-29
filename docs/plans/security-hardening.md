@@ -12,7 +12,7 @@ The attacker is a malicious nearby phone: a modified app or BLE tool that floods
 - One wire break (protocol v2, every test phone reinstalled together), then compatible changes only once the pilot beta starts.
 - Over-limit traffic is dropped, and an origin that keeps exceeding gets a cooldown. Limits charge the **origin** node, never the relay that forwarded the traffic. Per-link limits only shape traffic and never put a relay in a timeout.
 - Defaults:
-  - Per origin: 15 chat messages/min (burst 20), 4 new SOS burst, refill 3/min (SOS updates are a separate class), 6 sync requests/min, 30 presence pulses/min.
+  - Per origin: 15 chat messages/min (burst 20), 4 new SOS burst, refill 3/min (SOS updates are a separate class), no sync limit (D29); live incidents 4 burst, 3/min and offer changes 6 burst, 5/min per incident, 30 presence pulses/min.
   - Cooldown of 60 s after 3 violations.
   - Per link: 64 frames/s and 256 KiB/s.
 - Typed messages max 1000 characters; received media capped at 2 MB; developer mode in debug builds only.

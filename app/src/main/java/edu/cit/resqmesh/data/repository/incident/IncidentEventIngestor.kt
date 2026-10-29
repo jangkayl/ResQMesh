@@ -45,28 +45,36 @@ internal class IncidentEventIngestor(
         ingestIncomingEventJson(eventJson) == IncidentIngestionResult.APPLIED
 
     suspend fun ingestIncomingEventJson(eventJson: String): IncidentIngestionResult {
+        val event = decodeEvent(eventJson) ?: return IncidentIngestionResult.REJECTED
         return try {
-            val json = JSONObject(eventJson)
-            val event = DomainEventEntity(
-                eventId = json.getString("eventId"),
-                entityId = json.getString("entityId"),
-                entityType = json.getString("entityType"),
-                eventType = json.getString("eventType"),
-                actorId = json.getString("actorId"),
-                actorName = json.optString("actorName", ""),
-                logicalVersion = json.getLong("logicalVersion"),
-                timestamp = json.getLong("timestamp"),
-                payloadJson = json.optString("payloadJson", "{}"),
-                signature = json.optString("signature").takeIf { it.isNotBlank() },
-                applied = true
-            )
             ingestIncomingEvent(event)
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (e: Exception) {
-            AppLogger.d("INCIDENT_REPO", "Failed to deserialize domain event")
+            AppLogger.d("INCIDENT_REPO", "Failed to ingest domain event")
             IncidentIngestionResult.REJECTED
         }
+    }
+
+    /** Parses a wire event; null (logged) when it is malformed. */
+    fun decodeEvent(eventJson: String): DomainEventEntity? = try {
+        val json = JSONObject(eventJson)
+        DomainEventEntity(
+            eventId = json.getString("eventId"),
+            entityId = json.getString("entityId"),
+            entityType = json.getString("entityType"),
+            eventType = json.getString("eventType"),
+            actorId = json.getString("actorId"),
+            actorName = json.optString("actorName", ""),
+            logicalVersion = json.getLong("logicalVersion"),
+            timestamp = json.getLong("timestamp"),
+            payloadJson = json.optString("payloadJson", "{}"),
+            signature = json.optString("signature").takeIf { it.isNotBlank() },
+            applied = true
+        )
+    } catch (e: Exception) {
+        AppLogger.d("INCIDENT_REPO", "Failed to deserialize domain event")
+        null
     }
 
     suspend fun applyIncomingEvent(event: DomainEventEntity): Boolean =
@@ -77,10 +85,16 @@ internal class IncidentEventIngestor(
     }
 
     private suspend fun ingestEventLocked(event: DomainEventEntity): IncidentIngestionResult {
+        // A future-dated event could outrank real incidents in the sync window. It is not stored, so it
+        // is accepted on a later arrival once it is no longer ahead of this phone's clock.
+        if (event.timestamp > System.currentTimeMillis() + MAX_FUTURE_SKEW_MS) {
+            AppLogger.d("INCIDENT_SYNC", "REJECTED reason=future-timestamp")
+            return IncidentIngestionResult.REJECTED
+        }
         var prior = domainEventDao.getEventById(event.eventId)
-        // Invalid first arrivals cannot reserve an ID against a later authentic original.
-        if (prior?.validationStatus == "REJECTED" &&
-            (prior.signature != event.signature || IncidentSyncSnapshot.eventHash(prior) != IncidentSyncSnapshot.eventHash(event))) {
+        // Invalid first arrivals cannot reserve an ID against a later authentic original, and an
+        // authentic event rejected against an older projection is re-validated on every arrival.
+        if (prior?.validationStatus == "REJECTED") {
             domainEventDao.deleteRejectedEvent(event.eventId)
             prior = null
         }
@@ -88,7 +102,6 @@ internal class IncidentEventIngestor(
             AppLogger.d("INCIDENT_SYNC", "REJECTED reason=conflicting-event-id")
             return IncidentIngestionResult.REJECTED
         }
-        if (prior?.validationStatus == "REJECTED") return IncidentIngestionResult.REJECTED
         if (prior?.applied == true) return IncidentIngestionResult.DUPLICATE
         val applied = applyIncomingEventProjection(event)
         val stored = domainEventDao.getEventById(event.eventId)
@@ -181,5 +194,9 @@ internal class IncidentEventIngestor(
         }
         val replayWorkflow = helpWorkflow
         if (replayWorkflow != null) replayWorkflow.withReplayLock { rebuild() } else rebuild()
+    }
+
+    private companion object {
+        const val MAX_FUTURE_SKEW_MS = 10L * 60 * 1000
     }
 }

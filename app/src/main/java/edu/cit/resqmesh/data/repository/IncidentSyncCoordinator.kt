@@ -28,7 +28,10 @@ class IncidentSyncCoordinator(
     private val log: (String) -> Unit = { AppLogger.d("INCIDENT_SYNC", it) },
 ) {
     private data class Link(val id: String, val endpoint: String, val established: Long)
-    private data class Session(val link: Link, val id: String = UUID.randomUUID().toString(), var job: Job? = null)
+    private data class Session(val link: Link, val id: String = UUID.randomUUID().toString(), var job: Job? = null) {
+        // Chosen afresh for each pass and sent with every request of that pass.
+        @Volatile var scope: IncidentSyncScope = IncidentSyncScope.current()
+    }
     private data class Waiting(val endpoint: String, val session: String, val response: CompletableDeferred<JSONObject>)
     private val sessions = ConcurrentHashMap<String, Session>()
     private val waiting = ConcurrentHashMap<String, Waiting>()
@@ -39,6 +42,14 @@ class IncidentSyncCoordinator(
     init {
         scope.launch {
             peers.peers.collectLatest { refreshSessions() }
+        }
+        // A fast same-endpoint reconnect can leave the READY list equal, so the state flow stays
+        // silent; each READY notification replaces the stale-generation session and reconciles.
+        scope.launch {
+            peers.events.collect { peer ->
+                refreshSessions()
+                trigger(peer.nodeId)
+            }
         }
         scope.launch {
             while (isActive) {
@@ -110,11 +121,12 @@ class IncidentSyncCoordinator(
         // Bounded passes handle snapshot churn without keeping a busy peer in an infinite loop.
         repeat(4) { pass ->
             check(current(session))
-            val local = store.snapshot()
+            session.scope = IncidentSyncScope.current()
+            val local = store.snapshot(session.scope)
             val remote = request(session, "DIGEST", local.digest())
             if (local.matches(remote)) {
                 val completed = request(session, "COMPLETE", local.digest())
-                if (completed.optBoolean("complete") && store.snapshot().matches(completed)) {
+                if (completed.optBoolean("complete") && store.snapshot(session.scope).matches(completed)) {
                     log("COMPLETE peer=${session.link.id} snapshot=${local.token.take(12)}")
                     return
                 }
@@ -200,7 +212,8 @@ class IncidentSyncCoordinator(
         try {
             repeat(4) { attempt ->
                 check(current(session))
-                val json = JSONObject(body.toString()).put("protocol", 2).put("op", operation)
+                val json = session.scope.writeTo(JSONObject(body.toString()))
+                    .put("protocol", PROTOCOL).put("op", operation)
                     .put("session", session.id).put("request", requestId)
                 val accepted = send(session.link.endpoint, "EVENT_SYNC_REQ", json, operation in CONTROL)
                 if (accepted) {
@@ -235,7 +248,7 @@ class IncidentSyncCoordinator(
 
     fun response(endpoint: String, payload: MeshPayload) {
         val json = runCatching { JSONObject(payload.text) }.getOrNull() ?: return
-        if (json.optInt("protocol") != 2) return
+        if (json.optInt("protocol") != PROTOCOL) return
         val peer = peers.peers.value.firstOrNull { it.endpointId == endpoint } ?: return
         if (payload.senderNodeId != peer.nodeId) return
         waiting[json.optString("request")]?.let {
@@ -248,10 +261,13 @@ class IncidentSyncCoordinator(
         if (!gateway.hasReadyEndpoint(endpoint) || gateway.isDeviceBlocked(peer.name) || payload.senderNodeId != peer.nodeId) return
         val receivedLink = link(peer)
         val incoming = JSONObject(payload.text)
-        if (incoming.optInt("protocol") != 2 || incoming.optString("session").isBlank() || incoming.optString("request").isBlank()) return
+        if (incoming.optInt("protocol") != PROTOCOL || incoming.optString("session").isBlank() ||
+            incoming.optString("request").isBlank()) return
         val operation = incoming.optString("op")
         val result = try {
-            val snapshot = store.snapshot()
+            // The requester's scope, so both phones hash the same incident set.
+            val scope = IncidentSyncScope.from(incoming) ?: error("missing scope")
+            val snapshot = store.snapshot(scope)
             if (operation in SNAPSHOT_OPERATIONS && incoming.optString("snapshot") != snapshot.token) {
                 JSONObject().put("error", "STALE")
             } else when (operation) {
@@ -293,7 +309,7 @@ class IncidentSyncCoordinator(
                     // A rebuild already running or queued for this incident covers a repeat request.
                     val incident = incoming.getString("incident")
                     rebuildGate.run(incident) { store.rebuild(incident) }
-                    store.snapshot().digest()
+                    store.snapshot(scope).digest()
                 }
                 else -> JSONObject().put("error", "UNSUPPORTED")
             }
@@ -302,7 +318,7 @@ class IncidentSyncCoordinator(
         } catch (_: Exception) {
             JSONObject().put("error", "INVALID")
         }
-        result.put("protocol", 2).put("session", incoming.getString("session"))
+        result.put("protocol", PROTOCOL).put("session", incoming.getString("session"))
             .put("request", incoming.getString("request")).put("op", operation)
         if (!peers.peers.value.any { link(it) == receivedLink } || !gateway.hasReadyEndpoint(endpoint)) return
         if (!send(endpoint, "EVENT_SYNC_RESP", result, operation in CONTROL)) {
@@ -319,6 +335,8 @@ class IncidentSyncCoordinator(
     }
 
     companion object {
+        /** 3 adds the requester-chosen sync scope; older builds fall back to legacy sync. */
+        const val PROTOCOL = 3
         const val PAGE_COUNT = 24
         const val PAGE_BYTES = 4 * 1024
         private val CONTROL = setOf("DIGEST", "COMPLETE")

@@ -22,6 +22,11 @@ interface IncidentDao {
     @Query("SELECT * FROM incidents ORDER BY incidentId")
     suspend fun getSyncIncidents(): List<IncidentEntity>
 
+    /** Sync window: every open incident plus closures since [since], open first, newest next, at most [cap]. */
+    @Query("SELECT * FROM incidents WHERE status NOT IN ('RESOLVED', 'CANCELLED') OR updatedAt >= :since " +
+        "ORDER BY (status IN ('RESOLVED', 'CANCELLED')), updatedAt DESC, incidentId LIMIT :cap")
+    suspend fun getSyncScope(since: Long, cap: Int): List<IncidentEntity>
+
     @Query("SELECT * FROM incidents WHERE incidentId = :incidentId LIMIT 1")
     suspend fun getIncidentById(incidentId: String): IncidentEntity?
 

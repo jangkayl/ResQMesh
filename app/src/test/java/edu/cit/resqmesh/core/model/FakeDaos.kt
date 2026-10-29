@@ -23,6 +23,12 @@ class IncidentEntityFakeDao : IncidentDao {
 
     override suspend fun getSyncIncidents(): List<IncidentEntity> = store.values.sortedBy { it.incidentId }
 
+    override suspend fun getSyncScope(since: Long, cap: Int): List<IncidentEntity> = store.values
+        .filter { it.status !in TERMINAL || it.updatedAt >= since }
+        .sortedWith(compareBy<IncidentEntity> { it.status in TERMINAL }
+            .thenByDescending { it.updatedAt }.thenBy { it.incidentId })
+        .take(cap)
+
     override suspend fun getIncidentById(incidentId: String): IncidentEntity? = store[incidentId]
 
     override fun observeIncidentById(incidentId: String): Flow<IncidentEntity?> =
@@ -39,9 +45,12 @@ class IncidentEntityFakeDao : IncidentDao {
         flow.value = store.toMap()
         return if (removed != null) 1 else 0
     }
+
+    private companion object { val TERMINAL = setOf("RESOLVED", "CANCELLED") }
 }
 
-class DomainEventEntityFakeDao : DomainEventDao {
+/** [incidents] lets the orphan query see which incident rows exist; without it there are no orphans. */
+class DomainEventEntityFakeDao(private val incidents: IncidentDao? = null) : DomainEventDao {
     private val store = mutableMapOf<String, DomainEventEntity>()
     private val flow = MutableStateFlow<Map<String, DomainEventEntity>>(emptyMap())
 
@@ -91,6 +100,15 @@ class DomainEventEntityFakeDao : DomainEventDao {
 
     override suspend fun getIncidentHistory(): List<DomainEventEntity> = store.values.filter { it.entityType == "INCIDENT" }
     override fun observeIncidentHistory(): Flow<List<DomainEventEntity>> = flow.map { it.values.filter { e -> e.entityType == "INCIDENT" } }
+    override suspend fun getIncidentHistoryFor(incidentIds: List<String>): List<DomainEventEntity> =
+        store.values.filter { it.entityType == "INCIDENT" && it.entityId in incidentIds }
+            .sortedWith(compareBy<DomainEventEntity> { it.entityId }.thenBy { it.eventId })
+    override suspend fun getOrphanIncidentEvents(since: Long, limit: Int): List<DomainEventEntity> {
+        val dao = incidents ?: return emptyList()
+        return store.values
+            .filter { it.entityType == "INCIDENT" && it.timestamp >= since && dao.getIncidentById(it.entityId) == null }
+            .sortedWith(compareBy<DomainEventEntity> { it.entityId }.thenBy { it.eventId }).take(limit)
+    }
     override suspend fun resetIncidentApplication(incidentId: String): Int {
         val ids = store.values.filter { it.entityId == incidentId && it.validationStatus == "ACCEPTED" }.map { it.eventId }
         ids.forEach { setApplied(it, false) }

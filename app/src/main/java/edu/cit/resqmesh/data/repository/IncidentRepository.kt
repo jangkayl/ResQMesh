@@ -4,6 +4,7 @@ import edu.cit.resqmesh.data.repository.incident.IncidentCommands
 import edu.cit.resqmesh.data.repository.incident.IncidentEventIngestor
 import edu.cit.resqmesh.data.repository.incident.LegacyIncidentProjection
 import edu.cit.resqmesh.data.repository.incident.LegacyIncidentSync
+import edu.cit.resqmesh.data.repository.incident.LiveIncidentPacer
 import edu.cit.resqmesh.core.network.MeshNetworkGateway
 import edu.cit.resqmesh.core.model.Incident
 import edu.cit.resqmesh.core.notification.IncidentEventNotice
@@ -17,6 +18,7 @@ import edu.cit.resqmesh.data.local.dao.IncidentDao
 import edu.cit.resqmesh.data.local.dao.IncidentOfferDao
 import edu.cit.resqmesh.data.local.AppDatabase
 import edu.cit.resqmesh.data.local.entity.IncidentOfferEntity
+import androidx.room.InvalidationTracker
 import androidx.room.withTransaction
 import edu.cit.resqmesh.data.local.entity.DomainEventEntity
 import edu.cit.resqmesh.data.local.entity.IncidentEntity
@@ -47,14 +49,26 @@ class IncidentRepository(
     private val helpWorkflow = if (offerDao != null && eventSigning != null)
         IncidentHelpWorkflow(database, incidentDao, offerDao, domainEventDao, identityManager,
             eventSigning, ::broadcastDomainEvent) else null
+    // Only Room reports writes, so without a database every request recomputes.
+    private val snapshotCache = database?.let { db ->
+        SyncSnapshotCache().also { cache ->
+            db.invalidationTracker.addObserver(object : InvalidationTracker.Observer(SYNC_TABLES) {
+                override fun onInvalidated(tables: Set<String>) = cache.invalidate()
+            })
+        }
+    }
     private val syncStore = object : IncidentSyncStore {
-        override suspend fun snapshot(): IncidentSyncSnapshot {
+        override suspend fun snapshot(scope: IncidentSyncScope): IncidentSyncSnapshot {
             suspend fun read(): IncidentSyncSnapshot {
-                val incidents = incidentDao.getSyncIncidents()
-                val offers = incidents.flatMap { offerDao?.getForIncident(it.incidentId).orEmpty() }
-                return IncidentSyncSnapshot(domainEventDao.getIncidentHistory(), incidents, offers)
+                val incidents = incidentDao.getSyncScope(scope.since, scope.cap)
+                val ids = incidents.map { it.incidentId }
+                val offers = if (ids.isEmpty()) emptyList() else offerDao?.getForIncidents(ids).orEmpty()
+                val history = (if (ids.isEmpty()) emptyList() else domainEventDao.getIncidentHistoryFor(ids)) +
+                    domainEventDao.getOrphanIncidentEvents(scope.since, ORPHAN_EVENT_LIMIT)
+                return IncidentSyncSnapshot(history.distinctBy { it.eventId }, incidents, offers)
             }
-            return if (database != null) database.withTransaction { read() } else read()
+            suspend fun compute() = if (database != null) database.withTransaction { read() } else read()
+            return snapshotCache?.get(scope) { compute() } ?: compute()
         }
         override suspend fun ingest(json: JSONObject): IncidentIngestionResult = ingestIncomingEventJson(json.toString())
         override suspend fun replay(incidentId: String) = replayPendingForIncident(incidentId)
@@ -66,6 +80,7 @@ class IncidentRepository(
 
     // Each domain event is distinct data, so a few may queue per link; overflow is recovered by anti-entropy.
     private val domainEventGate = SingleFlightGate("DOMAIN_EVENT", maxQueued = 16)
+    private val livePacer = LiveIncidentPacer(domainEventDao, eventSigning)
     private val syncRequestGate = SingleFlightGate("EVENT_SYNC_REQ")
     private val syncCoordinator = readyPeerEvents?.let {
         IncidentSyncCoordinator(networkGateway, it, syncStore, repositoryScope, ::startLegacyReconciliationWithPeer)
@@ -84,6 +99,7 @@ class IncidentRepository(
         networkGateway.onDomainEvent = { endpointId, payload ->
             repositoryScope.launch {
                 domainEventGate.run(endpointId) {
+                    if (!livePacer.admit(ingestor.decodeEvent(payload.text))) return@run
                     val result = ingestIncomingEventJson(payload.text)
                     if (result == IncidentIngestionResult.APPLIED) {
                         forwardAcceptedDomainEvent(payload, endpointId)
@@ -96,16 +112,14 @@ class IncidentRepository(
         networkGateway.onEventSyncRequest = { endpointId, payload ->
             repositoryScope.launch {
                 syncRequestGate.run(endpointId) {
-                    if (runCatching { JSONObject(payload.text).optInt("protocol") == 2 }.getOrDefault(false))
-                        syncCoordinator?.receive(endpointId, payload)
+                    if (isModernSync(payload.text)) syncCoordinator?.receive(endpointId, payload)
                     else handleSyncRequest(endpointId, payload.text)
                 }
             }
         }
         networkGateway.onEventSyncResponse = { endpointId, payload ->
             repositoryScope.launch {
-                if (runCatching { JSONObject(payload.text).optInt("protocol") == 2 }.getOrDefault(false))
-                    syncCoordinator?.response(endpointId, payload)
+                if (isModernSync(payload.text)) syncCoordinator?.response(endpointId, payload)
                 else handleSyncResponse(endpointId, payload.text)
             }
         }
@@ -123,7 +137,8 @@ class IncidentRepository(
     }
 
     fun getAllIncidents(): Flow<List<IncidentEntity>> = incidentDao.getAllIncidents()
-    internal suspend fun syncSnapshot(): IncidentSyncSnapshot = syncStore.snapshot()
+    internal suspend fun syncSnapshot(scope: IncidentSyncScope = IncidentSyncScope.current()): IncidentSyncSnapshot =
+        syncStore.snapshot(scope)
     fun getActiveIncidents(): Flow<List<IncidentEntity>> = incidentDao.getActiveIncidents()
     fun observeIncidentById(id: String): Flow<IncidentEntity?> = incidentDao.observeIncidentById(id)
     fun observeEventsForIncident(id: String): Flow<List<DomainEventEntity>> = domainEventDao.observeEventsForEntity(id)
@@ -309,4 +324,12 @@ class IncidentRepository(
         ::replayPendingForIncident,
         ::startReconciliationWithPeer
     )
+
+    private fun isModernSync(text: String) =
+        runCatching { JSONObject(text).optInt("protocol") == IncidentSyncCoordinator.PROTOCOL }.getOrDefault(false)
+
+    private companion object {
+        val SYNC_TABLES = arrayOf("incidents", "incident_offers", "domain_events")
+        const val ORPHAN_EVENT_LIMIT = 200
+    }
 }

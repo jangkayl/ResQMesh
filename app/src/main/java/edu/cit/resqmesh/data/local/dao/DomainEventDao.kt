@@ -48,6 +48,15 @@ interface DomainEventDao {
     @Query("SELECT * FROM domain_events WHERE entityType = 'INCIDENT' ORDER BY entityId, eventId")
     fun observeIncidentHistory(): Flow<List<DomainEventEntity>>
 
+    @Query("SELECT * FROM domain_events WHERE entityType = 'INCIDENT' AND entityId IN (:incidentIds) " +
+        "ORDER BY entityId, eventId")
+    suspend fun getIncidentHistoryFor(incidentIds: List<String>): List<DomainEventEntity>
+
+    /** Recent events whose incident row does not exist yet, such as offers waiting for a creation. */
+    @Query("SELECT * FROM domain_events WHERE entityType = 'INCIDENT' AND timestamp >= :since " +
+        "AND entityId NOT IN (SELECT incidentId FROM incidents) ORDER BY entityId, eventId LIMIT :limit")
+    suspend fun getOrphanIncidentEvents(since: Long, limit: Int): List<DomainEventEntity>
+
     @Query("UPDATE domain_events SET applied = 0 WHERE entityId = :incidentId AND validationStatus = 'ACCEPTED'")
     suspend fun resetIncidentApplication(incidentId: String): Int
 

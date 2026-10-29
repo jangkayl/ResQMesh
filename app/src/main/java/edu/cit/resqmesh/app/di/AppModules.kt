@@ -114,6 +114,7 @@ val networkModule = module {
     single { InboundGuards(get(), System::currentTimeMillis) }
     single { OutgoingChatBudget(get(), System::currentTimeMillis) }
     single { OutgoingSosBudget(get(), System::currentTimeMillis) }
+    single { edu.cit.resqmesh.core.network.ratelimit.OutgoingIncidentBudget(get(), System::currentTimeMillis) }
     single { NativeBleManager(androidContext(), get()) }
     single<MeshNetworkGateway> { NativeBleGateway(get()) }
 }
@@ -269,7 +270,7 @@ val viewModelModule = module {
     viewModel { WalkieTalkieViewModel(useCases = get(), mediaHelper = get(), liveAudioEngine = get()) }
     viewModel { OfflineMapViewModel(storageGuard = get(), downloader = get(), connectivityProvider = get()) }
     viewModel { AboutViewModel() }
-    viewModel { IncidentViewModel(incidentRepository = get(), identityManager = get()) }
+    viewModel { IncidentViewModel(incidentRepository = get(), identityManager = get(), incidentBudget = get()) }
 }
 
 val appModules = listOf(

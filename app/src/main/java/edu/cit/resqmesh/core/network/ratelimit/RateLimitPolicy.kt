@@ -1,7 +1,7 @@
 package edu.cit.resqmesh.core.network.ratelimit
 
 /** Traffic classes limited per origin node. [OTHER] is never limited. */
-enum class TrafficClass { CHAT, SOS_NEW, SOS_UPDATE, SYNC_REQUEST, PRESENCE, OTHER }
+enum class TrafficClass { CHAT, SOS_NEW, SOS_UPDATE, INCIDENT_NEW, OFFER_CHANGE, PRESENCE, OTHER }
 
 private const val LINK_BYTES_PER_SEC_DEFAULT = 262_144.0 // 256 KiB
 
@@ -24,8 +24,17 @@ data class RateLimitPolicy(
     // 6 updates/min; 12 burst and 10/min leave margin. Ends of a known SOS are exempt (SosRepository.ingest).
     val sosUpdatePerMin: Double = 10.0,
     val sosUpdateBurst: Double = 12.0,
-    val syncRequestPerMin: Double = 6.0,
-    val syncRequestBurst: Double = 3.0,
+    // Live broadcasts of new incidents per reporter key: the sender's 3 back to back (OutgoingIncidentBudget)
+    // plus 1 margin for BLE queue bunching. Catch-up sync is never charged.
+    val incidentNewPerMin: Double = 3.0,
+    val incidentNewBurst: Double = 4.0,
+    val incidentSendPerMin: Double = 3.0,
+    val incidentSendBurst: Double = 3.0,
+    // Live offer changes per (helper key, incident): the sender's 5 plus 1 margin. Withdrawals are exempt.
+    val offerChangePerMin: Double = 5.0,
+    val offerChangeBurst: Double = 6.0,
+    val offerSendPerMin: Double = 5.0,
+    val offerSendBurst: Double = 5.0,
     val presencePerMin: Double = 30.0,
     val presenceBurst: Double = 10.0,
     val violationsBeforeCooldown: Int = 3,
@@ -40,7 +49,8 @@ data class RateLimitPolicy(
         TrafficClass.CHAT -> chatBurst to chatPerMin / MS_PER_MIN
         TrafficClass.SOS_NEW -> sosNewBurst to sosNewPerMin / MS_PER_MIN
         TrafficClass.SOS_UPDATE -> sosUpdateBurst to sosUpdatePerMin / MS_PER_MIN
-        TrafficClass.SYNC_REQUEST -> syncRequestBurst to syncRequestPerMin / MS_PER_MIN
+        TrafficClass.INCIDENT_NEW -> incidentNewBurst to incidentNewPerMin / MS_PER_MIN
+        TrafficClass.OFFER_CHANGE -> offerChangeBurst to offerChangePerMin / MS_PER_MIN
         TrafficClass.PRESENCE -> presenceBurst to presencePerMin / MS_PER_MIN
         TrafficClass.OTHER -> null
     }

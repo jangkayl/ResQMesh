@@ -37,7 +37,8 @@ fun TacticalHelpOfferSheet(
     actionBusy: Boolean,
     onDismiss: () -> Unit,
     onSubmit: (String) -> Unit,
-    onWithdraw: (() -> Unit)? = null
+    onWithdraw: (() -> Unit)? = null,
+    waitSeconds: Int = 0
 ) {
     var localNote by rememberSaveable { mutableStateOf(initialNote) }
     val isNoteValid = localNote.trim().isNotEmpty() && localNote.trim().length <= TextField.HELP_NOTE.maxLength
@@ -194,7 +195,7 @@ fun TacticalHelpOfferSheet(
                         onSubmit(localNote.trim())
                     }
                 },
-                enabled = !actionBusy && localNote.isNotBlank(),
+                enabled = !actionBusy && localNote.isNotBlank() && waitSeconds == 0,
                 modifier = Modifier
                     .fillMaxWidth()
                     .defaultMinSize(minHeight = 52.dp),
@@ -218,7 +219,11 @@ fun TacticalHelpOfferSheet(
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = if (isEditing) "Update offer" else "Transmit help offer",
+                        text = when {
+                            waitSeconds > 0 -> "Available in $waitSeconds s"
+                            isEditing -> "Update offer"
+                            else -> "Transmit help offer"
+                        },
                         style = MaterialTheme.typography.titleSmall.copy(
                             fontSize = 15.sp,
                             fontWeight = FontWeight.Bold

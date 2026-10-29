@@ -28,7 +28,7 @@ Builds, focused tests, executed instrumentation, qualitative user reports and an
 
 ## D7: Conservative feature scope
 
-Persistent origin outboxes and protocol-1 transfer journals are implemented; universal disconnected-cluster delivery is not guaranteed. Stronger transactional outbox capacity/route repair, bounded replication, resource requests, safety check-ins and unfinished location-confidence policies remain proposals. Battery-aware routing requires measurements. RSSI supports cautious trends, not distance/triangulation. Data mules, virtual private mesh, large media expansion and new protocols are inactive research ideas.
+Origin outboxes and transfer journals exist; disconnected-cluster delivery is not guaranteed. Stronger transactional outbox capacity/route repair, bounded replication, resource requests, safety check-ins and unfinished location-confidence policies remain proposals. Battery-aware routing needs measurements. RSSI supports cautious trends, not distance/triangulation. Data mules, virtual private mesh, large media expansion and new protocols are inactive research ideas.
 
 ## D8: Lightweight context engineering
 
@@ -94,11 +94,11 @@ Deferred designs: [archive index](../archive/docs-superseded-2026-10-04/README.m
 
 ## D23: Preserve behavior during networking decomposition
 
-Structural refactors preserve facade APIs, callback order, generation fences, persistence, queues, routing, crypto and Compose lifetimes, and imply no performance or delivery change. Target cohesive 200–400-line owners and review files above 500; NativeBleManager keeps a reviewed 743-line exception. Phase evidence is archived; results are in [validation](validation.md).
+Structural refactors preserve facade APIs, callback order, generation fences, persistence, queues, routing, crypto and Compose lifetimes, and imply no performance or delivery change. Target 200–400-line owners; NativeBleManager keeps a reviewed 743-line exception. Results: [validation](validation.md).
 
 ## D24: Private-envelope crypto direction
 
-Keep hybrid encryption. After the demo, version the envelope: RSA-OAEP-SHA256 key wrap under a new Keystore alias and AES-GCM AAD binding version, sender, recipient and message ID, with v1 decryption kept for migration. Superseded on 2026-10-17 by D26 (X25519 plus Ed25519 through Tink). Until it ships, no authenticated E2EE claim; forward secrecy is never claimed.
+Hybrid encryption stays; the planned RSA-OAEP envelope was superseded on 2026-10-17 by D26 (X25519 plus Ed25519 through Tink). Until then, no authenticated E2EE claim; forward secrecy is never claimed.
 
 ## D26: Origin-charged limits and a single wire break
 
@@ -106,7 +106,7 @@ The threat model is a malicious nearby phone. Rate limits charge the originating
 
 ## D25: Packages before Gradle modules
 
-Enforce layer boundaries with package moves and `scripts/ci/check_boundaries.ps1`, whose allowlist may only shrink. It reached zero on 2026-10-17 ([plan](plans/layer-boundaries.md)). The user approved that subset ahead of the freeze. It uses adapters rather than renamed repositories, String-typed models and `feature-no-data`, and adds use cases only for multi-step flows. Cross-feature rules wait for P3. The project stays one module; other behavior-touching refactors wait until after the demo freeze.
+Enforce layer boundaries with packages and `scripts/ci/check_boundaries.ps1`; its allowlist reached zero on 2026-10-17 ([plan](plans/layer-boundaries.md)). It uses adapters rather than renamed repositories, String-typed models and `feature-no-data`, and adds use cases only for multi-step flows. Cross-feature rules wait for P3. The project stays one module; other behavior-touching refactors wait until after the demo freeze.
 
 ## D27: User-controlled location
 
@@ -115,3 +115,7 @@ Auto-detect defaults on; each SOS may exclude location; location never blocks SO
 ## D28: Incident notifications
 
 New Critical/Serious incidents notify everyone unless toggled off; reporter/helper alerts are ungated. Own events, replay and incidents over 30 minutes old stay silent.
+
+## D29: Bounded incident sync, paced creation
+
+Sync (protocol 3) carries open and 24 h closed incidents, at most 100, with full history; older stay local. Sync is never rate limited. Per signing key, reports are paced 3 then 1/20 s and offer changes 5/min per incident; receivers pace live broadcasts only; withdrawals and lead decisions are exempt.

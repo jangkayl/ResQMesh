@@ -58,7 +58,8 @@ fun CreateIncidentSheet(
     onDismiss: () -> Unit,
     onSubmit: (title: String, type: String, severity: String, desc: String, area: String, lat: Double?, lng: Double?, time: Long?, acc: Float?) -> Unit,
     submissionError: String? = null,
-    isSubmitting: Boolean = false
+    isSubmitting: Boolean = false,
+    reportWaitSeconds: Int = 0
 ) {
     val context = LocalContext.current
     val locationClient = remember { KoinJavaComponent.getKoin().get<LocationClientFactory>().create() }
@@ -199,7 +200,7 @@ fun CreateIncidentSheet(
                     ) {
                         Button(
                             onClick = ::validateAndSubmit,
-                            enabled = !isSubmitting,
+                            enabled = !isSubmitting && reportWaitSeconds == 0,
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(50.dp),
@@ -217,6 +218,12 @@ fun CreateIncidentSheet(
                                 )
                                 Spacer(Modifier.width(10.dp))
                                 Text("Broadcasting to Mesh…", fontSize = 15.sp, fontWeight = FontWeight.Bold)
+                            } else if (reportWaitSeconds > 0) {
+                                Text(
+                                    "Next report available in $reportWaitSeconds s",
+                                    fontSize = 15.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
                             } else {
                                 Text("Broadcast Request to Mesh Network", fontSize = 15.sp, fontWeight = FontWeight.Bold)
                             }
