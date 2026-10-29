@@ -30,10 +30,10 @@ At least three phones, A, B and C, in a line (A–B–C, with A and C out of dir
 Report a FAIL for any of these:
 - a crash
 - a valid message, receipt, SOS, image or voice note that never arrives
-- `INBOUND_REJECT`, `RL_COOLDOWN`, `L2CAP_READ_TIMEOUT`, `L2CAP_QUEUE_FULL`, `TRANSFER_OVERFLOW`, `KEY_REJECT`, `TOPO_REJECT` or `ADV_EVICT_BLOCKED` during normal traffic
+- `INBOUND_REJECT`, `RL_COOLDOWN`, `L2CAP_READ_TIMEOUT`, `L2CAP_QUEUE_STALL`, `TRANSFER_OVERFLOW`, `KEY_REJECT`, `TOPO_REJECT` or `ADV_EVICT_BLOCKED` during normal traffic
 - a peer that stays READY-less after reconnect
 
-Markers to grep: `INBOUND_REJECT`, `RL_DROP`, `RL_COOLDOWN`, `LINK_SHAPE`, `L2CAP_READ_TIMEOUT`, `L2CAP_QUEUE_FULL`, `TRANSFER_OVERFLOW`, `SYNC_COALESCED`, `KEY_REJECT`, `TOPO_REJECT`, `ADV_EVICT_BLOCKED`.
+Markers to grep: `INBOUND_REJECT`, `RL_DROP`, `RL_COOLDOWN`, `LINK_SHAPE`, `L2CAP_READ_TIMEOUT`, `L2CAP_QUEUE_STALL`, `TRANSFER_OVERFLOW`, `SYNC_COALESCED`, `KEY_REJECT`, `TOPO_REJECT`, `ADV_EVICT_BLOCKED`.
 
 Report per step: PASS, FAIL or UNTESTED, the build identities, phone models, the topology, and the capture folder. Never share message content or keys.
 

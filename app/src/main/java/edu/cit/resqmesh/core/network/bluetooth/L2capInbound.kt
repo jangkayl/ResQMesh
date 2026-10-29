@@ -4,30 +4,76 @@ import edu.cit.resqmesh.core.network.bluetooth.state.MeshFrameCodec
 import java.io.EOFException
 import java.io.InputStream
 
-/** Caps frames (and bytes) read off an L2CAP socket but not yet consumed on the handler thread. */
+/**
+ * Caps frames (and bytes) read off an L2CAP socket but not yet consumed on the handler thread.
+ * A full gate is back-pressure, not a drop: the reader thread waits in [awaitAcquire] before reading
+ * the next frame body, so the peer's stream simply stalls instead of losing frames.
+ */
 class L2capInboundGate(
     private val maxFrames: Int = MAX_PENDING_FRAMES,
     private val maxBytes: Long = MAX_PENDING_BYTES
 ) {
+    enum class Admission { ADMITTED, TIMED_OUT, CLOSED }
+
+    private val lock = Object()
     private var frames = 0
     private var bytes = 0L
+    private var closed = false
 
     /** True when the frame was admitted; the caller must [release] it exactly once. */
-    @Synchronized fun tryAcquire(size: Int): Boolean {
-        if (frames >= maxFrames || bytes + size > maxBytes) return false
+    fun tryAcquire(size: Int): Boolean = synchronized(lock) { admitLocked(size) }
+
+    /**
+     * Waits (on the calling reader thread only) up to [timeoutMs] for room. An empty queue always
+     * admits, so one frame larger than the byte cap cannot deadlock. [isOpen] is re-checked every
+     * [POLL_MS] so link retirement unblocks the wait even when [close] is not called.
+     */
+    fun awaitAcquire(size: Int, timeoutMs: Long, isOpen: () -> Boolean = { true }): Admission {
+        val deadline = System.nanoTime() + timeoutMs * NANOS_PER_MS
+        synchronized(lock) {
+            var result: Admission? = null
+            while (result == null) {
+                val remainingMs = (deadline - System.nanoTime()) / NANOS_PER_MS
+                result = when {
+                    closed || !isOpen() -> Admission.CLOSED
+                    admitLocked(size) -> Admission.ADMITTED
+                    remainingMs <= 0 -> Admission.TIMED_OUT
+                    else -> { lock.wait(minOf(remainingMs, POLL_MS)); null }
+                }
+            }
+            return result
+        }
+    }
+
+    fun release(size: Int) {
+        synchronized(lock) {
+            if (frames > 0) frames--
+            bytes = (bytes - size).coerceAtLeast(0L)
+            lock.notifyAll()
+        }
+    }
+
+    /** Unblocks a waiting reader; later waits return [Admission.CLOSED]. */
+    fun close() {
+        synchronized(lock) {
+            closed = true
+            lock.notifyAll()
+        }
+    }
+
+    private fun admitLocked(size: Int): Boolean {
+        if (frames > 0 && (frames >= maxFrames || bytes + size > maxBytes)) return false
         frames++
         bytes += size
         return true
     }
 
-    @Synchronized fun release(size: Int) {
-        if (frames > 0) frames--
-        bytes = (bytes - size).coerceAtLeast(0L)
-    }
-
     companion object {
         const val MAX_PENDING_FRAMES = 32
         const val MAX_PENDING_BYTES = 4L * 1024 * 1024
+        const val STALL_TIMEOUT_MS = 15_000L
+        private const val POLL_MS = 250L
+        private const val NANOS_PER_MS = 1_000_000L
     }
 }
 
@@ -92,21 +138,6 @@ class L2capFrameReader(
             onProgress()
         }
         return payload
-    }
-
-    /** Consumes and drops a payload (queue full) without buffering it; false when [isOwned] turned false. */
-    fun skipPayload(length: Int, isOwned: () -> Boolean = { true }): Boolean {
-        val scratch = ByteArray(minOf(length, IO_CHUNK_BYTES))
-        var remaining = length
-        while (remaining > 0) {
-            val count = input.read(scratch, 0, minOf(scratch.size, remaining))
-            if (count < 0) throw EOFException()
-            if (!isOwned()) return false
-            remaining -= count
-            onChunk(count)
-            onProgress()
-        }
-        return true
     }
 
     companion object {

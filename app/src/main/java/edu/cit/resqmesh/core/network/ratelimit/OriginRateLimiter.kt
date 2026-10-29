@@ -21,12 +21,12 @@ class OriginRateLimiter(
     fun check(originNodeId: String, trafficClass: TrafficClass): Decision {
         val spec = policy.bucketSpec(trafficClass)
         if (spec == null) return Decision.Allowed
-        // SOS classes are only ever limited by their own buckets: a cooldown earned elsewhere never blocks them.
+        // SOS classes are only ever limited by their own buckets: a cooldown never blocks them.
         val isSos = trafficClass == TrafficClass.SOS_NEW || trafficClass == TrafficClass.SOS_UPDATE
         return when {
-            !isSos && penalties.isCoolingDown(originNodeId) -> Decision.CoolingDown
+            !isSos && penalties.isCoolingDown(originNodeId, trafficClass) -> Decision.CoolingDown
             tryConsume(originNodeId, trafficClass, spec) -> Decision.Allowed
-            penalties.recordViolation(originNodeId) -> Decision.CooldownStarted
+            penalties.recordViolation(originNodeId, trafficClass) -> Decision.CooldownStarted
             else -> Decision.Dropped
         }
     }

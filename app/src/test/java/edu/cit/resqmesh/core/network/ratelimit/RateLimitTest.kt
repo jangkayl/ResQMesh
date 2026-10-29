@@ -6,6 +6,8 @@ import org.junit.Assert.assertTrue
 import org.junit.Assert.assertFalse
 import org.junit.Test
 
+private val C = TrafficClass.CHAT
+
 class RateLimitTest {
     private var now = 0L
     private val clock: () -> Long = { now }
@@ -24,23 +26,23 @@ class RateLimitTest {
 
     @Test fun penaltyBoxStartsAndEndsCooldown() {
         val box = PenaltyBox(3, 60_000, 60_000, clock)
-        assertFalse(box.recordViolation("o"))
-        assertFalse(box.recordViolation("o"))
-        assertTrue(box.recordViolation("o"))
-        assertTrue(box.isCoolingDown("o"))
-        assertFalse(box.isCoolingDown("other"))
+        assertFalse(box.recordViolation("o", C))
+        assertFalse(box.recordViolation("o", C))
+        assertTrue(box.recordViolation("o", C))
+        assertTrue(box.isCoolingDown("o", C))
+        assertFalse(box.isCoolingDown("other", C))
         now += 59_999
-        assertTrue(box.isCoolingDown("o"))
+        assertTrue(box.isCoolingDown("o", C))
         now += 1
-        assertFalse(box.isCoolingDown("o"))
+        assertFalse(box.isCoolingDown("o", C))
     }
 
     @Test fun penaltyViolationsOutsideWindowDoNotAccumulate() {
         val box = PenaltyBox(3, 1000, 5000, clock)
-        box.recordViolation("o"); box.recordViolation("o")
+        box.recordViolation("o", C); box.recordViolation("o", C)
         now += 1000
-        assertFalse(box.recordViolation("o"))
-        assertFalse(box.isCoolingDown("o"))
+        assertFalse(box.recordViolation("o", C))
+        assertFalse(box.isCoolingDown("o", C))
     }
 
     @Test fun limiterEnforcesBurstAndCoolsDownThenRecovers() {
@@ -49,7 +51,7 @@ class RateLimitTest {
         assertEquals(Decision.Dropped, limiter.check("o", TrafficClass.CHAT))
         assertEquals(Decision.Dropped, limiter.check("o", TrafficClass.CHAT))
         assertEquals(Decision.CooldownStarted, limiter.check("o", TrafficClass.CHAT))
-        assertEquals(Decision.CoolingDown, limiter.check("o", TrafficClass.PRESENCE))
+        assertEquals(Decision.CoolingDown, limiter.check("o", TrafficClass.CHAT))
         now += 60_000
         assertEquals(Decision.Allowed, limiter.check("o", TrafficClass.CHAT))
     }
@@ -94,6 +96,31 @@ class RateLimitTest {
     }
 }
 
+class ClassScopedCooldownTest {
+    private var now = 0L
+    private val policy = RateLimitPolicy(chatBurst = 1.0, presenceBurst = 1.0)
+    private val limiter = OriginRateLimiter(policy) { now }
+
+    private fun coolDown(origin: String, trafficClass: TrafficClass) {
+        limiter.check(origin, trafficClass)
+        repeat(2) { limiter.check(origin, trafficClass) }
+        assertEquals(Decision.CooldownStarted, limiter.check(origin, trafficClass))
+    }
+
+    @Test fun chatCooldownDoesNotBlockPresenceOrSync() {
+        coolDown("o", TrafficClass.CHAT)
+        assertEquals(Decision.CoolingDown, limiter.check("o", TrafficClass.CHAT))
+        assertEquals(Decision.Allowed, limiter.check("o", TrafficClass.PRESENCE))
+        assertEquals(Decision.Allowed, limiter.check("o", TrafficClass.SYNC_REQUEST))
+    }
+
+    @Test fun presenceCooldownDoesNotBlockChat() {
+        coolDown("o", TrafficClass.PRESENCE)
+        assertEquals(Decision.CoolingDown, limiter.check("o", TrafficClass.PRESENCE))
+        assertEquals(Decision.Allowed, limiter.check("o", TrafficClass.CHAT))
+    }
+}
+
 class SosCooldownTest {
     private var now = 0L
     private val policy = RateLimitPolicy(chatBurst = 1.0, sosNewBurst = 1.0, sosUpdateBurst = 1.0)
@@ -107,19 +134,19 @@ class SosCooldownTest {
 
     @Test fun cooldownFromOtherClassesNeverBlocksSos() {
         coolDown("o")
-        assertEquals(Decision.CoolingDown, limiter.check("o", TrafficClass.PRESENCE))
+        assertEquals(Decision.CoolingDown, limiter.check("o", TrafficClass.CHAT))
         assertEquals(Decision.Allowed, limiter.check("o", TrafficClass.SOS_NEW))
         assertEquals(Decision.Allowed, limiter.check("o", TrafficClass.SOS_UPDATE))
         // SOS still obeys its own buckets while cooling down.
         assertEquals(Decision.Dropped, limiter.check("o", TrafficClass.SOS_NEW))
     }
 
-    @Test fun sosViolationsCountTowardCooldownThatOnlyBlocksOtherClasses() {
+    @Test fun sosViolationsNeverCoolDownOtherClasses() {
         assertEquals(Decision.Allowed, limiter.check("o", TrafficClass.SOS_NEW))
         assertEquals(Decision.Dropped, limiter.check("o", TrafficClass.SOS_NEW))
         assertEquals(Decision.Dropped, limiter.check("o", TrafficClass.SOS_NEW))
         assertEquals(Decision.CooldownStarted, limiter.check("o", TrafficClass.SOS_NEW))
-        assertEquals(Decision.CoolingDown, limiter.check("o", TrafficClass.CHAT))
+        assertEquals(Decision.Allowed, limiter.check("o", TrafficClass.CHAT))
         now += 120_000
         assertEquals(Decision.Allowed, limiter.check("o", TrafficClass.SOS_NEW))
     }

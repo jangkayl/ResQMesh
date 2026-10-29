@@ -139,34 +139,49 @@ class L2capTransport(
                     val header = reader.readHeader()
                     if (header is L2capFrameReader.Header.Invalid) {
                         AppLogger.d("BLE_MESH", "Rejected invalid L2CAP payload length ${header.value} from $endpoint")
-                        break
-                    }
-                    val length = (header as L2capFrameReader.Header.Length).value
-                    // When full, the reliable-transfer layer retries; discarding keeps the stream aligned.
-                    val admitted = gate.tryAcquire(length)
-                    if (admitted) incoming.incrementAndGet()
-                    else AppLogger.d("BLE_MESH", "L2CAP_QUEUE_FULL endpoint=$endpoint: dropped $length byte frame")
-                    val payload = if (admitted) reader.readPayload(length, ::isOwned)
-                    else { reader.skipPayload(length, ::isOwned); null }
-                    watchdog.frameEnded()
-                    if (!isOwned()) {
-                        if (admitted) gate.release(length)
                         return@Thread
                     }
-                    if (payload != null) {
-                        AppLogger.d("BLE_MESH", "L2CAP Received $length bytes from $endpoint")
-                        handler.post {
-                            try { if (isOwned()) onPayload(endpoint, payload) }
-                            finally {
-                                incoming.decrementAndGet()
-                                gate.release(length)
-                            }
+                    val length = (header as L2capFrameReader.Header.Length).value
+                    // Back-pressure: wait for handler space before reading the body, so no frame is dropped.
+                    // Not mid-frame while waiting, so the read watchdog stays quiet.
+                    watchdog.frameEnded()
+                    val admission = gate.awaitAcquire(length, L2capInboundGate.STALL_TIMEOUT_MS, ::isOwned)
+                    if (admission == L2capInboundGate.Admission.TIMED_OUT) {
+                        AppLogger.d(
+                            "BLE_MESH",
+                            "L2CAP_QUEUE_STALL endpoint=$endpoint: queue full ${L2capInboundGate.STALL_TIMEOUT_MS} ms"
+                        )
+                        return@Thread
+                    }
+                    if (admission != L2capInboundGate.Admission.ADMITTED) return@Thread
+                    watchdog.frameStarted(System.currentTimeMillis())
+                    incoming.incrementAndGet()
+                    val payload = try {
+                        reader.readPayload(length, ::isOwned)
+                    } catch (error: Exception) {
+                        incoming.decrementAndGet()
+                        gate.release(length)
+                        throw error
+                    }
+                    watchdog.frameEnded()
+                    if (payload == null || !isOwned()) {
+                        incoming.decrementAndGet()
+                        gate.release(length)
+                        return@Thread
+                    }
+                    AppLogger.d("BLE_MESH", "L2CAP Received $length bytes from $endpoint")
+                    handler.post {
+                        try { if (isOwned()) onPayload(endpoint, payload) }
+                        finally {
+                            incoming.decrementAndGet()
+                            gate.release(length)
                         }
                     }
                 }
             } catch (error: Exception) {
                 AppLogger.d("BLE_MESH", "L2CAP stream disconnected for $endpoint: ${error.message}")
             } finally {
+                gate.close()
                 readerDone.set(true)
                 handler.removeCallbacks(stallCheck)
                 lost(writer.close())

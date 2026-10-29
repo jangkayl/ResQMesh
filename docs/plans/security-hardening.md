@@ -49,7 +49,8 @@ As built, these changed from the outline:
 - SOS limits are charged after the SOS signature verifies, keyed by the signing-key prefix, not the claimed sender.
 - A direct payload whose origin differs from the link's admitted identity is rejected.
 - Relayed traffic is limited per origin and ingress link, so a spoof on one link can't throttle the victim on another.
-- A cooldown never blocks SOS.
+- A cooldown never blocks SOS, and is per (origin, traffic class): chat abuse cools down only chat, so presence and sync keep flowing.
+- A full L2CAP handler queue applies back-pressure (the reader waits up to 15 s before reading the next body, then closes the link with `L2CAP_QUEUE_STALL`) instead of dropping frames.
 - PING, PONG, PIECE and ACK are shaped per link only.
 - Topology sequences more than 10 min ahead of the local clock are rejected.
 - Validator text and ciphertext caps equal the frame cap, so long voice notes still fit.

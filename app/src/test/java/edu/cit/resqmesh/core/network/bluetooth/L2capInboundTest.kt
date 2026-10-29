@@ -54,17 +54,62 @@ class L2capInboundTest {
         }
     }
 
-    @Test fun invalidLengthIsFlaggedAndSkipKeepsStreamAligned() {
+    @Test fun invalidLengthIsFlagged() {
         val tooBig = ByteBuffer.allocate(4).putInt(MeshFrameCodec.MAX_PAYLOAD_BYTES + 1).array()
         assertTrue(L2capFrameReader(ByteArrayInputStream(tooBig)).readHeader() is L2capFrameReader.Header.Invalid)
+    }
 
-        val big = MeshFrameCodec.encode(ByteArray(40_000))!!
-        val stream = ByteArrayInputStream(big + MeshFrameCodec.encode(byteArrayOf(7))!!)
-        val reader = L2capFrameReader(stream)
-        val first = (reader.readHeader() as L2capFrameReader.Header.Length).value
-        assertTrue(reader.skipPayload(first))
-        val second = (reader.readHeader() as L2capFrameReader.Header.Length).value
-        assertArrayEquals(byteArrayOf(7), reader.readPayload(second))
+    @Test fun fullGateMakesReaderWaitThenProceedsWhenSpaceFrees() {
+        val gate = L2capInboundGate(maxFrames = 1, maxBytes = 100)
+        assertTrue(gate.tryAcquire(10))
+        var result: L2capInboundGate.Admission? = null
+        val reader = Thread { result = gate.awaitAcquire(10, 5_000) }
+        reader.start()
+        Thread.sleep(150)
+        assertTrue(reader.isAlive)
+        gate.release(10)
+        reader.join(2_000)
+        assertEquals(L2capInboundGate.Admission.ADMITTED, result)
+    }
+
+    @Test fun fullGateTimesOutInsteadOfSkipping() {
+        val gate = L2capInboundGate(maxFrames = 1, maxBytes = 100)
+        assertTrue(gate.tryAcquire(10))
+        assertEquals(L2capInboundGate.Admission.TIMED_OUT, gate.awaitAcquire(10, 100))
+    }
+
+    @Test fun oversizeFrameIsAdmittedOnlyWhenQueueIsEmpty() {
+        val gate = L2capInboundGate(maxFrames = 4, maxBytes = 100)
+        assertEquals(L2capInboundGate.Admission.ADMITTED, gate.awaitAcquire(500, 100))
+        assertFalse(gate.tryAcquire(1))
+        gate.release(500)
+        assertTrue(gate.tryAcquire(1))
+    }
+
+    @Test fun closeUnblocksWaitingReader() {
+        val gate = L2capInboundGate(maxFrames = 1, maxBytes = 100)
+        assertTrue(gate.tryAcquire(10))
+        var result: L2capInboundGate.Admission? = null
+        val reader = Thread { result = gate.awaitAcquire(10, 30_000) }
+        reader.start()
+        Thread.sleep(100)
+        gate.close()
+        reader.join(2_000)
+        assertFalse(reader.isAlive)
+        assertEquals(L2capInboundGate.Admission.CLOSED, result)
+    }
+
+    @Test fun lostOwnershipUnblocksWaitingReader() {
+        val gate = L2capInboundGate(maxFrames = 1, maxBytes = 100)
+        assertTrue(gate.tryAcquire(10))
+        var open = true
+        var result: L2capInboundGate.Admission? = null
+        val reader = Thread { result = gate.awaitAcquire(10, 30_000) { open } }
+        reader.start()
+        Thread.sleep(100)
+        open = false
+        reader.join(2_000)
+        assertEquals(L2capInboundGate.Admission.CLOSED, result)
     }
 
     @Test fun trickledBytesReportOneFrameStartAndProgressPerRead() {
