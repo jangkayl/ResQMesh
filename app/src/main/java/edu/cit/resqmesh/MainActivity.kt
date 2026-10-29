@@ -58,6 +58,7 @@ class MainActivity : ComponentActivity() {
     private var onPermissionsResult: ((Boolean) -> Unit)? = null
     private val sosDeepLinkTriggered = mutableStateOf(false)
     private val pendingChatNode = mutableStateOf<String?>(null)
+    private val pendingIncidentId = mutableStateOf<String?>(null)
     private val pendingViewMap = mutableStateOf(false)
     private val pendingSosSender = mutableStateOf<String?>(null)
     private val pendingSosText = mutableStateOf<String?>(null)
@@ -75,6 +76,7 @@ class MainActivity : ComponentActivity() {
                 sosDeepLinkTriggered.value = true
             }
             is NavigationRequest.OpenChat -> pendingChatNode.value = request.nodeId
+            is NavigationRequest.OpenIncident -> pendingIncidentId.value = request.incidentId
         }
     }
 
@@ -122,7 +124,8 @@ class MainActivity : ComponentActivity() {
                 var hardwareState by remember { mutableStateOf(isHardwareEnabledSafe()) }
 
                 val hasDeepLink =
-                    sosDeepLinkTriggered.value || pendingChatNode.value != null || pendingViewMap.value
+                    sosDeepLinkTriggered.value || pendingChatNode.value != null || pendingViewMap.value ||
+                        pendingIncidentId.value != null
                 var guidePending by rememberSaveable {
                     mutableStateOf(FirstLaunchGuideStore.load(applicationContext) == GuideState.Pending)
                 }
@@ -225,6 +228,8 @@ class MainActivity : ComponentActivity() {
                                 },
                                 initialChatNode = pendingChatNode.value,
                                 onClearInitialChatNode = { pendingChatNode.value = null },
+                                initialIncidentId = pendingIncidentId.value,
+                                onClearInitialIncident = { pendingIncidentId.value = null },
                                 initialViewMap = pendingViewMap.value,
                                 initialSosSender = pendingSosSender.value,
                                 initialSosText = pendingSosText.value,

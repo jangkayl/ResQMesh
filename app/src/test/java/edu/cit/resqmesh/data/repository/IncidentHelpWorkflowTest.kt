@@ -420,6 +420,96 @@ class IncidentHelpWorkflowTest {
     }
 
     @Test
+    fun staleConfirmationForReplacedSelectionIsRetainedAsHistory() = runTest {
+        assertTrue(helperB.offerHelp(incidentId, "Nearby"))
+        assertTrue(helperC.offerHelp(incidentId, "Transport"))
+        assertTrue(reporter.selectLead(incidentId, offerDao.getByHelper(incidentId, "helper-b-key")!!.offerId))
+        val pending = incidentDao.getIncidentById(incidentId)!!
+        assertTrue(reporter.revokeLead(incidentId))
+        assertTrue(reporter.selectLead(incidentId, offerDao.getByHelper(incidentId, "helper-c-key")!!.offerId))
+        val latest = incidentDao.getIncidentById(incidentId)!!
+        val stale = signed(DomainEventEntity("stale-b-confirmation", incidentId, "INCIDENT", "INCIDENT_LEAD_CONFIRMED",
+            "B", "Helper B", pending.version, 10, JSONObject().put("selectionId", pending.selectionId).toString()))
+        assertFalse(reporter.apply(stale))
+        assertEquals(latest, incidentDao.getIncidentById(incidentId))
+        val stored = eventDao.getEventById(stale.eventId)!!
+        assertTrue(stored.applied)
+        assertEquals("ACCEPTED", stored.validationStatus)
+    }
+
+    @Test
+    fun declineAfterRevocationIsHistoryRatherThanPending() = runTest {
+        assertTrue(helperB.offerHelp(incidentId, "Nearby"))
+        assertTrue(reporter.selectLead(incidentId, offerDao.getByHelper(incidentId, "helper-b-key")!!.offerId))
+        val selected = incidentDao.getIncidentById(incidentId)!!
+        assertTrue(reporter.revokeLead(incidentId))
+        val revoked = incidentDao.getIncidentById(incidentId)!!
+        val decline = signed(DomainEventEntity("offline-decline", incidentId, "INCIDENT", "INCIDENT_LEAD_DECLINED",
+            "B", "Helper B", selected.version, 10, JSONObject().put("selectionId", selected.selectionId).toString()))
+        assertFalse(reporter.apply(decline))
+        assertEquals(revoked, incidentDao.getIncidentById(incidentId))
+        assertTrue(eventDao.getEventById(decline.eventId)!!.applied)
+        assertTrue(eventDao.getUnappliedForIncident(incidentId).isEmpty())
+    }
+
+    @Test
+    fun revocationAfterConcurrentDeclineConsumesReporterVersion() = runTest {
+        assertTrue(helperB.offerHelp(incidentId, "Nearby"))
+        val offer = emitted.last()
+        assertTrue(reporter.selectLead(incidentId, offerDao.getByHelper(incidentId, "helper-b-key")!!.offerId))
+        val selection = emitted.last()
+        val selected = incidentDao.getIncidentById(incidentId)!!
+        assertTrue(helperB.declineLead(incidentId))
+        val decline = emitted.last()
+        val replica = freshReplica()
+        listOf(offer, selection, decline).forEach { assertTrue(replica.workflow.apply(it)) }
+        assertCleared(replica.incidents.getIncidentById(incidentId)!!)
+        assertTrue(replica.workflow.apply(signedRevocation(selected)))
+        assertEquals(selected.version + 1, replica.incidents.getIncidentById(incidentId)!!.version)
+        assertCleared(replica.incidents.getIncidentById(incidentId)!!)
+    }
+
+    @Test
+    fun lateDeclineAfterRevocationAndCancellationIsHistory() = runTest {
+        assertTrue(helperB.offerHelp(incidentId, "Nearby"))
+        val offer = emitted.last()
+        assertTrue(reporter.selectLead(incidentId, offerDao.getByHelper(incidentId, "helper-b-key")!!.offerId))
+        val selection = emitted.last()
+        val selected = incidentDao.getIncidentById(incidentId)!!
+        assertTrue(reporter.revokeLead(incidentId))
+        val revocation = emitted.last()
+        assertTrue(reporter.cancel(incidentId))
+        val cancellation = emitted.last()
+        val decline = signed(DomainEventEntity("late-decline", incidentId, "INCIDENT", "INCIDENT_LEAD_DECLINED",
+            "B", "Helper B", selected.version, 10, JSONObject().put("selectionId", selected.selectionId).toString()))
+        val replica = freshReplica()
+        listOf(offer, selection, revocation, cancellation).forEach { assertTrue(replica.workflow.apply(it)) }
+        assertFalse(replica.workflow.apply(decline))
+        assertTrue(replica.events.getEventById(decline.eventId)!!.applied)
+        assertEquals(IncidentState.CANCELLED.name, replica.incidents.getIncidentById(incidentId)!!.status)
+    }
+
+    @Test
+    fun decisionForUnknownSelectionFromNonHelperIsRejected() = runTest {
+        val junk = signed(DomainEventEntity("junk-confirm", incidentId, "INCIDENT", "INCIDENT_LEAD_CONFIRMED",
+            "C", "Helper C", 2, 10, JSONObject().put("selectionId", "made-up").toString()))
+        assertFalse(reporter.apply(junk))
+        assertEquals("REJECTED", eventDao.getEventById(junk.eventId)!!.validationStatus)
+    }
+
+    @Test
+    fun previouslyRejectedAuthenticEventIsRevalidated() = runTest {
+        assertTrue(helperB.offerHelp(incidentId, "Nearby"))
+        val offer = emitted.last()
+        val target = freshReplica()
+        target.events.insertEvent(offer.copy(applied = false, validationStatus = "REJECTED"))
+        assertEquals(IncidentIngestionResult.APPLIED, repository(target).ingestIncomingEvent(offer))
+        assertEquals(1, target.offers.getForIncident(incidentId).size)
+        assertEquals(IncidentIngestionResult.REJECTED,
+            repository(target).ingestIncomingEvent(offer.copy(eventId = "forged-offer", signature = "forged")))
+    }
+
+    @Test
     fun forgedWithdrawalCannotClearSelection() = runTest {
         assertTrue(helperB.offerHelp(incidentId, "Nearby"))
         val offer = offerDao.getByHelper(incidentId, "helper-b-key")!!
@@ -691,6 +781,9 @@ class IncidentHelpWorkflowTest {
             return ids.size
         }
         override suspend fun getById(offerId: String): IncidentOfferEntity? = rows[offerId]
+        override suspend fun getForIncidents(incidentIds: List<String>): List<IncidentOfferEntity> =
+            rows.values.filter { it.incidentId in incidentIds }
+                .sortedWith(compareBy<IncidentOfferEntity> { it.incidentId }.thenBy { it.offerId })
         override suspend fun getByHelper(incidentId: String, helperKey: String): IncidentOfferEntity? =
             rows.values.firstOrNull { it.incidentId == incidentId && it.helperKey == helperKey }
         override suspend fun insertOffer(offerId: String, incidentId: String, helperKey: String,

@@ -7,8 +7,62 @@ import org.json.JSONObject
 import java.io.ByteArrayOutputStream
 import java.io.DataOutputStream
 import java.security.MessageDigest
+import java.util.concurrent.atomic.AtomicLong
 
 enum class IncidentIngestionResult { APPLIED, DEFERRED, DUPLICATE, REJECTED }
+
+/**
+ * Which incidents one sync session compares: every open incident plus closures updated at or after
+ * [since], open first and newest next, at most [cap]. The initiator chooses it and sends it with every
+ * request, so both phones hash exactly the same set whatever their clocks say.
+ */
+data class IncidentSyncScope(val since: Long, val cap: Int) {
+    fun writeTo(json: JSONObject): JSONObject = json.put("since", since).put("cap", cap)
+
+    companion object {
+        const val CLOSED_WINDOW_MS = 24L * 60 * 60 * 1000
+        const val MAX_INCIDENTS = 100
+        private const val MAX_SKEW_MS = 12L * 60 * 60 * 1000
+        private const val MINUTE_MS = 60_000L
+
+        /** Rounded to the minute so repeated sessions share a cached snapshot. */
+        fun current(now: Long = System.currentTimeMillis()) =
+            IncidentSyncScope((now - CLOSED_WINDOW_MS) / MINUTE_MS * MINUTE_MS, MAX_INCIDENTS)
+
+        /**
+         * A peer's requested scope, or null unless it is the standard window: the fixed cap and a
+         * minute-aligned `since` within 12 h of ours. That bounds how many distinct snapshots a peer can
+         * force past the cache while tolerating ordinary clock skew.
+         */
+        fun from(json: JSONObject, now: Long = System.currentTimeMillis()): IncidentSyncScope? {
+            val since = json.optLong("since", -1)
+            val standard = json.optInt("cap") == MAX_INCIDENTS && since > 0 && since % MINUTE_MS == 0L &&
+                kotlin.math.abs(since - (now - CLOSED_WINDOW_MS)) <= MAX_SKEW_MS
+            return if (standard) IncidentSyncScope(since, MAX_INCIDENTS) else null
+        }
+    }
+}
+
+/**
+ * Reuses the last scoped snapshot until a tracked table changes. [invalidate] runs after every write
+ * (Room's invalidation tracker), and a snapshot computed while a write raced it is returned but not kept.
+ */
+class SyncSnapshotCache {
+    private val version = AtomicLong()
+    @Volatile private var cached: Triple<IncidentSyncScope, Long, IncidentSyncSnapshot>? = null
+
+    fun invalidate() { version.incrementAndGet() }
+
+    suspend fun get(scope: IncidentSyncScope, compute: suspend () -> IncidentSyncSnapshot): IncidentSyncSnapshot {
+        val before = version.get()
+        cached?.let { (cachedScope, cachedVersion, snapshot) ->
+            if (cachedScope == scope && cachedVersion == before) return snapshot
+        }
+        val fresh = compute()
+        if (version.get() == before) cached = Triple(scope, before, fresh)
+        return fresh
+    }
+}
 
 /** No local delivery/reachability fields participate in these hashes. */
 data class IncidentSyncEntry(val id: String, val history: String, val state: String) {
@@ -22,9 +76,12 @@ class IncidentSyncSnapshot(
 ) {
     val events = history.filter { it.entityType == "INCIDENT" && it.validationStatus == "ACCEPTED" }
         .sortedBy { it.eventId }
-    val pending = history.count { it.entityType == "INCIDENT" && !it.applied && it.validationStatus != "REJECTED" }
-    private val eventGroups = events.groupBy { it.entityId }
     private val incidentMap = incidents.associateBy { it.incidentId }
+    // Orphans (events whose incident is unknown) never count: one unresolvable event must not block COMPLETE.
+    val pending = history.count {
+        it.entityType == "INCIDENT" && !it.applied && it.validationStatus != "REJECTED" && it.entityId in incidentMap
+    }
+    private val eventGroups = events.groupBy { it.entityId }
     private val offerGroups = offers.groupBy { it.incidentId }
     val entries: List<IncidentSyncEntry> = (incidents.map { it.incidentId } + events.map { it.entityId })
         .distinct().sorted().map { id ->
@@ -85,7 +142,7 @@ class IncidentSyncSnapshot(
 }
 
 interface IncidentSyncStore {
-    suspend fun snapshot(): IncidentSyncSnapshot
+    suspend fun snapshot(scope: IncidentSyncScope): IncidentSyncSnapshot
     suspend fun ingest(json: JSONObject): IncidentIngestionResult
     suspend fun replay(incidentId: String)
     suspend fun rebuild(incidentId: String)

@@ -210,15 +210,24 @@ class IncidentHelpWorkflow(
         val payload = runCatching { JSONObject(event.payloadJson) }.getOrNull() ?: return false
         val offer = payload.optString("offerId").takeIf { it.isNotBlank() }?.let { offers.getById(it) }
         val helperKey = payload.optString("helperKey")
-        if ((event.eventType == EventType.INCIDENT_OFFER_WITHDRAWN.name && offer == null) ||
-            (event.eventType in setOf(EventType.INCIDENT_LEAD_CONFIRMED.name,
-                EventType.INCIDENT_LEAD_DECLINED.name) && incident.selectedHelperKey == null)) {
+        if (event.eventType == EventType.INCIDENT_OFFER_WITHDRAWN.name && offer == null) {
             val historicalSelection = selectionEvent(incident, payload.optString("selectionId"))
             if (historicalSelection != null && selectionSupersededBy(incident, historicalSelection) != null) {
                 retainHistoricalDecision(event, incident, historicalSelection)
                 return false
             }
             if (!event.signature.isNullOrBlank()) defer()
+            return false
+        }
+        // A decision for a selection this replica no longer holds is history once that selection
+        // is known, and waits for it otherwise. Rejecting it would split replica histories forever.
+        // Unknown selections wait only for decisions signed by an offering helper; others are rejected,
+        // and a rejected event is re-validated if it arrives again.
+        if (event.eventType in HELPER_DECISIONS && payload.optString("selectionId") != incident.selectionId) {
+            if (payload.optString("selectionId").isBlank()) return false
+            val historicalSelection = selectionEvent(incident, payload.optString("selectionId"))
+            if (historicalSelection != null) retainHistoricalDecision(event, incident, historicalSelection)
+            else if (offers.getForIncident(incident.incidentId).any { signer.verify(event, it.helperKey) }) defer()
             return false
         }
         val actorKey = when (event.eventType) {
@@ -350,9 +359,9 @@ class IncidentHelpWorkflow(
                 if (incident.selectionId == target && target.isNotBlank()) {
                     updatedIncident = clearedSelection(incident).copy(version = event.logicalVersion, updatedAt = event.timestamp)
                 } else {
-                    val historicalSelection = selectionEvent(incident, target) ?: return false
-                    if (selectionSupersededBy(incident, historicalSelection) == null) return false
-                    // A reporter can revoke after offer invalidation; retain any newer selection.
+                    // A reporter can revoke after offer invalidation or a concurrent helper decline;
+                    // the revocation still consumes its version, and any newer selection is retained.
+                    selectionEvent(incident, target) ?: return false
                     updatedIncident = incident.copy(version = event.logicalVersion,
                         updatedAt = maxOf(incident.updatedAt, event.timestamp))
                 }

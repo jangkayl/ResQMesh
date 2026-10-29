@@ -18,6 +18,12 @@ import edu.cit.resqmesh.core.domain.repository.IncidentFeedRepository
 import edu.cit.resqmesh.core.domain.repository.LocalUserRepository
 import edu.cit.resqmesh.feature.incident.model.isReporter
 import edu.cit.resqmesh.core.logging.AppLogger
+import edu.cit.resqmesh.core.network.ratelimit.IncidentBudgetState
+import edu.cit.resqmesh.core.network.ratelimit.OutgoingIncidentBudget
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.channelFlow
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -30,13 +36,28 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.withContext
 
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 
 class IncidentViewModel(
     private val incidentRepository: IncidentFeedRepository,
     private val identityManager: LocalUserRepository,
-    private val cryptoDispatcher: CoroutineDispatcher = Dispatchers.Default
+    private val cryptoDispatcher: CoroutineDispatcher = Dispatchers.Default,
+    private val incidentBudget: OutgoingIncidentBudget = OutgoingIncidentBudget()
 ) : ViewModel() {
+
+    /** Report and offer pacing for the incident buttons. Ticks once a second only while a wait is pending. */
+    val budget: StateFlow<IncidentBudgetState> = channelFlow {
+        incidentBudget.refresh()
+        launch { incidentBudget.state.collect { send(it) } }
+        incidentBudget.state.map { it.reportWaitMs > 0 || it.offerWaitMs.isNotEmpty() }.distinctUntilChanged()
+            .collectLatest { waiting ->
+                while (waiting) {
+                    delay(BUDGET_TICK_MS)
+                    incidentBudget.refresh()
+                }
+            }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(BUDGET_STOP_TIMEOUT_MS), incidentBudget.state.value)
 
     val activeIncidents: StateFlow<List<Incident>> = incidentRepository.getActiveIncidents()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
@@ -216,6 +237,14 @@ class IncidentViewModel(
         }
     }
 
+    /** Opens an incident from a notification; ignored when it is not in the local feed. */
+    fun selectIncidentById(id: String) {
+        viewModelScope.launch {
+            incidentRepository.getAllIncidents().first().firstOrNull { it.incidentId == id }
+                ?.let { selectIncident(it) }
+        }
+    }
+
     fun createIncident(
         type: String,
         severity: String,
@@ -229,6 +258,11 @@ class IncidentViewModel(
         onSuccess: (Incident) -> Unit = {},
         onFailure: () -> Unit = {}
     ) {
+        // The Report button is disabled while paced; this guards a tap that races the countdown.
+        if (!incidentBudget.tryConsumeReport()) {
+            onFailure()
+            return
+        }
         viewModelScope.launch {
             try {
                 val incident = incidentRepository.createIncident(
@@ -245,6 +279,7 @@ class IncidentViewModel(
                 selectIncident(incident)
                 onSuccess(incident)
             } catch (_: Exception) {
+                incidentBudget.refundReport()
                 onFailure()
             }
         }
@@ -329,7 +364,23 @@ class IncidentViewModel(
     }
 
     fun clearActionMessage() { _actionMessage.value = null }
-    fun offerHelp(id: String, note: String) = perform("Offer") { incidentRepository.offerHelp(id, note) }
+    /** Offers and edits are paced per incident; withdrawing and lead decisions never are. */
+    fun offerHelp(id: String, note: String) {
+        if (_actionBusy.value) return
+        if (!incidentBudget.tryConsumeOffer(id)) {
+            _actionMessage.value = "Offer changes are paced. Try again in a few seconds."
+            return
+        }
+        perform("Offer") {
+            var applied = false
+            try {
+                applied = incidentRepository.offerHelp(id, note)
+            } finally {
+                if (!applied) incidentBudget.refundOffer(id)
+            }
+            applied
+        }
+    }
     fun withdrawOffer(id: String) = perform("Withdrawal") { incidentRepository.withdrawOffer(id) }
     fun selectLead(id: String, offerId: String) = perform("Selection") { incidentRepository.selectLead(id, offerId) }
     fun confirmLead(id: String) = perform("Confirmation") { incidentRepository.confirmLead(id) }
@@ -337,4 +388,9 @@ class IncidentViewModel(
     fun revokeLead(id: String) = perform("Revocation") { incidentRepository.revokeLead(id) }
     fun resolveHelp(id: String) = perform("Resolution") { incidentRepository.resolveHelp(id) }
     fun cancelHelp(id: String) = perform("Cancellation") { incidentRepository.cancelHelp(id) }
+
+    private companion object {
+        const val BUDGET_TICK_MS = 1_000L
+        const val BUDGET_STOP_TIMEOUT_MS = 5_000L
+    }
 }

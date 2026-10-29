@@ -34,6 +34,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import edu.cit.resqmesh.core.model.NodeIdentity
+import edu.cit.resqmesh.core.network.ratelimit.waitSeconds
 import edu.cit.resqmesh.core.ui.theme.SafetyOrange
 import edu.cit.resqmesh.core.ui.theme.SignalAmber
 import edu.cit.resqmesh.core.ui.theme.SignalGreen
@@ -71,6 +72,7 @@ fun IncidentListScreen(
     val offers by viewModel.offers.collectAsState()
     val actionMessage by viewModel.actionMessage.collectAsState()
     val actionBusy by viewModel.actionBusy.collectAsState()
+    val budget by viewModel.budget.collectAsState()
     val identity by viewModel.identityState.collectAsState()
     val localUser = identity.user
     val offersByIncident by viewModel.offersByIncident.collectAsState()
@@ -362,6 +364,7 @@ fun IncidentListScreen(
                 onDismiss = { showCreateSheet = false },
                 submissionError = createError,
                 isSubmitting = isCreating,
+                reportWaitSeconds = waitSeconds(budget.reportWaitMs),
                 onSubmit = { title, type, severity, desc, area, lat, lng, time, acc ->
                     isCreating = true
                     createError = null
@@ -429,6 +432,7 @@ fun IncidentListScreen(
                     leadReachability = leadReachability,
                     actionBusy = actionBusy,
                     actionMessage = actionMessage,
+                    offerWaitSeconds = waitSeconds(budget.offerWaitMs(inc.incidentId)),
                     onOffer = { viewModel.offerHelp(inc.incidentId, it) },
                     onWithdrawOffer = { viewModel.withdrawOffer(inc.incidentId) },
                     onSelectLead = { viewModel.selectLead(inc.incidentId, it) },

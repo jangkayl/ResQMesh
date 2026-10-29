@@ -13,11 +13,15 @@ class NavigationRequestParserTest {
         sos: Boolean = false,
         map: Boolean = false,
         text: String? = null,
-        id: String? = null,
-        chat: String? = null
-    ) = NavigationRequestParser.RawExtras(
-        triggerSos = sos, viewSosMap = map, text = text, sosId = id, chatNode = chat
-    )
+        id: String? = null
+    ) = NavigationRequestParser.RawExtras(triggerSos = sos, viewSosMap = map, text = text, sosId = id)
+
+    private fun sosWith(chatNode: String? = null, incidentId: String? = null) =
+        NavigationRequestParser.RawExtras(triggerSos = true, chatNode = chatNode, incidentId = incidentId)
+
+    private fun chat(node: String) = NavigationRequestParser.RawExtras(chatNode = node)
+
+    private fun incident(id: String) = NavigationRequestParser.RawExtras(incidentId = id)
 
     @Test fun noExtrasYieldsNoRequest() = assertNull(parse())
 
@@ -34,14 +38,26 @@ class NavigationRequestParserTest {
     }
 
     @Test fun chatRequiresNodeIdSuffix() {
-        assertEquals(NavigationRequest.OpenChat("Ann [R]#AB12"), parse(extras(chat = "Ann [R]#AB12")))
-        assertNull(parse(extras(chat = "Ann")))
-        assertNull(parse(extras(chat = "Ann#")))
-        assertNull(parse(extras(chat = "Ann#bad id!")))
-        assertNull(parse(extras(chat = "  ")))
+        assertEquals(NavigationRequest.OpenChat("Ann [R]#AB12"), parse(chat("Ann [R]#AB12")))
+        assertNull(parse(chat("Ann")))
+        assertNull(parse(chat("Ann#")))
+        assertNull(parse(chat("Ann#bad id!")))
+        assertNull(parse(chat("  ")))
     }
 
     @Test fun sosTakesPrecedenceOverChat() {
-        assertTrue(parse(extras(sos = true, chat = "Ann#AB12")) is NavigationRequest.OpenSos)
+        assertTrue(parse(sosWith(chatNode = "Ann#AB12")) is NavigationRequest.OpenSos)
+    }
+
+    @Test fun incidentRequiresSafeId() {
+        assertEquals(NavigationRequest.OpenIncident("a1-B2_c.3:4"), parse(incident(" a1-B2_c.3:4 ")))
+        assertNull(parse(incident("a b;<x>")))
+        val capped = NavigationRequest.OpenIncident("x".repeat(NavigationRequestParser.MAX_SOS_ID))
+        assertEquals(capped, parse(incident("x".repeat(200))))
+        assertNull(parse(incident("  ")))
+    }
+
+    @Test fun sosTakesPrecedenceOverIncident() {
+        assertTrue(parse(sosWith(incidentId = "inc-1")) is NavigationRequest.OpenSos)
     }
 }

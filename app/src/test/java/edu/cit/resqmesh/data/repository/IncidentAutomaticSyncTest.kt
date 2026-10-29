@@ -62,7 +62,7 @@ class IncidentAutomaticSyncTest {
         val links = mutableMapOf<String, Long>()
         val peers = MeshReadyPeerEvents()
         val incidents = IncidentEntityFakeDao()
-        val events = DomainEventEntityFakeDao()
+        val events = DomainEventEntityFakeDao(incidents)
         val offers = MemoryOffers()
         val callbacks = mutableMapOf<String, Any?>()
         val gateway = Proxy.newProxyInstance(MeshNetworkGateway::class.java.classLoader,
@@ -283,6 +283,121 @@ class IncidentAutomaticSyncTest {
         assertEquals(a.snapshot().stateRoot, b.snapshot().stateRoot)
     }
 
+    private suspend fun Node.age(incidentId: String, ageMs: Long) {
+        val incident = incidents.getIncidentById(incidentId)!!
+        val then = System.currentTimeMillis() - ageMs
+        incidents.insertOrUpdate(incident.copy(createdAt = then, updatedAt = then))
+    }
+
+    @Test fun newPhoneGetsOpenAndRecentlyClosedIncidentsButNotOldClosedOnes() = runTest {
+        val radio = Radio(backgroundScope); val a = Node("A", radio); val b = Node("B", radio)
+        val oldOpen = a.create(); a.age(oldOpen.incidentId, 3 * DAY)
+        val oldClosed = a.create(); assertTrue(a.repo.cancelHelp(oldClosed.incidentId))
+        a.age(oldClosed.incidentId, 2 * DAY)
+        val recentClosed = a.create(); assertTrue(a.repo.cancelHelp(recentClosed.incidentId))
+        runCurrent() // flush the offline broadcasts before the phones meet
+        radio.connect(a, b); settle(60_000)
+        assertNotNull(b.incidents.getIncidentById(oldOpen.incidentId))
+        assertNotNull(b.incidents.getIncidentById(recentClosed.incidentId))
+        assertNull(b.incidents.getIncidentById(oldClosed.incidentId))
+        assertEquals(a.snapshot().historyRoot, b.snapshot().historyRoot)
+    }
+
+    @Test fun newPhoneReceivesAtMostTheNewestHundredIncidents() = runTest {
+        val radio = Radio(backgroundScope); val a = Node("A", radio); val b = Node("B", radio)
+        repeat(130) { a.create() }
+        runCurrent() // flush the offline broadcasts before the phones meet
+        radio.connect(a, b); settle(300_000)
+        assertEquals(IncidentSyncScope.MAX_INCIDENTS, b.incidents.getSyncIncidents().size)
+        assertEquals(a.snapshot().historyRoot, b.snapshot().historyRoot)
+        assertEquals(a.snapshot().stateRoot, b.snapshot().stateRoot)
+    }
+
+    @Test fun liveBurstIsPacedButCatchUpSyncDeliversEverything() = runTest {
+        val radio = Radio(backgroundScope); val a = Node("A", radio); val b = Node("B", radio)
+        radio.connect(a, b); settle()
+        radio.drop = { _, _, p -> p.type.startsWith("EVENT_SYNC") } // live path only
+        repeat(6) { a.create() }
+        runCurrent()
+        assertEquals(4, b.incidents.getSyncIncidents().size) // receiver burst of 4 per reporter key
+        radio.drop = { _, _, _ -> false }
+        settle(60_000)
+        assertEquals(6, b.incidents.getSyncIncidents().size)
+        assertEquals(a.snapshot().historyRoot, b.snapshot().historyRoot)
+    }
+
+    @Test fun futureDatedEventIsRejectedWithoutBeingStored() = runTest {
+        val radio = Radio(backgroundScope); val a = Node("A", radio); val b = Node("B", radio)
+        val incident = a.create()
+        val event = a.events.getEventsForEntity(incident.incidentId).single()
+        val future = event.copy(eventId = "future", entityId = "future-incident",
+            timestamp = System.currentTimeMillis() + 60 * 60 * 1000, signature = null)
+        val signed = future.copy(signature = a.signer.sign(future))
+        assertEquals(IncidentIngestionResult.REJECTED, b.repo.ingestIncomingEvent(signed))
+        assertNull(b.events.getEventById("future"))
+    }
+
+    @Test fun liveWithdrawalIsNeverPacedAfterTheOfferBurst() = runTest {
+        val radio = Radio(backgroundScope); val a = Node("A", radio); val b = Node("B", radio)
+        val incident = a.create(); radio.connect(a, b); settle()
+        radio.drop = { _, _, p -> p.type.startsWith("EVENT_SYNC") } // live path only
+        repeat(6) { assertTrue(b.repo.offerHelp(incident.incidentId, "note $it")); runCurrent() }
+        assertEquals(6L, a.offers.getForIncident(incident.incidentId).single().revision)
+        assertTrue(b.repo.withdrawOffer(incident.incidentId)); runCurrent()
+        assertTrue(a.offers.getForIncident(incident.incidentId).single().withdrawn)
+    }
+
+    @Test fun forgedLiveCreationNeverSpendsTheVictimsBudget() = runTest {
+        val radio = Radio(backgroundScope); val a = Node("A", radio); val b = Node("B", radio)
+        radio.connect(a, b); settle()
+        val real = a.create(); runCurrent()
+        val event = a.events.getEventsForEntity(real.incidentId).single()
+        repeat(10) {
+            val forged = IncidentSyncSnapshot.eventJson(
+                event.copy(eventId = "forged-$it", entityId = "fake-$it", signature = "bad"))
+            @Suppress("UNCHECKED_CAST")
+            val deliver = b.callbacks["onDomainEvent"] as (String, MeshPayload) -> Unit
+            deliver("A", MeshPayload(id = "f$it", type = "DOMAIN_EVENT",
+                senderName = "A#A", senderNodeId = "A", text = forged.toString()))
+        }
+        runCurrent()
+        radio.drop = { _, _, p -> p.type.startsWith("EVENT_SYNC") }
+        repeat(3) { a.create() }
+        runCurrent()
+        assertEquals(4, b.incidents.getSyncIncidents().size)
+    }
+
+    @Test fun concurrentDeclineAndRevocationWhileApartConverge() = runTest {
+        val radio = Radio(backgroundScope); val a = Node("A", radio); val b = Node("B", radio)
+        val incident = a.create(); radio.connect(a, b); settle()
+        assertTrue(b.repo.offerHelp(incident.incidentId, "Nearby")); settle()
+        val offer = a.offers.getForIncident(incident.incidentId).single()
+        assertTrue(a.repo.selectLead(incident.incidentId, offer.offerId)); settle()
+        assertEquals("AWAITING_HELPER", b.incidents.getIncidentById(incident.incidentId)?.status)
+        radio.disconnect(a, b); runCurrent()
+        assertTrue(b.repo.declineLead(incident.incidentId))
+        assertTrue(a.repo.revokeLead(incident.incidentId))
+        radio.connect(a, b); settle(90_000)
+        assertEquals(a.incidents.getIncidentById(incident.incidentId), b.incidents.getIncidentById(incident.incidentId))
+        assertEquals(0, a.snapshot().pending); assertEquals(0, b.snapshot().pending)
+        assertEquals(a.snapshot().historyRoot, b.snapshot().historyRoot)
+        assertEquals(a.snapshot().stateRoot, b.snapshot().stateRoot)
+    }
+
+    @Test fun readyNotificationReconcilesSameEndpointReconnectBeforePeriodicCheck() = runTest {
+        val radio = Radio(backgroundScope); val a = Node("A", radio); val b = Node("B", radio)
+        a.create(); radio.drop = { _, _, _ -> true }; radio.connect(a, b); settle(1_000)
+        // Same endpoint, new link generation; the READY list is unchanged so the state flow stays silent.
+        a.links["B"] = ++radio.epoch; b.links["A"] = radio.epoch
+        radio.drop = { _, _, _ -> false }
+        a.peers.publish(ConnectedDevice("B", "B#B", nodeId = "B", isPayloadReady = true))
+        b.peers.publish(ConnectedDevice("A", "A#A", nodeId = "A", isPayloadReady = true))
+        settle(8_000)
+        assertEquals(a.snapshot().historyRoot, b.snapshot().historyRoot)
+    }
+
+    private companion object { const val DAY = 24L * 60 * 60 * 1000 }
+
     private class MemoryOffers : IncidentOfferDao {
         val rows = mutableMapOf<String, IncidentOfferEntity>()
         val flow = MutableStateFlow<List<IncidentOfferEntity>>(emptyList())
@@ -290,6 +405,9 @@ class IncidentAutomaticSyncTest {
         override fun observeAllActiveOffers() = flow.map { it.filter { o -> !o.withdrawn } }
         override suspend fun getForIncident(incidentId: String) = rows.values.filter { it.incidentId == incidentId }
         override suspend fun getById(offerId: String) = rows[offerId]
+        override suspend fun getForIncidents(incidentIds: List<String>) =
+            rows.values.filter { it.incidentId in incidentIds }
+            .sortedWith(compareBy<IncidentOfferEntity> { it.incidentId }.thenBy { it.offerId })
         override suspend fun getByHelper(incidentId: String, helperKey: String) = rows.values.firstOrNull { it.incidentId == incidentId && it.helperKey == helperKey }
         override suspend fun deleteForIncident(incidentId: String): Int {
             val ids = getForIncident(incidentId).map { it.offerId }; ids.forEach { rows.remove(it) }; flow.value = rows.values.toList(); return ids.size

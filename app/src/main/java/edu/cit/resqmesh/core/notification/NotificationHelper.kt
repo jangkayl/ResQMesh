@@ -20,6 +20,7 @@ class NotificationHelper(private val context: Context) {
 
     private val channelId = "resqmesh_private_messages_v2"
     private val emergencyChannelId = "resqmesh_emergency_v4"
+    private val incidentChannelId = "resqmesh_incidents_v1"
 
     // Bounded message history per sender (max 7 messages) for Android MessagingStyle notifications
     private data class NotificationMessage(
@@ -70,6 +71,17 @@ class NotificationHelper(private val context: Context) {
                 setSound(alarmSound, audioAttributes)
             }
             notificationManager.createNotificationChannel(emergencyChannel)
+
+            // 3. Incident alerts: separate from SOS so users can tune them independently
+            val incidentChannel = NotificationChannel(
+                incidentChannelId,
+                "Incident alerts",
+                NotificationManager.IMPORTANCE_HIGH
+            ).apply {
+                description = "Serious incidents and updates on incidents you report or lead"
+                setShowBadge(true)
+            }
+            notificationManager.createNotificationChannel(incidentChannel)
         }
     }
 
@@ -212,6 +224,42 @@ class NotificationHelper(private val context: Context) {
             e.printStackTrace()
         }
     }
+
+    /**
+     * Shows or replaces the single notification for an incident. [quietUpdate] suppresses
+     * sound and vibration when replacing an earlier alert.
+     */
+    fun showIncidentNotification(incidentId: String, title: String, text: String, quietUpdate: Boolean = false) {
+        if (!NotificationManagerCompat.from(context).areNotificationsEnabled()) return
+        val openIntent = Intent(context, NotificationRouterActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
+            putExtra("EXTRA_OPEN_INCIDENT", incidentId)
+        }
+        val pendingIntent = PendingIntent.getActivity(
+            context,
+            ("incident_open_$incidentId").hashCode(),
+            openIntent,
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+        )
+        val builder = NotificationCompat.Builder(context, incidentChannelId)
+            .setSmallIcon(R.drawable.resqmesh_logo)
+            .setContentTitle(title)
+            .setContentText(text)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(text))
+            .setPriority(if (quietUpdate) NotificationCompat.PRIORITY_LOW else NotificationCompat.PRIORITY_HIGH)
+            .setCategory(NotificationCompat.CATEGORY_STATUS)
+            .setAutoCancel(true)
+            .setOnlyAlertOnce(quietUpdate)
+            .setContentIntent(pendingIntent)
+            .setColor(0xFFFF5A00.toInt())
+        try {
+            NotificationManagerCompat.from(context).notify("incident_$incidentId", 2, builder.build())
+        } catch (e: SecurityException) {
+            e.printStackTrace()
+        }
+    }
+
+    fun clearIncident(id: String) { NotificationManagerCompat.from(context).cancel("incident_$id", 2) }
 
     fun clearSos(id: String) { NotificationManagerCompat.from(context).cancel("sos_$id", 1) }
 

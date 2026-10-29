@@ -69,7 +69,8 @@ fun IncidentDetailSheet(
     onViewLocation: (Double, Double, String, String) -> Unit,
     identityLoading: Boolean = localUserId == null,
     identityError: String? = null,
-    onDirectChat: (String) -> Unit = {}
+    onDirectChat: (String) -> Unit = {},
+    offerWaitSeconds: Int = 0
 ) {
     val presentation = remember(incident, offers, localUserId, localSigningKey, events, identityLoading, identityError) {
         incidentPresentation(incident, offers, localUserId, localSigningKey, events, identityLoading, identityError)
@@ -406,6 +407,7 @@ fun IncidentDetailSheet(
                 initialNote = offerDraftNote,
                 isEditing = presentation.myOffer != null,
                 actionBusy = actionBusy,
+                waitSeconds = offerWaitSeconds,
                 onDismiss = { showOfferSheet = false },
                 onSubmit = { note ->
                     onOffer(note)

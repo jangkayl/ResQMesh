@@ -107,11 +107,21 @@ class ClassScopedCooldownTest {
         assertEquals(Decision.CooldownStarted, limiter.check(origin, trafficClass))
     }
 
-    @Test fun chatCooldownDoesNotBlockPresenceOrSync() {
+    @Test fun chatCooldownDoesNotBlockPresenceOrIncidents() {
         coolDown("o", TrafficClass.CHAT)
         assertEquals(Decision.CoolingDown, limiter.check("o", TrafficClass.CHAT))
         assertEquals(Decision.Allowed, limiter.check("o", TrafficClass.PRESENCE))
-        assertEquals(Decision.Allowed, limiter.check("o", TrafficClass.SYNC_REQUEST))
+        assertEquals(Decision.Allowed, limiter.check("o", TrafficClass.INCIDENT_NEW))
+    }
+
+    @Test fun incidentClassesDropWithoutEverCoolingDown() {
+        repeat(4) { assertEquals(Decision.Allowed, limiter.check("k", TrafficClass.INCIDENT_NEW)) }
+        repeat(10) { assertEquals(Decision.Dropped, limiter.check("k", TrafficClass.INCIDENT_NEW)) }
+        now += 20_000 // one token at 3/min
+        assertEquals(Decision.Allowed, limiter.check("k", TrafficClass.INCIDENT_NEW))
+        repeat(6) { assertEquals(Decision.Allowed, limiter.check("k|inc", TrafficClass.OFFER_CHANGE)) }
+        assertEquals(Decision.Dropped, limiter.check("k|inc", TrafficClass.OFFER_CHANGE))
+        assertEquals(Decision.Allowed, limiter.check("k|other", TrafficClass.OFFER_CHANGE))
     }
 
     @Test fun presenceCooldownDoesNotBlockChat() {

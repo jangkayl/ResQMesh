@@ -30,12 +30,19 @@ class InboundOriginGate(
         val origin = originOf(payload, endpointId)
         val trafficClass = classify(payload)
         val direct = isDirect(payload)
+        // Sync requests are never rate limited (a dropped request stalls the requester for its whole
+        // timeout); they are hop-by-hop, so only a direct request from the link's own peer is served.
+        val sync = payload.type in SYNC_REQUEST_TYPES
+        val mismatch = direct && !admittedNodeId.isNullOrBlank() && !admittedNodeId.equals(origin, ignoreCase = true)
         return when {
-            trafficClass == TrafficClass.OTHER || isExempt(origin, payload, myNodeId) -> true
-            direct && !admittedNodeId.isNullOrBlank() && !admittedNodeId.equals(origin, ignoreCase = true) -> {
+            sync && !direct -> false
+            trafficClass == TrafficClass.OTHER && !sync -> true
+            // Checked before the self-origin exemption, so claiming this phone's own id cannot skip limits.
+            mismatch -> {
                 logMismatch(endpointId, payload)
                 false
             }
+            sync || isExempt(origin, payload, myNodeId) -> true
             // A direct payload from the link's admitted peer is authenticated by the link; anything
             // else is only a claim and is tracked per ingress endpoint.
             else -> charge(endpointId, payload, origin, trafficClass, direct && !admittedNodeId.isNullOrBlank())
@@ -127,7 +134,6 @@ class InboundOriginGate(
 
     private fun classify(payload: MeshPayload): TrafficClass = when (payload.type) {
         "MESSAGE", "CONVERSATION" -> TrafficClass.CHAT
-        "SOS_SYNC_REQ", "EVENT_SYNC_REQ" -> TrafficClass.SYNC_REQUEST
         // PING/PONG are per-link liveness probes (link shaping only), not origin presence.
         "SYSTEM" -> TrafficClass.PRESENCE
         // SOS_EVENT is charged after signature verification (admitVerifiedSos).
@@ -140,3 +146,6 @@ class InboundOriginGate(
         const val LOG_INTERVAL_MS = 5_000L
     }
 }
+
+
+private val SYNC_REQUEST_TYPES = setOf("SOS_SYNC_REQ", "EVENT_SYNC_REQ")

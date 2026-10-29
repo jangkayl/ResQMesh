@@ -49,13 +49,13 @@ TOFU first-contact authentication, out-of-band verification, authenticated E2EE 
 ## Repository, persistence and feature ownership
 
 MeshRepository joins callbacks, routing, persistence and UI. MeshNetworkGateway hides Bluetooth; MessageStore hides Room; PrivateDeliveryPlanner selects exact hops. Koin supplies adapters; AppCoroutineScope owns background work. MeshNetworkEventBinder binds the same 23 callbacks/providers once in repository init; named private repository handlers retain policy. Bindings survive stop/start or radio suspension. NativeBleGateway has a separate adapter file. Payload handlers are grouped by presence, delivery, link control, audio and incident events under dispatch/. Transport-state changes clear readiness/rooted routes; route checks use actual paths and direct loss preserves alternatives.
-Phase B inbound order (`feat/security-phase-b`): link shaping, codec, decode, validator, dedup, InboundOriginGate, handler. SOS is limited after signature checks; GOODBYE is never relayed ([plan](plans/security-hardening.md)).
+Phase B inbound order: link shaping, codec, decode, validator, dedup, InboundOriginGate, handler. SOS is limited after signature checks; sync is unlimited (direct peer only); live incident broadcasts are paced; GOODBYE is never relayed ([plan](plans/security-hardening.md)).
 
 Public sends persist pending before dispatch. Per-neighbor acceptance, wholly rejected retries, partial feedback and a serialized flush avoid whole-broadcast retries after acceptance. Acceptance is never recipient delivery.
 
 Room 11 stores explicit Community/Radio/SOS destinations. History/drafts/unread stay scoped; off-channel Radio stores silently and monitoring plays only new selected-channel notes. Retries retain destinations. Migration 10→11 hides legacy unscoped SOS/audio without deleting records.
 
-Incidents use stable reporter/helper authority, signed prerequisites and transactional projections. Withdrawal/offline offer changes reopen selection without advancing reporter versions or choosing replacements. IncidentSyncCoordinator compares history/state hashes on READY, changes and a 30-second (±3 s jitter) backstop; missing dependencies block completion. Room 9→10 separates validation/application. IncidentCommands coordinates actions; IncidentEventIngestor owns the single projection mutex/rebuilding flag with existing help replay/Room lock order. LegacyIncidentProjection, LegacyIncidentSync and IncidentEventCodec retain legacy compatibility; help workflow and modern sync keep their existing owners.
+Incidents use stable reporter/helper authority, signed prerequisites and transactional projections. Withdrawal/offline offer changes reopen selection without advancing reporter versions. IncidentSyncCoordinator (protocol 3) compares cached hashes over the requester's scope (open plus 24 h closures, max 100) on READY, changes and every 30 seconds; missing dependencies block completion. Out-of-order help events defer or become history; rejections are re-validated. IncidentEventIngestor owns projection mutex/rebuild flag; legacy classes stay compatible.
 
 SosRepository stores signed revisioned snapshots and terminal records atomically. Alert IDs include signing-key namespaces; updates/end require that key. SOS ignores tuning. Creation/end relay urgently with TTL/hop bounds; rejected origin sends remain pending. SosSyncCoordinator reconciles bounded snapshots on READY/changes and every 30 seconds with jitter; confirmation belongs to the named neighbor/snapshot. Receiver silence is local; independent sirens stop within 30 seconds. Sender Back preserves SOS; creation cancellation returns to the hub. Cached timestamps must be positive and under 15 minutes; header fallback time never proves GPS freshness.
 
@@ -63,11 +63,11 @@ Presentation screens retain state/effects/launchers and scopes; visual sections 
 
 ## Maps, notifications and sessions
 
-MapLibre renders versioned local PMTiles. Signed manifests use P-256 verification with Ed25519 fallback, hash/completion checks and atomic activation. Private notifications use MessagingStyle; SOS uses CATEGORY_ALARM. Cold launches retain setup gates.
+MapLibre renders versioned local PMTiles. Signed manifests use P-256 verification with Ed25519 fallback, hash/completion checks and atomic activation. Private notifications use MessagingStyle; SOS uses CATEGORY_ALARM. Incident alerts follow D28. Cold launches retain setup gates.
 
 `LocationPreferences` gates foreground-only tracking (default on); excluded SOS location sends no coordinates or refine. MeshSessionController owns start/stop. Opt-in MeshForegroundService is a non-sticky connectedDevice anchor with a silent, debounced notification; no boot receiver or wake lock. Go offline stops radio/service. Unexpected service destruction stops transport; disabled background mode stops on activity destruction except configuration changes.
 
-[Structural scope and remaining candidates](../archive/docs-superseded-2026-10-16/plans/network-maintainability-refactor.md) records completed ownership extractions, final-candidate user-reported phone passes and unresolved automated checks.
+[Structural scope and remaining candidates](../archive/docs-superseded-2026-10-16/plans/network-maintainability-refactor.md) records extractions, phone passes and open checks.
 
 ## Evidence and source navigation
 

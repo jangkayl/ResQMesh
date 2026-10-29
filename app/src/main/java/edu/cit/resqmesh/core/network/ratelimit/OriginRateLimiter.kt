@@ -21,11 +21,13 @@ class OriginRateLimiter(
     fun check(originNodeId: String, trafficClass: TrafficClass): Decision {
         val spec = policy.bucketSpec(trafficClass)
         if (spec == null) return Decision.Allowed
-        // SOS classes are only ever limited by their own buckets: a cooldown never blocks them.
-        val isSos = trafficClass == TrafficClass.SOS_NEW || trafficClass == TrafficClass.SOS_UPDATE
+        // SOS and incident creation classes are only ever limited by their own buckets: a cooldown never
+        // blocks them, and a dropped live event is recovered by catch-up sync once the bucket refills.
+        val bucketOnly = trafficClass in BUCKET_ONLY
         return when {
-            !isSos && penalties.isCoolingDown(originNodeId, trafficClass) -> Decision.CoolingDown
+            !bucketOnly && penalties.isCoolingDown(originNodeId, trafficClass) -> Decision.CoolingDown
             tryConsume(originNodeId, trafficClass, spec) -> Decision.Allowed
+            trafficClass == TrafficClass.INCIDENT_NEW || trafficClass == TrafficClass.OFFER_CHANGE -> Decision.Dropped
             penalties.recordViolation(originNodeId, trafficClass) -> Decision.CooldownStarted
             else -> Decision.Dropped
         }
@@ -41,5 +43,10 @@ class OriginRateLimiter(
     fun forget(originNodeId: String) {
         synchronized(buckets) { buckets.remove(originNodeId) }
         penalties.forget(originNodeId)
+    }
+
+    private companion object {
+        val BUCKET_ONLY = setOf(TrafficClass.SOS_NEW, TrafficClass.SOS_UPDATE,
+            TrafficClass.INCIDENT_NEW, TrafficClass.OFFER_CHANGE)
     }
 }
