@@ -108,13 +108,11 @@ val ResQSlate200 = Color(0xFFE4E1DC)
 val ResQSlate100 = Color(0xFFF2EFEA)
 val ResQSlate50 = Color(0xFFFAF8F5)
 
-val InboxBackground = Color(0xFF101012)
 val InboxSurface = Color(0xFF19191C)
 val InboxDivider = Color(0xFF303036)
 val InboxTextPrimary = Color(0xFFF8F7F5)
 val InboxTextSecondary = Color(0xFFA09E9B)
 
-val InboxAccentBlue = SafetyOrange
 val InboxActiveTab = Color(0xFF242429)
 
 val SuccessGreen = Color(0xFF10B981)

@@ -36,7 +36,7 @@ private enum class TerminalFilter(val label: String) {
 }
 
 @Composable
-fun DebugTerminal(onOpenRadar: (() -> Unit)? = null) {
+fun DebugTerminal() {
     val isVisible by AppLogger.isTerminalVisible.collectAsState()
     if (!isVisible) return
 
@@ -109,8 +109,7 @@ fun DebugTerminal(onOpenRadar: (() -> Unit)? = null) {
                 showVerbose = showVerbose,
                 onVerboseToggle = { showVerbose = !showVerbose },
                 onClear = { AppLogger.clear(); unseenCount = 0 },
-                onClose = AppLogger::hideTerminal,
-                onOpenRadar = onOpenRadar
+                onClose = AppLogger::hideTerminal
             )
 
             Divider(color = TerminalGreen.copy(alpha = 0.5f), thickness = 1.dp)
@@ -207,8 +206,7 @@ private fun TerminalHeader(
     showVerbose: Boolean,
     onVerboseToggle: () -> Unit,
     onClear: () -> Unit,
-    onClose: () -> Unit,
-    onOpenRadar: (() -> Unit)? = null
+    onClose: () -> Unit
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -231,20 +229,6 @@ private fun TerminalHeader(
             )
         }
         Row(verticalAlignment = Alignment.CenterVertically) {
-            if (onOpenRadar != null) {
-                Text(
-                    text = "RADAR",
-                    color = TerminalGreen,
-                    fontFamily = FontFamily.Monospace,
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier
-                        .border(1.dp, TerminalGreen, RoundedCornerShape(4.dp))
-                        .clickable(onClick = onOpenRadar)
-                        .padding(horizontal = 6.dp, vertical = 4.dp)
-                )
-                Spacer(Modifier.width(6.dp))
-            }
             Text(
                 text = if (showVerbose) "DETAILS ON" else "DETAILS",
                 color = TerminalGreen,

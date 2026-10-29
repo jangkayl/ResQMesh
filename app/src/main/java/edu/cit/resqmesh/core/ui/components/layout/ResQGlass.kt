@@ -105,25 +105,6 @@ fun ResQAuroraBackground(
     )
 }
 
-/** A focused, solid emergency canvas. Red is reserved for actual SOS and failure flows. */
-@Composable
-fun ResQSosBackground(
-    modifier: Modifier = Modifier,
-    contentAlignment: Alignment = Alignment.TopStart,
-    content: @Composable BoxScope.() -> Unit
-) {
-    val colors = ResQTheme.colors
-    val background = MaterialTheme.colorScheme.background
-    Box(
-        modifier = modifier.drawBehind {
-            drawRect(brush = Brush.verticalGradient(listOf(colors.sosContainer, background)))
-            drawCircle(colors.sos.copy(alpha = 0.08f), size.minDimension * 0.72f, Offset(size.width * 0.5f, size.height * 0.08f))
-        },
-        contentAlignment = contentAlignment,
-        content = content
-    )
-}
-
 @Composable
 fun ResQGradientOrb(
     modifier: Modifier = Modifier,
