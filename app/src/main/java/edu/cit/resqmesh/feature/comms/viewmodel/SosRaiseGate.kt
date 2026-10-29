@@ -1,22 +1,18 @@
 package edu.cit.resqmesh.feature.comms.viewmodel
 
+import edu.cit.resqmesh.core.model.SosRaiseCharge
 import edu.cit.resqmesh.core.network.ratelimit.OutgoingSosBudget
 
 /**
- * Admits a call to raise an SOS. Only a NEW raise (no own active SOS) takes a token; reopening the active SOS
- * is never gated, and ending or refining never reaches this gate at all.
+ * The sender budget as the repository's charge hook. The repository calls [tryCharge] under its lock only when
+ * it will really create a new sosId, so a reopen of the active SOS never spends a token and a genuine new raise
+ * is never skipped. Ending and refining never reach it.
  */
-class SosRaiseGate(val budget: OutgoingSosBudget, private val hasActiveOwnSos: () -> Boolean) {
-    enum class Admission { REOPEN, NEW_RAISE, NO_BUDGET }
+class SosRaiseGate(val budget: OutgoingSosBudget) : SosRaiseCharge {
+    override fun tryCharge(): Boolean = budget.tryConsume()
 
-    fun admit(): Admission = when {
-        hasActiveOwnSos() -> Admission.REOPEN
-        !budget.tryConsume() -> Admission.NO_BUDGET
-        else -> Admission.NEW_RAISE
-    }
-
-    /** Returns the token of an admitted new raise whose create failed. */
-    fun refund() = budget.refund()
+    /** Returns the token of a new raise whose creation failed. */
+    override fun refund() = budget.refund()
 
     /** Feedback for a refused raise, such as "SOS available in 42 seconds". */
     fun waitMessage(): String {

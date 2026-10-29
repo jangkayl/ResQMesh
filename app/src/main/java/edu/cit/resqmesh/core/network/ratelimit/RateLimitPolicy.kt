@@ -19,9 +19,10 @@ data class RateLimitPolicy(
     // Sender-side pacing for raising a new SOS: 3 back to back, then one per minute.
     val sosSendPerMin: Double = 1.0,
     val sosSendBurst: Double = 3.0,
-    // Not fixed by the plan: updates to an existing SOS are chattier than new alerts but still bounded.
+    // Not fixed by the plan: updates are chattier than new alerts but bounded. Burst 10 covers the sender's 3 raises
+    // with a refine each plus ends (ends of a known SOS are exempt, see SosRepository.ingest).
     val sosUpdatePerMin: Double = 6.0,
-    val sosUpdateBurst: Double = 3.0,
+    val sosUpdateBurst: Double = 10.0,
     val syncRequestPerMin: Double = 6.0,
     val syncRequestBurst: Double = 3.0,
     val presencePerMin: Double = 30.0,

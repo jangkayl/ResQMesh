@@ -26,6 +26,7 @@ import edu.cit.resqmesh.core.domain.usecase.messaging.SendPrivateChatMessageUseC
 import edu.cit.resqmesh.core.domain.usecase.sos.RaiseSosUseCase
 import edu.cit.resqmesh.core.network.ratelimit.ChatBudgetState
 import edu.cit.resqmesh.core.network.ratelimit.OutgoingChatBudget
+import edu.cit.resqmesh.core.model.SosRaiseResult
 import edu.cit.resqmesh.core.network.ratelimit.OutgoingSosBudget
 import edu.cit.resqmesh.core.network.ratelimit.SosBudgetState
 import edu.cit.resqmesh.core.security.input.TextField
@@ -83,7 +84,7 @@ class CommunicationViewModel(
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(BUDGET_STOP_TIMEOUT_MS), chatBudget.state.value)
 
-    private val sosGate = SosRaiseGate(sosBudget) { sosRepository.ownActive.value != null }
+    private val sosGate = SosRaiseGate(sosBudget)
 
     /** SOS raise budget for the hub button. Ticks once a second only while collected and not full. */
     val sosBudgetState: StateFlow<SosBudgetState> = channelFlow {
@@ -246,24 +247,24 @@ class CommunicationViewModel(
 
     fun sendEmergencySOS(sosType: String, onCreated: (String) -> Unit = {}) {
         if (creatingSos) return
-        val admission = sosGate.admit()
-        if (admission == SosRaiseGate.Admission.NO_BUDGET) {
-            sosErrors.tryEmit(sosGate.waitMessage())
-            return
-        }
         creatingSos = true
         val generation = ++sosLocationGeneration
         viewModelScope.launch {
-            var created = false
             try {
-                val id = raiseSos(sosType)
-                created = true
+                // The repository charges the budget under its lock, only when it creates a new sosId.
+                val id = when (val result = raiseSos.raise(sosType, sosGate)) {
+                    is SosRaiseResult.Created -> result.id
+                    is SosRaiseResult.Reopened -> result.id
+                    SosRaiseResult.Throttled -> {
+                        sosErrors.emit(sosGate.waitMessage())
+                        return@launch
+                    }
+                }
                 onCreated(id)
                 raiseSos.refineLocation(id, isCurrent = { generation == sosLocationGeneration }) { update ->
                     viewModelScope.launch { update() }
                 }
             } catch (e: Exception) {
-                if (admission == SosRaiseGate.Admission.NEW_RAISE && !created) sosGate.refund()
                 if (e is kotlinx.coroutines.CancellationException) throw e
                 sosErrors.emit("Could not complete SOS sending. Check SOS alerts before trying again.")
             } finally { creatingSos = false }

@@ -56,7 +56,7 @@ As built, these changed from the outline:
 - Validator text and ciphertext caps equal the frame cap, so long voice notes still fit.
 - Outgoing chat follows a shared sender budget of 20 (refill 20/min) that composers show; the receiver burst is 25, a 5-message margin for BLE queue bunching.
 - Raising a new SOS follows a sender budget of 3 (refill 1/min, `OutgoingSosBudget`) that the SOS hub button shows ("Wait N s", and a message when pressed). The receiver `SOS_NEW` limit is burst 4, refill 1/min, charged only for revision 1 of an unknown `sosId`; a refine or end that arrives first is charged as an update. Ending, refining and reopening the active SOS are never gated.
-- An SOS that arrives by sync (missed live), is new to the phone, still active and created within 10 min raises the same notification and alarm once. Ended, older and known alerts stay silent.
+- The first revision of an SOS this phone sees (live or by sync, whatever its number) raises the notification and alarm once if it is active, created within 10 min and not our own (node id or signing key). Ended, older and known alerts stay silent. `SOS_UPDATE` is burst 10 (6/min), and the end of a known SOS is never limited. The new-vs-reopen decision and the token charge happen under the repository lock.
 
 Open limits:
 

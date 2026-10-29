@@ -2,6 +2,8 @@ package edu.cit.resqmesh.core.domain.repository
 
 import edu.cit.resqmesh.core.model.SosActivity
 import edu.cit.resqmesh.core.model.SosAlert
+import edu.cit.resqmesh.core.model.SosRaiseCharge
+import edu.cit.resqmesh.core.model.SosRaiseResult
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
 
@@ -21,6 +23,16 @@ interface SosAlertRepository {
         accuracy: Float? = null,
         captured: Long? = null
     ): String
+    @Suppress("LongParameterList")
+    /** Reopens the active own SOS or creates one; [charge] is taken under the repository lock, only for a new sosId. */
+    suspend fun raise(
+        type: String,
+        charge: SosRaiseCharge,
+        lat: Double? = null,
+        lng: Double? = null,
+        accuracy: Float? = null,
+        captured: Long? = null
+    ): SosRaiseResult
     suspend fun updateLocation(id: String, lat: Double, lng: Double, accuracy: Float, captured: Long)
     suspend fun end(id: String)
     suspend fun silence(id: String)
