@@ -1,5 +1,6 @@
 package edu.cit.resqmesh.feature.comms.ui
 
+import edu.cit.resqmesh.feature.comms.ui.components.composer.waitSeconds
 import edu.cit.resqmesh.feature.comms.ui.radio.RadioMonitorControls
 import edu.cit.resqmesh.feature.comms.ui.radio.RadioPlaybackStatus
 import edu.cit.resqmesh.feature.comms.ui.radio.TacticalChannelHistoryButton
@@ -57,6 +58,11 @@ fun WalkieTalkieScreen(
     val speaker by walkieTalkieViewModel.currentSpeaker.collectAsState()
     val latestChannel by androidx.compose.runtime.rememberUpdatedState(channel)
     var recording by remember { mutableStateOf(false) }
+    val sendBudget by commsViewModel.chatBudgetState.collectAsState()
+    val voiceHeld by commsViewModel.voiceHeld.collectAsState()
+    val budgetWaiting = sendBudget.remaining <= 0
+    val waitDescription = edu.cit.resqmesh.feature.comms.ui.components.composer.chatBudgetWaitDescription(sendBudget)
+    val latestWaiting by androidx.compose.runtime.rememberUpdatedState(budgetWaiting)
     var recordingDestination by remember { mutableStateOf(channel) }
     var channelsOpen by remember { mutableStateOf(false) }
     val haptics = LocalHapticFeedback.current
@@ -318,11 +324,13 @@ fun WalkieTalkieScreen(
                     )
                     .clip(CircleShape)
                     .semantics {
-                        contentDescription = "Hold to record voice note"
+                        contentDescription = if (budgetWaiting) waitDescription else "Hold to record voice note"
                     }
                     .pointerInput(Unit) {
+                        // Recording is blocked at 0 tokens; a budget that empties mid-recording is handled by the hold.
                         detectTapGestures(
                             onPress = {
+                                if (latestWaiting) return@detectTapGestures
                                 haptics.performHapticFeedback(HapticFeedbackType.LongPress)
                                 val recordingChannel = latestChannel
                                 recordingDestination = recordingChannel
@@ -337,7 +345,7 @@ fun WalkieTalkieScreen(
                                     val audio = mediaHelper.stopRecording()
                                     // Scrolling or leaving the screen cancels the press; it must not send a partial note.
                                     if (releasedNormally && audio != null) {
-                                        commsViewModel.sendConversation("RADIO", channel = recordingChannel, text = "Voice message", audio = audio)
+                                        commsViewModel.sendRadioVoice(recordingChannel, audio)
                                     }
                                 }
                             }
@@ -369,7 +377,14 @@ fun WalkieTalkieScreen(
                         )
                         Spacer(Modifier.height(8.dp))
                         Text(
-                            text = if (recording) "RECORDING" else "HOLD TO TALK",
+                            text = when {
+                                recording -> "RECORDING"
+                                budgetWaiting -> androidx.compose.ui.res.stringResource(
+                                    edu.cit.resqmesh.R.string.chat_budget_wait,
+                                    sendBudget.waitSeconds()
+                                )
+                                else -> "HOLD TO TALK"
+                            },
                             style = MaterialTheme.typography.labelMedium.copy(letterSpacing = 1.2.sp),
                             fontWeight = FontWeight.ExtraBold,
                             color = Color.White
@@ -382,7 +397,11 @@ fun WalkieTalkieScreen(
         Spacer(Modifier.weight(1f))
 
         Text(
-            text = if (recording) "Release button to broadcast voice" else "Push and hold to transmit voice",
+            text = when {
+                recording -> "Release button to broadcast voice"
+                voiceHeld -> "Voice note held. It sends when the send budget refills."
+                else -> "Push and hold to transmit voice"
+            },
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.Bold,
             color = if (recording) ResQTheme.colors.sos else MaterialTheme.colorScheme.onSurface

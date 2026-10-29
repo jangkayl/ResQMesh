@@ -120,6 +120,27 @@ class CommunicationViewModel(
         val time = conversationStates.value.firstOrNull { it.conversationId == key }?.lastReadAt ?: 0L
         return messages.count { !it.isMine && it.timestamp > time }
     }
+    private val _voiceHeld = MutableStateFlow(false)
+
+    /** True while a finished radio voice note waits for a send token. */
+    val voiceHeld: StateFlow<Boolean> = _voiceHeld.asStateFlow()
+    private val heldVoice = ArrayDeque<Pair<String, String>>()
+
+    /** Sends a radio voice note now, or holds it and sends it once a token is available; never drops it. */
+    fun sendRadioVoice(channel: String, audio: String) {
+        heldVoice.addLast(channel to audio)
+        flushHeldVoice()
+    }
+
+    private fun flushHeldVoice() {
+        while (heldVoice.isNotEmpty()) {
+            val (channel, audio) = heldVoice.first()
+            if (!sendConversation("RADIO", channel = channel, text = "Voice message", audio = audio)) break
+            heldVoice.removeFirst()
+        }
+        _voiceHeld.value = heldVoice.isNotEmpty()
+    }
+
     /** Returns false only when the send budget is empty: nothing was sent and the caller must keep its text. */
     fun sendConversation(kind: String, channel: String = "", sosId: String = "", text: String, audio: String? = null): Boolean {
         val clean = checkedMessageText(text)
@@ -155,6 +176,9 @@ class CommunicationViewModel(
     }
 
     init {
+        viewModelScope.launch {
+            chatBudget.state.collect { if (it.remaining > 0 && heldVoice.isNotEmpty()) flushHeldVoice() }
+        }
         viewModelScope.launch {
             useCases.observePublicMessages().collect { messages ->
                 _uiState.update { it.copy(publicMessages = messages) }
