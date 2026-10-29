@@ -14,7 +14,6 @@ import androidx.compose.runtime.collectAsState
 import edu.cit.resqmesh.feature.comms.ui.ActiveChatScreen
 import edu.cit.resqmesh.feature.comms.ui.PublicChatTab
 import edu.cit.resqmesh.feature.radar.ui.NetworkScreen
-import edu.cit.resqmesh.feature.radar.ui.ResponderTrackerScreen
 import edu.cit.resqmesh.feature.sos.ui.SOSBroadcastScreen
 import edu.cit.resqmesh.feature.sos.ui.SosMapScreen
 import edu.cit.resqmesh.feature.profile.ui.ProfileScreen
@@ -63,7 +62,6 @@ fun MainContainerScreen(
 
     // Sub-navigation state for prototype
     var activeChatNode by remember { mutableStateOf<String?>(null) }
-    var trackingNode by remember { mutableStateOf<String?>(null) }
     var isSOSActive by remember { mutableStateOf(false) }
     var showSosHub by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
     var sosThreadId by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf<String?>(null) }
@@ -82,8 +80,6 @@ fun MainContainerScreen(
     val aboutViewModel: AboutViewModel = org.koin.androidx.compose.koinViewModel()
     val incidentViewModel: edu.cit.resqmesh.feature.incident.viewmodel.IncidentViewModel = org.koin.androidx.compose.koinViewModel()
     val incidentMetrics by incidentViewModel.metrics.collectAsState()
-
-    // Legacy Radar screen remains in source intentionally. Offline maps are managed via Profile/Settings.
 
     val incomingSosAlert by commsViewModel.incomingSosAlert.collectAsState()
     val activeSosMessageId by commsViewModel.activeSosMessageId.collectAsState()
@@ -131,7 +127,6 @@ fun MainContainerScreen(
         }
     }
 
-    var showDeveloperRadar by remember { mutableStateOf(false) }
     val isDeveloperMode by setupViewModel.isDeveloperModeEnabled.collectAsState()
 
     LaunchedEffect(Unit) {
@@ -141,7 +136,7 @@ fun MainContainerScreen(
     val showOwnReminder = activeSosMessageId != null && incomingSosAlert == null &&
         mapSosAlert == null && currentSosThreadId == null && !isSOSActive && !showSosHub
     val showTopReminder = showOwnReminder && (activeChatNode != null || showRadioHistory ||
-        isCommunityConversationOpen || showDeveloperRadar || trackingNode != null ||
+        isCommunityConversationOpen ||
         showPermissions || showAbout || showGuide || showProfile || showNetworkDetails ||
         showIncidents || showOfflineMaps)
     val openOwnSos = { sosThreadId = activeSosMessageId }
@@ -209,12 +204,6 @@ fun MainContainerScreen(
                     edu.cit.resqmesh.feature.comms.ui.RadioHistoryScreen(commsViewModel, mediaHelper,
                         onBack = { showRadioHistory = false })
                 }
-                showDeveloperRadar -> {
-                    ResQAuroraBackground(modifier = Modifier.fillMaxSize()) {
-                        edu.cit.resqmesh.feature.radar.ui.RadarScreen(viewModel = radarViewModel)
-                    }
-                    BackHandler { showDeveloperRadar = false }
-                }
                 isCommunityConversationOpen -> {
                     PublicChatTab(
                         viewModel = commsViewModel,
@@ -263,19 +252,6 @@ fun MainContainerScreen(
                         )
                     }
                     BackHandler { activeChatNode = null }
-                }
-                trackingNode != null -> {
-                    ResQAuroraBackground(modifier = Modifier.fillMaxSize()) {
-                        ResponderTrackerScreen(
-                            nodeName = trackingNode!!,
-                            onBack = { trackingNode = null },
-                            onChat = {
-                                activeChatNode = trackingNode
-                                trackingNode = null
-                            }
-                        )
-                    }
-                    BackHandler { trackingNode = null }
                 }
                 showPermissions -> {
                     ResQAuroraBackground(modifier = Modifier.fillMaxSize()) {
@@ -423,8 +399,6 @@ fun MainContainerScreen(
         }
 
         MainApplicationOverlays(isDeveloperMode, incomingSosAlert != null, mapSosAlert != null, activeSosMessageId != null, isSOSActive, publicSendSnackbar,
-            onToggleTerminal = { AppLogger.toggleTerminal() },
-            onToggleRadar = { showDeveloperRadar = !showDeveloperRadar },
-            onOpenRadar = { showDeveloperRadar = true; AppLogger.hideTerminal() })
+            onToggleTerminal = { AppLogger.toggleTerminal() })
     }
 }

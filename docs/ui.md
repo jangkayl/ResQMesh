@@ -49,7 +49,7 @@ Never display debug plaintext, keys, ciphertext previews or sensitive location.
 
 Background mesh is opt-in. Home/notification distinguish Bluetooth off, permission required, starting, searching and connected. OFF clears readiness; Go offline cancels recovery.
 
-Home peer chips open matching stable-ID Network details. Blocked peers stay in Blocked Devices (Direct Link Denied), with relay messaging when a route exists. Legacy Radar/terminal remains behind Debugging Mode; Settings owns offline maps.
+Home peer chips open matching stable-ID Network details. Blocked peers stay in Blocked Devices (Direct Link Denied), with relay messaging when a route exists. Debug terminal remains behind Debugging Mode; Settings owns offline maps.
 
 The terminal is bounded and session-only. Explicit categories are Connection, Sync, Transport, Routing, Security, System and Alerts. Summaries show endpoint/role/generation/readiness/transport; put heartbeat/relay chatter under Details. Newest first, pause follow while reading, and provide Latest/Sync jumps.
 

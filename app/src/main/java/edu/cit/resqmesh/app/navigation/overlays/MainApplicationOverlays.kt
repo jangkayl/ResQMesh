@@ -22,9 +22,7 @@ internal fun BoxScope.MainApplicationOverlays(
     hasOwnSos: Boolean,
     isSOSActive: Boolean,
     publicSendSnackbar: androidx.compose.material3.SnackbarHostState,
-    onToggleTerminal: () -> Unit,
-    onToggleRadar: () -> Unit,
-    onOpenRadar: () -> Unit
+    onToggleTerminal: () -> Unit
 ) {
     if (isDeveloperMode && !hasIncomingSos && !hasMapAlert && !hasOwnSos && !isSOSActive) {
         FloatingDeveloperBadge(
@@ -34,9 +32,6 @@ internal fun BoxScope.MainApplicationOverlays(
                 .padding(top = 8.dp, end = 12.dp),
             onClick = {
                 onToggleTerminal()
-            },
-            onLongClick = {
-                onToggleRadar()
             }
         )
     }
@@ -46,9 +41,5 @@ internal fun BoxScope.MainApplicationOverlays(
         modifier = Modifier.align(Alignment.BottomCenter).padding(horizontal = 16.dp, vertical = 88.dp)
     )
 
-    DebugTerminal(
-        onOpenRadar = {
-            onOpenRadar()
-        }
-    )
+    DebugTerminal()
 }

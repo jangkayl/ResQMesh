@@ -35,7 +35,9 @@ Basic block, incident, SOS and recovery checks have user-reported successes; the
 
 **Batch C hygiene / Phase 0** (branch `refactor/batch-c-hygiene`, stacked on Batch A): golden wire/table tests, leftover cleanup and archiving, catalog-only versions, Koin root in `app/di` split by layer, `core/utils` regrouped, and CI gates (androidTest compile, detekt baseline, boundary check). Local checks pass; the user reported all [smoke card](testing/batch-c-hygiene-smoke-card.md) steps working on 2026-10-17 (models and counts not supplied).
 
-**Batch A cleanup** (branch `refactor/batch-a-cleanup`): dead incident UI removed, two thread-safety fixes, swallowed-exception logging, debug-only Logcat and named timer constants. Local checks pass; the user reported all [smoke card](testing/batch-a-cleanup-smoke-card.md) steps working on 2026-10-16 (build hash, models and counts not supplied). Remaining review work is phases P1–P6 of the revision plan (crypto/delivery, data boundary, presentation, BLE internals, release/deps, modules).
+**Dead screens** (`refactor/remove-dead-screens`): unreachable screens and debug Radar removed; local checks pass, device pending.
+
+**Batch A cleanup** (branch `refactor/batch-a-cleanup`): dead incident UI removed, two thread-safety fixes, swallowed-exception logging, debug-only Logcat and named timer constants. Local checks pass; the user reported all [smoke card](testing/batch-a-cleanup-smoke-card.md) steps working on 2026-10-16 (build hash, models and counts not supplied). Remaining review work: revision-plan phases P1–P6.
 
 ## Next actions
 
