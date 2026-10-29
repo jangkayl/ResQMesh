@@ -12,7 +12,7 @@ data class ChatBudgetState(val remaining: Int, val capacity: Int, val nextRefill
 /**
  * Sender-side chat pacing shared by public and private chat. It follows the receiver's per-origin CHAT
  * limit (see [RateLimitPolicy]) so quick sends are paced and visible instead of silently dropped remotely.
- * In memory only: a process restart starts it full, which the receiver margin (burst 25 vs 20) absorbs.
+ * In memory only: a process restart starts it full, which the receiver margin (burst 20 vs 15) absorbs.
  */
 class OutgoingChatBudget(
     policy: RateLimitPolicy = RateLimitPolicy(),

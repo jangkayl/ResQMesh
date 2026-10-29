@@ -22,9 +22,9 @@ class RadioVoiceHoldTest {
         runCurrent()
         assertEquals(emptyList<String>(), sent)
         assertEquals(2, hold.held.value)
-        advanceTimeBy(3_000L); runCurrent()
+        advanceTimeBy(4_000L); runCurrent()
         assertEquals(listOf("a"), sent)
-        advanceTimeBy(3_000L); runCurrent()
+        advanceTimeBy(4_000L); runCurrent()
         assertEquals(listOf("a", "b"), sent)
         assertEquals(0, hold.held.value)
     }
@@ -44,7 +44,7 @@ class RadioVoiceHoldTest {
         val hold = RadioVoiceHold(budget, backgroundScope) { _, audio -> sent += audio; true }
         hold.submit("1", "a")
         assertEquals(listOf("a"), sent)
-        assertEquals(19, budget.state.value.remaining)
+        assertEquals(14, budget.state.value.remaining)
     }
 
     @Test fun refusedNoteIsDroppedAndItsTokenRefunded() = runTest {
@@ -52,6 +52,6 @@ class RadioVoiceHoldTest {
         val hold = RadioVoiceHold(budget, backgroundScope) { _, _ -> false }
         hold.submit("1", "a")
         assertEquals(0, hold.held.value)
-        assertEquals(20, budget.state.value.remaining)
+        assertEquals(15, budget.state.value.remaining)
     }
 }

@@ -12,16 +12,16 @@ class SosRaiseGateTest {
     private val gate = SosRaiseGate(budget)
 
     @Test fun noTokenMeansRefusedAndTheMessageNamesTheWait() {
-        repeat(5) { assertTrue(gate.tryCharge()) }
+        repeat(3) { assertTrue(gate.tryCharge()) }
         assertFalse(gate.tryCharge())
-        assertEquals("SOS available in 12 seconds", gate.waitMessage())
-        now += 11_000L
+        assertEquals("SOS available in 20 seconds", gate.waitMessage())
+        now += 19_000L
         budget.refresh()
         assertEquals("SOS available in 1 second", gate.waitMessage())
     }
 
     @Test fun aFailedCreateRefundsTheToken() {
-        repeat(5) { gate.tryCharge() }
+        repeat(3) { gate.tryCharge() }
         gate.refund()
         assertTrue(gate.tryCharge())
     }

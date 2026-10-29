@@ -20,7 +20,7 @@ internal fun ChatBudgetState.waitSeconds(): Int =
 
 private const val MS_PER_SECOND = 1000L
 
-/** Composer send-budget text such as "18 of 20 left" plus " · +1 in 3 s" while the budget is not full. */
+/** Composer send-budget text such as "13 of 15 left" plus " · +1 in 4 s" while the budget is not full. */
 @Suppress("FunctionNaming")
 @Composable
 internal fun ChatBudgetLine(budget: ChatBudgetState, modifier: Modifier = Modifier) {

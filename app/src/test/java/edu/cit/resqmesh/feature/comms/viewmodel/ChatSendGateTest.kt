@@ -19,27 +19,27 @@ class ChatSendGateTest {
     @Test fun doubleTapInsideTheDebounceWindowIsNotChargedTwice() {
         assertEquals(Admission.GO, gate.admit("public:txt"))
         assertEquals(Admission.DEBOUNCED, gate.admit("public:txt"))
-        assertEquals(19, budget.state.value.remaining)
+        assertEquals(14, budget.state.value.remaining)
     }
 
     @Test fun refusedBudgetDoesNotMarkTheDebounceSoTheNextTapAfterRefillSends() {
         while (budget.tryConsume()) Unit
         assertEquals(Admission.NO_BUDGET, gate.admit("private:Bob:txt", markNow = false))
-        now += 3_000L
+        now += 4_000L
         assertEquals(Admission.GO, gate.admit("private:Bob:txt"))
     }
 
     @Test fun refundRestoresTheTokenOfAnAdmittedButRefusedSend() {
         gate.admit("public:txt")
         gate.refund()
-        assertEquals(20, budget.state.value.remaining)
+        assertEquals(15, budget.state.value.remaining)
     }
 
     @Test fun settleRefundsOnlyWhenTheRepositoryRefusedTheSend() {
         gate.admit("loc")
         gate.settle(sent = true)
-        assertEquals(19, budget.state.value.remaining)
+        assertEquals(14, budget.state.value.remaining)
         gate.settle(sent = false)
-        assertEquals(20, budget.state.value.remaining)
+        assertEquals(15, budget.state.value.remaining)
     }
 }

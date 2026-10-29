@@ -47,7 +47,7 @@ class RateLimitTest {
 
     @Test fun limiterEnforcesBurstAndCoolsDownThenRecovers() {
         val limiter = OriginRateLimiter(RateLimitPolicy(), clock)
-        repeat(25) { assertEquals(Decision.Allowed, limiter.check("o", TrafficClass.CHAT)) }
+        repeat(20) { assertEquals(Decision.Allowed, limiter.check("o", TrafficClass.CHAT)) }
         assertEquals(Decision.Dropped, limiter.check("o", TrafficClass.CHAT))
         assertEquals(Decision.Dropped, limiter.check("o", TrafficClass.CHAT))
         assertEquals(Decision.CooldownStarted, limiter.check("o", TrafficClass.CHAT))
@@ -58,7 +58,7 @@ class RateLimitTest {
 
     @Test fun limiterIsolatesOriginsAndClasses() {
         val limiter = OriginRateLimiter(RateLimitPolicy(), clock)
-        repeat(6) { assertEquals(Decision.Allowed, limiter.check("origin-A", TrafficClass.SOS_NEW)) } // burst 6
+        repeat(4) { assertEquals(Decision.Allowed, limiter.check("origin-A", TrafficClass.SOS_NEW)) } // burst 4
         assertEquals(Decision.Dropped, limiter.check("origin-A", TrafficClass.SOS_NEW))
         assertEquals(Decision.Allowed, limiter.check("origin-B", TrafficClass.SOS_NEW))
         assertEquals(Decision.Allowed, limiter.check("origin-A", TrafficClass.CHAT))
@@ -69,7 +69,7 @@ class RateLimitTest {
 
     @Test fun limiterBoundsTrackedOrigins() {
         val limiter = OriginRateLimiter(RateLimitPolicy(maxTrackedOrigins = 2), clock)
-        repeat(6) { limiter.check("a", TrafficClass.SOS_NEW) }
+        repeat(4) { limiter.check("a", TrafficClass.SOS_NEW) }
         limiter.check("b", TrafficClass.SOS_NEW)
         limiter.check("c", TrafficClass.SOS_NEW) // evicts a
         assertEquals(Decision.Allowed, limiter.check("a", TrafficClass.SOS_NEW))

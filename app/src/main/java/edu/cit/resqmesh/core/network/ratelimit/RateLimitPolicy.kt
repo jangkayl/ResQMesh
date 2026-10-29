@@ -7,21 +7,21 @@ private const val LINK_BYTES_PER_SEC_DEFAULT = 262_144.0 // 256 KiB
 
 /** Rates are tokens per minute; bursts are bucket capacities. Defaults follow docs/plans/security-hardening.md. */
 data class RateLimitPolicy(
-    val chatPerMin: Double = 20.0,
+    val chatPerMin: Double = 15.0,
     // Receiver burst is 5 above the sender budget (chatSendBurst) so BLE queue bunching never trips it.
-    val chatBurst: Double = 25.0,
-    // Sender-side pacing for outgoing chat (OutgoingChatBudget): the same 20/min refill, burst 20.
-    val chatSendPerMin: Double = 20.0,
-    val chatSendBurst: Double = 20.0,
-    // Receiver burst is the sender's 5 raises (OutgoingSosBudget) plus 1 margin for BLE queue bunching.
-    val sosNewPerMin: Double = 5.0,
-    val sosNewBurst: Double = 6.0,
-    // Sender-side pacing for raising a new SOS: 5 back to back, then one every 12 s.
-    val sosSendPerMin: Double = 5.0,
-    val sosSendBurst: Double = 5.0,
+    val chatBurst: Double = 20.0,
+    // Sender-side pacing for outgoing chat (OutgoingChatBudget): the same 15/min refill, burst 15.
+    val chatSendPerMin: Double = 15.0,
+    val chatSendBurst: Double = 15.0,
+    // Receiver burst is the sender's 3 raises (OutgoingSosBudget) plus 1 margin for BLE queue bunching.
+    val sosNewPerMin: Double = 3.0,
+    val sosNewBurst: Double = 4.0,
+    // Sender-side pacing for raising a new SOS: 3 back to back, then one every 20 s.
+    val sosSendPerMin: Double = 3.0,
+    val sosSendBurst: Double = 3.0,
     // Not fixed by the plan. Each raise costs up to 2 updates: its refine, plus its revision 1 when that arrives
-    // after the refine (then the sosId is known, so rev 1 is charged as an update). 5 raises/min can therefore
-    // charge 10 updates/min; burst 12 adds a 2-event margin. Ends of a known SOS are exempt (SosRepository.ingest).
+    // after the refine (then the sosId is known, so rev 1 is charged as an update). 3 raises/min charge at most
+    // 6 updates/min; 12 burst and 10/min leave margin. Ends of a known SOS are exempt (SosRepository.ingest).
     val sosUpdatePerMin: Double = 10.0,
     val sosUpdateBurst: Double = 12.0,
     val syncRequestPerMin: Double = 6.0,

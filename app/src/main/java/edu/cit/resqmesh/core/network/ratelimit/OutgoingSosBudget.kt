@@ -10,8 +10,8 @@ import kotlin.math.floor
 data class SosBudgetState(val remaining: Int, val capacity: Int, val nextRefillInMs: Long)
 
 /**
- * Sender-side pacing for raising a NEW SOS: five back to back, then one every 12 s. It follows the receiver's
- * per-origin SOS_NEW limit (see [RateLimitPolicy], burst 6) so a quick re-raise is paced visibly instead of
+ * Sender-side pacing for raising a NEW SOS: three back to back, then one every 20 s. It follows the receiver's
+ * per-origin SOS_NEW limit (see [RateLimitPolicy], burst 4) so a quick re-raise is paced visibly instead of
  * being dropped by remote phones. Ending, refining and reopening the active SOS never use it.
  * In memory only: a process restart starts it full, which the receiver margin absorbs.
  */

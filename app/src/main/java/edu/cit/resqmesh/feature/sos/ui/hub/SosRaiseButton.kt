@@ -28,7 +28,7 @@ import edu.cit.resqmesh.core.network.ratelimit.SosBudgetState
 import edu.cit.resqmesh.core.network.ratelimit.waitSeconds
 
 /**
- * The raise button with the raise budget, like the chat composer: "4 of 5 left", plus " · +1 in N s" while not
+ * The raise button with the raise budget, like the chat composer: "2 of 3 left", plus " · +1 in N s" while not
  * full. At 0 it is disabled, reads " · Wait N s" and tells TalkBack "SOS available in N seconds".
  */
 @Suppress("FunctionNaming")

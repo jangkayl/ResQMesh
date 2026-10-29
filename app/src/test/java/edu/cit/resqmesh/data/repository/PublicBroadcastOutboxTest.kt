@@ -119,7 +119,7 @@ class PublicBroadcastOutboxTest {
     @Test fun retryWithoutTokenStaysPendingUntilRefillWhileFirstSendIsNotChargedTwice() = runTest {
         var now = 1_000_000L
         val budget = OutgoingChatBudget(clock = { now })
-        repeat(20) { assertTrue(budget.tryConsume()) }
+        repeat(15) { assertTrue(budget.tryConsume()) }
         val f = Fixture(backgroundScope, budget)
         val id = f.repo.sendPublicMessage("test", null, null)
         runCurrent()
@@ -134,8 +134,8 @@ class PublicBroadcastOutboxTest {
         assertEquals(listOf("PENDING"), f.store.rows["orphan"]!!.deliveredTo)
         assertEquals(2, f.broadcasts)
         assertEquals(0, budget.state.value.remaining)
-        now += 3_000L
-        advanceTimeBy(3_000L); runCurrent()
+        now += 4_000L
+        advanceTimeBy(4_000L); runCurrent()
         assertEquals(emptyList<String>(), f.store.rows["orphan"]!!.deliveredTo)
         assertEquals(3, f.broadcasts)
     }
