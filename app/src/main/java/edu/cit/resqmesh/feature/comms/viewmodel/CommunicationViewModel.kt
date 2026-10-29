@@ -3,6 +3,7 @@ package edu.cit.resqmesh.feature.comms.viewmodel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import edu.cit.resqmesh.feature.comms.model.ChatUiState
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -43,7 +44,8 @@ class CommunicationViewModel(
     private val sendPrivate: SendPrivateChatMessageUseCase,
     private val chatBudget: OutgoingChatBudget,
     private val sosBudget: OutgoingSosBudget,
-    private val voiceHold: RadioVoiceHold
+    private val voiceHold: RadioVoiceHold,
+    private val locationPreferences: edu.cit.resqmesh.core.location.LocationPreferences
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ChatUiState())
@@ -118,7 +120,19 @@ class CommunicationViewModel(
     private val _isAcquiringLocation = MutableStateFlow(false)
     val isAcquiringLocation: StateFlow<Boolean> = _isAcquiringLocation.asStateFlow()
 
-    val locationStatus: StateFlow<edu.cit.resqmesh.core.location.LocationStatus> = locationClient.locationStatus
+    val autoDetectLocation: StateFlow<Boolean> = locationPreferences.autoDetectEnabled
+    val lastLocationFix: StateFlow<edu.cit.resqmesh.core.location.LocationFix?> = locationClient.lastFix
+
+    /** Client status, reported as OFF while the user has auto-detect turned off. */
+    val locationStatus: StateFlow<edu.cit.resqmesh.core.location.LocationStatus> =
+        kotlinx.coroutines.flow.combine(locationClient.locationStatus, autoDetectLocation) { status, enabled ->
+            if (enabled) status else edu.cit.resqmesh.core.location.LocationStatus.OFF
+        }.stateIn(
+            viewModelScope,
+            SharingStarted.Eagerly,
+            if (autoDetectLocation.value) locationClient.locationStatus.value
+            else edu.cit.resqmesh.core.location.LocationStatus.OFF
+        )
     
     val incomingSosAlert = sosRepository.incoming.map { it?.toChatMessage() }
         .stateIn(viewModelScope, SharingStarted.Eagerly, null)
@@ -181,6 +195,9 @@ class CommunicationViewModel(
 
     init {
         viewModelScope.launch {
+            autoDetectLocation.drop(1).collect(::applyAutoDetect)
+        }
+        viewModelScope.launch {
             useCases.observePublicMessages().collect { messages ->
                 _uiState.update { it.copy(publicMessages = messages) }
             }
@@ -231,22 +248,49 @@ class CommunicationViewModel(
 
     val publicSendFeedback = kotlinx.coroutines.flow.merge(useCases.sendPublicMessage.feedback, sosErrors)
 
+    private var trackingRequested = false
+
+    /** Starts passive tracking while the main screen is shown, if the user allows auto-detect. */
     fun startLocationTracking() {
-        locationClient.startTracking(30000L)
+        trackingRequested = true
+        if (autoDetectLocation.value) locationClient.startTracking(LOCATION_INTERVAL_MS)
     }
-    
+
     fun stopLocationTracking() {
+        trackingRequested = false
         locationClient.stopTracking()
     }
 
-    fun sendEmergencySOS(sosType: String, onCreated: (String) -> Unit = {}) {
+    /** Restarts tracking after the user grants permission or turns phone location on. */
+    fun refreshLocationTracking() {
+        if (!trackingRequested || !autoDetectLocation.value) return
+        locationClient.stopTracking()
+        locationClient.startTracking(LOCATION_INTERVAL_MS)
+    }
+
+    fun setAutoDetectLocation(enabled: Boolean) = locationPreferences.setAutoDetectEnabled(enabled)
+
+    /** Applies an auto-detect change from any screen: off stops updates and forgets the cached fix. */
+    private fun applyAutoDetect(enabled: Boolean) {
+        if (enabled) {
+            if (trackingRequested) locationClient.startTracking(LOCATION_INTERVAL_MS)
+        } else {
+            locationClient.clearCachedLocation()
+            locationClient.stopTracking()
+        }
+    }
+
+    fun isSosLocationWithheld(sosId: String): Boolean = locationPreferences.isLocationWithheld(sosId)
+
+    fun sendEmergencySOS(sosType: String, includeLocation: Boolean = true, onCreated: (String) -> Unit = {}) {
         if (creatingSos) return
         creatingSos = true
         val generation = ++sosLocationGeneration
         viewModelScope.launch {
             try {
                 // The repository charges the budget under its lock, only when it creates a new sosId.
-                val id = when (val result = raiseSos.raise(sosType, sosGate)) {
+                val result = raiseSos.raise(sosType, sosGate, includeLocation)
+                val id = when (result) {
                     is SosRaiseResult.Created -> result.id
                     is SosRaiseResult.Reopened -> result.id
                     SosRaiseResult.Throttled -> {
@@ -254,7 +298,14 @@ class CommunicationViewModel(
                         return@launch
                     }
                 }
+                // A reopen keeps whatever location the SOS already carried, so only a new SOS is marked withheld.
+                if (includeLocation) {
+                    locationPreferences.setLocationWithheld(id, false)
+                } else if (result is SosRaiseResult.Created) {
+                    locationPreferences.setLocationWithheld(id, true)
+                }
                 onCreated(id)
+                if (!includeLocation) return@launch
                 raiseSos.refineLocation(id, isCurrent = { generation == sosLocationGeneration }) { update ->
                     viewModelScope.launch { update() }
                 }
@@ -402,3 +453,5 @@ class CommunicationViewModel(
 private const val SEND_DEBOUNCE_MS = 400L
 private const val BUDGET_TICK_MS = 1_000L
 private const val BUDGET_STOP_TIMEOUT_MS = 5_000L
+
+private const val LOCATION_INTERVAL_MS = 30_000L

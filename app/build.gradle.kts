@@ -76,6 +76,15 @@ android {
     testOptions {
         unitTests.isReturnDefaultValues = true
     }
+    lint {
+        // detekt covers test code; lint only needs app sources.
+        ignoreTestSources = true
+    }
+}
+
+// Always re-run unit tests so the Gradle build cache can't hide a flaky test.
+tasks.withType<Test>().configureEach {
+    outputs.cacheIf { false }
 }
 
 dependencies {

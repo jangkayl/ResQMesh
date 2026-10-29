@@ -2,7 +2,7 @@ name: Lean QA
 
 on:
   push:
-    branches: [main]
+    branches: [main, dev]
   pull_request:
   workflow_dispatch:
 
@@ -33,12 +33,12 @@ jobs:
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v6
+        with:
+          # Only pushes to main/dev save the Gradle cache; PRs read their base branch's cache.
+          cache-read-only: ${{ github.event_name == 'pull_request' }}
 
-      - name: Build debug APK, run unit tests, and run Android Lint
-        run: ./gradlew :app:assembleDebug :app:testDebugUnitTest :app:lintDebug --console=plain --no-daemon
-
-      - name: Compile instrumentation tests and run detekt
-        run: ./gradlew :app:assembleDebugAndroidTest detekt --console=plain --no-daemon
+      - name: Unit tests, Android Lint, instrumentation-test compile and detekt
+        run: ./gradlew :app:testDebugUnitTest :app:lintDebug :app:assembleDebugAndroidTest detekt --console=plain --configuration-cache
 
       - name: Check architecture boundaries
         shell: pwsh

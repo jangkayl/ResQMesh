@@ -66,6 +66,11 @@ fun HomeScreen(
     }
     val nodes = remember(radarState) { classifyRadarNodes(radarState) }
     val directNodeNames = remember(nodes) { nodes.filter { it.kind == NodeKind.DIRECT }.map { it.name } }
+    val autoDetectLocation = commsViewModel?.autoDetectLocation?.collectAsState()?.value ?: true
+    val lastLocationFix = commsViewModel?.lastLocationFix?.collectAsState()?.value
+    val fixLocation = edu.cit.resqmesh.core.ui.components.location.rememberLocationFixAction(
+        onChanged = { commsViewModel?.refreshLocationTracking() }
+    )
 
     HomeScreenContent(
         isNodeActive = connectionState.isOnline,
@@ -76,6 +81,10 @@ fun HomeScreen(
         myDeviceName = myDeviceName,
         directNodeNames = directNodeNames,
         locationStatus = locationStatus,
+        lastLocationFix = lastLocationFix,
+        autoDetectLocation = autoDetectLocation,
+        onAutoDetectLocationChange = commsViewModel?.let { vm -> vm::setAutoDetectLocation },
+        onFixLocation = fixLocation,
         onMessagesClick = onMessagesClick,
         onNetworkClick = onNetworkClick,
         onPeerClick = onPeerClick,
@@ -97,6 +106,10 @@ fun HomeScreenContent(
     myDeviceName: String,
     directNodeNames: List<String>,
     locationStatus: LocationStatus = LocationStatus.READY,
+    lastLocationFix: edu.cit.resqmesh.core.location.LocationFix? = null,
+    autoDetectLocation: Boolean = true,
+    onAutoDetectLocationChange: ((Boolean) -> Unit)? = null,
+    onFixLocation: ((edu.cit.resqmesh.core.ui.components.location.LocationAvailability) -> Unit)? = null,
     onMessagesClick: () -> Unit,
     onNetworkClick: () -> Unit,
     onPeerClick: (String) -> Unit = { onNetworkClick() },
@@ -166,7 +179,13 @@ fun HomeScreenContent(
         )
 
         // 7. Integrated Satellite GPS Status Pill ("Location found")
-        ModernGpsStatusCard(locationStatus = locationStatus)
+        ModernGpsStatusCard(
+            locationStatus = locationStatus,
+            lastFix = lastLocationFix,
+            autoDetectEnabled = autoDetectLocation,
+            onAutoDetectChange = onAutoDetectLocationChange,
+            onFixLocation = onFixLocation
+        )
 
         // 8. Reassuring Safety Guidance Footer
         ModernSafetyFooter()

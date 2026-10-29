@@ -6,10 +6,13 @@ import kotlinx.coroutines.flow.StateFlow
 
 interface LocationClient {
     val locationStatus: StateFlow<LocationStatus>
-    
+    val lastFix: StateFlow<LocationFix?>
+
     fun startTracking(interval: Long)
     fun stopTracking()
     fun getLastKnownLocation(): Location?
     fun requestPinpointLocation(onResult: (Location?) -> Unit)
     fun cancelPinpointLocation() {}
+    /** Drops the cached fix, used when the user turns auto-detect off. */
+    fun clearCachedLocation() {}
 }

@@ -24,9 +24,12 @@ class RaiseSosUseCase(
         SosRaiseResult.Throttled -> error("unreachable: no charge refuses")
     }
 
-    /** Like [invoke], but a NEW sosId first takes [charge] under the repository lock; a reopen is never charged. */
-    suspend fun raise(sosType: String, charge: SosRaiseCharge): SosRaiseResult {
-        val cached = locationClient.getLastKnownLocation()
+    /**
+     * Like [invoke], but a NEW sosId first takes [charge] under the repository lock; a reopen is never charged.
+     * With [includeLocation] false the SOS carries no coordinates and callers skip [refineLocation].
+     */
+    suspend fun raise(sosType: String, charge: SosRaiseCharge, includeLocation: Boolean = true): SosRaiseResult {
+        val cached = if (includeLocation) locationClient.getLastKnownLocation() else null
         val validCachedTime = cached?.time?.takeIf { it > 0 && (now() - it) < SOS_CACHED_LOCATION_MAX_AGE_MS }
         return sosRepository.raise(
             sosType, charge, cached?.latitude, cached?.longitude, cached?.accuracy, validCachedTime

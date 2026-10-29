@@ -29,18 +29,47 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import edu.cit.resqmesh.core.location.LocationFix
 import edu.cit.resqmesh.core.location.LocationStatus
+import edu.cit.resqmesh.core.ui.components.location.LocationAvailability
+import edu.cit.resqmesh.core.ui.components.location.fixLabel
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.material.icons.outlined.LocationOff
+import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.Switch
+import androidx.compose.runtime.produceState
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import kotlinx.coroutines.delay
 import edu.cit.resqmesh.core.ui.theme.ModernMint
 import edu.cit.resqmesh.core.ui.theme.ResQTheme
 
 @Composable
-internal fun ModernGpsStatusCard(locationStatus: LocationStatus) {
-    val (statusColor, titleText, descText) = when (locationStatus) {
-        LocationStatus.ACQUIRING -> Triple(ResQTheme.colors.warning, "Acquiring GPS location...", "Looking for satellite signal for emergency SOS.")
-        LocationStatus.READY -> Triple(ModernMint, "Location found", "A last known location is available. SOS will request an update.")
-        LocationStatus.ERROR_DENIED -> Triple(MaterialTheme.colorScheme.error, "Location Permission Needed", "Enable location permissions so rescuers can find you.")
-        LocationStatus.ERROR_DISABLED -> Triple(ResQTheme.colors.warning, "Phone GPS is Disabled", "Turn on GPS in device settings for SOS positioning.")
-        LocationStatus.IDLE -> Triple(MaterialTheme.colorScheme.onSurfaceVariant, "Location Idle", "Position will be acquired when sending SOS.")
+internal fun ModernGpsStatusCard(
+    locationStatus: LocationStatus,
+    lastFix: LocationFix? = null,
+    autoDetectEnabled: Boolean = locationStatus != LocationStatus.OFF,
+    onAutoDetectChange: ((Boolean) -> Unit)? = null,
+    onFixLocation: ((LocationAvailability) -> Unit)? = null
+) {
+    val now by produceState(System.currentTimeMillis(), lastFix) {
+        while (true) {
+            value = System.currentTimeMillis()
+            delay(FIX_AGE_TICK_MS)
+        }
+    }
+    val text = gpsStatusText(locationStatus, lastFix, now)
+    val problem = when (locationStatus) {
+        LocationStatus.ERROR_DENIED -> LocationAvailability.PERMISSION_DENIED
+        LocationStatus.ERROR_DISABLED -> LocationAvailability.LOCATION_OFF
+        else -> null
+    }
+    val rowModifier = if (onAutoDetectChange != null && problem == null) {
+        Modifier.toggleable(value = autoDetectEnabled, role = Role.Switch, onValueChange = onAutoDetectChange)
+    } else {
+        Modifier
     }
 
     Surface(
@@ -51,51 +80,87 @@ internal fun ModernGpsStatusCard(locationStatus: LocationStatus) {
         shadowElevation = 1.dp
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+            modifier = rowModifier
+                .heightIn(min = 56.dp)
+                .padding(horizontal = 14.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            Box(
-                modifier = Modifier
-                    .size(28.dp)
-                    .clip(CircleShape)
-                    .background(statusColor.copy(alpha = 0.12f)),
-                contentAlignment = Alignment.Center
-            ) {
-                if (locationStatus == LocationStatus.ACQUIRING) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(16.dp),
-                        strokeWidth = 2.dp,
-                        color = statusColor
-                    )
-                } else {
-                    Icon(
-                        imageVector = Icons.Outlined.NearMe,
-                        contentDescription = null,
-                        tint = statusColor,
-                        modifier = Modifier.size(16.dp)
-                    )
-                }
-            }
-
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = titleText,
-                    style = MaterialTheme.typography.bodySmall,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Text(
-                    text = descText,
-                    style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+            GpsStatusBadge(locationStatus)
+            GpsStatusTexts(text, Modifier.weight(1f))
+            if (problem != null && onFixLocation != null) {
+                FilledTonalButton(
+                    onClick = { onFixLocation(problem) },
+                    modifier = Modifier.heightIn(min = 48.dp)
+                ) { Text(problem.fixLabel()) }
+            } else if (onAutoDetectChange != null) {
+                // Visual only: the row is the toggle, labelled by the texts above.
+                Switch(
+                    checked = autoDetectEnabled,
+                    onCheckedChange = null,
+                    modifier = Modifier.semantics { contentDescription = "Auto-detect location" }
                 )
             }
         }
     }
 }
+
+@Composable
+private fun GpsStatusTexts(text: GpsStatusText, modifier: Modifier) {
+    Column(modifier = modifier) {
+        Text(
+            text = text.title,
+            style = MaterialTheme.typography.bodySmall,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+        Text(
+            text = text.description,
+            style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis
+        )
+    }
+}
+
+@Composable
+private fun GpsStatusBadge(locationStatus: LocationStatus) {
+    val statusColor = when (locationStatus) {
+        LocationStatus.ACQUIRING, LocationStatus.ERROR_DISABLED -> ResQTheme.colors.warning
+        LocationStatus.READY -> ModernMint
+        LocationStatus.ERROR_DENIED -> MaterialTheme.colorScheme.error
+        LocationStatus.IDLE, LocationStatus.OFF -> MaterialTheme.colorScheme.onSurfaceVariant
+    }
+    Box(
+        modifier = Modifier
+            .size(28.dp)
+            .clip(CircleShape)
+            .background(statusColor.copy(alpha = 0.12f)),
+        contentAlignment = Alignment.Center
+    ) {
+        if (locationStatus == LocationStatus.ACQUIRING) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(16.dp),
+                strokeWidth = 2.dp,
+                color = statusColor
+            )
+        } else {
+            Icon(
+                imageVector = if (locationStatus == LocationStatus.OFF) {
+                    Icons.Outlined.LocationOff
+                } else {
+                    Icons.Outlined.NearMe
+                },
+                contentDescription = null,
+                tint = statusColor,
+                modifier = Modifier.size(16.dp)
+            )
+        }
+    }
+}
+
+private const val FIX_AGE_TICK_MS = 30_000L
 
 /**
  * Clean, reassuring safety guidance footer.

@@ -62,6 +62,7 @@ fun ProfileScreen(
     val isDeveloperMode by viewModel.isDeveloperModeEnabled.collectAsState()
     val isLongRangeProfile by viewModel.isLongRangeProfile.collectAsState()
     val isBackgroundMeshEnabled by viewModel.isBackgroundMeshEnabled.collectAsState()
+    val isAutoDetectLocation by viewModel.isAutoDetectLocationEnabled.collectAsState()
     var showConnectionConfirm by remember { mutableStateOf(false) }
     var connectionError by remember { mutableStateOf<MeshStartError?>(null) }
     val scope = rememberCoroutineScope()
@@ -277,6 +278,26 @@ fun ProfileScreen(
                         Switch(
                             checked = isBackgroundMeshEnabled,
                             onCheckedChange = viewModel::setBackgroundMeshEnabled
+                        )
+                    }
+                )
+                DividerLine()
+                SettingRow(
+                    icon = Icons.Default.MyLocation,
+                    title = "Auto-detect location",
+                    subtitle = if (isAutoDetectLocation) {
+                        "Keeps a recent location ready for SOS. It is only sent when you send an SOS or share it."
+                    } else {
+                        "Off. You can still include your location when sending an SOS. " +
+                            "Bluetooth still needs the location permission to find nearby phones."
+                    },
+                    onClick = {
+                        viewModel.setAutoDetectLocationEnabled(!isAutoDetectLocation)
+                    },
+                    trailing = {
+                        Switch(
+                            checked = isAutoDetectLocation,
+                            onCheckedChange = viewModel::setAutoDetectLocationEnabled
                         )
                     }
                 )
