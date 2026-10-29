@@ -28,6 +28,13 @@ class TokenBucket(
         return tokens
     }
 
+    /** Gives back [amount] tokens, never above capacity. */
+    @Synchronized
+    fun refund(amount: Double) {
+        refill()
+        tokens = minOf(capacity, tokens + amount)
+    }
+
     /** Charges [amount] even when that overdraws the bucket; the balance then refills back past zero. */
     @Synchronized
     fun consumeWithDebt(amount: Double) {

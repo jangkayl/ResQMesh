@@ -18,6 +18,7 @@ import edu.cit.resqmesh.core.network.MeshNetworkGateway
 import edu.cit.resqmesh.core.network.NativeBleGateway
 import edu.cit.resqmesh.core.network.NativeBleManager
 import edu.cit.resqmesh.core.network.ratelimit.InboundGuards
+import edu.cit.resqmesh.core.network.ratelimit.OutgoingChatBudget
 import edu.cit.resqmesh.core.network.ratelimit.RateLimitPolicy
 import edu.cit.resqmesh.core.service.MeshSessionController
 import edu.cit.resqmesh.core.audio.LiveAudioEngine
@@ -107,6 +108,7 @@ val platformModule = module {
 val networkModule = module {
     single { RateLimitPolicy() }
     single { InboundGuards(get(), System::currentTimeMillis) }
+    single { OutgoingChatBudget(get(), System::currentTimeMillis) }
     single { NativeBleManager(androidContext(), get()) }
     single<MeshNetworkGateway> { NativeBleGateway(get()) }
 }
@@ -131,7 +133,8 @@ val repositoryModule = module {
             repositoryScope = get<AppCoroutineScope>().scope,
             readyPeerEvents = get(),
             peerNameStore = get(),
-            sosRepository = get()
+            sosRepository = get(),
+            chatBudget = get()
         )
     }
 
@@ -233,7 +236,8 @@ val viewModelModule = module {
             sosRepository = get(),
             conversationRepository = get(),
             raiseSos = get(),
-            sendPrivate = get()
+            sendPrivate = get(),
+            chatBudget = get()
         )
     }
     viewModel { WalkieTalkieViewModel(useCases = get(), mediaHelper = get(), liveAudioEngine = get()) }

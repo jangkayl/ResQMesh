@@ -8,7 +8,11 @@ private const val LINK_BYTES_PER_SEC_DEFAULT = 262_144.0 // 256 KiB
 /** Rates are tokens per minute; bursts are bucket capacities. Defaults follow docs/plans/security-hardening.md. */
 data class RateLimitPolicy(
     val chatPerMin: Double = 20.0,
-    val chatBurst: Double = 10.0,
+    // Receiver burst is 5 above the sender budget (chatSendBurst) so BLE queue bunching never trips it.
+    val chatBurst: Double = 25.0,
+    // Sender-side pacing for outgoing chat (OutgoingChatBudget): the same 20/min refill, burst 20.
+    val chatSendPerMin: Double = 20.0,
+    val chatSendBurst: Double = 20.0,
     val sosNewPerMin: Double = 0.5, // one new SOS per 2 minutes
     val sosNewBurst: Double = 1.0,
     // Not fixed by the plan: updates to an existing SOS are chattier than new alerts but still bounded.

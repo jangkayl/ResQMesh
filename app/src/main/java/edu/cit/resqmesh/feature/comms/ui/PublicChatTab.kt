@@ -76,6 +76,7 @@ fun PublicChatTab(
     val uiState by viewModel.uiState.collectAsState()
     val channelId by viewModel.currentChannelId.collectAsState()
     val isAcquiringLocation by viewModel.isAcquiringLocation.collectAsState()
+    val sendBudget by viewModel.chatBudgetState.collectAsState()
 
     BackHandler {
         onBack()
@@ -188,12 +189,14 @@ fun PublicChatTab(
                             rawMessage
                         }
                         if (finalMessage.isNotBlank() || pendingImage != null || pendingAudio != null) {
-                            viewModel.sendPublicMessage(finalMessage, pendingImage, pendingAudio)
-                            inputText = ""
-                            viewModel.draft("COMMUNITY", "")
-                            pendingImage = null
-                            pendingAudio = null
-                            replyingToMessage = null
+                            // False means the send budget is empty: keep the text, image, audio and reply as typed.
+                            if (viewModel.sendPublicMessage(finalMessage, pendingImage, pendingAudio)) {
+                                inputText = ""
+                                viewModel.draft("COMMUNITY", "")
+                                pendingImage = null
+                                pendingAudio = null
+                                replyingToMessage = null
+                            }
                         }
                     },
                     onSendLocation = {
@@ -207,7 +210,8 @@ fun PublicChatTab(
                         }
                     },
                     mediaHelper = mediaHelper,
-                    isAcquiringLocation = isAcquiringLocation
+                    isAcquiringLocation = isAcquiringLocation,
+                    sendBudget = sendBudget
                 )
             }
         ) { innerPadding ->

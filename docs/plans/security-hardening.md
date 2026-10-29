@@ -53,6 +53,7 @@ As built, these changed from the outline:
 - PING, PONG, PIECE and ACK are shaped per link only.
 - Topology sequences more than 10 min ahead of the local clock are rejected.
 - Validator text and ciphertext caps equal the frame cap, so long voice notes still fit.
+- Outgoing chat follows a shared sender budget of 20 (refill 20/min) that composers show; the receiver burst is 25, a 5-message margin for BLE queue bunching.
 
 Open limits:
 

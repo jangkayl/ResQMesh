@@ -45,7 +45,7 @@ class RateLimitTest {
 
     @Test fun limiterEnforcesBurstAndCoolsDownThenRecovers() {
         val limiter = OriginRateLimiter(RateLimitPolicy(), clock)
-        repeat(10) { assertEquals(Decision.Allowed, limiter.check("o", TrafficClass.CHAT)) }
+        repeat(25) { assertEquals(Decision.Allowed, limiter.check("o", TrafficClass.CHAT)) }
         assertEquals(Decision.Dropped, limiter.check("o", TrafficClass.CHAT))
         assertEquals(Decision.Dropped, limiter.check("o", TrafficClass.CHAT))
         assertEquals(Decision.CooldownStarted, limiter.check("o", TrafficClass.CHAT))

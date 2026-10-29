@@ -17,7 +17,7 @@ At least three phones, A, B and C, in a line (A–B–C, with A and C out of dir
 
 1. **Normal traffic, direct:** A↔B public text, private text (DELIVERED), an image, and a voice note of about 60 s. Expected: everything arrives, with no `INBOUND_REJECT`, `RL_DROP` or `LINK_SHAPE` markers.
 2. **Relayed traffic:** the same set A→C through B. Expected: it arrives on C, and B logs no `RL_DROP` or `RL_COOLDOWN`.
-3. **Chat burst:** on A, send 15 short public messages as fast as possible. Expected: all arrive (the per-origin burst is 10 and refill is 20/min, with outbox retry covering the rest). A few `RL_DROP class=CHAT` lines on B or C are acceptable only if every message still arrives within about 30 s.
+3. **Chat burst:** on A, send 25 messages as fast as possible in public, then private. Expected: the counter drops to 0, Send shows "Wait N s" and refills about +1 per 3 s, every message A sends arrives on B, B logs no `RL_DROP class=CHAT` or `RL_COOLDOWN`, and A stays READY on B.
 4. **SOS:** raise an SOS on A, let the location refine, then end it. Expected: B and C show raise, update and end. Then raise a new SOS on C. Expected: it arrives on A even though A just raised one.
 5. **SOS re-raise (known limit):** on A, raise, end and re-raise within 2 minutes. Record whether the second SOS arrives on B. The new-SOS limit is 1 per 2 minutes per signing key, so a drop with `RL_DROP class=SOS_NEW` is the expected current behavior. Report it either way.
 6. **Reconnect and MAC rotation:** turn Bluetooth off and on on B, and also leave B idle for at least 15 minutes. Expected: A and C re-admit B under the same name, with no `ADV_EVICT_BLOCKED` loop and no lasting duplicate peer.

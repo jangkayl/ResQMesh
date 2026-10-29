@@ -4,6 +4,7 @@ import edu.cit.resqmesh.core.model.ChatMessage
 import edu.cit.resqmesh.core.model.ConnectedDevice
 import edu.cit.resqmesh.core.model.NodeIdentity
 import edu.cit.resqmesh.core.network.MeshPayload
+import edu.cit.resqmesh.core.network.ratelimit.OutgoingChatBudget
 import edu.cit.resqmesh.core.network.OutboundFrameEvent
 import edu.cit.resqmesh.core.network.MeshNetworkGateway
 import edu.cit.resqmesh.core.logging.AppLogger
@@ -27,7 +28,9 @@ import edu.cit.resqmesh.data.repository.PrivateTransferProgress
 import edu.cit.resqmesh.data.repository.mesh.MeshDeliveryConstants.PRIVATE_DELIVERY_TIMEOUT_MS
 import edu.cit.resqmesh.data.repository.mesh.MeshDeliveryConstants.OUTBOX_RETRY_BACKOFF_MS
 import edu.cit.resqmesh.data.repository.mesh.MeshDeliveryConstants.OUTBOX_EXPIRY_MS
+import edu.cit.resqmesh.data.repository.mesh.MeshDeliveryConstants.MIN_BUDGET_RETRY_MS
 
+@Suppress("LongParameterList")
 internal class MeshOutboundDelivery(
     private val networkManager: MeshNetworkGateway,
     private val messageStore: MessageStore,
@@ -40,7 +43,8 @@ internal class MeshOutboundDelivery(
     private val _publicSendFeedback: kotlinx.coroutines.flow.MutableSharedFlow<String>,
     private val localName: () -> String,
     private val readyPeers: () -> List<ConnectedDevice>,
-    private val resolveName: (String) -> String
+    private val resolveName: (String) -> String,
+    private val chatBudget: OutgoingChatBudget = OutgoingChatBudget()
 ) {
     private val myNodeName get() = localName()
     private fun readyConnectedDevices() = readyPeers()
@@ -49,6 +53,10 @@ internal class MeshOutboundDelivery(
     val outboxMutex = Mutex()
     private val outboxWake = Channel<Unit>(Channel.CONFLATED)
     private var outboxRetryJob: Job? = null
+    private var outboxRetryDueAt = 0L
+    // First sends were already charged by the ViewModel gate, so their first dispatch is exempt even when it
+    // happens later from the outbox. Everything else (receipt retries, recovered rows) is charged per dispatch.
+    private val prepaid = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
     private val privateAcceptedAttempts = java.util.concurrent.ConcurrentHashMap<String, Int>()
     private val privateTimeoutOwners = java.util.concurrent.ConcurrentHashMap<String, Any>()
     private val privateProgress = java.util.concurrent.ConcurrentHashMap<String, PrivateTransferProgress>()
@@ -134,13 +142,21 @@ internal class MeshOutboundDelivery(
         outboxWake.trySend(Unit)
     }
 
-    private fun scheduleOutboxRetry() {
-        if (outboxRetryJob?.isActive == true) return
+    private fun scheduleOutboxRetry(delayMs: Long = OUTBOX_RETRY_BACKOFF_MS) {
+        val dueAt = System.currentTimeMillis() + delayMs
+        if (outboxRetryJob?.isActive == true) {
+            if (outboxRetryDueAt <= dueAt) return
+            outboxRetryJob?.cancel()
+        }
+        outboxRetryDueAt = dueAt
         outboxRetryJob = repositoryScope.launch {
-            delay(OUTBOX_RETRY_BACKOFF_MS)
+            delay(delayMs)
             scheduleOutboxFlush()
         }
     }
+
+    /** True when a dispatch of [messageId] may go out now: already paid by the send gate, or a token is taken. */
+    private fun admitDispatch(messageId: String) = prepaid.contains(messageId) || chatBudget.tryConsume()
 
     private suspend fun flushOutbox() = outboxMutex.withLock {
         val now = System.currentTimeMillis()
@@ -151,6 +167,7 @@ internal class MeshOutboundDelivery(
         if (readyDevices.isEmpty()) return
 
         var retryRejectedDispatch = false
+        var budgetDeferred = false
         for ((message, targetName) in pendingMessages) {
             if (targetName == null && (message.conversationKind.startsWith("LEGACY_") || message.isSOS ||
                     (message.conversationKind == "SOS" && sosRepository?.canReply(message.sosId) != true))) {
@@ -194,7 +211,12 @@ internal class MeshOutboundDelivery(
                 if (transmission != null) privateProgress[message.id] = PrivateTransferProgress(transmission, directedRouteList.size - 1)
                 val dispatchResult = when (delivery) {
                     is PrivateDeliveryPlanner.Target.Endpoint -> {
-                        networkManager.sendDirectPayload(delivery.endpointId, payloadBytes)
+                        if (admitDispatch(message.id)) {
+                            networkManager.sendDirectPayload(delivery.endpointId, payloadBytes)
+                        } else {
+                            budgetDeferred = true // stays PENDING until a token refills
+                            null
+                        }
                     }
                     PrivateDeliveryPlanner.Target.Unavailable -> {
                         null
@@ -202,6 +224,7 @@ internal class MeshOutboundDelivery(
                 }
                 if (dispatchResult?.accepted == true) {
                     messageStore.markSent(message.id)
+                    prepaid.remove(message.id)
                     awaitPrivateReceipt(message.id)
                 } else {
                     privateProgress.remove(message.id)
@@ -226,6 +249,10 @@ internal class MeshOutboundDelivery(
                     senderNodeId = message.senderNodeId.ifBlank { networkManager.myNodeId },
                     ttl = networkManager.currentMeshTtl()
                 )
+                if (!admitDispatch(message.id)) {
+                    budgetDeferred = true // stays PENDING until a token refills
+                    continue
+                }
                 val result = if (message.isSOS) {
                     networkManager.broadcastPriorityPayload(payloadBytes)
                 } else {
@@ -233,8 +260,10 @@ internal class MeshOutboundDelivery(
                 }
                 if (result.anyAccepted) {
                     messageStore.markSent(message.id)
+                    prepaid.remove(message.id)
                 } else if (result.neighbors.values.any { it == edu.cit.resqmesh.core.network.TransportDispatchResult.REJECTED_INVALID_FRAME }) {
                     messageStore.expirePending(message.id)
+                    prepaid.remove(message.id)
                 } else {
                     retryRejectedDispatch = true
                 }
@@ -242,6 +271,9 @@ internal class MeshOutboundDelivery(
         }
         if (retryRejectedDispatch) {
             scheduleOutboxRetry()
+        } else if (budgetDeferred) {
+            chatBudget.refresh()
+            scheduleOutboxRetry(chatBudget.state.value.nextRefillInMs.coerceAtLeast(MIN_BUDGET_RETRY_MS))
         }
     }
 
@@ -280,6 +312,7 @@ internal class MeshOutboundDelivery(
 
         val message = ChatMessage(messageId, myNodeName, text, imageBase64, audioBase64, locationLat, locationLng, true, false, timestamp,
             conversationKind = conversationKind, channelId = channelId, sosId = sosId, senderNodeId = networkManager.myNodeId)
+        prepaid.add(messageId)
         repositoryScope.launch {
             outboxMutex.withLock {
                 if (conversationKind == "SOS" && sosRepository?.canReply(sosId) != true) {
@@ -293,8 +326,10 @@ internal class MeshOutboundDelivery(
                 } else if (isSOS) networkManager.broadcastPriorityPayload(payloadBytes) else networkManager.broadcastPayload(payloadBytes)
                 if (result.anyAccepted) {
                     messageStore.markSent(messageId)
+                    prepaid.remove(messageId)
                 } else if (result.neighbors.values.any { it == edu.cit.resqmesh.core.network.TransportDispatchResult.REJECTED_INVALID_FRAME }) {
                     messageStore.expirePending(messageId)
+                    prepaid.remove(messageId)
                 } else {
                     scheduleOutboxRetry()
                 }
@@ -315,6 +350,7 @@ internal class MeshOutboundDelivery(
             return false
         }
 
+        prepaid.add(msgId)
         val readyDevices = readyConnectedDevices()
         val directedRouteList = if (readyDevices.isNotEmpty()) meshRouter.findShortestPath(myNodeName, currentTarget, readyDevices) else emptyList()
         val targetPubKey = publicKeys.trustedKey(currentTarget)
@@ -366,6 +402,7 @@ internal class MeshOutboundDelivery(
                 "Private message to ${AppLogger.redactName(targetName)} was not sent: " +
                     "recipient key unavailable or encryption failed"
             )
+            prepaid.remove(msgId)
             return false
         }
 
@@ -390,6 +427,7 @@ internal class MeshOutboundDelivery(
                 AppLogger.d("MeshNetwork_E2EE", "PRIVATE_DISPATCH message=$msgId result=$dispatchResult elapsedMs=${android.os.SystemClock.elapsedRealtime()}")
                 if (dispatchResult?.accepted == true) {
                     messageStore.markSent(msgId)
+                    prepaid.remove(msgId)
                     awaitPrivateReceipt(msgId)
                 } else {
                     privateProgress.remove(msgId)
