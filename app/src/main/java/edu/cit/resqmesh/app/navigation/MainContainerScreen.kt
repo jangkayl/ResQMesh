@@ -84,6 +84,8 @@ fun MainContainerScreen(
     val incomingSosAlert by commsViewModel.incomingSosAlert.collectAsState()
     val activeSosMessageId by commsViewModel.activeSosMessageId.collectAsState()
     val locationStatus by commsViewModel.locationStatus.collectAsState()
+    val autoDetectLocation by commsViewModel.autoDetectLocation.collectAsState()
+    val lastLocationFix by commsViewModel.lastLocationFix.collectAsState()
 
     LaunchedEffect(incomingSosAlert) {
         incomingSosAlert?.let { alert ->
@@ -185,12 +187,23 @@ fun MainContainerScreen(
                         isSOSActive = false
                         showSosHub = true
                     }
+                    val availability by edu.cit.resqmesh.core.ui.components.location.rememberLocationAvailability()
+                    val fixLocation = edu.cit.resqmesh.core.ui.components.location.rememberLocationFixAction(
+                        onChanged = commsViewModel::refreshLocationTracking
+                    )
                     SOSBroadcastScreen(
                         onCancel = cancelSosBroadcast,
-                        onSosTriggered = { type ->
-                            commsViewModel.sendEmergencySOS(type) { id -> sosThreadId = id; showSosHub = false }
+                        onSosTriggered = { type, includeLocation ->
+                            commsViewModel.sendEmergencySOS(type, includeLocation) { id ->
+                                sosThreadId = id
+                                showSosHub = false
+                            }
                             isSOSActive = false
-                        }
+                        },
+                        availability = availability,
+                        autoDetectLocation = autoDetectLocation,
+                        lastFix = lastLocationFix,
+                        onFixLocation = fixLocation
                     )
                     BackHandler(onBack = cancelSosBroadcast)
                 }

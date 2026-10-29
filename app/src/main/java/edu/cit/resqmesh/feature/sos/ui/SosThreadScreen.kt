@@ -177,6 +177,9 @@ fun SosThreadScreen(
         onBack = leave,
         header = { isCompact ->
             if (alert != null) {
+                val locationWithheld = remember(id, alert.latitude) {
+                    alert.latitude == null && vm.isOwnSos(alert) && vm.isSosLocationWithheld(id)
+                }
                 if (isCompact) {
                     CompactSosHeader(
                         alert = alert,
@@ -189,7 +192,8 @@ fun SosThreadScreen(
                         onEnd = { confirmEnd = true },
                         onSilence = { vm.silenceSos(id) },
                         onActivity = { showActivity = true },
-                        isOwner = vm.isOwnSos(alert)
+                        isOwner = vm.isOwnSos(alert),
+                        locationWithheld = locationWithheld
                     )
                 } else {
                     ExpandedSosHeader(
@@ -203,7 +207,8 @@ fun SosThreadScreen(
                         onEnd = { confirmEnd = true },
                         onSilence = { vm.silenceSos(id) },
                         onActivity = { showActivity = true },
-                        isOwner = vm.isOwnSos(alert)
+                        isOwner = vm.isOwnSos(alert),
+                        locationWithheld = locationWithheld
                     )
                 }
             }

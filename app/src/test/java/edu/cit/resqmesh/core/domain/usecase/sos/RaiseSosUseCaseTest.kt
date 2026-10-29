@@ -3,6 +3,7 @@ package edu.cit.resqmesh.core.domain.usecase.sos
 import android.location.Location
 import edu.cit.resqmesh.core.domain.repository.SosAlertRepository
 import edu.cit.resqmesh.core.location.LocationClient
+import edu.cit.resqmesh.core.location.LocationFix
 import edu.cit.resqmesh.core.location.LocationStatus
 import edu.cit.resqmesh.core.model.SosActivity
 import edu.cit.resqmesh.core.model.SosAlert
@@ -49,6 +50,22 @@ class RaiseSosUseCaseTest {
         val repo = FakeSos()
         RaiseSosUseCase(FakeLocation(null), repo) { now }("FIRE")
         assertEquals(Created("FIRE", null, null, null, null), repo.created.single())
+    }
+
+    @Test
+    fun excludedLocationSendsNoCoordinatesEvenWithFreshFix() = runTest {
+        val repo = FakeSos()
+        val location = FakeLocation(fix(now - 1_000L))
+        RaiseSosUseCase(location, repo) { now }.raise("MEDICAL", SosRaiseCharge.NONE, includeLocation = false)
+        assertEquals(Created("MEDICAL", null, null, null, null), repo.created.single())
+        assertEquals(0, location.pinpointRequests)
+    }
+
+    @Test
+    fun includedLocationIsTheDefault() = runTest {
+        val repo = FakeSos()
+        RaiseSosUseCase(FakeLocation(fix(now - 1_000L)), repo) { now }.raise("MEDICAL", SosRaiseCharge.NONE)
+        assertEquals(14.5, repo.created.single().lat)
     }
 
     @Test
@@ -105,10 +122,12 @@ class RaiseSosUseCaseTest {
     private class FakeLocation(private val cached: Location?) : LocationClient {
         private var pending: ((Location?) -> Unit)? = null
         override val locationStatus: StateFlow<LocationStatus> = MutableStateFlow(LocationStatus.IDLE)
+        override val lastFix: StateFlow<LocationFix?> = MutableStateFlow(null)
+        var pinpointRequests = 0
         override fun startTracking(interval: Long) = Unit
         override fun stopTracking() = Unit
         override fun getLastKnownLocation(): Location? = cached
-        override fun requestPinpointLocation(onResult: (Location?) -> Unit) { pending = onResult }
+        override fun requestPinpointLocation(onResult: (Location?) -> Unit) { pinpointRequests++; pending = onResult }
         fun deliver(location: Location?) { pending?.invoke(location) }
     }
 

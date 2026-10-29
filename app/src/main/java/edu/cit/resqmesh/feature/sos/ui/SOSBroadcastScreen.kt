@@ -4,6 +4,12 @@ import edu.cit.resqmesh.feature.sos.ui.broadcast.BroadcastIllumination
 import edu.cit.resqmesh.feature.sos.ui.EmergencyProfile
 import edu.cit.resqmesh.feature.sos.ui.broadcast.MinimalistEmergencyCard
 import edu.cit.resqmesh.feature.sos.ui.broadcast.SlideToBroadcastSlider
+import edu.cit.resqmesh.feature.sos.ui.broadcast.SosLocationRow
+import edu.cit.resqmesh.feature.sos.ui.broadcast.sosLocationRowModel
+import edu.cit.resqmesh.core.location.LocationFix
+import edu.cit.resqmesh.core.ui.components.location.LocationAvailability
+import androidx.compose.runtime.saveable.rememberSaveable
+import kotlinx.coroutines.delay
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.BorderStroke
@@ -49,7 +55,11 @@ import edu.cit.resqmesh.core.ui.theme.TestResQMeshTheme
 @Composable
 fun SOSBroadcastScreen(
     onCancel: () -> Unit,
-    onSosTriggered: (String) -> Unit = {}
+    onSosTriggered: (type: String, includeLocation: Boolean) -> Unit = { _, _ -> },
+    availability: LocationAvailability = LocationAvailability.AVAILABLE,
+    autoDetectLocation: Boolean = true,
+    lastFix: LocationFix? = null,
+    onFixLocation: (LocationAvailability) -> Unit = {}
 ) {
     val isLight = MaterialTheme.colorScheme.background.luminance() > 0.5f
 
@@ -87,6 +97,13 @@ fun SOSBroadcastScreen(
     }
 
     var selectedIndex by remember { mutableIntStateOf(0) }
+    var includeLocation by rememberSaveable { mutableStateOf(true) }
+    val now by produceState(System.currentTimeMillis()) {
+        while (true) {
+            delay(FIX_AGE_TICK_MS)
+            value = System.currentTimeMillis()
+        }
+    }
     val currentProfile = emergencyTypes[selectedIndex]
 
     val animatedAccentColor by animateColorAsState(
@@ -288,63 +305,16 @@ fun SOSBroadcastScreen(
 
                 Spacer(Modifier.height(24.dp))
 
-                // 4. Hardware & Telemetry Diagnostic Strip
-                Surface(
-                    shape = RoundedCornerShape(16.dp),
-                    color = if (isLight) Color.White else Color(0xFF11141D),
-                    border = BorderStroke(1.dp, if (isLight) MaterialTheme.colorScheme.outlineVariant else Color(0xFF1E2433)),
-                    shadowElevation = if (isLight) 4.dp else 0.dp,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 12.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(
-                                imageVector = Icons.Default.GpsFixed,
-                                contentDescription = null,
-                                tint = ResQTheme.colors.success,
-                                modifier = Modifier.size(15.dp)
-                            )
-                            Spacer(Modifier.width(6.dp))
-                            Text(
-                                text = "GPS FIXED",
-                                fontFamily = FontFamily.Monospace,
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = ResQTheme.colors.success
-                            )
-                        }
-
-                        Box(
-                            modifier = Modifier
-                                .height(16.dp)
-                                .width(1.dp)
-                                .background(if (isLight) MaterialTheme.colorScheme.outlineVariant else Color(0xFF263045))
-                        )
-
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(
-                                imageVector = Icons.Default.Sensors,
-                                contentDescription = null,
-                                tint = animatedAccentColor,
-                                modifier = Modifier.size(15.dp)
-                            )
-                            Spacer(Modifier.width(6.dp))
-                            Text(
-                                text = "DECENTRALIZED RELAY",
-                                fontFamily = FontFamily.Monospace,
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = if (isLight) MaterialTheme.colorScheme.onSurface else Color.White.copy(alpha = 0.85f)
-                            )
-                        }
-                    }
-                }
+                // 4. Location choice: included by default for each new SOS, one tap to leave it out.
+                SosLocationRow(
+                    model = sosLocationRowModel(includeLocation, availability, autoDetectLocation, lastFix, now),
+                    includeLocation = includeLocation,
+                    onIncludeChange = {
+                        includeLocation = it
+                        haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                    },
+                    onFixProblem = onFixLocation
+                )
             }
 
             Spacer(Modifier.height(32.dp))
@@ -359,7 +329,7 @@ fun SOSBroadcastScreen(
                     emergencyTitle = currentProfile.title,
                     isLight = isLight,
                     onConfirm = {
-                        onSosTriggered(currentProfile.title)
+                        onSosTriggered(currentProfile.title, includeLocation)
                     }
                 )
 
@@ -388,6 +358,8 @@ fun SOSBroadcastScreen(
  * Requires an intentional full horizontal swipe to trigger the SOS,
  * preventing accidental touch activations. Adapts smoothly to Light/Dark modes.
  */
+
+private const val FIX_AGE_TICK_MS = 30_000L
 
 @Preview(name = "SOS — Minimalist & Secure Dark", widthDp = 390, heightDp = 844)
 @Composable

@@ -49,7 +49,9 @@ internal fun ExpandedSosHeader(
     onEnd: () -> Unit,
     onSilence: () -> Unit,
     onActivity: () -> Unit,
-    isOwner: Boolean
+    isOwner: Boolean,
+    /** Own SOS sent with "Include my location" off. */
+    locationWithheld: Boolean = false
 ) {
     val isLight = MaterialTheme.colorScheme.background.luminance() > 0.5f
     val statusTimestamp = when {
@@ -225,6 +227,7 @@ internal fun ExpandedSosHeader(
                         Text(
                             text = when {
                                 alert.latitude != null -> "Pinned (${String.format(java.util.Locale.US, "%.4f, %.4f", alert.latitude, alert.longitude)}) · ±${alert.accuracyMeters?.toInt() ?: "?"}m"
+                                locationWithheld -> "Location not shared"
                                 alert.ended -> "Location telemetry unavailable"
                                 else -> "Acquiring GPS location..."
                             },
@@ -320,7 +323,9 @@ internal fun CompactSosHeader(
     onEnd: () -> Unit,
     onSilence: () -> Unit,
     onActivity: () -> Unit,
-    isOwner: Boolean
+    isOwner: Boolean,
+    /** Own SOS sent with "Include my location" off. */
+    locationWithheld: Boolean = false
 ) {
     val isLight = MaterialTheme.colorScheme.background.luminance() > 0.5f
     Surface(
@@ -407,7 +412,12 @@ internal fun CompactSosHeader(
                 )
                 Spacer(Modifier.width(2.dp))
                 Text(
-                    text = if (alert.latitude != null) "±${alert.accuracyMeters?.toInt() ?: "?"}m" else if (alert.ended) "No GPS" else "Acquiring...",
+                    text = when {
+                        alert.latitude != null -> "±${alert.accuracyMeters?.toInt() ?: "?"}m"
+                        locationWithheld -> "Not shared"
+                        alert.ended -> "No GPS"
+                        else -> "Acquiring..."
+                    },
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,

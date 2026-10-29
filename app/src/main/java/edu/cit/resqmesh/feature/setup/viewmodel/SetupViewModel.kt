@@ -26,7 +26,8 @@ data class MeshStartError(val message: String, val needsAppPermission: Boolean =
 class SetupViewModel(
     private val useCases: edu.cit.resqmesh.core.domain.usecase.MeshUseCases,
     private val identityProvider: LocalUserRepository,
-    private val meshSessionController: MeshSessionController
+    private val meshSessionController: MeshSessionController,
+    private val locationPreferences: edu.cit.resqmesh.core.location.LocationPreferences
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ConnectionUiState())
@@ -38,6 +39,7 @@ class SetupViewModel(
     private val _isLongRangeProfile = MutableStateFlow(true)
     val isLongRangeProfile: StateFlow<Boolean> = _isLongRangeProfile.asStateFlow()
     val isBackgroundMeshEnabled: StateFlow<Boolean> = meshSessionController.backgroundMeshEnabled
+    val isAutoDetectLocationEnabled: StateFlow<Boolean> = locationPreferences.autoDetectEnabled
 
     init {
         viewModelScope.launch {
@@ -177,5 +179,10 @@ class SetupViewModel(
 
     fun setBackgroundMeshEnabled(enabled: Boolean) {
         meshSessionController.setBackgroundMeshEnabled(enabled)
+    }
+
+    /** Tracking reacts to this preference in CommunicationViewModel. */
+    fun setAutoDetectLocationEnabled(enabled: Boolean) {
+        locationPreferences.setAutoDetectEnabled(enabled)
     }
 }

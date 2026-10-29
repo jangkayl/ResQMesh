@@ -84,6 +84,7 @@ val platformModule = module {
     single { MediaHelper(androidContext()) }
     single { NotificationHelper(androidContext()) }
     single<LocationClient> { DefaultLocationClient(androidContext()) }
+    single { edu.cit.resqmesh.core.location.LocationPreferences(androidContext()) }
     single<LocationClientFactory> { DefaultLocationClientFactory(androidContext()) }
 
     // Offline map package management
@@ -236,7 +237,14 @@ val viewModelModule = module {
             useCases.sendPublicMessage.conversation("RADIO", channel, "", "Voice message", audio).isNotEmpty()
         }
     }
-    viewModel { SetupViewModel(useCases = get(), identityProvider = get(), meshSessionController = get()) }
+    viewModel {
+        SetupViewModel(
+            useCases = get(),
+            identityProvider = get(),
+            meshSessionController = get(),
+            locationPreferences = get()
+        )
+    }
     viewModel { RadarViewModel(get()) }
     viewModel {
         CommunicationViewModel(
@@ -248,7 +256,8 @@ val viewModelModule = module {
             sendPrivate = get(),
             chatBudget = get(),
             sosBudget = get(),
-            voiceHold = get()
+            voiceHold = get(),
+            locationPreferences = get()
         )
     }
     viewModel { WalkieTalkieViewModel(useCases = get(), mediaHelper = get(), liveAudioEngine = get()) }

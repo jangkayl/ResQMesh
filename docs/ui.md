@@ -1,6 +1,6 @@
 # UI guidance
 
-Last reviewed: 2026-10-06. Baseline: see [status](status.md); incident UI repairs are recorded on `fix/incident-ui-ux`. Use Compose/Material 3; inspect current source.
+Last reviewed: 2026-10-06. Baseline: see [status](status.md). Use Compose/Material 3; inspect current source.
 
 ## Components and ownership
 
@@ -37,7 +37,7 @@ Community, each Radio channel and each SOS isolate history/unread/drafts. Save o
 
 SOS creation uses deliberate slide-to-send; early release resets. Creation Cancel/Back returns to the hub. Sender thread Back preserves SOS and its reopen banner. End requires confirmation; receiver Back silences locally. Alert-specific cancellation cannot end another alert; terminal history stays read-only. Show queued, link-sent and neighbor-confirmed states separately.
 
-SOS cards retain category/status/transmission, location accuracy, time and history. Header time fallback never proves GPS freshness. Reserve measured floating-header/reminder regions, reverse conversations and keep latest messages/composer above the IME. Short/large-text threads expose scrollable SOS controls; badges wrap. Ended badges say ENDED, not rescue completed.
+SOS location row: per-SOS include (default on), Allow/Turn on, never blocks sending. SOS cards retain category/status/transmission, location accuracy, time and history. Header time fallback never proves GPS freshness. Reserve measured floating-header/reminder regions, reverse conversations and keep latest messages/composer above the IME. Short/large-text threads expose scrollable SOS controls; badges wrap. Ended badges say ENDED, not rescue completed.
 
 Incidents use historical reporter names and ownership badges. Identity loading/errors explain unavailable controls. Details use one page and docked actions. Selected offers cannot be edited; withdrawal removes selection and requires fresh approval. Route loss never reassigns. Connection labels describe the selected helper's actual route.
 

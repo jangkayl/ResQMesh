@@ -17,6 +17,7 @@ import android.content.pm.PackageManager
 import android.location.LocationManager
 import androidx.core.content.ContextCompat
 import androidx.core.location.LocationManagerCompat
+import edu.cit.resqmesh.core.location.LocationFix
 import edu.cit.resqmesh.core.location.LocationStatus
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -28,6 +29,14 @@ class DefaultLocationClient(
 
     private val client: FusedLocationProviderClient = LocationServices.getFusedLocationProviderClient(context.applicationContext)
     private var cachedLocation: Location? = null
+        set(value) {
+            field = value
+            _lastFix.value = value?.let {
+                LocationFix(it.accuracy, it.time.takeIf { t -> t > 0 } ?: System.currentTimeMillis())
+            }
+        }
+    private val _lastFix = MutableStateFlow<LocationFix?>(null)
+    override val lastFix: StateFlow<LocationFix?> = _lastFix.asStateFlow()
     private var pinpointCancellation: com.google.android.gms.tasks.CancellationTokenSource? = null
     override fun cancelPinpointLocation() { pinpointCancellation?.cancel(); pinpointCancellation = null }
     private var locationCallback: LocationCallback? = null
@@ -51,12 +60,16 @@ class DefaultLocationClient(
             return
         }
 
+        // Replace, never stack, update callbacks: a leaked one could not be removed later.
+        locationCallback?.let { client.removeLocationUpdates(it) }
+        locationCallback = null
         _locationStatus.value = LocationStatus.ACQUIRING
 
         // Check if we already have a reasonably fresh cached location
         try {
             client.lastLocation.addOnSuccessListener { loc ->
-                if (loc != null) {
+                // Tracking may have stopped (auto-detect off) before this arrives.
+                if (loc != null && locationCallback != null) {
                     cachedLocation = loc
                     _locationStatus.value = LocationStatus.READY
                 }
@@ -94,6 +107,10 @@ class DefaultLocationClient(
         if (cachedLocation == null) {
             _locationStatus.value = LocationStatus.IDLE
         }
+    }
+
+    override fun clearCachedLocation() {
+        cachedLocation = null
     }
 
     override fun getLastKnownLocation(): Location? {
