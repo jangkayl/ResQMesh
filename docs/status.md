@@ -37,9 +37,9 @@ Basic block, incident, SOS and recovery checks have user-reported successes; the
 
 **Dead screens**: merged; device pending.
 
-**Location controls** (`feat/location-controls`): local checks pass; [card](testing/location-controls-card.md) pending.
+**Location controls** (`feat/location-controls`): local checks pass; [card](testing/location-controls-card.md) pending. Incident alerts: [card](testing/incident-notifications-card.md).
 
-**Batch A cleanup** (branch `refactor/batch-a-cleanup`): dead incident UI removed, two thread-safety fixes, swallowed-exception logging, debug-only Logcat and named timer constants. Local checks pass; the user reported all [smoke card](testing/batch-a-cleanup-smoke-card.md) steps working on 2026-10-16 (build hash, models and counts not supplied). Remaining review work: revision-plan phases P1–P6.
+**Batch A cleanup** (branch `refactor/batch-a-cleanup`): dead incident UI removed, two thread-safety fixes, swallowed-exception logging, debug-only Logcat and named timer constants. Local checks pass; the user reported all [smoke card](testing/batch-a-cleanup-smoke-card.md) steps working on 2026-10-16 (build, models, counts not supplied). Remaining review work: revision-plan phases P1–P6.
 
 ## Next actions
 

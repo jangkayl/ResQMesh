@@ -27,7 +27,8 @@ class SetupViewModel(
     private val useCases: edu.cit.resqmesh.core.domain.usecase.MeshUseCases,
     private val identityProvider: LocalUserRepository,
     private val meshSessionController: MeshSessionController,
-    private val locationPreferences: edu.cit.resqmesh.core.location.LocationPreferences
+    private val locationPreferences: edu.cit.resqmesh.core.location.LocationPreferences,
+    private val notificationPreferences: edu.cit.resqmesh.core.notification.NotificationPreferences
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ConnectionUiState())
@@ -40,6 +41,7 @@ class SetupViewModel(
     val isLongRangeProfile: StateFlow<Boolean> = _isLongRangeProfile.asStateFlow()
     val isBackgroundMeshEnabled: StateFlow<Boolean> = meshSessionController.backgroundMeshEnabled
     val isAutoDetectLocationEnabled: StateFlow<Boolean> = locationPreferences.autoDetectEnabled
+    val isIncidentAlertsEnabled: StateFlow<Boolean> = notificationPreferences.incidentAlertsEnabled
 
     init {
         viewModelScope.launch {
@@ -184,5 +186,9 @@ class SetupViewModel(
     /** Tracking reacts to this preference in CommunicationViewModel. */
     fun setAutoDetectLocationEnabled(enabled: Boolean) {
         locationPreferences.setAutoDetectEnabled(enabled)
+    }
+
+    fun setIncidentAlertsEnabled(enabled: Boolean) {
+        notificationPreferences.setIncidentAlertsEnabled(enabled)
     }
 }

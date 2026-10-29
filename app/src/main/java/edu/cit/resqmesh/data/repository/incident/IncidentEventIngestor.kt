@@ -1,6 +1,8 @@
 package edu.cit.resqmesh.data.repository.incident
 
 import edu.cit.resqmesh.core.model.EventType
+import edu.cit.resqmesh.core.model.Incident
+import edu.cit.resqmesh.data.mapper.toModel
 import edu.cit.resqmesh.core.logging.AppLogger
 import edu.cit.resqmesh.data.local.dao.DomainEventDao
 import edu.cit.resqmesh.data.local.dao.IncidentDao
@@ -28,7 +30,8 @@ internal class IncidentEventIngestor(
     private val syncCoordinatorProvider: () -> IncidentSyncCoordinator?,
     private val broadcast: (DomainEventEntity, Boolean) -> Unit,
     private val legacyProjection: suspend (DomainEventEntity) -> Boolean,
-    private val rejectEvent: suspend (DomainEventEntity, String) -> Boolean
+    private val rejectEvent: suspend (DomainEventEntity, String) -> Boolean,
+    private val notifyApplied: suspend (DomainEventEntity, Incident) -> Unit = { _, _ -> }
 ) {
     private val helpWorkflow get() = helpWorkflowProvider()
     private val syncCoordinator get() = syncCoordinatorProvider()
@@ -94,10 +97,24 @@ internal class IncidentEventIngestor(
             stored != null && stored.validationStatus != "REJECTED" -> IncidentIngestionResult.DEFERRED
             else -> IncidentIngestionResult.REJECTED
         }
-        if (result == IncidentIngestionResult.APPLIED) syncCoordinator?.changed()
+        if (result == IncidentIngestionResult.APPLIED) {
+            syncCoordinator?.changed()
+            if (!rebuilding) notifyAppliedSafely(event)
+        }
         if (result == IncidentIngestionResult.DEFERRED)
             AppLogger.d("INCIDENT_SYNC", "DEPENDENCY_PENDING incident=${event.entityId}")
         return result
+    }
+
+    private suspend fun notifyAppliedSafely(event: DomainEventEntity) {
+        try {
+            val incident = incidentDao.getIncidentById(event.entityId)?.toModel() ?: return
+            notifyApplied(event, incident)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (e: Exception) {
+            AppLogger.d("INCIDENT_REPO", "Incident notification failed")
+        }
     }
 
     private suspend fun applyIncomingEventProjection(event: DomainEventEntity): Boolean {

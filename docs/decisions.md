@@ -90,7 +90,7 @@ Broadcasts stay the fast path; periodic history/state digest comparison repairs 
 
 Community, Radio and SOS keep independent history, drafts and unread state. SOS ownership belongs to the origin key: sender Back preserves it, receiver silence is local, and only signed origin termination ends it, reconciled after reconnect. Matching builds are required. Details: [architecture](architecture.md).
 
-Deferred designs are in the [archive index](../archive/docs-superseded-2026-10-04/README.md); evidence and failures are in [validation](validation.md) and [status](status.md).
+Deferred designs: [archive index](../archive/docs-superseded-2026-10-04/README.md).
 
 ## D23: Preserve behavior during networking decomposition
 
@@ -98,7 +98,7 @@ Structural refactors preserve facade APIs, callback order, generation fences, pe
 
 ## D24: Private-envelope crypto direction
 
-Keep hybrid encryption. After the demo, version the envelope: RSA-OAEP-SHA256 key wrap under a new Keystore alias and AES-GCM AAD binding version, sender, recipient and message ID, with v1 decryption kept for migration. These add no meaningful latency or size. Superseded on 2026-10-17 by D26: v2 goes straight to X25519 plus Ed25519 through Tink in one wire break. Until it ships, no authenticated E2EE claim; forward secrecy is never claimed.
+Keep hybrid encryption. After the demo, version the envelope: RSA-OAEP-SHA256 key wrap under a new Keystore alias and AES-GCM AAD binding version, sender, recipient and message ID, with v1 decryption kept for migration. Superseded on 2026-10-17 by D26 (X25519 plus Ed25519 through Tink). Until it ships, no authenticated E2EE claim; forward secrecy is never claimed.
 
 ## D26: Origin-charged limits and a single wire break
 
@@ -111,3 +111,7 @@ Enforce layer boundaries with package moves and `scripts/ci/check_boundaries.ps1
 ## D27: User-controlled location
 
 Auto-detect defaults on; each SOS may exclude location; location never blocks SOS. No background location or withheld wire flag.
+
+## D28: Incident notifications
+
+New Critical/Serious incidents notify everyone unless toggled off; reporter/helper alerts are ungated. Own events, replay and incidents over 30 minutes old stay silent.

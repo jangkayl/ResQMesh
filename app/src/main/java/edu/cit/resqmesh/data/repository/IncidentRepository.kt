@@ -5,6 +5,10 @@ import edu.cit.resqmesh.data.repository.incident.IncidentEventIngestor
 import edu.cit.resqmesh.data.repository.incident.LegacyIncidentProjection
 import edu.cit.resqmesh.data.repository.incident.LegacyIncidentSync
 import edu.cit.resqmesh.core.network.MeshNetworkGateway
+import edu.cit.resqmesh.core.model.Incident
+import edu.cit.resqmesh.core.notification.IncidentEventNotice
+import edu.cit.resqmesh.core.notification.IncidentLocalIdentity
+import edu.cit.resqmesh.core.notification.IncidentNotifier
 import edu.cit.resqmesh.core.network.MeshPayload
 import edu.cit.resqmesh.core.network.ratelimit.SingleFlightGate
 import edu.cit.resqmesh.core.logging.AppLogger
@@ -36,7 +40,8 @@ class IncidentRepository(
     private val readyPeerEvents: MeshReadyPeerEvents? = null,
     private val offerDao: IncidentOfferDao? = null,
     private val database: AppDatabase? = null,
-    private val eventSigning: IncidentEventSigning? = null
+    private val eventSigning: IncidentEventSigning? = null,
+    private val incidentNotifier: IncidentNotifier? = null
 ) {
     private val ingestor: IncidentEventIngestor = createEventIngestor()
     private val helpWorkflow = if (offerDao != null && eventSigning != null)
@@ -265,6 +270,16 @@ class IncidentRepository(
         ::broadcastDomainEvent
     )
 
+    private suspend fun notifyIncidentApplied(event: DomainEventEntity, incident: Incident) {
+        val notifier = incidentNotifier ?: return
+        val signingKey = eventSigning?.publicKey ?: return
+        val local = IncidentLocalIdentity(identityManager.getUserId(), identityManager.getDeviceId(), signingKey)
+        notifier.applied(
+            IncidentEventNotice(event.eventType, event.actorId, event.actorName, event.logicalVersion, local),
+            incident
+        )
+    }
+
     private fun createEventIngestor() = IncidentEventIngestor(
         incidentDao,
         domainEventDao,
@@ -274,7 +289,8 @@ class IncidentRepository(
         { syncCoordinator },
         ::broadcastDomainEvent,
         ::applyLegacyProjection,
-        ::rejectIncoming
+        ::rejectIncoming,
+        ::notifyIncidentApplied
     )
 
     private fun createLegacyIncidentProjection() = LegacyIncidentProjection(

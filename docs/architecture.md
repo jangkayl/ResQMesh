@@ -63,11 +63,11 @@ Presentation screens retain state/effects/launchers and scopes; visual sections 
 
 ## Maps, notifications and sessions
 
-MapLibre renders versioned local PMTiles. Signed manifests use P-256 verification with Ed25519 fallback, hash/completion checks and atomic activation. Private notifications use MessagingStyle; SOS uses CATEGORY_ALARM. Cold launches retain setup gates.
+MapLibre renders versioned local PMTiles. Signed manifests use P-256 verification with Ed25519 fallback, hash/completion checks and atomic activation. Private notifications use MessagingStyle; SOS uses CATEGORY_ALARM. Incident alerts follow D28. Cold launches retain setup gates.
 
 `LocationPreferences` gates foreground-only tracking (default on); excluded SOS location sends no coordinates or refine. MeshSessionController owns start/stop. Opt-in MeshForegroundService is a non-sticky connectedDevice anchor with a silent, debounced notification; no boot receiver or wake lock. Go offline stops radio/service. Unexpected service destruction stops transport; disabled background mode stops on activity destruction except configuration changes.
 
-[Structural scope and remaining candidates](../archive/docs-superseded-2026-10-16/plans/network-maintainability-refactor.md) records completed ownership extractions, final-candidate user-reported phone passes and unresolved automated checks.
+[Structural scope and remaining candidates](../archive/docs-superseded-2026-10-16/plans/network-maintainability-refactor.md) records extractions, phone passes and open checks.
 
 ## Evidence and source navigation
 

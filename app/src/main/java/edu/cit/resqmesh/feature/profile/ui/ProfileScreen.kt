@@ -63,6 +63,7 @@ fun ProfileScreen(
     val isLongRangeProfile by viewModel.isLongRangeProfile.collectAsState()
     val isBackgroundMeshEnabled by viewModel.isBackgroundMeshEnabled.collectAsState()
     val isAutoDetectLocation by viewModel.isAutoDetectLocationEnabled.collectAsState()
+    val isIncidentAlerts by viewModel.isIncidentAlertsEnabled.collectAsState()
     var showConnectionConfirm by remember { mutableStateOf(false) }
     var connectionError by remember { mutableStateOf<MeshStartError?>(null) }
     val scope = rememberCoroutineScope()
@@ -298,6 +299,25 @@ fun ProfileScreen(
                         Switch(
                             checked = isAutoDetectLocation,
                             onCheckedChange = viewModel::setAutoDetectLocationEnabled
+                        )
+                    }
+                )
+                DividerLine()
+                SettingRow(
+                    icon = Icons.Default.NotificationsActive,
+                    title = "New incident alerts",
+                    subtitle = if (isIncidentAlerts) {
+                        "Notifies you of new Critical and Serious incidents. Updates on your own reports always notify."
+                    } else {
+                        "Off. You still get updates on incidents you report or lead."
+                    },
+                    onClick = {
+                        viewModel.setIncidentAlertsEnabled(!isIncidentAlerts)
+                    },
+                    trailing = {
+                        Switch(
+                            checked = isIncidentAlerts,
+                            onCheckedChange = viewModel::setIncidentAlertsEnabled
                         )
                     }
                 )

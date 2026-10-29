@@ -30,6 +30,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.withContext
 
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 
 class IncidentViewModel(
@@ -213,6 +214,14 @@ class IncidentViewModel(
         } else {
             _incidentEvents.value = emptyList()
             _offers.value = emptyList()
+        }
+    }
+
+    /** Opens an incident from a notification; ignored when it is not in the local feed. */
+    fun selectIncidentById(id: String) {
+        viewModelScope.launch {
+            incidentRepository.getAllIncidents().first().firstOrNull { it.incidentId == id }
+                ?.let { selectIncident(it) }
         }
     }
 

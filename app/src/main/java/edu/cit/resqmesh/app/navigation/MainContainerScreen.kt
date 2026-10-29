@@ -46,6 +46,8 @@ fun MainContainerScreen(
     onAppearanceSelected: (AppAppearance) -> Unit,
     initialChatNode: String? = null,
     onClearInitialChatNode: (() -> Unit)? = null,
+    initialIncidentId: String? = null,
+    onClearInitialIncident: (() -> Unit)? = null,
     initialViewMap: Boolean = false,
     initialSosSender: String? = null,
     initialSosText: String? = null,
@@ -102,6 +104,15 @@ fun MainContainerScreen(
             currentDestination = ResQDestination.Messages
             notificationHelper.clearPrivateMessagesFor(initialChatNode)
             onClearInitialChatNode?.invoke()
+        }
+    }
+
+    // Deep link handling: open the incident a notification refers to
+    LaunchedEffect(initialIncidentId) {
+        if (!initialIncidentId.isNullOrBlank()) {
+            incidentViewModel.selectIncidentById(initialIncidentId)
+            showIncidents = true
+            onClearInitialIncident?.invoke()
         }
     }
 

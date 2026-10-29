@@ -16,6 +16,8 @@ sealed interface NavigationRequest {
     ) : NavigationRequest
 
     data class OpenChat(val nodeId: String) : NavigationRequest
+
+    data class OpenIncident(val incidentId: String) : NavigationRequest
 }
 
 /**
@@ -40,12 +42,14 @@ object NavigationRequestParser {
     const val EXTRA_SOS_TEXT = "EXTRA_SOS_TEXT"
     const val EXTRA_SOS_ID = "EXTRA_SOS_ID"
     const val EXTRA_OPEN_CHAT_NODE = "EXTRA_OPEN_CHAT_NODE"
+    const val EXTRA_OPEN_INCIDENT = "EXTRA_OPEN_INCIDENT"
 
     const val MAX_SOS_TEXT = 1000
     const val MAX_NAME = 128
     const val MAX_SOS_ID = 64
 
     private val NODE_ID = Regex("[A-Za-z0-9_-]{1,64}")
+    private val INCIDENT_ID = Regex("[A-Za-z0-9_.:-]{1,$MAX_SOS_ID}")
     private val SOS_ID = Regex("[A-Za-z0-9_.:-]{1,$MAX_SOS_ID}")
 
     /** Drops control characters, trims, and caps length; null when nothing remains. */
@@ -70,19 +74,20 @@ object NavigationRequestParser {
         val sender: String? = null,
         val text: String? = null,
         val sosId: String? = null,
-        val chatNode: String? = null
+        val chatNode: String? = null,
+        val incidentId: String? = null
     )
 
-    fun parse(extras: RawExtras): NavigationRequest? {
-        if (extras.triggerSos || extras.viewSosMap) {
-            return NavigationRequest.OpenSos(
-                sender = sanitize(extras.sender, MAX_NAME),
-                text = sanitize(extras.text, MAX_SOS_TEXT),
-                sosId = sanitize(extras.sosId, MAX_SOS_ID)?.takeIf { SOS_ID.matches(it) },
-                viewMap = true
-            )
-        }
-        return validChatNode(extras.chatNode)?.let { NavigationRequest.OpenChat(it) }
+    fun parse(extras: RawExtras): NavigationRequest? = when {
+        extras.triggerSos || extras.viewSosMap -> NavigationRequest.OpenSos(
+            sender = sanitize(extras.sender, MAX_NAME),
+            text = sanitize(extras.text, MAX_SOS_TEXT),
+            sosId = sanitize(extras.sosId, MAX_SOS_ID)?.takeIf { SOS_ID.matches(it) },
+            viewMap = true
+        )
+        else -> sanitize(extras.incidentId, MAX_SOS_ID)?.takeIf { INCIDENT_ID.matches(it) }
+            ?.let { NavigationRequest.OpenIncident(it) }
+            ?: validChatNode(extras.chatNode)?.let { NavigationRequest.OpenChat(it) }
     }
 
     fun fromIntent(intent: Intent?): NavigationRequest? {
@@ -94,7 +99,8 @@ object NavigationRequestParser {
                 sender = intent.getStringExtra(EXTRA_SOS_SENDER),
                 text = intent.getStringExtra(EXTRA_SOS_TEXT),
                 sosId = intent.getStringExtra(EXTRA_SOS_ID),
-                chatNode = intent.getStringExtra(EXTRA_OPEN_CHAT_NODE)
+                chatNode = intent.getStringExtra(EXTRA_OPEN_CHAT_NODE),
+                incidentId = intent.getStringExtra(EXTRA_OPEN_INCIDENT)
             )
         )
     }

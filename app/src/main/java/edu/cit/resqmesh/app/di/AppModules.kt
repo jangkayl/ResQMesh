@@ -85,6 +85,7 @@ val platformModule = module {
     single { NotificationHelper(androidContext()) }
     single<LocationClient> { DefaultLocationClient(androidContext()) }
     single { edu.cit.resqmesh.core.location.LocationPreferences(androidContext()) }
+    single { edu.cit.resqmesh.core.notification.NotificationPreferences(androidContext()) }
     single<LocationClientFactory> { DefaultLocationClientFactory(androidContext()) }
 
     // Offline map package management
@@ -162,6 +163,9 @@ val repositoryModule = module {
             originGate = get<InboundGuards>().origins
         )
     }
+    single<edu.cit.resqmesh.core.notification.IncidentNotifier> {
+        edu.cit.resqmesh.feature.incident.alert.IncidentAlertController(get(), get())
+    }
     single(createdAtStart = true) {
         IncidentRepository(
             incidentDao = get<AppDatabase>().incidentDao(),
@@ -172,7 +176,8 @@ val repositoryModule = module {
             identityManager = get(),
             networkGateway = get(),
             repositoryScope = get<AppCoroutineScope>().scope,
-            readyPeerEvents = get()
+            readyPeerEvents = get(),
+            incidentNotifier = get()
         )
     }
 }
@@ -242,7 +247,8 @@ val viewModelModule = module {
             useCases = get(),
             identityProvider = get(),
             meshSessionController = get(),
-            locationPreferences = get()
+            locationPreferences = get(),
+            notificationPreferences = get()
         )
     }
     viewModel { RadarViewModel(get()) }
