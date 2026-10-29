@@ -34,4 +34,12 @@ class ChatSendGateTest {
         gate.refund()
         assertEquals(20, budget.state.value.remaining)
     }
+
+    @Test fun settleRefundsOnlyWhenTheRepositoryRefusedTheSend() {
+        gate.admit("loc")
+        gate.settle(sent = true)
+        assertEquals(19, budget.state.value.remaining)
+        gate.settle(sent = false)
+        assertEquals(20, budget.state.value.remaining)
+    }
 }

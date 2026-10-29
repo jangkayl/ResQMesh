@@ -19,6 +19,7 @@ import edu.cit.resqmesh.core.network.NativeBleGateway
 import edu.cit.resqmesh.core.network.NativeBleManager
 import edu.cit.resqmesh.core.network.ratelimit.InboundGuards
 import edu.cit.resqmesh.core.network.ratelimit.OutgoingChatBudget
+import edu.cit.resqmesh.feature.comms.viewmodel.RadioVoiceHold
 import edu.cit.resqmesh.core.network.ratelimit.RateLimitPolicy
 import edu.cit.resqmesh.core.service.MeshSessionController
 import edu.cit.resqmesh.core.audio.LiveAudioEngine
@@ -227,6 +228,12 @@ val domainModule = module {
 
 /** ViewModels. */
 val viewModelModule = module {
+    single {
+        val useCases = get<MeshUseCases>()
+        RadioVoiceHold(get(), get<AppCoroutineScope>().scope) { channel, audio ->
+            useCases.sendPublicMessage.conversation("RADIO", channel, "", "Voice message", audio).isNotEmpty()
+        }
+    }
     viewModel { SetupViewModel(useCases = get(), identityProvider = get(), meshSessionController = get()) }
     viewModel { RadarViewModel(get()) }
     viewModel {
@@ -237,7 +244,8 @@ val viewModelModule = module {
             conversationRepository = get(),
             raiseSos = get(),
             sendPrivate = get(),
-            chatBudget = get()
+            chatBudget = get(),
+            voiceHold = get()
         )
     }
     viewModel { WalkieTalkieViewModel(useCases = get(), mediaHelper = get(), liveAudioEngine = get()) }

@@ -60,9 +60,11 @@ fun WalkieTalkieScreen(
     var recording by remember { mutableStateOf(false) }
     val sendBudget by commsViewModel.chatBudgetState.collectAsState()
     val voiceHeld by commsViewModel.voiceHeld.collectAsState()
+    val holdFull = voiceHeld >= edu.cit.resqmesh.feature.comms.viewmodel.RadioVoiceHold.CAPACITY
     val budgetWaiting = sendBudget.remaining <= 0
+    val pttBlocked = budgetWaiting || holdFull
     val waitDescription = edu.cit.resqmesh.feature.comms.ui.components.composer.chatBudgetWaitDescription(sendBudget)
-    val latestWaiting by androidx.compose.runtime.rememberUpdatedState(budgetWaiting)
+    val latestWaiting by androidx.compose.runtime.rememberUpdatedState(pttBlocked)
     var recordingDestination by remember { mutableStateOf(channel) }
     var channelsOpen by remember { mutableStateOf(false) }
     val haptics = LocalHapticFeedback.current
@@ -324,7 +326,11 @@ fun WalkieTalkieScreen(
                     )
                     .clip(CircleShape)
                     .semantics {
-                        contentDescription = if (budgetWaiting) waitDescription else "Hold to record voice note"
+                        contentDescription = when {
+                            holdFull -> "Voice queue full, wait for held notes to send"
+                            budgetWaiting -> waitDescription
+                            else -> "Hold to record voice note"
+                        }
                     }
                     .pointerInput(Unit) {
                         // Recording is blocked at 0 tokens; a budget that empties mid-recording is handled by the hold.
@@ -379,6 +385,7 @@ fun WalkieTalkieScreen(
                         Text(
                             text = when {
                                 recording -> "RECORDING"
+                                holdFull -> "QUEUE FULL"
                                 budgetWaiting -> androidx.compose.ui.res.stringResource(
                                     edu.cit.resqmesh.R.string.chat_budget_wait,
                                     sendBudget.waitSeconds()
@@ -399,7 +406,7 @@ fun WalkieTalkieScreen(
         Text(
             text = when {
                 recording -> "Release button to broadcast voice"
-                voiceHeld -> "Voice note held. It sends when the send budget refills."
+                voiceHeld > 0 -> "$voiceHeld voice note(s) held. They send as the send budget refills."
                 else -> "Push and hold to transmit voice"
             },
             style = MaterialTheme.typography.titleMedium,

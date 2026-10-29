@@ -38,7 +38,8 @@ class CommunicationViewModel(
     private val conversationRepository: edu.cit.resqmesh.core.domain.repository.ConversationStateRepository,
     private val raiseSos: RaiseSosUseCase,
     private val sendPrivate: SendPrivateChatMessageUseCase,
-    private val chatBudget: OutgoingChatBudget
+    private val chatBudget: OutgoingChatBudget,
+    private val voiceHold: RadioVoiceHold
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ChatUiState())
@@ -120,26 +121,11 @@ class CommunicationViewModel(
         val time = conversationStates.value.firstOrNull { it.conversationId == key }?.lastReadAt ?: 0L
         return messages.count { !it.isMine && it.timestamp > time }
     }
-    private val _voiceHeld = MutableStateFlow(false)
+    /** Radio voice notes waiting for a send token (held app-wide, see [RadioVoiceHold]). */
+    val voiceHeld: StateFlow<Int> = voiceHold.held
 
-    /** True while a finished radio voice note waits for a send token. */
-    val voiceHeld: StateFlow<Boolean> = _voiceHeld.asStateFlow()
-    private val heldVoice = ArrayDeque<Pair<String, String>>()
-
-    /** Sends a radio voice note now, or holds it and sends it once a token is available; never drops it. */
-    fun sendRadioVoice(channel: String, audio: String) {
-        heldVoice.addLast(channel to audio)
-        flushHeldVoice()
-    }
-
-    private fun flushHeldVoice() {
-        while (heldVoice.isNotEmpty()) {
-            val (channel, audio) = heldVoice.first()
-            if (!sendConversation("RADIO", channel = channel, text = "Voice message", audio = audio)) break
-            heldVoice.removeFirst()
-        }
-        _voiceHeld.value = heldVoice.isNotEmpty()
-    }
+    /** Sends a radio voice note now or holds it for the next token; false only when the hold is full. */
+    fun sendRadioVoice(channel: String, audio: String): Boolean = voiceHold.submit(channel, audio)
 
     /** Returns false only when the send budget is empty: nothing was sent and the caller must keep its text. */
     fun sendConversation(kind: String, channel: String = "", sosId: String = "", text: String, audio: String? = null): Boolean {
@@ -176,9 +162,6 @@ class CommunicationViewModel(
     }
 
     init {
-        viewModelScope.launch {
-            chatBudget.state.collect { if (it.remaining > 0 && heldVoice.isNotEmpty()) flushHeldVoice() }
-        }
         viewModelScope.launch {
             useCases.observePublicMessages().collect { messages ->
                 _uiState.update { it.copy(publicMessages = messages) }
@@ -222,10 +205,8 @@ class CommunicationViewModel(
         val clean = checkedMessageText(text)
         val admission = if (clean == null) ChatSendGate.Admission.DEBOUNCED
         else sendGate.admit("public:${mediaKind(imageBase64, audioBase64)}")
-        if (clean != null && admission == ChatSendGate.Admission.GO &&
-            useCases.sendPublicMessage(clean, imageBase64, audioBase64).isEmpty()
-        ) {
-            sendGate.refund()
+        if (clean != null && admission == ChatSendGate.Admission.GO) {
+            sendGate.settle(useCases.sendPublicMessage(clean, imageBase64, audioBase64).isNotEmpty())
         }
         return admission != ChatSendGate.Admission.NO_BUDGET
     }
@@ -371,7 +352,10 @@ class CommunicationViewModel(
                 reportPrivateSendFailure()
             }
         } else {
-            useCases.sendPublicMessage("📍 I am sharing my location.", null, null, location.latitude, location.longitude)
+            sendGate.settle(
+                useCases.sendPublicMessage("📍 I am sharing my location.", null, null, location.latitude, location.longitude)
+                    .isNotEmpty()
+            )
         }
     }
 
@@ -384,7 +368,7 @@ class CommunicationViewModel(
                 reportPrivateSendFailure()
             }
         } else {
-            useCases.sendPublicMessage(errorMsg, null, null, null, null)
+            sendGate.settle(useCases.sendPublicMessage(errorMsg, null, null, null, null).isNotEmpty())
         }
     }
 }

@@ -172,10 +172,12 @@ internal class MeshOutboundDelivery(
             if (targetName == null && (message.conversationKind.startsWith("LEGACY_") || message.isSOS ||
                     (message.conversationKind == "SOS" && sosRepository?.canReply(message.sosId) != true))) {
                 messageStore.expirePending(message.id)
+                prepaid.remove(message.id)
                 continue
             }
             if (now - message.timestamp > OUTBOX_EXPIRY_MS) {
                 messageStore.expirePending(message.id)
+                prepaid.remove(message.id)
                 continue
             }
             if (targetName != null) {

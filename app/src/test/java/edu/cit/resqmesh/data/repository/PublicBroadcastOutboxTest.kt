@@ -139,4 +139,21 @@ class PublicBroadcastOutboxTest {
         assertEquals(emptyList<String>(), f.store.rows["orphan"]!!.deliveredTo)
         assertEquals(3, f.broadcasts)
     }
+
+    @Test fun expiredPendingMessageReleasesItsPrepaidMark() = runTest {
+        val f = Fixture(backgroundScope)
+        val id = f.repo.sendPublicMessage("test", null, null)
+        runCurrent()
+        fun prepaid(): Set<*> {
+            val field = MeshRepository::class.java.getDeclaredField("outbound").apply { isAccessible = true }
+            val outbound = field.get(f.repo)
+            val prepaid = outbound.javaClass.getDeclaredField("prepaid").apply { isAccessible = true }
+            return prepaid.get(outbound) as Set<*>
+        }
+        assertTrue(id in prepaid())
+        f.store.rows[id] = f.store.rows[id]!!.copy(timestamp = 0L)
+        advanceTimeBy(5_000L); runCurrent()
+        assertEquals(listOf("FAILED"), f.store.rows[id]!!.deliveredTo)
+        assertFalse(id in prepaid())
+    }
 }

@@ -23,4 +23,9 @@ class ChatSendGate(val budget: OutgoingChatBudget, private val debouncer: SendDe
 
     /** Returns the token of an admitted send that was refused before it left the device. */
     fun refund() = budget.refund()
+
+    /** Refunds the token of an admitted send when the repository refused it (empty message id). */
+    fun settle(sent: Boolean) {
+        if (!sent) refund()
+    }
 }

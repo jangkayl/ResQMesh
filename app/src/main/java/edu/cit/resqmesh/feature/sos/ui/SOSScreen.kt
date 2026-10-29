@@ -25,6 +25,10 @@ import edu.cit.resqmesh.feature.comms.viewmodel.CommunicationViewModel
 @Composable
 fun SOSScreen(viewModel: CommunicationViewModel) {
     var isBroadcasting by remember { mutableStateOf(false) }
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val sendBudget by viewModel.chatBudgetState.collectAsState()
+    val waitDescription =
+        edu.cit.resqmesh.feature.comms.ui.components.composer.chatBudgetWaitDescription(sendBudget)
     
     val infiniteTransition = rememberInfiniteTransition()
     val pulseScale by infiniteTransition.animateFloat(
@@ -83,10 +87,15 @@ fun SOSScreen(viewModel: CommunicationViewModel) {
                             interactionSource = remember { MutableInteractionSource() },
                             indication = null
                         ) { 
-                            isBroadcasting = !isBroadcasting
                             if (isBroadcasting) {
-                                // Simulate network flooding
-                                viewModel.sendPublicMessage("🚨 CRITICAL SOS: I NEED HELP!", null, null)
+                                isBroadcasting = false
+                            } else if (viewModel.sendPublicMessage("🚨 CRITICAL SOS: I NEED HELP!", null, null)) {
+                                isBroadcasting = true
+                            } else {
+                                // Empty send budget: the receiver would drop it, so say when sending is possible.
+                                android.widget.Toast.makeText(
+                                    context, waitDescription, android.widget.Toast.LENGTH_SHORT
+                                ).show()
                             }
                         },
                     color = if (isBroadcasting) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.surfaceVariant,
