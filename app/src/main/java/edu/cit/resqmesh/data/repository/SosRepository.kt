@@ -119,24 +119,37 @@ class SosRepository(
             return@withLock SosIngestion.REJECTED
         }
         val previouslyKnown = store.alert(e.sosId) != null
-        if (rateLimited(e, endpoint, previouslyKnown)) return@withLock SosIngestion.REJECTED
+        val isNewRaise = !previouslyKnown && e.revision == 1L
+        if (rateLimited(e, endpoint, isNewRaise)) return@withLock SosIngestion.REJECTED
         val result = apply(e, pending = false)
         if (result == SosIngestion.APPLIED) {
             changes.tryEmit(Unit)
             if (e.ended) {
                 sink.ended(e.sosId)
                 if (incoming.value?.sosId == e.sosId) incoming.value = null
-            } else if (live && !previouslyKnown && e.revision == 1L && e.originNodeId != identity.getDeviceId()) {
+            } else if (alarms(e, live, previouslyKnown)) {
                 store.alert(e.sosId)?.let { sink.received(it); incoming.value = it }
             }
         }
         result
     }
 
-    /** Only a verified, not yet stored event from a link charges its signing key's bucket; duplicates are free. */
-    private suspend fun rateLimited(e: SosEvent, endpoint: String?, previouslyKnown: Boolean): Boolean {
+    /**
+     * The alarm fires once, for an alert new to this phone (a known sosId is silent, so it never repeats). Live
+     * it needs the first revision; through sync (missed live) it needs an active alert created within 10 minutes.
+     */
+    private suspend fun alarms(e: SosEvent, live: Boolean, previouslyKnown: Boolean): Boolean {
+        if (previouslyKnown || e.originNodeId == identity.getDeviceId()) return false
+        return if (live) e.revision == 1L else !e.ended && now() - e.createdAt <= SYNC_ALARM_MAX_AGE_MS
+    }
+
+    /**
+     * Only a verified, not yet stored event from a link charges its signing key's bucket; duplicates are free.
+     * SOS_NEW is charged only for revision 1 of an unknown sosId; a refine or end that arrives first is an update.
+     */
+    private suspend fun rateLimited(e: SosEvent, endpoint: String?, isNewRaise: Boolean): Boolean {
         if (endpoint == null || originGate == null || store.event(e.eventId) != null) return false
-        return !originGate.admitVerifiedSos(endpoint, SosProtocol.prefix(e.signingKey), !previouslyKnown)
+        return !originGate.admitVerifiedSos(endpoint, SosProtocol.prefix(e.signingKey), isNewRaise)
     }
 
     private suspend fun apply(e: SosEvent, pending: Boolean): SosIngestion {
@@ -192,3 +205,6 @@ class SosRepository(
 
     private fun log(marker: String, message: String) { AppLogger.d(marker, message) }
 }
+
+/** A sync-delivered SOS older than this is history, not an emergency to alarm on. */
+private const val SYNC_ALARM_MAX_AGE_MS = 10 * 60 * 1000L

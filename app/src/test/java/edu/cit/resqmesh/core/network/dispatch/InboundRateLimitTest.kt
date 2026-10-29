@@ -94,7 +94,8 @@ class InboundRateLimitTest {
         assertEquals(8, cb.sosPackets.size)
         // The victim's real, signature-verified SOS bucket is untouched.
         assertTrue(gate.admitVerifiedSos("r1", "SOS-victim-", true))
-        assertEquals(false, gate.admitVerifiedSos("r1", "SOS-victim-", true)) // burst of one new SOS
+        repeat(3) { assertTrue(gate.admitVerifiedSos("r1", "SOS-victim-", true)) }
+        assertEquals(false, gate.admitVerifiedSos("r1", "SOS-victim-", true)) // burst of four new SOS
         assertTrue(gate.admitVerifiedSos("r1", "SOS-other-", true))
     }
 

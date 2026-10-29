@@ -27,7 +27,7 @@ Behavior and source ownership are in [architecture](architecture.md); accepted p
 | MEASURE-01 | Evidence pending | Repeated arrival/receipt counts, latency, sustained load/fallback and route-withdrawal coverage. |
 | SCALE-01 | Evidence pending | Five/ten-phone matrices, range and capacity. |
 | TRUST-01 | Work/evidence pending | First-contact verification and defined identity/security guarantees. |
-| SEC-01 | Phase A user-reported PASS; Phase B on `feat/security-phase-b` (2026-10-18), gate passes, no device evidence; user-reported spam loss (2026-10-29) fixed by a sender budget | Run the [Phase B card](testing/security-phase-b-card.md) after the freeze, then merge. Phases C–E wait ([plan](plans/security-hardening.md)). Open limit: SOS re-raise within 2 min drops at relays. |
+| SEC-01 | Phase A user-reported PASS; Phase B on `feat/security-phase-b` (2026-10-18), gate passes, no device evidence; user-reported spam loss and SOS re-raise drop (2026-10-29) fixed by sender budgets | Run the [Phase B card](testing/security-phase-b-card.md) after the freeze, then merge. Phases C–E wait ([plan](plans/security-hardening.md)). SOS raises budgeted; sync-delivered active SOS alarm. |
 
 Basic block, incident, SOS and recovery checks have user-reported successes; their adversarial, load and repeated cases remain pending, not known defects. See the [physical checklist](testing/physical-reliability-tests.md).
 

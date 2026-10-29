@@ -69,7 +69,8 @@ class SosLifecycleAndSyncTest {
     }
     private class Node(
         val id: String, val network: Network, store: MemoryStore = MemoryStore(),
-        gate: edu.cit.resqmesh.core.network.ratelimit.InboundOriginGate? = null
+        gate: edu.cit.resqmesh.core.network.ratelimit.InboundOriginGate? = null,
+        clock: () -> Long = { 1000 }
     ) {
         val store = store
         val links = mutableMapOf<String, Long>()
@@ -103,7 +104,7 @@ class SosLifecycleAndSyncTest {
             override fun getDeviceId() = id
         }
         val repo = SosRepository(
-            store, signing, identity, gateway, peers, network.scope, sink, now = { 1000 }, originGate = gate
+            store, signing, identity, gateway, peers, network.scope, sink, now = clock, originGate = gate
         )
         init { network.nodes[id] = this }
     }
@@ -127,7 +128,8 @@ class SosLifecycleAndSyncTest {
         b.gateway.onSosPacket?.invoke("X", envelope(real))
         runCurrent()
         assertNotNull(b.store.alert(id))
-        // The verified event charged its own key bucket: a second new alert from the same key is limited.
+        // The verified event charged its own key bucket (burst 4): a fifth new alert from the same key is limited.
+        repeat(3) { assertTrue(gate.admitVerifiedSos("X", SosProtocol.prefix(real.signingKey), true)) }
         assertFalse(gate.admitVerifiedSos("X", SosProtocol.prefix(real.signingKey), true))
     }
 
@@ -208,7 +210,7 @@ class SosLifecycleAndSyncTest {
         assertNotNull(b.store.alert(id))
         a.repo.end(id); runCurrent(); advanceTimeBy(35_000); runCurrent()
         assertTrue(b.store.alert(id)!!.ended)
-        assertTrue(b.sink.alarms.isEmpty())
+        assertEquals(listOf(id), b.sink.alarms) // sync alarmed once when it brought the alert; the end stays silent
     }
 
     @Test fun rejectedUrgentRelayPersistsThenRetries() = runTest {
@@ -220,5 +222,59 @@ class SosLifecycleAndSyncTest {
         net.rejectFrom = null; advanceTimeBy(5001); runCurrent()
         assertNotNull(c.store.alert(id))
         assertEquals(1, c.sink.alarms.count { it == id })
+    }
+
+    private suspend fun latest(n: Node, id: String) =
+        SosProtocol.json.decodeFromString<SosEvent>(n.store.alert(id)!!.eventJson)
+
+    @Test fun fourRaisesInAMinuteAllApplyAndTheFifthIsLimited() = runTest {
+        val net = Network(backgroundScope)
+        val gate = edu.cit.resqmesh.core.network.ratelimit.InboundOriginGate(
+            edu.cit.resqmesh.core.network.ratelimit.OriginRateLimiter())
+        val a = Node("A", net); val b = Node("B", net, gate = gate)
+        repeat(4) {
+            val id = a.repo.create("Medical")
+            assertEquals(SosIngestion.APPLIED, b.repo.ingest(latest(a, id), true, "X"))
+            a.repo.end(id)
+        }
+        assertEquals(4, b.sink.alarms.size)
+        val fifth = a.repo.create("Medical")
+        assertEquals(SosIngestion.REJECTED, b.repo.ingest(latest(a, fifth), true, "X"))
+    }
+
+    @Test fun laterRevisionOfAnUnknownSosIsChargedAsUpdateNotNew() = runTest {
+        val net = Network(backgroundScope)
+        val gate = edu.cit.resqmesh.core.network.ratelimit.InboundOriginGate(
+            edu.cit.resqmesh.core.network.ratelimit.OriginRateLimiter())
+        val a = Node("A", net); val b = Node("B", net, gate = gate)
+        val id = a.repo.create("Medical")
+        a.repo.updateLocation(id, 10.0, 20.0, 5f, 1001)
+        assertEquals(2L, latest(a, id).revision)
+        assertEquals(SosIngestion.APPLIED, b.repo.ingest(latest(a, id), true, "X")) // refine arrives first
+        val prefix = SosProtocol.prefix(a.signing.publicKey)
+        repeat(4) { assertTrue(gate.admitVerifiedSos("X", prefix, true)) } // the full SOS_NEW burst is untouched
+    }
+
+    @Test fun syncDeliveredActiveRecentSosAlarmsOnceAndNeverTwice() = runTest {
+        val net = Network(backgroundScope); val a = Node("A", net); val b = Node("B", net)
+        val id = a.repo.create("Medical")
+        val event = latest(a, id)
+        assertEquals(SosIngestion.APPLIED, b.repo.ingest(event, live = false))
+        assertEquals(listOf(id), b.sink.alarms)
+        assertEquals(SosIngestion.DUPLICATE, b.repo.ingest(event, live = false))
+        assertEquals(SosIngestion.DUPLICATE, b.repo.ingest(event, live = true))
+        assertEquals(listOf(id), b.sink.alarms)
+    }
+
+    @Test fun syncDeliveredEndedOrOldSosStaysSilent() = runTest {
+        val net = Network(backgroundScope); val a = Node("A", net)
+        val old = Node("B", net, clock = { 1000L + 10 * 60_000L + 1 })
+        val ended = Node("C", net)
+        val oldId = a.repo.create("Medical")
+        assertEquals(SosIngestion.APPLIED, old.repo.ingest(latest(a, oldId), live = false))
+        a.repo.end(oldId)
+        assertEquals(SosIngestion.APPLIED, ended.repo.ingest(latest(a, oldId), live = false))
+        assertTrue(old.sink.alarms.isEmpty())
+        assertTrue(ended.sink.alarms.isEmpty())
     }
 }

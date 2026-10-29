@@ -162,4 +162,8 @@
         <item quantity="one">Send available in %1$d second</item>
         <item quantity="other">Send available in %1$d seconds</item>
     </plurals>
+    <plurals name="sos_budget_available_in">
+        <item quantity="one">SOS available in %1$d second</item>
+        <item quantity="other">SOS available in %1$d seconds</item>
+    </plurals>
 </resources>

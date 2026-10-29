@@ -26,6 +26,8 @@ import edu.cit.resqmesh.core.domain.usecase.messaging.SendPrivateChatMessageUseC
 import edu.cit.resqmesh.core.domain.usecase.sos.RaiseSosUseCase
 import edu.cit.resqmesh.core.network.ratelimit.ChatBudgetState
 import edu.cit.resqmesh.core.network.ratelimit.OutgoingChatBudget
+import edu.cit.resqmesh.core.network.ratelimit.OutgoingSosBudget
+import edu.cit.resqmesh.core.network.ratelimit.SosBudgetState
 import edu.cit.resqmesh.core.security.input.TextField
 import edu.cit.resqmesh.core.security.input.TextPolicy
 import edu.cit.resqmesh.core.security.input.ValidationResult
@@ -39,6 +41,7 @@ class CommunicationViewModel(
     private val raiseSos: RaiseSosUseCase,
     private val sendPrivate: SendPrivateChatMessageUseCase,
     private val chatBudget: OutgoingChatBudget,
+    private val sosBudget: OutgoingSosBudget,
     private val voiceHold: RadioVoiceHold
 ) : ViewModel() {
 
@@ -79,6 +82,26 @@ class CommunicationViewModel(
             }
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(BUDGET_STOP_TIMEOUT_MS), chatBudget.state.value)
+
+    private val sosGate = SosRaiseGate(sosBudget) { sosRepository.ownActive.value != null }
+
+    /** SOS raise budget for the hub button. Ticks once a second only while collected and not full. */
+    val sosBudgetState: StateFlow<SosBudgetState> = channelFlow {
+        sosBudget.refresh()
+        launch { sosBudget.state.collect { send(it) } }
+        sosBudget.state.map { it.remaining < it.capacity }.distinctUntilChanged().collectLatest { notFull ->
+            while (notFull) {
+                delay(BUDGET_TICK_MS)
+                sosBudget.refresh()
+            }
+        }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(BUDGET_STOP_TIMEOUT_MS), sosBudget.state.value)
+
+    /** Tells the user when the next new SOS can be raised (the hub button was pressed with no token). */
+    fun explainSosWait() {
+        sosBudget.refresh()
+        sosErrors.tryEmit(sosGate.waitMessage())
+    }
 
     private fun mediaKind(image: String?, audio: String?) = when {
         image != null -> "img"
@@ -223,16 +246,24 @@ class CommunicationViewModel(
 
     fun sendEmergencySOS(sosType: String, onCreated: (String) -> Unit = {}) {
         if (creatingSos) return
+        val admission = sosGate.admit()
+        if (admission == SosRaiseGate.Admission.NO_BUDGET) {
+            sosErrors.tryEmit(sosGate.waitMessage())
+            return
+        }
         creatingSos = true
         val generation = ++sosLocationGeneration
         viewModelScope.launch {
+            var created = false
             try {
                 val id = raiseSos(sosType)
+                created = true
                 onCreated(id)
                 raiseSos.refineLocation(id, isCurrent = { generation == sosLocationGeneration }) { update ->
                     viewModelScope.launch { update() }
                 }
             } catch (e: Exception) {
+                if (admission == SosRaiseGate.Admission.NEW_RAISE && !created) sosGate.refund()
                 if (e is kotlinx.coroutines.CancellationException) throw e
                 sosErrors.emit("Could not complete SOS sending. Check SOS alerts before trying again.")
             } finally { creatingSos = false }

@@ -19,6 +19,7 @@ import edu.cit.resqmesh.core.network.NativeBleGateway
 import edu.cit.resqmesh.core.network.NativeBleManager
 import edu.cit.resqmesh.core.network.ratelimit.InboundGuards
 import edu.cit.resqmesh.core.network.ratelimit.OutgoingChatBudget
+import edu.cit.resqmesh.core.network.ratelimit.OutgoingSosBudget
 import edu.cit.resqmesh.feature.comms.viewmodel.RadioVoiceHold
 import edu.cit.resqmesh.core.network.ratelimit.RateLimitPolicy
 import edu.cit.resqmesh.core.service.MeshSessionController
@@ -110,6 +111,7 @@ val networkModule = module {
     single { RateLimitPolicy() }
     single { InboundGuards(get(), System::currentTimeMillis) }
     single { OutgoingChatBudget(get(), System::currentTimeMillis) }
+    single { OutgoingSosBudget(get(), System::currentTimeMillis) }
     single { NativeBleManager(androidContext(), get()) }
     single<MeshNetworkGateway> { NativeBleGateway(get()) }
 }
@@ -245,6 +247,7 @@ val viewModelModule = module {
             raiseSos = get(),
             sendPrivate = get(),
             chatBudget = get(),
+            sosBudget = get(),
             voiceHold = get()
         )
     }

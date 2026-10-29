@@ -13,8 +13,12 @@ data class RateLimitPolicy(
     // Sender-side pacing for outgoing chat (OutgoingChatBudget): the same 20/min refill, burst 20.
     val chatSendPerMin: Double = 20.0,
     val chatSendBurst: Double = 20.0,
-    val sosNewPerMin: Double = 0.5, // one new SOS per 2 minutes
-    val sosNewBurst: Double = 1.0,
+    // Receiver burst is the sender's 3 raises (OutgoingSosBudget) plus 1 margin for BLE queue bunching.
+    val sosNewPerMin: Double = 1.0,
+    val sosNewBurst: Double = 4.0,
+    // Sender-side pacing for raising a new SOS: 3 back to back, then one per minute.
+    val sosSendPerMin: Double = 1.0,
+    val sosSendBurst: Double = 3.0,
     // Not fixed by the plan: updates to an existing SOS are chattier than new alerts but still bounded.
     val sosUpdatePerMin: Double = 6.0,
     val sosUpdateBurst: Double = 3.0,

@@ -8,7 +8,7 @@ Last reviewed: 2026-10-06. Baseline: see [status](status.md); incident UI repair
 - Safety Orange (#FF5A00) marks actions; green positive, amber attention and red SOS. Use text/semantic shapes and at least 48dp targets.
 - Home retains its larger name, plain location labels and network view within nearby sharing.
 - Mission, Messages, Voice and Mesh use the shared shell. Mission/Messages/Voice have solid theme backgrounds and a prominent navigation SOS action without continuous pulse.
-- Chat composers hide inline media tools while typing; the floating action bubble retains access. They show the shared send budget ("18 of 20 left", plus "+1 in 3 s" while refilling); at 0 Send is disabled, reads "Wait N s" with a matching content description, and typed text is kept. Network/topology uses cards and a 2D route map.
+- Chat composers hide inline media tools while typing; the floating action bubble retains access. They show the shared send budget ("18 of 20 left", plus "+1 in 3 s" while refilling); at 0 Send is disabled, reads "Wait N s" with a matching content description, and typed text is kept. Network/topology uses cards and a 2D route map. The SOS hub button stays visible when the raise budget (3, then 1 per minute) is empty: it reads "Wait N s", and pressing it explains the wait.
 - The first-launch guide has three skippable animated pages, progress dots, no in-page Back and Settings replay.
 - Setup has no tag input. Names omit technical tags; peer details show ID; headers resolve current names.
 - Keep routing/transport/business decisions outside composables. Routes collect state; stateless components receive models/callbacks. ViewModels/use cases expose state/actions.
