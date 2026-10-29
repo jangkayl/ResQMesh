@@ -24,25 +24,43 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import edu.cit.resqmesh.R
+import edu.cit.resqmesh.core.network.ratelimit.SosBudgetState
+import edu.cit.resqmesh.core.network.ratelimit.waitSeconds
 
-/** The raise button; with [raiseWaitSeconds] > 0 it shows "Wait N s" and says so to TalkBack. */
+/**
+ * The raise button with the raise budget, like the chat composer: "4 of 5 left", plus " · +1 in N s" while not
+ * full. At 0 it is disabled, reads " · Wait N s" and tells TalkBack "SOS available in N seconds".
+ */
 @Suppress("FunctionNaming")
 @Composable
-internal fun SosRaiseButton(raiseWaitSeconds: Int, onCreate: () -> Unit) {
-    val waiting = raiseWaitSeconds > 0
+internal fun SosRaiseButton(budget: SosBudgetState, onCreate: () -> Unit) {
+    val waiting = budget.remaining <= 0
+    val seconds = budget.waitSeconds()
     val waitDescription = if (waiting) {
-        pluralStringResource(R.plurals.sos_budget_available_in, raiseWaitSeconds, raiseWaitSeconds)
+        pluralStringResource(R.plurals.sos_budget_available_in, seconds, seconds)
     } else {
         ""
     }
+    val left = stringResource(R.string.sos_budget_left, budget.remaining, budget.capacity)
+    val counter = when {
+        waiting -> left + stringResource(R.string.sos_budget_wait, seconds)
+        budget.remaining < budget.capacity -> left + stringResource(R.string.sos_budget_refill, seconds)
+        else -> left
+    }
     Button(
         onClick = onCreate,
+        enabled = !waiting,
         modifier = Modifier
             .fillMaxWidth()
             .heightIn(min = 54.dp)
             .then(if (waiting) Modifier.semantics { contentDescription = waitDescription } else Modifier),
         shape = RoundedCornerShape(16.dp),
-        colors = ButtonDefaults.buttonColors(containerColor = SosActionRed, contentColor = Color.White),
+        colors = ButtonDefaults.buttonColors(
+            containerColor = SosActionRed,
+            contentColor = Color.White,
+            disabledContainerColor = SosActionRed.copy(alpha = DISABLED_ALPHA),
+            disabledContentColor = Color.White.copy(alpha = DISABLED_ALPHA)
+        ),
         elevation = ButtonDefaults.buttonElevation(defaultElevation = 4.dp)
     ) {
         Icon(imageVector = Icons.Default.Warning, contentDescription = null, modifier = Modifier.size(22.dp))
@@ -53,12 +71,9 @@ internal fun SosRaiseButton(raiseWaitSeconds: Int, onCreate: () -> Unit) {
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Black
             )
-            if (waiting) {
-                Text(
-                    text = stringResource(R.string.chat_budget_wait, raiseWaitSeconds),
-                    style = MaterialTheme.typography.labelSmall
-                )
-            }
+            Text(text = counter, style = MaterialTheme.typography.labelSmall)
         }
     }
 }
+
+private const val DISABLED_ALPHA = 0.5f

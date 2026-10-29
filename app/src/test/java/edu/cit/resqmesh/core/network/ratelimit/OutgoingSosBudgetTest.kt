@@ -10,27 +10,31 @@ class OutgoingSosBudgetTest {
     private val budget = OutgoingSosBudget(clock = { now })
 
     @Test fun startsFullWithNoWait() {
-        assertEquals(SosBudgetState(remaining = 3, capacity = 3, nextRefillInMs = 0L), budget.state.value)
+        assertEquals(SosBudgetState(remaining = 5, capacity = 5, nextRefillInMs = 0L), budget.state.value)
     }
 
-    @Test fun allowsThreeThenBlocksAndReportsTheWait() {
-        repeat(3) { assertTrue(budget.tryConsume()) }
+    @Test fun allowsFiveThenBlocksAndReportsTheWait() {
+        repeat(5) { assertTrue(budget.tryConsume()) }
         assertFalse(budget.tryConsume())
-        assertEquals(SosBudgetState(0, 3, 60_000L), budget.state.value)
+        assertEquals(SosBudgetState(0, 5, 12_000L), budget.state.value)
+        assertEquals(12, budget.state.value.waitSeconds())
     }
 
-    @Test fun refillsOneRaiseEveryMinute() {
-        repeat(3) { budget.tryConsume() }
-        now += 59_999L
+    @Test fun refillsOneRaiseEveryTwelveSeconds() {
+        repeat(5) { budget.tryConsume() }
+        now += 11_999L
         budget.refresh()
-        assertEquals(SosBudgetState(0, 3, 1L), budget.state.value)
+        assertEquals(SosBudgetState(0, 5, 1L), budget.state.value)
         now += 1L
         assertTrue(budget.tryConsume())
         assertFalse(budget.tryConsume())
+        now += 12_000L
+        budget.refresh()
+        assertEquals(SosBudgetState(1, 5, 12_000L), budget.state.value)
     }
 
     @Test fun refundRestoresAToken() {
-        repeat(3) { budget.tryConsume() }
+        repeat(5) { budget.tryConsume() }
         budget.refund()
         assertEquals(1, budget.state.value.remaining)
         assertTrue(budget.tryConsume())
@@ -40,6 +44,6 @@ class OutgoingSosBudgetTest {
         budget.refund()
         now += 600_000L
         budget.refresh()
-        assertEquals(SosBudgetState(3, 3, 0L), budget.state.value)
+        assertEquals(SosBudgetState(5, 5, 0L), budget.state.value)
     }
 }

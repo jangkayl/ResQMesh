@@ -129,8 +129,8 @@ class SosLifecycleAndSyncTest {
         b.gateway.onSosPacket?.invoke("X", envelope(real))
         runCurrent()
         assertNotNull(b.store.alert(id))
-        // The verified event charged its own key bucket (burst 4): a fifth new alert from the same key is limited.
-        repeat(3) { assertTrue(gate.admitVerifiedSos("X", SosProtocol.prefix(real.signingKey), true)) }
+        // The verified event charged its own key bucket (burst 6): a seventh new alert from the same key is limited.
+        repeat(5) { assertTrue(gate.admitVerifiedSos("X", SosProtocol.prefix(real.signingKey), true)) }
         assertFalse(gate.admitVerifiedSos("X", SosProtocol.prefix(real.signingKey), true))
     }
 
@@ -228,19 +228,19 @@ class SosLifecycleAndSyncTest {
     private suspend fun latest(n: Node, id: String) =
         SosProtocol.json.decodeFromString<SosEvent>(n.store.alert(id)!!.eventJson)
 
-    @Test fun fourRaisesInAMinuteAllApplyAndTheFifthIsLimited() = runTest {
+    @Test fun sixRaisesInAMinuteAllApplyAndTheSeventhIsLimited() = runTest {
         val net = Network(backgroundScope)
         val gate = edu.cit.resqmesh.core.network.ratelimit.InboundOriginGate(
             edu.cit.resqmesh.core.network.ratelimit.OriginRateLimiter())
         val a = Node("A", net); val b = Node("B", net, gate = gate)
-        repeat(4) {
+        repeat(6) {
             val id = a.repo.create("Medical")
             assertEquals(SosIngestion.APPLIED, b.repo.ingest(latest(a, id), true, "X"))
             a.repo.end(id)
         }
-        assertEquals(4, b.sink.alarms.size)
-        val fifth = a.repo.create("Medical")
-        assertEquals(SosIngestion.REJECTED, b.repo.ingest(latest(a, fifth), true, "X"))
+        assertEquals(6, b.sink.alarms.size)
+        val seventh = a.repo.create("Medical")
+        assertEquals(SosIngestion.REJECTED, b.repo.ingest(latest(a, seventh), true, "X"))
     }
 
     @Test fun laterRevisionOfAnUnknownSosIsChargedAsUpdateNotNew() = runTest {
@@ -253,7 +253,7 @@ class SosLifecycleAndSyncTest {
         assertEquals(2L, latest(a, id).revision)
         assertEquals(SosIngestion.APPLIED, b.repo.ingest(latest(a, id), true, "X")) // refine arrives first
         val prefix = SosProtocol.prefix(a.signing.publicKey)
-        repeat(4) { assertTrue(gate.admitVerifiedSos("X", prefix, true)) } // the full SOS_NEW burst is untouched
+        repeat(6) { assertTrue(gate.admitVerifiedSos("X", prefix, true)) } // the full SOS_NEW burst is untouched
     }
 
     @Test fun syncDeliveredActiveRecentSosAlarmsOnceAndNeverTwice() = runTest {
@@ -331,12 +331,12 @@ class SosLifecycleAndSyncTest {
         assertTrue(same.sink.alarms.isEmpty())
     }
 
-    @Test fun threeRaiseRefineEndCyclesWithinAMinuteAllApply() = runTest {
+    @Test fun fiveRaiseRefineEndCyclesWithinAMinuteAllApply() = runTest {
         val net = Network(backgroundScope)
         val gate = edu.cit.resqmesh.core.network.ratelimit.InboundOriginGate(
             edu.cit.resqmesh.core.network.ratelimit.OriginRateLimiter())
         val a = Node("A", net); val b = Node("B", net, gate = gate)
-        repeat(3) { i ->
+        repeat(5) { i ->
             val id = a.repo.create("Medical")
             assertEquals(SosIngestion.APPLIED, b.repo.ingest(latest(a, id), true, "X"))
             a.repo.updateLocation(id, 10.0, 20.0, 5f, 1001L + i)
@@ -344,6 +344,24 @@ class SosLifecycleAndSyncTest {
             a.repo.end(id)
             assertEquals(SosIngestion.APPLIED, b.repo.ingest(latest(a, id), true, "X"))
         }
-        assertEquals(3, b.sink.alarms.size)
+        assertEquals(5, b.sink.alarms.size)
+    }
+
+    @Test fun fiveReorderedRaisesWithRefinesFirstAreNeverLimited() = runTest {
+        val net = Network(backgroundScope)
+        val gate = edu.cit.resqmesh.core.network.ratelimit.InboundOriginGate(
+            edu.cit.resqmesh.core.network.ratelimit.OriginRateLimiter())
+        val a = Node("A", net); val b = Node("B", net, gate = gate)
+        repeat(5) { i ->
+            val id = a.repo.create("Medical")
+            val first = latest(a, id)
+            a.repo.updateLocation(id, 10.0, 20.0, 5f, 1001L + i)
+            // Worst case per raise: the refine and then the late revision 1 are both charged as updates.
+            assertEquals(SosIngestion.APPLIED, b.repo.ingest(latest(a, id), true, "X"))
+            assertEquals(SosIngestion.STALE, b.repo.ingest(first, true, "X"))
+            a.repo.end(id)
+            assertEquals(SosIngestion.APPLIED, b.repo.ingest(latest(a, id), true, "X"))
+        }
+        assertEquals(5, b.sink.alarms.size)
     }
 }

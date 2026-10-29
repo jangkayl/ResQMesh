@@ -13,16 +13,17 @@ data class RateLimitPolicy(
     // Sender-side pacing for outgoing chat (OutgoingChatBudget): the same 20/min refill, burst 20.
     val chatSendPerMin: Double = 20.0,
     val chatSendBurst: Double = 20.0,
-    // Receiver burst is the sender's 3 raises (OutgoingSosBudget) plus 1 margin for BLE queue bunching.
-    val sosNewPerMin: Double = 1.0,
-    val sosNewBurst: Double = 4.0,
-    // Sender-side pacing for raising a new SOS: 3 back to back, then one per minute.
-    val sosSendPerMin: Double = 1.0,
-    val sosSendBurst: Double = 3.0,
-    // Not fixed by the plan: updates are chattier than new alerts but bounded. Burst 10 covers the sender's 3 raises
-    // with a refine each plus ends (ends of a known SOS are exempt, see SosRepository.ingest).
-    val sosUpdatePerMin: Double = 6.0,
-    val sosUpdateBurst: Double = 10.0,
+    // Receiver burst is the sender's 5 raises (OutgoingSosBudget) plus 1 margin for BLE queue bunching.
+    val sosNewPerMin: Double = 5.0,
+    val sosNewBurst: Double = 6.0,
+    // Sender-side pacing for raising a new SOS: 5 back to back, then one every 12 s.
+    val sosSendPerMin: Double = 5.0,
+    val sosSendBurst: Double = 5.0,
+    // Not fixed by the plan. Each raise costs up to 2 updates: its refine, plus its revision 1 when that arrives
+    // after the refine (then the sosId is known, so rev 1 is charged as an update). 5 raises/min can therefore
+    // charge 10 updates/min; burst 12 adds a 2-event margin. Ends of a known SOS are exempt (SosRepository.ingest).
+    val sosUpdatePerMin: Double = 10.0,
+    val sosUpdateBurst: Double = 12.0,
     val syncRequestPerMin: Double = 6.0,
     val syncRequestBurst: Double = 3.0,
     val presencePerMin: Double = 30.0,

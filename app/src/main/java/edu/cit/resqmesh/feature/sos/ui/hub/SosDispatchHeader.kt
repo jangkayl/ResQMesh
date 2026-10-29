@@ -21,6 +21,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import edu.cit.resqmesh.core.ui.theme.ResQTheme
 import edu.cit.resqmesh.core.model.SosAlert
+import edu.cit.resqmesh.core.network.ratelimit.SosBudgetState
 import edu.cit.resqmesh.feature.comms.model.SosMeshStatus
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -35,7 +36,7 @@ internal fun SosDispatchHeader(
     myActiveSos: SosAlert?,
     onBack: () -> Unit,
     onCreate: () -> Unit,
-    raiseWaitSeconds: Int,
+    raiseBudget: SosBudgetState,
     onOpen: (String) -> Unit
 ) {
     // Tactical Top Header
@@ -149,7 +150,7 @@ internal fun SosDispatchHeader(
             }
         }
     } else {
-        SosRaiseButton(raiseWaitSeconds, onCreate)
+        SosRaiseButton(raiseBudget, onCreate)
     }
 
     Spacer(Modifier.height(14.dp))

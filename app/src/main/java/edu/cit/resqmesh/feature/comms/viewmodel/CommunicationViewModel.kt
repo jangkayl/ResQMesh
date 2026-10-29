@@ -98,12 +98,6 @@ class CommunicationViewModel(
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(BUDGET_STOP_TIMEOUT_MS), sosBudget.state.value)
 
-    /** Tells the user when the next new SOS can be raised (the hub button was pressed with no token). */
-    fun explainSosWait() {
-        sosBudget.refresh()
-        sosErrors.tryEmit(sosGate.waitMessage())
-    }
-
     private fun mediaKind(image: String?, audio: String?) = when {
         image != null -> "img"
         audio != null -> "aud"

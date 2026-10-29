@@ -29,7 +29,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import edu.cit.resqmesh.core.model.ConversationPolicy
-import edu.cit.resqmesh.core.network.ratelimit.waitSeconds
 import edu.cit.resqmesh.core.ui.theme.ResQTheme
 import edu.cit.resqmesh.core.audio.MediaHelper
 import edu.cit.resqmesh.feature.comms.viewmodel.CommunicationViewModel
@@ -51,7 +50,6 @@ fun SosHubScreen(
     val all by vm.allPublicMessages.collectAsState()
     val states by vm.conversationStates.collectAsState()
     val raiseBudget by vm.sosBudgetState.collectAsState()
-    val waitSeconds = raiseBudget.waitSeconds()
     BackHandler(onBack = onBack)
 
     val userOwnsActiveSos = alerts.any { !it.ended && vm.isOwnSos(it) }
@@ -75,8 +73,8 @@ fun SosHubScreen(
             item {
                 SosDispatchHeader(
                     meshStatus, meshAccent, isLight, userOwnsActiveSos, myActiveSos, onBack,
-                    onCreate = { if (waitSeconds > 0) vm.explainSosWait() else onCreate() },
-                    raiseWaitSeconds = waitSeconds,
+                    onCreate = onCreate,
+                    raiseBudget = raiseBudget,
                     onOpen = onOpen
                 )
             }

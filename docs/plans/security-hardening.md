@@ -12,7 +12,7 @@ The attacker is a malicious nearby phone: a modified app or BLE tool that floods
 - One wire break (protocol v2, every test phone reinstalled together), then compatible changes only once the pilot beta starts.
 - Over-limit traffic is dropped, and an origin that keeps exceeding gets a cooldown. Limits charge the **origin** node, never the relay that forwarded the traffic. Per-link limits only shape traffic and never put a relay in a timeout.
 - Defaults:
-  - Per origin: 20 chat messages/min (burst 10), 4 new SOS burst, refill 1/min (SOS updates are a separate class), 6 sync requests/min, 30 presence pulses/min.
+  - Per origin: 20 chat messages/min (burst 10), 6 new SOS burst, refill 5/min (SOS updates are a separate class), 6 sync requests/min, 30 presence pulses/min.
   - Cooldown of 60 s after 3 violations.
   - Per link: 64 frames/s and 256 KiB/s.
 - Typed messages max 1000 characters; received media capped at 2 MB; developer mode in debug builds only.
@@ -55,8 +55,8 @@ As built, these changed from the outline:
 - Topology sequences more than 10 min ahead of the local clock are rejected.
 - Validator text and ciphertext caps equal the frame cap, so long voice notes still fit.
 - Outgoing chat follows a shared sender budget of 20 (refill 20/min) that composers show; the receiver burst is 25, a 5-message margin for BLE queue bunching.
-- Raising a new SOS follows a sender budget of 3 (refill 1/min, `OutgoingSosBudget`) that the SOS hub button shows ("Wait N s", and a message when pressed). The receiver `SOS_NEW` limit is burst 4, refill 1/min, charged only for revision 1 of an unknown `sosId`; a refine or end that arrives first is charged as an update. Ending, refining and reopening the active SOS are never gated.
-- The first revision of an SOS this phone sees (live or by sync, whatever its number) raises the notification and alarm once if it is active, created within 10 min and not our own (node id or signing key). Ended, older and known alerts stay silent. `SOS_UPDATE` is burst 10 (6/min), and the end of a known SOS is never limited. The new-vs-reopen decision and the token charge happen under the repository lock.
+- Raising a new SOS follows a sender budget of 5 (refill 5/min, one per 12 s, `OutgoingSosBudget`). The SOS hub button shows "N of 5 left"; at 0 it is disabled and reads "Wait N s" (a race past the button still gets "SOS available in N seconds"). The receiver `SOS_NEW` limit is burst 6, refill 5/min, charged only for revision 1 of an unknown `sosId`; a refine or end that arrives first is charged as an update. Ending, refining and reopening the active SOS are never gated.
+- The first revision of an SOS this phone sees (live or by sync, whatever its number) raises the notification and alarm once if it is active, created within 10 min and not our own (node id or signing key). Ended, older and known alerts stay silent. `SOS_UPDATE` is burst 12, refill 10/min: a raise can charge 2 updates (its refine, then a late revision 1), so 5 raises/min need 10/min. The end of a known SOS is never limited. The new-vs-reopen decision and the token charge happen under the repository lock.
 
 Open limits:
 
