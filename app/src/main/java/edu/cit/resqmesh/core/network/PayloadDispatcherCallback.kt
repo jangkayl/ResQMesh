@@ -1,15 +1,19 @@
 package edu.cit.resqmesh.core.network
 
+import edu.cit.resqmesh.core.network.dedup.ExpiringIdCache
+
 interface PayloadDispatcherCallback {
     fun onConversationMessage(endpointId: String, payload: MeshPayload) {}
     fun onSosPacket(endpointId: String, payload: MeshPayload) {}
     fun getMyDeviceName(): String
     fun getMyNodeId(): String
-    fun getSeenMessageIds(): MutableSet<String>
+    fun getSeenIdCache(): ExpiringIdCache
     fun getEndpointMedium(endpointId: String): String
     fun getConnectedEndpointIdByName(name: String): String?
     fun getConnectedEndpointIdByNodeId(nodeId: String): String?
     fun getStpNeighbors(): Set<String>
+    /** Stable node id bound to [endpointId] once its direct identity exchange completed, else null. */
+    fun getAdmittedNodeId(endpointId: String): String? = null
 
     fun sendDirectPayload(endpointId: String, payload: ByteArray): TransportDispatchResult
     fun sendPriorityPayload(endpointId: String, payload: ByteArray): TransportDispatchResult

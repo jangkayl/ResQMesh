@@ -11,7 +11,6 @@ import edu.cit.resqmesh.core.network.bluetooth.state.BleStateStore
 import edu.cit.resqmesh.core.network.bluetooth.state.MeshFrameCodec
 import edu.cit.resqmesh.core.network.bluetooth.state.OutboundQueuePolicy
 import edu.cit.resqmesh.core.logging.AppLogger
-import java.io.DataInputStream
 import java.io.DataOutputStream
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicInteger
@@ -103,34 +102,88 @@ class L2capTransport(
         AppLogger.updateLinkTransport(endpoint, "GATT+L2CAP")
         handler.post { if (isOwned()) onPromoteGattWork(endpoint) }
         onConnected()
+        val gate = L2capInboundGate()
+        val watchdog = L2capReadWatchdog()
+        val readerDone = java.util.concurrent.atomic.AtomicBoolean(false)
+        val stallCheck = object : Runnable {
+            override fun run() {
+                if (readerDone.get() || !isOwned()) return
+                if (watchdog.isStalled(System.currentTimeMillis())) {
+                    AppLogger.d(
+                        "BLE_MESH",
+                        "L2CAP_READ_TIMEOUT endpoint=$endpoint: no progress for ${L2capReadWatchdog.READ_TIMEOUT_MS} ms"
+                    )
+                    close(socket)
+                    return
+                }
+                handler.postDelayed(this, L2capReadWatchdog.CHECK_INTERVAL_MS)
+            }
+        }
+        handler.postDelayed(stallCheck, L2capReadWatchdog.CHECK_INTERVAL_MS)
         Thread {
             try {
-                val input = DataInputStream(socket.inputStream)
-                while (isOwned()) {
-                    val length = input.readInt()
-                    if (!MeshFrameCodec.isValidPayloadLength(length)) {
-                        AppLogger.d("BLE_MESH", "Rejected invalid L2CAP payload length $length from $endpoint")
-                        break
+                val reader = L2capFrameReader(
+                    socket.inputStream,
+                    onFrameStarted = { watchdog.frameStarted(System.currentTimeMillis()) },
+                    onChunk = { count ->
+                        val delay = store.guards.streamDelayMs("$endpoint/l2cap", count)
+                        if (delay > 0) Thread.sleep(delay)
+                    },
+                    onProgress = {
+                        val now = System.currentTimeMillis()
+                        watchdog.progress(now)
+                        handler.post { if (isOwned()) store.connectionInteractionTimes[endpoint] = now }
                     }
-                    val payload = ByteArray(length)
+                )
+                while (isOwned()) {
+                    val header = reader.readHeader()
+                    if (header is L2capFrameReader.Header.Invalid) {
+                        AppLogger.d("BLE_MESH", "Rejected invalid L2CAP payload length ${header.value} from $endpoint")
+                        return@Thread
+                    }
+                    val length = (header as L2capFrameReader.Header.Length).value
+                    // Back-pressure: wait for handler space before reading the body, so no frame is dropped.
+                    // Not mid-frame while waiting, so the read watchdog stays quiet.
+                    watchdog.frameEnded()
+                    val admission = gate.awaitAcquire(length, L2capInboundGate.STALL_TIMEOUT_MS, ::isOwned)
+                    if (admission == L2capInboundGate.Admission.TIMED_OUT) {
+                        AppLogger.d(
+                            "BLE_MESH",
+                            "L2CAP_QUEUE_STALL endpoint=$endpoint: queue full ${L2capInboundGate.STALL_TIMEOUT_MS} ms"
+                        )
+                        return@Thread
+                    }
+                    if (admission != L2capInboundGate.Admission.ADMITTED) return@Thread
+                    watchdog.frameStarted(System.currentTimeMillis())
                     incoming.incrementAndGet()
-                    var offset = 0
-                    while (offset < length) {
-                        val count = input.read(payload, offset, minOf(IO_CHUNK_BYTES, length - offset))
-                        if (count < 0) throw java.io.EOFException()
-                        if (!isOwned()) return@Thread
-                        offset += count
-                        handler.post { if (isOwned()) store.connectionInteractionTimes[endpoint] = System.currentTimeMillis() }
+                    val payload = try {
+                        reader.readPayload(length, ::isOwned)
+                    } catch (error: Exception) {
+                        incoming.decrementAndGet()
+                        gate.release(length)
+                        throw error
+                    }
+                    watchdog.frameEnded()
+                    if (payload == null || !isOwned()) {
+                        incoming.decrementAndGet()
+                        gate.release(length)
+                        return@Thread
                     }
                     AppLogger.d("BLE_MESH", "L2CAP Received $length bytes from $endpoint")
                     handler.post {
                         try { if (isOwned()) onPayload(endpoint, payload) }
-                        finally { incoming.decrementAndGet() }
+                        finally {
+                            incoming.decrementAndGet()
+                            gate.release(length)
+                        }
                     }
                 }
             } catch (error: Exception) {
                 AppLogger.d("BLE_MESH", "L2CAP stream disconnected for $endpoint: ${error.message}")
             } finally {
+                gate.close()
+                readerDone.set(true)
+                handler.removeCallbacks(stallCheck)
                 lost(writer.close())
                 close(socket)
             }
@@ -166,5 +219,5 @@ class L2capTransport(
         try { socket.close() } catch (_: Exception) {}
     }
 
-    private companion object { const val IO_CHUNK_BYTES = 16 * 1024 }
+    private companion object { const val IO_CHUNK_BYTES = L2capFrameReader.IO_CHUNK_BYTES }
 }

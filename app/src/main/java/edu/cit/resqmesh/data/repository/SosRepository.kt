@@ -1,7 +1,10 @@
 package edu.cit.resqmesh.data.repository
 
 import edu.cit.resqmesh.core.network.*
+import edu.cit.resqmesh.core.network.ratelimit.InboundOriginGate
 import edu.cit.resqmesh.core.logging.AppLogger
+import edu.cit.resqmesh.core.model.SosRaiseCharge
+import edu.cit.resqmesh.core.model.SosRaiseResult
 import edu.cit.resqmesh.data.local.entity.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
@@ -13,11 +16,13 @@ import kotlinx.serialization.protobuf.ProtoBuf
 import java.util.UUID
 
 @OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
+@Suppress("LongParameterList") // the origin gate joins the existing injected collaborators
 class SosRepository(
     private val store: SosStore, private val signing: IncidentEventSigning,
     private val identity: IdentityProvider, private val gateway: MeshNetworkGateway,
     private val peers: MeshReadyPeerEvents, private val scope: CoroutineScope,
-    private val sink: SosAlertSink, private val now: () -> Long = System::currentTimeMillis
+    private val sink: SosAlertSink, private val now: () -> Long = System::currentTimeMillis,
+    private val originGate: InboundOriginGate? = null
 ) {
     private val mutex = Mutex()
     private val inbound = kotlinx.coroutines.channels.Channel<Pair<String, MeshPayload>>(64)
@@ -40,7 +45,11 @@ class SosRepository(
                 if (payload.text.toByteArray().size > 8_192 || payload.ttl !in 1..10 || payload.relayHopCount !in 0..10) continue
                 val e = runCatching { SosProtocol.json.decodeFromString<SosEvent>(payload.text) }.getOrNull()
                     ?: continue
-                val result = ingest(e, live = true)
+                if (!SosProtocol.envelopeMatches(payload, e)) {
+                    log("SOS_EVENT", "INBOUND_REJECT type=SOS_EVENT reason=envelope_mismatch")
+                    continue
+                }
+                val result = ingest(e, live = true, endpoint = endpoint)
                 if (result == SosIngestion.APPLIED && payload.ttl > 1 && payload.relayHopCount < 10) {
                     val forwarded = payload.copy(ttl = payload.ttl - 1, relayHopCount = payload.relayHopCount + 1)
                     val dispatch = gateway.broadcastPriorityPayload(ProtoBuf.encodeToByteArray(forwarded), endpoint)
@@ -63,17 +72,39 @@ class SosRepository(
         scope.launch { while (isActive) { delay(5_000); flush() } }
     }
 
-    suspend fun create(type: String, lat: Double? = null, lng: Double? = null, accuracy: Float? = null, captured: Long? = null): String = mutex.withLock {
-        store.all().firstOrNull { !it.ended && it.originNodeId == identity.getDeviceId() }?.let { return@withLock it.sosId }
-        val user = identity.getOrCreateUser()
-        val id = SosProtocol.prefix(signing.publicKey) + UUID.randomUUID()
-        val e = SosEvent(UUID.randomUUID().toString(), id, identity.getDeviceId(), user.displayName,
-            signing.publicKey, type, 1, false, now(), now(), lat, lng, accuracy, captured?.takeIf { it > 0 })
-        val signed = e.copy(signature = signing.sign(e.signingEvent()))
-        check(apply(signed, pending = true) == SosIngestion.APPLIED)
-        changes.tryEmit(Unit)
-        dispatch(signed)
-        id
+    suspend fun create(type: String, lat: Double? = null, lng: Double? = null, accuracy: Float? = null, captured: Long? = null): String =
+        when (val r = raise(type, SosRaiseCharge.NONE, lat, lng, accuracy, captured)) {
+            is SosRaiseResult.Created -> r.id
+            is SosRaiseResult.Reopened -> r.id
+            SosRaiseResult.Throttled -> error("unreachable: no charge refuses")
+        }
+
+    /**
+     * Reopens the active own SOS (never charged) or creates a new one. [charge] is taken under the repository
+     * lock, only when a new sosId will really be created, and refunded if that creation fails.
+     */
+    suspend fun raise(
+        type: String, charge: SosRaiseCharge, lat: Double? = null, lng: Double? = null,
+        accuracy: Float? = null, captured: Long? = null
+    ): SosRaiseResult = mutex.withLock {
+        store.all().firstOrNull { !it.ended && it.originNodeId == identity.getDeviceId() }
+            ?.let { return@withLock SosRaiseResult.Reopened(it.sosId) }
+        if (!charge.tryCharge()) return@withLock SosRaiseResult.Throttled
+        var created = false
+        try {
+            val user = identity.getOrCreateUser()
+            val id = SosProtocol.prefix(signing.publicKey) + UUID.randomUUID()
+            val e = SosEvent(UUID.randomUUID().toString(), id, identity.getDeviceId(), user.displayName,
+                signing.publicKey, type, 1, false, now(), now(), lat, lng, accuracy, captured?.takeIf { it > 0 })
+            val signed = e.copy(signature = signing.sign(e.signingEvent()))
+            check(apply(signed, pending = true) == SosIngestion.APPLIED)
+            changes.tryEmit(Unit)
+            created = true
+            dispatch(signed)
+            SosRaiseResult.Created(id)
+        } finally {
+            if (!created) charge.refund() // the SOS was not stored: give the token back
+        }
     }
 
     suspend fun updateLocation(id: String, lat: Double, lng: Double, accuracy: Float, captured: Long) = mutex.withLock {
@@ -102,23 +133,51 @@ class SosRepository(
         dispatch(signed)
     }
 
-    suspend fun ingest(e: SosEvent, live: Boolean = false): SosIngestion = mutex.withLock {
+    @Suppress("UnusedParameter") // the alarm no longer depends on the path; callers still say where it came from
+    suspend fun ingest(e: SosEvent, live: Boolean = false, endpoint: String? = null): SosIngestion = mutex.withLock {
         if (!SosProtocol.valid(e) || !signing.verify(e.signingEvent(), e.signingKey)) {
             log("SOS_EVENT", "rejected id=${e.sosId.take(100)}")
             return@withLock SosIngestion.REJECTED
         }
+        if (SosProtocol.futureDated(e, now())) {
+            log("SOS_EVENT", "INBOUND_REJECT type=SOS_EVENT reason=future_created_at id=${e.sosId.take(100)}")
+            return@withLock SosIngestion.REJECTED
+        }
         val previouslyKnown = store.alert(e.sosId) != null
+        val isNewRaise = !previouslyKnown && e.revision == 1L
+        // An end of a known SOS is never limited or delayed; it is bounded by the raises that created the sosId.
+        val endOfKnown = previouslyKnown && e.ended
+        if (!endOfKnown && rateLimited(e, endpoint, isNewRaise)) return@withLock SosIngestion.REJECTED
         val result = apply(e, pending = false)
         if (result == SosIngestion.APPLIED) {
             changes.tryEmit(Unit)
             if (e.ended) {
                 sink.ended(e.sosId)
                 if (incoming.value?.sosId == e.sosId) incoming.value = null
-            } else if (live && !previouslyKnown && e.revision == 1L && e.originNodeId != identity.getDeviceId()) {
+            } else if (alarms(e, previouslyKnown)) {
                 store.alert(e.sosId)?.let { sink.received(it); incoming.value = it }
             }
         }
         result
+    }
+
+    /**
+     * The alarm fires once per sosId: for the first revision this phone sees, whatever its number and whether it
+     * came live or by sync, while the alert is active and created within 10 minutes (a known sosId is silent).
+     * Own SOS is excluded by node id and by signing key (the Keystore key normally does not survive a reinstall).
+     */
+    private suspend fun alarms(e: SosEvent, previouslyKnown: Boolean): Boolean {
+        if (previouslyKnown || e.ended || e.originNodeId == identity.getDeviceId()) return false
+        return e.signingKey != signing.publicKey && now() - e.createdAt <= SYNC_ALARM_MAX_AGE_MS
+    }
+
+    /**
+     * Only a verified, not yet stored event from a link charges its signing key's bucket; duplicates are free.
+     * SOS_NEW is charged only for revision 1 of an unknown sosId; a refine or end that arrives first is an update.
+     */
+    private suspend fun rateLimited(e: SosEvent, endpoint: String?, isNewRaise: Boolean): Boolean {
+        if (endpoint == null || originGate == null || store.event(e.eventId) != null) return false
+        return !originGate.admitVerifiedSos(endpoint, SosProtocol.prefix(e.signingKey), isNewRaise)
     }
 
     private suspend fun apply(e: SosEvent, pending: Boolean): SosIngestion {
@@ -174,3 +233,6 @@ class SosRepository(
 
     private fun log(marker: String, message: String) { AppLogger.d(marker, message) }
 }
+
+/** A sync-delivered SOS older than this is history, not an emergency to alarm on. */
+private const val SYNC_ALARM_MAX_AGE_MS = 10 * 60 * 1000L

@@ -4,6 +4,13 @@ import edu.cit.resqmesh.core.ui.components.inputs.InputCounter
 import edu.cit.resqmesh.core.security.input.TextField
 import edu.cit.resqmesh.core.security.input.TextPolicy
 import edu.cit.resqmesh.feature.comms.ui.components.composer.LocationAcquisitionBanner
+import edu.cit.resqmesh.feature.comms.ui.components.composer.ChatBudgetLine
+import edu.cit.resqmesh.feature.comms.ui.components.composer.chatBudgetWaitDescription
+import edu.cit.resqmesh.feature.comms.ui.components.composer.waitSeconds
+import edu.cit.resqmesh.core.network.ratelimit.ChatBudgetState
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import edu.cit.resqmesh.feature.comms.ui.components.composer.ComposerAttachmentPreview
 import edu.cit.resqmesh.feature.comms.ui.components.composer.ComposerActionPopup
 import android.net.Uri
@@ -79,7 +86,8 @@ fun ChatInput(
     isAcquiringLocation: Boolean = false,
     replyingTo: ChatMessage? = null,
     onCancelReply: () -> Unit = {},
-    maxInputLength: Int = TextField.MESSAGE.maxLength
+    maxInputLength: Int = TextField.MESSAGE.maxLength,
+    sendBudget: ChatBudgetState? = null
 ) {
     val context = LocalContext.current
     val haptics = LocalHapticFeedback.current
@@ -100,7 +108,9 @@ fun ChatInput(
         }
     }
 
-    val canSend = (inputText.isNotBlank() || pendingImage != null || pendingAudio != null) && !isRecording
+    val budgetWaiting = sendBudget != null && sendBudget.remaining <= 0
+    val hasContent = inputText.isNotBlank() || pendingImage != null || pendingAudio != null
+    val canSend = hasContent && !isRecording && !budgetWaiting
 
     // Dynamic morphing calculation based on content length and line count
     val lineCount = remember(inputText) { inputText.count { it == '\n' } + 1 }
@@ -235,6 +245,8 @@ fun ChatInput(
                                 onToggleRecord()
                                 isPopupExpanded = false
                             })
+
+        if (sendBudget != null) ChatBudgetLine(sendBudget)
 
         // 4. Floating Frosted-Glass Composer Row
         ResQGlassSurface(
@@ -461,15 +473,21 @@ fun ChatInput(
                 // High-Impact Glowing Send Button
                 Surface(
                     modifier = Modifier
-                        .size(44.dp)
+                        .then(if (budgetWaiting) Modifier.height(44.dp).widthIn(min = 44.dp) else Modifier.size(44.dp))
                         .padding(bottom = 2.dp)
+                        .then(
+                            if (budgetWaiting && sendBudget != null) {
+                                val waitDescription = chatBudgetWaitDescription(sendBudget)
+                                Modifier.semantics { contentDescription = waitDescription }
+                            } else Modifier
+                        )
                         .shadow(
                             elevation = if (canSend) 10.dp else 0.dp,
                             shape = CircleShape,
                             ambientColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f),
                             spotColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f)
                         ),
-                    shape = CircleShape,
+                    shape = if (budgetWaiting) RoundedCornerShape(22.dp) else CircleShape,
                     color = if (canSend) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
                     contentColor = if (canSend) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f),
                     onClick = {
@@ -481,11 +499,19 @@ fun ChatInput(
                     enabled = canSend
                 ) {
                     Box(contentAlignment = Alignment.Center) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Outlined.Send,
-                            contentDescription = stringResource(R.string.private_chat_send_action),
-                            modifier = Modifier.size(19.dp)
-                        )
+                        if (budgetWaiting && sendBudget != null) {
+                            Text(
+                                text = stringResource(R.string.chat_budget_wait, sendBudget.waitSeconds()),
+                                style = MaterialTheme.typography.labelMedium,
+                                modifier = Modifier.padding(horizontal = 12.dp).clearAndSetSemantics { }
+                            )
+                        } else {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Outlined.Send,
+                                contentDescription = stringResource(R.string.private_chat_send_action),
+                                modifier = Modifier.size(19.dp)
+                            )
+                        }
                     }
                 }
             }

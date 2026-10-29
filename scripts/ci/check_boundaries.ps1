@@ -26,7 +26,7 @@ $files = Get-ChildItem -LiteralPath $srcRoot -Recurse -File -Filter '*.kt'
 foreach ($file in $files) {
     $rel = $file.FullName.Substring($srcRoot.Length + 1).Replace('\', '/')
     # Imports and fully-qualified references on any line except the package declaration.
-    $imports = Select-String -LiteralPath $file.FullName -Pattern '(?<![\w.])com\.example\.testresqmesh(\.\w+)+' -AllMatches |
+    $imports = Select-String -LiteralPath $file.FullName -Pattern "(?<![\w.])$([regex]::Escape($base))(\.\w+)+" -AllMatches |
         Where-Object { $_.Line -notmatch '^\s*package\s' } |
         ForEach-Object { $_.Matches } | ForEach-Object { $_.Value } | Sort-Object -Unique
     foreach ($rule in $rules) {

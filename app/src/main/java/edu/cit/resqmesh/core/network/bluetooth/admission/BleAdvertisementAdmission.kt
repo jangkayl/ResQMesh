@@ -4,6 +4,7 @@ import edu.cit.resqmesh.core.model.NodeIdentity
 import edu.cit.resqmesh.core.model.ScanEvent
 import edu.cit.resqmesh.core.logging.AppLogger
 import edu.cit.resqmesh.core.network.bluetooth.BleAdvertisement
+import edu.cit.resqmesh.core.network.bluetooth.state.BleLinkRole
 import edu.cit.resqmesh.core.network.bluetooth.BleAdmissionReason
 import edu.cit.resqmesh.core.network.bluetooth.BleConnectStartResult
 import edu.cit.resqmesh.core.network.bluetooth.admission.BleAdmissionConstants.CANDIDATE_FRESH_MS
@@ -58,7 +59,7 @@ internal class BleAdvertisementAdmission(
             advertisements[candidateIdentity(peerName, endpoint)] = advertisement to now
             while (advertisements.size > MAX_CANDIDATES) advertisements.remove(advertisements.keys.first())
         }
-        evictRotatedGhost(peerName, endpoint)
+        evictRotatedGhost(peerName, endpoint, advertisement.nodeId)
         if (observed) store.endpointLastSeen[endpoint] = now
         store.endpointLastScore[endpoint] = advertisement.electionScore
         if (advertisement.nodeId.isNotEmpty()) store.endpointNodeIds[endpoint] = advertisement.nodeId
@@ -101,7 +102,8 @@ internal class BleAdvertisementAdmission(
             // and the peer advertises directConnections == 0. A newly connecting or actively
             // communicating socket must not be torn down simply because the peer's peripheral
             // advertising MAC differs from its central connection MAC.
-            val isZombie = hasLiveRole && isOldLinkSilent && isOldLinkAged && advertisement.directConnections == 0
+            val isZombie = hasLiveRole && isOldLinkSilent && isOldLinkAged && advertisement.directConnections == 0 &&
+                mayReplaceLink(existingEndpoint, peerName, advertisement.nodeId)
 
             if (isZombie) {
                 AppLogger.d("BLE_MESH", "Purging zombie link $existingEndpoint for rebooted peer $peerName (new endpoint $endpoint)")
@@ -160,11 +162,31 @@ internal class BleAdvertisementAdmission(
         admitOrElect(endpoint, peerName, advertisement, now)
     }
 
-    private fun evictRotatedGhost(peerName: String, endpoint: String) {
+    /**
+     * An identity claimed only in an advertisement (unauthenticated) may replace an existing link
+     * only when that link's identity is not admitted, or the claim equals the identity it was admitted
+     * under. This is what keeps legitimate MAC rotation working: the same admitted node reappears on a
+     * new address with the same node ID. Unknown admitted ID fails closed.
+     */
+    private fun mayReplaceLink(oldEndpoint: String, peerName: String, claimedNodeId: String): Boolean {
+        if (!store.links.isIdentityAdmitted(oldEndpoint)) return true
+        val admittedId = BleLinkRole.entries
+            .firstNotNullOfOrNull { store.links.current(oldEndpoint, it)?.peerNodeId?.takeIf(String::isNotBlank) }
+            ?: NodeIdentity.idOf(store.connectedEndpointNames[oldEndpoint])
+            ?: store.endpointNodeIds[oldEndpoint]
+        val claimed = claimedNodeId.ifEmpty { NodeIdentity.idOf(peerName).orEmpty() }
+        val allowed = admittedId != null && claimed.isNotEmpty() && admittedId.equals(claimed, ignoreCase = true)
+        if (!allowed) {
+            AppLogger.d("BLE_MESH", "ADV_EVICT_BLOCKED endpoint=$oldEndpoint reason=admitted_identity_mismatch")
+        }
+        return allowed
+    }
+
+    private fun evictRotatedGhost(peerName: String, endpoint: String, claimedNodeId: String) {
         val oldEndpoint = store.connectedEndpointNames.entries
             .find { it.key != endpoint && NodeIdentity.matches(it.value, peerName) }?.key ?: return
         val hasLiveRole = store.activeConnections.containsKey(oldEndpoint) || store.activeServerConnections.containsKey(oldEndpoint)
-        if (hasLiveRole) return
+        if (hasLiveRole || !mayReplaceLink(oldEndpoint, peerName, claimedNodeId)) return
         AppLogger.d("BLE_MESH", "GHOST EVICTION: $peerName rotated MAC from $oldEndpoint to $endpoint. Purging ghost.")
         disconnectEndpoint(oldEndpoint)
         store.connectedEndpointIds.remove(oldEndpoint)

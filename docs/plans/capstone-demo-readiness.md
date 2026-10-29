@@ -30,7 +30,7 @@ Use [architecture](../architecture.md), [status](../status.md), [research](../re
 
 No calendar deadline or completed trial is inferred.
 
-- [ ] Architecture/state diagrams and requirements-to-test table: PASS/FAIL/UNTESTED.
+- [ ] Architecture/state diagrams and requirements-to-test table: PASS/FAIL/UNTESTED. Not needed for now (user, 2026-10-18); drafted only on request, as are slides.
 - [ ] Separate builds/unit checks, executed emulator instrumentation, user reports and analyzed phone captures.
 - [ ] Record phone/build matrix, timestamps, counts, route/transport and measured convergence/delays.
 - [ ] Document trust, background/OEM, capacity and intermittent loss limits.

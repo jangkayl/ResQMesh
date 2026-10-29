@@ -217,7 +217,12 @@ internal class MeshPeerCoordinator(
             PeerPublicKeyDirectory.Observation.KEY_CHANGE_PENDING ->
                 AppLogger.d("BLE_MESH", "Public-key change requires approval for $senderName")
             PeerPublicKeyDirectory.Observation.INVALID_IDENTITY ->
-                AppLogger.d("BLE_MESH", "Ignored public key with invalid stable identity")
+                AppLogger.event(
+                    category = edu.cit.resqmesh.core.logging.TerminalLogCategory.SYNC,
+                    event = "KEY_REJECT",
+                    message = "KEY_REJECT reason=invalid_identity_or_binding",
+                    peerName = senderName
+                )
             else -> {
                 AppLogger.d("BLE_MESH", "Recorded public-key observation for $senderName")
                 scheduleOutboxFlush()

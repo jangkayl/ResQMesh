@@ -10,5 +10,6 @@ internal object MeshDeliveryConstants {
     const val BLOCK_RETRY_MS = 3_000L
     const val PRIVATE_DELIVERY_TIMEOUT_MS = 15_000L
     const val OUTBOX_RETRY_BACKOFF_MS = 5_000L
+    const val MIN_BUDGET_RETRY_MS = 250L
     const val OUTBOX_EXPIRY_MS = 24 * 60 * 60 * 1000L
 }

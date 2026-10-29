@@ -49,6 +49,7 @@ fun SosHubScreen(
     val alerts by vm.sosAlerts.collectAsState()
     val all by vm.allPublicMessages.collectAsState()
     val states by vm.conversationStates.collectAsState()
+    val raiseBudget by vm.sosBudgetState.collectAsState()
     BackHandler(onBack = onBack)
 
     val userOwnsActiveSos = alerts.any { !it.ended && vm.isOwnSos(it) }
@@ -70,7 +71,12 @@ fun SosHubScreen(
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             item {
-                SosDispatchHeader(meshStatus, meshAccent, isLight, userOwnsActiveSos, myActiveSos, onBack, onCreate, onOpen)
+                SosDispatchHeader(
+                    meshStatus, meshAccent, isLight, userOwnsActiveSos, myActiveSos, onBack,
+                    onCreate = onCreate,
+                    raiseBudget = raiseBudget,
+                    onOpen = onOpen
+                )
             }
 
             // Section 1: Active Emergencies

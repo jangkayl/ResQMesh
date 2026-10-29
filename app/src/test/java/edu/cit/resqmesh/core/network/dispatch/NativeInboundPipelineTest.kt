@@ -14,7 +14,7 @@ import org.junit.Test
 class NativeInboundPipelineTest {
     private class Fixture {
         val store = BleStateStore()
-        val versions = mutableMapOf<String, Int>()
+        val versions = edu.cit.resqmesh.core.utils.collections.BoundedLruMap<String, Int>(16)
         val calls = mutableListOf<String>()
         var current = true
         var live = true
@@ -41,6 +41,12 @@ class NativeInboundPipelineTest {
         )
 
         fun receive(payload: MeshPayload) = pipeline.processBinaryPayload("endpoint", ProtoBuf.encodeToByteArray(payload))
+    }
+
+    @Test fun frameFloodOnOneLinkIsDroppedAfterTheFramesPerSecondBudget() {
+        val f = Fixture()
+        repeat(100) { f.receive(MeshPayload(id = "p$it", type = "PING")) }
+        assertTrue(f.calls.count { it == "dispatch" } in 64..66)
     }
 
     @Test fun obsoleteTransportCannotDispatchOrTouchTheJournal() {
@@ -73,7 +79,7 @@ class NativeInboundPipelineTest {
         f.receive(MeshPayload(id = "synthetic", type = "SYSTEM", senderName = "Remote#C003",
             senderNodeId = "C003", routePath = listOf("Forwarder#B002"), transferProtocol = ReliableMeshTransfers.VERSION))
         assertEquals("Forwarder#B002", f.store.connectedEndpointNames["endpoint"])
-        assertTrue(f.versions.isEmpty())
+        assertTrue(f.versions.size == 0)
         assertEquals(listOf("old-listener", "heartbeat-removed", "dispatch"), f.calls)
     }
 

@@ -49,6 +49,7 @@ TOFU first-contact authentication, out-of-band verification, authenticated E2EE 
 ## Repository, persistence and feature ownership
 
 MeshRepository joins callbacks, routing, persistence and UI. MeshNetworkGateway hides Bluetooth; MessageStore hides Room; PrivateDeliveryPlanner selects exact hops. Koin supplies adapters; AppCoroutineScope owns background work. MeshNetworkEventBinder binds the same 23 callbacks/providers once in repository init; named private repository handlers retain policy. Bindings survive stop/start or radio suspension. NativeBleGateway has a separate adapter file. Payload handlers are grouped by presence, delivery, link control, audio and incident events under dispatch/. Transport-state changes clear readiness/rooted routes; route checks use actual paths and direct loss preserves alternatives.
+Phase B inbound order (`feat/security-phase-b`): link shaping, codec, decode, validator, dedup, InboundOriginGate, handler. SOS is limited after signature checks; GOODBYE is never relayed ([plan](plans/security-hardening.md)).
 
 Public sends persist pending before dispatch. Per-neighbor acceptance, wholly rejected retries, partial feedback and a serialized flush avoid whole-broadcast retries after acceptance. Acceptance is never recipient delivery.
 

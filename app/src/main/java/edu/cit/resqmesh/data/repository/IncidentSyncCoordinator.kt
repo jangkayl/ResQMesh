@@ -3,6 +3,7 @@ package edu.cit.resqmesh.data.repository
 import edu.cit.resqmesh.core.model.ConnectedDevice
 import edu.cit.resqmesh.core.network.MeshNetworkGateway
 import edu.cit.resqmesh.core.network.MeshPayload
+import edu.cit.resqmesh.core.network.ratelimit.SingleFlightGate
 import edu.cit.resqmesh.core.logging.AppLogger
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.collectLatest
@@ -31,6 +32,7 @@ class IncidentSyncCoordinator(
     private data class Waiting(val endpoint: String, val session: String, val response: CompletableDeferred<JSONObject>)
     private val sessions = ConcurrentHashMap<String, Session>()
     private val waiting = ConcurrentHashMap<String, Waiting>()
+    private val rebuildGate = SingleFlightGate("INCIDENT_REBUILD")
     private var changeJob: Job? = null
     private var rotation = 0
 
@@ -287,7 +289,12 @@ class IncidentSyncCoordinator(
                     changed()
                     JSONObject().put("results", results)
                 }
-                "REBUILD" -> { store.rebuild(incoming.getString("incident")); store.snapshot().digest() }
+                "REBUILD" -> {
+                    // A rebuild already running or queued for this incident covers a repeat request.
+                    val incident = incoming.getString("incident")
+                    rebuildGate.run(incident) { store.rebuild(incident) }
+                    store.snapshot().digest()
+                }
                 else -> JSONObject().put("error", "UNSUPPORTED")
             }
         } catch (cancelled: CancellationException) {

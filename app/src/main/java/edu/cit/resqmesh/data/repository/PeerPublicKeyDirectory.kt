@@ -2,7 +2,12 @@ package edu.cit.resqmesh.data.repository
 
 import android.content.Context
 import android.content.SharedPreferences
+import android.util.Base64
+import edu.cit.resqmesh.core.logging.AppLogger
+import edu.cit.resqmesh.core.logging.TerminalLogCategory
+import edu.cit.resqmesh.core.logging.TerminalLogLevel
 import edu.cit.resqmesh.core.model.NodeIdentity
+import edu.cit.resqmesh.core.network.bluetooth.DirectIdentityPolicy
 import java.security.MessageDigest
 import org.json.JSONArray
 import org.json.JSONObject
@@ -11,9 +16,14 @@ import org.json.JSONObject
  * Persistent trust-on-first-use directory for keys learned from direct or relayed SYSTEM pulses.
  * Public keys are not secret, but a changed key is never silently substituted for a pinned key.
  */
-class PeerPublicKeyDirectory(private val preferences: SharedPreferences) {
+class PeerPublicKeyDirectory(
+    private val preferences: SharedPreferences,
+    /** Replaceable in JVM tests, where android.util.Base64 and real RSA identities are unavailable. */
+    private val keyBindsToNodeId: (nodeId: String, publicKey: String) -> Boolean = ::defaultKeyBinding
+) {
     constructor(context: Context) : this(context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE))
 
+    /** INVALID_IDENTITY covers both an inconsistent node-id claim and a key that fails the id/RSA binding. */
     enum class Observation { TRUSTED, UNCHANGED, KEY_CHANGE_PENDING, INVALID_IDENTITY }
 
     private data class Entry(
@@ -28,9 +38,20 @@ class PeerPublicKeyDirectory(private val preferences: SharedPreferences) {
 
     private val entries = load().toMutableMap()
 
+    init {
+        val valid = StoredPinAudit(keyBindsToNodeId).valid(entries)
+        if (valid != entries) {
+            entries.clear()
+            entries.putAll(valid)
+            persist()
+        }
+    }
+
     @Synchronized fun observe(peerName: String, advertisedNodeId: String, publicKey: String): Observation {
         val nodeId = stableId(peerName, advertisedNodeId) ?: return Observation.INVALID_IDENTITY
         if (publicKey.isBlank()) return Observation.INVALID_IDENTITY
+        // Only keys bound to the stable node ID (SHA-256 prefix, RSA >= 2048) may be pinned or proposed.
+        if (!keyBindsToNodeId(nodeId, publicKey)) return Observation.INVALID_IDENTITY
         val now = System.currentTimeMillis()
         val current = entries[nodeId]
         if (current == null) {
@@ -113,6 +134,29 @@ class PeerPublicKeyDirectory(private val preferences: SharedPreferences) {
         .joinToString("") { "%02X".format(it) }
         .take(16)
 
+    /** Stored pins must satisfy the same id/key binding as new ones; a failing pin is dropped. */
+    private class StoredPinAudit(private val binds: (nodeId: String, publicKey: String) -> Boolean) {
+        fun valid(stored: Map<String, Entry>): Map<String, Entry> = buildMap {
+            stored.forEach { (nodeId, entry) ->
+                if (!bound(nodeId, entry.publicKey)) {
+                    AppLogger.event(
+                        category = TerminalLogCategory.SECURITY,
+                        event = "KEY_REJECT",
+                        message = "KEY_REJECT reason=stored_invalid node=$nodeId",
+                        level = TerminalLogLevel.WARN,
+                        tag = "PEER_KEYS"
+                    )
+                } else {
+                    val pending = entry.pendingKey
+                    val keep = pending == null || bound(nodeId, pending)
+                    put(nodeId, if (keep) entry else entry.copy(pendingKey = null))
+                }
+            }
+        }
+
+        private fun bound(nodeId: String, key: String) = runCatching { binds(nodeId, key) }.getOrDefault(false)
+    }
+
     private fun load(): Map<String, Entry> = runCatching {
         val array = JSONArray(preferences.getString(KEY_ENTRIES, "[]"))
         buildMap {
@@ -151,3 +195,6 @@ class PeerPublicKeyDirectory(private val preferences: SharedPreferences) {
         const val KEY_ENTRIES = "entries_v1"
     }
 }
+
+private fun defaultKeyBinding(nodeId: String, publicKey: String): Boolean =
+    DirectIdentityPolicy.keyMatchesNodeId(nodeId, publicKey) { Base64.decode(it, Base64.DEFAULT) }

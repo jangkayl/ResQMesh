@@ -28,6 +28,8 @@ import androidx.compose.ui.unit.dp
 import edu.cit.resqmesh.core.model.ConversationPolicy
 import edu.cit.resqmesh.core.audio.MediaHelper
 import edu.cit.resqmesh.feature.comms.ui.components.ChatBubble
+import edu.cit.resqmesh.feature.comms.ui.components.composer.ChatBudgetLine
+import edu.cit.resqmesh.feature.comms.ui.components.composer.chatBudgetWaitDescription
 import edu.cit.resqmesh.feature.comms.viewmodel.CommunicationViewModel
 
 @Composable
@@ -44,6 +46,8 @@ fun PublicConversationScreen(
 ) {
     val all by vm.allPublicMessages.collectAsState()
     val states by vm.conversationStates.collectAsState()
+    val sendBudget by vm.chatBudgetState.collectAsState()
+    val budgetWaiting = sendBudget.remaining <= 0
     val key = ConversationPolicy.key(kind, channel, sosId)
     val messages = ConversationPolicy.messages(all, kind, channel, sosId)
     val displayMessages = remember(messages) { messages.asReversed() }
@@ -219,7 +223,8 @@ fun PublicConversationScreen(
                             textAlign = TextAlign.Center
                         )
                     }
-                } else {
+                } else Column {
+                    ChatBudgetLine(sendBudget)
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -252,12 +257,12 @@ fun PublicConversationScreen(
 
                         FilledIconButton(
                             onClick = {
-                                if (input.isNotBlank()) {
-                                    vm.sendConversation(kind, channel, sosId, input.trim())
+                                // False means the send budget is empty: keep the typed text.
+                                if (input.isNotBlank() && vm.sendConversation(kind, channel, sosId, input.trim())) {
                                     input = ""
                                 }
                             },
-                            enabled = input.isNotBlank(),
+                            enabled = input.isNotBlank() && !budgetWaiting,
                             modifier = Modifier.size(50.dp).testTag("conversation_send"),
                             shape = CircleShape,
                             colors = IconButtonDefaults.filledIconButtonColors(
@@ -267,7 +272,8 @@ fun PublicConversationScreen(
                         ) {
                             Icon(
                                 imageVector = Icons.AutoMirrored.Filled.Send,
-                                contentDescription = "Send Message",
+                                contentDescription =
+                                    if (budgetWaiting) chatBudgetWaitDescription(sendBudget) else "Send Message",
                                 modifier = Modifier.size(20.dp)
                             )
                         }

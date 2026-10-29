@@ -6,6 +6,7 @@ import edu.cit.resqmesh.core.model.ConnectedDevice
 import edu.cit.resqmesh.core.network.BroadcastDispatchResult
 import edu.cit.resqmesh.core.network.MeshNetworkGateway
 import edu.cit.resqmesh.core.network.TransportDispatchResult
+import edu.cit.resqmesh.core.network.ratelimit.OutgoingChatBudget
 import java.lang.reflect.Proxy
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -34,7 +35,7 @@ class PublicBroadcastOutboxTest {
         private fun update(id: String, marker: String) { rows[id]?.let { rows[id] = it.copy(deliveredTo = listOf(marker)) } }
     }
 
-    private class Fixture(scope: CoroutineScope) {
+    private class Fixture(scope: CoroutineScope, budget: OutgoingChatBudget = OutgoingChatBudget()) {
         val store = Store()
         var result = BroadcastDispatchResult(mapOf("B" to TransportDispatchResult.REJECTED_QUEUE_FULL))
         var broadcasts = 0
@@ -45,7 +46,7 @@ class PublicBroadcastOutboxTest {
                 "getMyNodeId" -> "A1"
                 "broadcastPayload", "broadcastPriorityPayload" -> {
                     payloads += kotlinx.serialization.protobuf.ProtoBuf.decodeFromByteArray(edu.cit.resqmesh.core.network.MeshPayload.serializer(), args!![0] as ByteArray)
-                    assertEquals("Persistence must precede dispatch", 1, store.rows.size)
+                    assertTrue("Persistence must precede dispatch", store.rows.isNotEmpty())
                     broadcasts++
                     result
                 }
@@ -56,7 +57,7 @@ class PublicBroadcastOutboxTest {
         val repo = MeshRepository(network, store, BlockRelationshipStore(prefs), PeerPublicKeyDirectory(prefs), scope, MeshReadyPeerEvents(), object : PeerNameStore {
             override val names = flowOf(emptyMap<String, String>())
             override suspend fun observeFullName(fullName: String) {}
-        })
+        }, chatBudget = budget)
 
         init {
             // Isolate repository send/retry behavior from Android callback/radio setup.
@@ -113,5 +114,46 @@ class PublicBroadcastOutboxTest {
         assertEquals(listOf("FAILED"), f.store.rows[id]!!.deliveredTo)
         advanceTimeBy(7_000L); runCurrent()
         assertEquals(1, f.broadcasts)
+    }
+
+    @Test fun retryWithoutTokenStaysPendingUntilRefillWhileFirstSendIsNotChargedTwice() = runTest {
+        var now = 1_000_000L
+        val budget = OutgoingChatBudget(clock = { now })
+        repeat(15) { assertTrue(budget.tryConsume()) }
+        val f = Fixture(backgroundScope, budget)
+        val id = f.repo.sendPublicMessage("test", null, null)
+        runCurrent()
+        // A recovered row was never paid by the send gate, so its dispatch needs a token.
+        val orphan = ChatMessage("orphan", "Me#A1", "queued", null, null, null, null, true, false,
+            System.currentTimeMillis(), deliveredTo = listOf("PENDING"))
+        f.store.rows[orphan.id] = orphan
+        f.result = BroadcastDispatchResult(mapOf("B" to TransportDispatchResult.ACCEPTED))
+        advanceTimeBy(5_000L); runCurrent()
+        // The paid first send goes out without a token; the unpaid retry stays PENDING.
+        assertEquals(emptyList<String>(), f.store.rows[id]!!.deliveredTo)
+        assertEquals(listOf("PENDING"), f.store.rows["orphan"]!!.deliveredTo)
+        assertEquals(2, f.broadcasts)
+        assertEquals(0, budget.state.value.remaining)
+        now += 4_000L
+        advanceTimeBy(4_000L); runCurrent()
+        assertEquals(emptyList<String>(), f.store.rows["orphan"]!!.deliveredTo)
+        assertEquals(3, f.broadcasts)
+    }
+
+    @Test fun expiredPendingMessageReleasesItsPrepaidMark() = runTest {
+        val f = Fixture(backgroundScope)
+        val id = f.repo.sendPublicMessage("test", null, null)
+        runCurrent()
+        fun prepaid(): Set<*> {
+            val field = MeshRepository::class.java.getDeclaredField("outbound").apply { isAccessible = true }
+            val outbound = field.get(f.repo)
+            val prepaid = outbound.javaClass.getDeclaredField("prepaid").apply { isAccessible = true }
+            return prepaid.get(outbound) as Set<*>
+        }
+        assertTrue(id in prepaid())
+        f.store.rows[id] = f.store.rows[id]!!.copy(timestamp = 0L)
+        advanceTimeBy(5_000L); runCurrent()
+        assertEquals(listOf("FAILED"), f.store.rows[id]!!.deliveredTo)
+        assertFalse(id in prepaid())
     }
 }

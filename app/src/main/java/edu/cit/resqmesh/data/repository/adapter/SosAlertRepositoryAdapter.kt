@@ -3,6 +3,8 @@ package edu.cit.resqmesh.data.repository.adapter
 import edu.cit.resqmesh.core.domain.repository.SosAlertRepository
 import edu.cit.resqmesh.core.model.SosActivity
 import edu.cit.resqmesh.core.model.SosAlert
+import edu.cit.resqmesh.core.model.SosRaiseCharge
+import edu.cit.resqmesh.core.model.SosRaiseResult
 import edu.cit.resqmesh.data.mapper.toEntity
 import edu.cit.resqmesh.data.mapper.toModel
 import edu.cit.resqmesh.data.repository.SosEvent
@@ -33,6 +35,9 @@ class SosAlertRepositoryAdapter(
     override fun isOwnSos(alert: SosAlert): Boolean = repository.owns(alert.toEntity())
     override suspend fun create(type: String, lat: Double?, lng: Double?, accuracy: Float?, captured: Long?): String =
         repository.create(type, lat, lng, accuracy, captured)
+    override suspend fun raise(
+        type: String, charge: SosRaiseCharge, lat: Double?, lng: Double?, accuracy: Float?, captured: Long?
+    ): SosRaiseResult = repository.raise(type, charge, lat, lng, accuracy, captured)
     override suspend fun updateLocation(id: String, lat: Double, lng: Double, accuracy: Float, captured: Long) =
         repository.updateLocation(id, lat, lng, accuracy, captured)
     override suspend fun end(id: String) = repository.end(id)

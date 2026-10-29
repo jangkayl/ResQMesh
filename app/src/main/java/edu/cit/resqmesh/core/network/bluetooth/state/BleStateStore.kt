@@ -3,12 +3,15 @@ package edu.cit.resqmesh.core.network.bluetooth.state
 import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothGatt
 import android.bluetooth.BluetoothSocket
+import edu.cit.resqmesh.core.network.dedup.ExpiringIdCache
+import edu.cit.resqmesh.core.network.ratelimit.InboundGuards
+import edu.cit.resqmesh.core.utils.collections.BoundedLruMap
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ConcurrentLinkedDeque
 import java.util.concurrent.CopyOnWriteArraySet
 import java.util.concurrent.atomic.AtomicBoolean
 
-class BleStateStore {
+class BleStateStore(val guards: InboundGuards = InboundGuards()) {
     fun retireServerOwnership(link: BleLink, releaseOwner: (String) -> Unit): Boolean {
         if (link.role != BleLinkRole.SERVER || !links.retire(link, releaseOwner)) return false
         activeServerConnections.remove(link.endpoint)
@@ -20,7 +23,9 @@ class BleStateStore {
     val links = BleLinkRegistry()
     val connectedEndpointIds = CopyOnWriteArraySet<String>()
     val connectedEndpointNames = ConcurrentHashMap<String, String>()
-    val seenMessageIds = CopyOnWriteArraySet<String>()
+    val seenMessageIds = ExpiringIdCache()
+    /** Peer node ID to the reliable-transfer protocol version it advertised; LRU-bounded. */
+    val peerTransferVersions = BoundedLruMap<String, Int>(MAX_PEER_TRANSFER_VERSIONS)
     
     val isNodeActive = AtomicBoolean(false)
     val isConnecting = AtomicBoolean(false)
@@ -40,8 +45,8 @@ class BleStateStore {
     val orphanDetectionTime = ConcurrentHashMap<String, Long>()
     
     val endpointLastSeen = ConcurrentHashMap<String, Long>()
-    val endpointFirstSeen = ConcurrentHashMap<String, Long>()
-    val endpointLastScore = ConcurrentHashMap<String, String>()
+    val endpointFirstSeen = BoundedLruMap<String, Long>(MAX_SCANNED_ENDPOINTS)
+    val endpointLastScore = BoundedLruMap<String, String>(MAX_SCANNED_ENDPOINTS)
     /** MAC address -> stable node ID lifted from the peer's advertisement. */
     val endpointNodeIds = ConcurrentHashMap<String, String>()
     val connectionEstablishTime = ConcurrentHashMap<String, Long>()
@@ -60,4 +65,10 @@ class BleStateStore {
      * backstop so a dropped GATT callback can never strand the lock permanently.
      */
     var connectLockAcquiredAt: Long = 0L
+
+    private companion object {
+        // Scan-fed tables see every advertising MAC in range, so they cannot grow without bound.
+        const val MAX_SCANNED_ENDPOINTS = 256
+        const val MAX_PEER_TRANSFER_VERSIONS = 512
+    }
 }

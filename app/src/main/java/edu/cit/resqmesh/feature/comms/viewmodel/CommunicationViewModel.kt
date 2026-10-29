@@ -15,22 +15,35 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.SharingStarted
 import edu.cit.resqmesh.core.model.toChatMessage
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.channelFlow
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.distinctUntilChanged
 import edu.cit.resqmesh.core.utils.SCAN_UI_THROTTLE_MS
 import edu.cit.resqmesh.core.utils.throttleLatest
 import edu.cit.resqmesh.core.domain.usecase.messaging.PrivateSendResult
 import edu.cit.resqmesh.core.domain.usecase.messaging.SendPrivateChatMessageUseCase
 import edu.cit.resqmesh.core.domain.usecase.sos.RaiseSosUseCase
+import edu.cit.resqmesh.core.network.ratelimit.ChatBudgetState
+import edu.cit.resqmesh.core.network.ratelimit.OutgoingChatBudget
+import edu.cit.resqmesh.core.model.SosRaiseResult
+import edu.cit.resqmesh.core.network.ratelimit.OutgoingSosBudget
+import edu.cit.resqmesh.core.network.ratelimit.SosBudgetState
 import edu.cit.resqmesh.core.security.input.TextField
 import edu.cit.resqmesh.core.security.input.TextPolicy
 import edu.cit.resqmesh.core.security.input.ValidationResult
 
+@Suppress("LongParameterList")
 class CommunicationViewModel(
     private val useCases: edu.cit.resqmesh.core.domain.usecase.MeshUseCases,
     private val locationClient: edu.cit.resqmesh.core.location.LocationClient,
     private val sosRepository: edu.cit.resqmesh.core.domain.repository.SosAlertRepository,
     private val conversationRepository: edu.cit.resqmesh.core.domain.repository.ConversationStateRepository,
     private val raiseSos: RaiseSosUseCase,
-    private val sendPrivate: SendPrivateChatMessageUseCase
+    private val sendPrivate: SendPrivateChatMessageUseCase,
+    private val chatBudget: OutgoingChatBudget,
+    private val sosBudget: OutgoingSosBudget,
+    private val voiceHold: RadioVoiceHold
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ChatUiState())
@@ -57,6 +70,33 @@ class CommunicationViewModel(
     private var sosLocationGeneration = 0L
     private var creatingSos = false
     private val sendDebouncer = SendDebouncer(SEND_DEBOUNCE_MS) { android.os.SystemClock.elapsedRealtime() }
+    private val sendGate = ChatSendGate(chatBudget, sendDebouncer)
+
+    /** Send budget for the composers. Ticks once a second only while collected and not full. */
+    val chatBudgetState: StateFlow<ChatBudgetState> = channelFlow {
+        chatBudget.refresh()
+        launch { chatBudget.state.collect { send(it) } }
+        chatBudget.state.map { it.remaining < it.capacity }.distinctUntilChanged().collectLatest { notFull ->
+            while (notFull) {
+                delay(BUDGET_TICK_MS)
+                chatBudget.refresh()
+            }
+        }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(BUDGET_STOP_TIMEOUT_MS), chatBudget.state.value)
+
+    private val sosGate = SosRaiseGate(sosBudget)
+
+    /** SOS raise budget for the hub button. Ticks once a second only while collected and not full. */
+    val sosBudgetState: StateFlow<SosBudgetState> = channelFlow {
+        sosBudget.refresh()
+        launch { sosBudget.state.collect { send(it) } }
+        sosBudget.state.map { it.remaining < it.capacity }.distinctUntilChanged().collectLatest { notFull ->
+            while (notFull) {
+                delay(BUDGET_TICK_MS)
+                sosBudget.refresh()
+            }
+        }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(BUDGET_STOP_TIMEOUT_MS), sosBudget.state.value)
 
     private fun mediaKind(image: String?, audio: String?) = when {
         image != null -> "img"
@@ -99,14 +139,27 @@ class CommunicationViewModel(
         val time = conversationStates.value.firstOrNull { it.conversationId == key }?.lastReadAt ?: 0L
         return messages.count { !it.isMine && it.timestamp > time }
     }
-    fun sendConversation(kind: String, channel: String = "", sosId: String = "", text: String, audio: String? = null) {
-        val clean = checkedMessageText(text) ?: return
-        if (!sendDebouncer.tryAcquire("conv:$kind:$channel:$sosId:${mediaKind(null, audio)}")) return
-        // An empty id means the repository refused the message (final length guard): keep the draft.
-        val messageId = useCases.sendPublicMessage.conversation(kind, channel, sosId, clean, audio)
-        if (messageId.isNotEmpty()) {
-            draft(edu.cit.resqmesh.core.model.ConversationPolicy.key(kind, channel, sosId), "")
+    /** Radio voice notes waiting for a send token (held app-wide, see [RadioVoiceHold]). */
+    val voiceHeld: StateFlow<Int> = voiceHold.held
+
+    /** Sends a radio voice note now or holds it for the next token; false only when the hold is full. */
+    fun sendRadioVoice(channel: String, audio: String): Boolean = voiceHold.submit(channel, audio)
+
+    /** Returns false only when the send budget is empty: nothing was sent and the caller must keep its text. */
+    fun sendConversation(kind: String, channel: String = "", sosId: String = "", text: String, audio: String? = null): Boolean {
+        val clean = checkedMessageText(text)
+        val admission = if (clean == null) ChatSendGate.Admission.DEBOUNCED
+        else sendGate.admit("conv:$kind:$channel:$sosId:${mediaKind(null, audio)}")
+        if (clean != null && admission == ChatSendGate.Admission.GO) {
+            // An empty id means the repository refused the message (final length guard): keep the draft.
+            val messageId = useCases.sendPublicMessage.conversation(kind, channel, sosId, clean, audio)
+            if (messageId.isNotEmpty()) {
+                draft(edu.cit.resqmesh.core.model.ConversationPolicy.key(kind, channel, sosId), "")
+            } else {
+                sendGate.refund()
+            }
         }
+        return admission != ChatSendGate.Admission.NO_BUDGET
     }
     fun isOwnSos(alert: edu.cit.resqmesh.core.model.SosAlert): Boolean = sosRepository.isOwnSos(alert)
     fun sosActivity(id: String) = sosRepository.sosActivity(id)
@@ -165,10 +218,15 @@ class CommunicationViewModel(
         }
     }
 
-    fun sendPublicMessage(text: String, imageBase64: String? = null, audioBase64: String? = null) {
-        val clean = checkedMessageText(text) ?: return
-        if (!sendDebouncer.tryAcquire("public:${mediaKind(imageBase64, audioBase64)}")) return
-        useCases.sendPublicMessage(clean, imageBase64, audioBase64)
+    /** Returns false only when the send budget is empty: nothing was sent and the caller must keep its text. */
+    fun sendPublicMessage(text: String, imageBase64: String? = null, audioBase64: String? = null): Boolean {
+        val clean = checkedMessageText(text)
+        val admission = if (clean == null) ChatSendGate.Admission.DEBOUNCED
+        else sendGate.admit("public:${mediaKind(imageBase64, audioBase64)}")
+        if (clean != null && admission == ChatSendGate.Admission.GO) {
+            sendGate.settle(useCases.sendPublicMessage(clean, imageBase64, audioBase64).isNotEmpty())
+        }
+        return admission != ChatSendGate.Admission.NO_BUDGET
     }
 
     val publicSendFeedback = kotlinx.coroutines.flow.merge(useCases.sendPublicMessage.feedback, sosErrors)
@@ -187,7 +245,15 @@ class CommunicationViewModel(
         val generation = ++sosLocationGeneration
         viewModelScope.launch {
             try {
-                val id = raiseSos(sosType)
+                // The repository charges the budget under its lock, only when it creates a new sosId.
+                val id = when (val result = raiseSos.raise(sosType, sosGate)) {
+                    is SosRaiseResult.Created -> result.id
+                    is SosRaiseResult.Reopened -> result.id
+                    SosRaiseResult.Throttled -> {
+                        sosErrors.emit(sosGate.waitMessage())
+                        return@launch
+                    }
+                }
                 onCreated(id)
                 raiseSos.refineLocation(id, isCurrent = { generation == sosLocationGeneration }) { update ->
                     viewModelScope.launch { update() }
@@ -218,9 +284,11 @@ class CommunicationViewModel(
         audioBase64: String? = null
     ): Boolean {
         val key = "private:$targetName:${mediaKind(imageBase64, audioBase64)}"
-        if (sendDebouncer.isBlocked(key)) return false
+        // No token: send nothing, keep the draft and show no error; the composer shows the wait.
+        if (sendGate.admit(key, markNow = false) != ChatSendGate.Admission.GO) return false
         val result = sendPrivate(targetName, text, imageBase64, audioBase64)
-        if (result !is PrivateSendResult.TooLong) sendDebouncer.mark(key)
+        if (result !is PrivateSendResult.TooLong) sendGate.mark(key)
+        if (result != PrivateSendResult.Sent) sendGate.refund()
         return when (result) {
             PrivateSendResult.Sent -> true
             PrivateSendResult.NeedsKeyVerification -> {
@@ -303,25 +371,34 @@ class CommunicationViewModel(
     }
 
     private fun sendLocationMessage(location: android.location.Location, isPrivate: Boolean, targetName: String?) {
+        if (!chatBudget.tryConsume()) return
         if (isPrivate && targetName != null) {
             if (!useCases.sendPrivateMessage(targetName, "📍 I am sharing my location.", null, null, location.latitude, location.longitude)) {
+                chatBudget.refund()
                 reportPrivateSendFailure()
             }
         } else {
-            useCases.sendPublicMessage("📍 I am sharing my location.", null, null, location.latitude, location.longitude)
+            sendGate.settle(
+                useCases.sendPublicMessage("📍 I am sharing my location.", null, null, location.latitude, location.longitude)
+                    .isNotEmpty()
+            )
         }
     }
 
     private fun sendLocationError(isPrivate: Boolean, targetName: String?) {
         val errorMsg = "⚠️ Failed to get fresh GPS lock. Make sure Location is on, and you have sky visibility."
+        if (!chatBudget.tryConsume()) return
         if (isPrivate && targetName != null) {
             if (!useCases.sendPrivateMessage(targetName, errorMsg, null, null, null, null)) {
+                chatBudget.refund()
                 reportPrivateSendFailure()
             }
         } else {
-            useCases.sendPublicMessage(errorMsg, null, null, null, null)
+            sendGate.settle(useCases.sendPublicMessage(errorMsg, null, null, null, null).isNotEmpty())
         }
     }
 }
 
 private const val SEND_DEBOUNCE_MS = 400L
+private const val BUDGET_TICK_MS = 1_000L
+private const val BUDGET_STOP_TIMEOUT_MS = 5_000L

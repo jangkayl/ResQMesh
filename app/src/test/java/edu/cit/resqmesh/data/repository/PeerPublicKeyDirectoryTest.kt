@@ -1,6 +1,9 @@
 package edu.cit.resqmesh.data.repository
 
 import android.content.SharedPreferences
+import edu.cit.resqmesh.core.network.bluetooth.DirectIdentityPolicy
+import java.security.KeyPairGenerator
+import java.security.MessageDigest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -67,7 +70,7 @@ class PeerPublicKeyDirectoryTest {
     @Test
     fun observeTrustsOnFirstUse() {
         val prefs = FakeSharedPreferences()
-        val dir = PeerPublicKeyDirectory(prefs)
+        val dir = lenientDirectory(prefs)
 
         val result = dir.observe("Bob [NODE]#B001", "B001", "KEY_1")
         assertEquals(PeerPublicKeyDirectory.Observation.TRUSTED, result)
@@ -78,7 +81,7 @@ class PeerPublicKeyDirectoryTest {
     @Test
     fun observeSameKeyReturnsUnchanged() {
         val prefs = FakeSharedPreferences()
-        val dir = PeerPublicKeyDirectory(prefs)
+        val dir = lenientDirectory(prefs)
 
         dir.observe("Bob [NODE]#B001", "B001", "KEY_1")
         val result = dir.observe("Bob [NODE]#B001", "B001", "KEY_1")
@@ -89,7 +92,7 @@ class PeerPublicKeyDirectoryTest {
     @Test
     fun observeDifferentKeyReturnsPending() {
         val prefs = FakeSharedPreferences()
-        val dir = PeerPublicKeyDirectory(prefs)
+        val dir = lenientDirectory(prefs)
 
         dir.observe("Bob [NODE]#B001", "B001", "KEY_1")
         val result = dir.observe("Bob [NODE]#B001", "B001", "KEY_2")
@@ -102,7 +105,7 @@ class PeerPublicKeyDirectoryTest {
     @Test
     fun fallbackLookupByDisplayName() {
         val prefs = FakeSharedPreferences()
-        val dir = PeerPublicKeyDirectory(prefs)
+        val dir = lenientDirectory(prefs)
 
         dir.observe("Bob [NODE]#B001", "B001", "KEY_1")
         // Lookup using display name without '#B001'
@@ -113,7 +116,7 @@ class PeerPublicKeyDirectoryTest {
     @Test
     fun acceptPendingChangeUpdatesKey() {
         val prefs = FakeSharedPreferences()
-        val dir = PeerPublicKeyDirectory(prefs)
+        val dir = lenientDirectory(prefs)
 
         dir.observe("Bob [NODE]#B001", "B001", "KEY_1")
         dir.observe("Bob [NODE]#B001", "B001", "KEY_2")
@@ -129,7 +132,7 @@ class PeerPublicKeyDirectoryTest {
     @Test
     fun rejectPendingChangeClearsPendingAndRetainsOriginalKey() {
         val prefs = FakeSharedPreferences()
-        val dir = PeerPublicKeyDirectory(prefs)
+        val dir = lenientDirectory(prefs)
 
         dir.observe("Bob [NODE]#B001", "B001", "KEY_1")
         dir.observe("Bob [NODE]#B001", "B001", "KEY_2")
@@ -140,5 +143,57 @@ class PeerPublicKeyDirectoryTest {
         assertTrue(rejected)
         assertFalse(dir.hasPendingChange("Bob [NODE]#B001"))
         assertEquals("KEY_1", dir.trustedKey("Bob [NODE]#B001"))
+    }
+
+    @Test
+    fun keyNotBoundToNodeIdIsNotPinned() {
+        val prefs = FakeSharedPreferences()
+        val dir = realDirectory(prefs)
+        val (id, key) = rsaKeyWithId(2048)
+        val other = if (id == "FFFF") "0000" else "FFFF"
+
+        assertEquals(PeerPublicKeyDirectory.Observation.INVALID_IDENTITY, dir.observe("Bob#$other", other, key))
+        assertEquals(PeerPublicKeyDirectory.Observation.INVALID_IDENTITY, dir.observe("Bob#$id", id, "not a key"))
+        assertNull(dir.trustedKey("Bob#$other"))
+        assertNull(dir.trustedKey("Bob#$id"))
+        assertNull(prefs.getString("entries_v1", null))
+    }
+
+    @Test
+    fun weakRsaKeyIsNotPinned() {
+        val dir = realDirectory(FakeSharedPreferences())
+        val (id, key) = rsaKeyWithId(1024)
+
+        assertEquals(PeerPublicKeyDirectory.Observation.INVALID_IDENTITY, dir.observe("Bob#$id", id, key))
+        assertNull(dir.trustedKey("Bob#$id"))
+    }
+
+    @Test
+    fun boundKeyIsPinnedAndReloadedAndInvalidStoredPinIsDropped() {
+        val prefs = FakeSharedPreferences()
+        val (id, key) = rsaKeyWithId(2048)
+
+        val observed = realDirectory(prefs).observe("Bob#$id", id, key)
+        assertEquals(PeerPublicKeyDirectory.Observation.TRUSTED, observed)
+        // A stored pin that fails the id/key binding is dropped at load, the valid pin is kept.
+        lenientDirectory(prefs).observe("Old#B001", "B001", "LEGACY")
+        val reloaded = realDirectory(prefs)
+        assertEquals(key, reloaded.trustedKey("Bob#$id"))
+        assertNull(reloaded.trustedKey("Old#B001"))
+        assertNull(realDirectory(prefs).trustedKey("Old#B001")) // and stays dropped after being persisted
+    }
+
+    private fun lenientDirectory(prefs: SharedPreferences) =
+        PeerPublicKeyDirectory(prefs) { _, _ -> true }
+
+    private fun realDirectory(prefs: SharedPreferences) = PeerPublicKeyDirectory(prefs) { nodeId, key ->
+        DirectIdentityPolicy.keyMatchesNodeId(nodeId, key) { java.util.Base64.getDecoder().decode(it) }
+    }
+
+    private fun rsaKeyWithId(bits: Int): Pair<String, String> {
+        val pair = KeyPairGenerator.getInstance("RSA").apply { initialize(bits) }.generateKeyPair()
+        val digest = MessageDigest.getInstance("SHA-256").digest(pair.public.encoded)
+        val id = digest.take(2).joinToString("") { "%02X".format(it) }
+        return id to java.util.Base64.getEncoder().encodeToString(pair.public.encoded)
     }
 }

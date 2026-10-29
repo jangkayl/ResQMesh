@@ -32,7 +32,7 @@ class NativePayloadCallbacksTest {
     private fun callbacks(events: Events, direct: (String, ByteArray) -> TransportDispatchResult = { _, _ -> TransportDispatchResult.ACCEPTED }) =
         NativePayloadCallbacks(
             events = events,
-            seenMessageIds = { linkedSetOf() },
+            seenIds = { edu.cit.resqmesh.core.network.dedup.ExpiringIdCache() },
             endpointForPeer = { "endpoint-$it" },
             pendingCustody = { false },
             forwardPrivate = direct,

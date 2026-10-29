@@ -177,4 +177,46 @@ class MeshRouterStableIdentityTest {
         assertTrue(router.knownNodes.value.isEmpty())
     }
 
+
+    @Test fun implausibleSequenceJumpIsRejectedWithoutOverwritingState() {
+        val router = MeshRouter()
+        val me = "Me#AAAA"
+        val relay = "Relay#BBBB"
+        val target = "Target#CCCC"
+        val directRelay = listOf(ConnectedDevice("endpoint", relay, nodeId = "BBBB", isPayloadReady = true))
+
+        assertTrue(router.updateTopology(relay, "BBBB", listOf(target), listOf("CCCC"), me, topologySequence = 1_000L))
+        assertFalse(router.updateTopology(relay, "BBBB", emptyList(), emptyList(), me,
+            topologySequence = 1_000L + MeshRouter.MAX_SEQUENCE_JUMP + 1))
+        assertEquals(listOf(me, relay, target), router.findShortestPath(me, target, directRelay))
+        // The ratchet was not advanced, so the next legitimate snapshot is still accepted.
+        assertTrue(router.updateTopology(relay, "BBBB", emptyList(), emptyList(), me, topologySequence = 1_001L))
+    }
+
+    @Test fun restartWithinLeaseJumpsForwardByDowntimeAndIsAccepted() {
+        val router = MeshRouter()
+        val me = "Me#AAAA"
+        val relay = "Relay#BBBB"
+        val start = 1_700_000_000_000L
+
+        val first = router.updateTopology(relay, "BBBB", emptyList(), emptyList(), me, topologySequence = start + 5)
+        assertTrue(first)
+        // Wall-clock reseed after ~60 s downtime.
+        val restarted = router.updateTopology(
+            relay, "BBBB", emptyList(), emptyList(), me, topologySequence = start + 60_000
+        )
+        assertTrue(restarted)
+        assertTrue(router.updateTopology(relay, "BBBB", emptyList(), emptyList(), me,
+            topologySequence = start + 60_000 + MeshRouter.MAX_SEQUENCE_JUMP))
+    }
+
+    @Test fun sequenceBeyondClockSkewIsRejectedButRestartsStillWork() {
+        var now = 1_000_000_000L
+        val router = MeshRouter { now }
+        fun update(seq: Long) = router.updateTopology("Relay#BBBB", "BBBB", emptyList(), emptyList(), "Me#AAAA", seq)
+        assertFalse(update(now + SosProtocol.MAX_FUTURE_SKEW_MS + 1)) // would pin the ratchet far ahead
+        assertTrue(update(now + 1_000)) // within skew, e.g. a seed taken from a slightly fast clock
+        now += 10_000
+        assertTrue(update(now + 1_500)) // later pulses keep advancing
+    }
 }

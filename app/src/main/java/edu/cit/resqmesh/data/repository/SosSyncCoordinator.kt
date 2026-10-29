@@ -3,6 +3,7 @@ package edu.cit.resqmesh.data.repository
 import edu.cit.resqmesh.core.model.ConnectedDevice
 import edu.cit.resqmesh.core.network.*
 import edu.cit.resqmesh.core.logging.AppLogger
+import edu.cit.resqmesh.core.network.ratelimit.SingleFlightGate
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import kotlinx.serialization.Serializable
@@ -30,6 +31,9 @@ internal class SosSyncCoordinator(
     private val jobs = ConcurrentHashMap<Link, Job>()
     private val waiting = ConcurrentHashMap<String, Waiting>()
     private val cursors = ConcurrentHashMap<Link, Pair<String, Int>>()
+    // Answering a request snapshots and encodes the whole store; one answer plus one queued rerun per
+    // link is enough because the requester retries and every cycle starts from a fresh digest.
+    private val requestGate = SingleFlightGate("SOS_SYNC_REQ")
     init {
         scope.launch { peers.peers.collect { refresh() } }
         scope.launch { changes.debounce(500).collect { refresh() } }
@@ -117,8 +121,8 @@ internal class SosSyncCoordinator(
             return
         }
         val l = peers.peers.value.firstOrNull { it.endpointId == endpoint }?.let(::link) ?: return
-        scope.launch {
-            if (!current(l)) return@launch
+        scope.launch { requestGate.run(endpoint) {
+            if (!current(l)) return@run
             val rows = snapshot()
             val token = digest(rows)
             var reply = SosSyncPacket(packet.request, token, complete = packet.cursor == -1 && token == packet.digest)
@@ -139,6 +143,6 @@ internal class SosSyncCoordinator(
                 if (reply.events.isEmpty()) gateway.sendPriorityPayload(endpoint, bytes)
                 else gateway.sendDirectPayload(endpoint, bytes)
             }
-        }
+        } }
     }
 }

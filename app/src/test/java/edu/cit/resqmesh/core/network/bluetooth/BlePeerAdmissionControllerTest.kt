@@ -1,6 +1,8 @@
 package edu.cit.resqmesh.core.network.bluetooth
 
 import android.bluetooth.BluetoothDevice
+import edu.cit.resqmesh.core.network.bluetooth.state.BleLinkRole
+import edu.cit.resqmesh.core.network.bluetooth.state.BleLinkState
 import edu.cit.resqmesh.core.network.bluetooth.state.BleStateStore
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -624,6 +626,67 @@ class BlePeerAdmissionControllerTest {
         assertFalse(f.store.connectedEndpointNames.containsKey(oldCentralMac))
         assertFalse(f.store.connectedEndpointIds.contains(oldCentralMac))
     }
+    private fun silentAdmittedLink(f: TestFixture, mac: String, admittedId: String, admitted: Boolean) {
+        f.store.connectedEndpointNames[mac] = "Bob#B2"
+        f.store.connectedEndpointIds.add(mac)
+        f.store.activeServerConnections[mac] = createDummyDevice()
+        f.store.connectionEstablishTime[mac] = f.clockTime - 20_000L
+        f.store.connectionInteractionTimes[mac] = f.clockTime - 20_000L
+        val link = f.store.links.begin(mac, BleLinkRole.SERVER, admittedId,
+            java.util.concurrent.ConcurrentLinkedDeque(), java.util.concurrent.atomic.AtomicBoolean(false))
+        f.store.links.transition(link, BleLinkState.CONFIGURING)
+        f.store.links.transition(link, BleLinkState.READY)
+        link.identityAdmitted = admitted
+    }
+
+    private fun purgeProbe(f: TestFixture, disconnected: MutableList<String>) = BlePeerAdmissionController(
+        store = f.store, scheduler = f.scheduler, localName = { f.localNameStr }, isBlocked = { false },
+        hasLinkToIdentity = { false }, hasIndirectRoute = { false }, hasPayloadReadyDirectLink = { false },
+        hasReadyLinkToIdentity = { false }, directLinkCount = { f.directLinks }, maxDirectLinks = { f.maxLinks },
+        electionScore = { f.localScoreStr }, latestEndpointForIdentity = { _, fallback -> fallback },
+        disconnectEndpoint = { disconnected.add(it) }, connect = { _, _ -> f.connectResult },
+        onScanned = {}, onDisconnected = {}, onPulse = {}, handshakeInfo = { f.handshakeInfoSupplier() },
+        distinctReadyPeerCount = { f.readyPeers }, clock = { f.clockTime }, jitterMs = { min, _ -> min },
+        onDecision = { f.decisions.add(it) }
+    )
+
+    @Test
+    fun advertisementClaimCannotEvictAdmittedLinkWithDifferentIdentity() {
+        val disconnected = mutableListOf<String>()
+        val f = TestFixture(directLinks = 1, readyPeers = 0, localScoreStr = "900AA")
+        val oldMac = "AA:BB:CC:DD:EE:FF"
+        silentAdmittedLink(f, oldMac, admittedId = "C3", admitted = true)
+
+        purgeProbe(f, disconnected).handle(BleAdvertisement("11:22:33:44:55:66", "Bob#B2", "B2", "700BB", 0))
+
+        assertFalse(disconnected.contains(oldMac))
+        assertTrue(f.store.connectedEndpointNames.containsKey(oldMac))
+    }
+
+    @Test
+    fun admittedSilentLinkIsStillReplacedWhenSameIdentityReappearsOnNewAddress() {
+        val disconnected = mutableListOf<String>()
+        val f = TestFixture(directLinks = 1, readyPeers = 0, localScoreStr = "900AA")
+        val oldMac = "AA:BB:CC:DD:EE:FF"
+        silentAdmittedLink(f, oldMac, admittedId = "B2", admitted = true)
+
+        purgeProbe(f, disconnected).handle(BleAdvertisement("11:22:33:44:55:66", "Bob#B2", "B2", "700BB", 0))
+
+        assertTrue(disconnected.contains(oldMac))
+    }
+
+    @Test
+    fun unadmittedSilentLinkIsReplacedEvenWhenIdentityDiffers() {
+        val disconnected = mutableListOf<String>()
+        val f = TestFixture(directLinks = 1, readyPeers = 0, localScoreStr = "900AA")
+        val oldMac = "AA:BB:CC:DD:EE:FF"
+        silentAdmittedLink(f, oldMac, admittedId = "C3", admitted = false)
+
+        purgeProbe(f, disconnected).handle(BleAdvertisement("11:22:33:44:55:66", "Bob#B2", "B2", "700BB", 0))
+
+        assertTrue(disconnected.contains(oldMac))
+    }
+
     @Test
     fun suspensionCancelsDelayedCandidatesEvenIfANewSessionIsActive() {
         val f = TestFixture()

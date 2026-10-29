@@ -6,6 +6,8 @@ import edu.cit.resqmesh.core.location.LocationClient
 import edu.cit.resqmesh.core.location.LocationStatus
 import edu.cit.resqmesh.core.model.SosActivity
 import edu.cit.resqmesh.core.model.SosAlert
+import edu.cit.resqmesh.core.model.SosRaiseCharge
+import edu.cit.resqmesh.core.model.SosRaiseResult
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -128,6 +130,9 @@ class RaiseSosUseCaseTest {
             created += Created(type, lat, lng, accuracy, captured)
             return "sos-${created.size}"
         }
+        override suspend fun raise(
+            type: String, charge: SosRaiseCharge, lat: Double?, lng: Double?, accuracy: Float?, captured: Long?
+        ): SosRaiseResult = SosRaiseResult.Created(create(type, lat, lng, accuracy, captured))
         override suspend fun updateLocation(id: String, lat: Double, lng: Double, accuracy: Float, captured: Long) {
             updates += id to captured
         }

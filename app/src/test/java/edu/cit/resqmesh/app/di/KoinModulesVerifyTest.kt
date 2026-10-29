@@ -45,6 +45,8 @@ class KoinModulesVerifyTest {
                 CoroutineScope::class,
                 Function0::class,
                 Function1::class,
+                Function2::class,
+                edu.cit.resqmesh.core.network.ratelimit.InboundOriginGate::class,
                 MapPackageCatalogEntry::class,
                 File::class,
                 String::class,

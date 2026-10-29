@@ -1,6 +1,6 @@
 # Security hardening plan
 
-Approved by the user on 2026-10-17. Status: Phase A implemented locally; phases B–E wait for the demo freeze to end. Tracked as SEC-01 in [status](../status.md).
+Approved by the user on 2026-10-17. Status: Phase A user-reported PASS. Phase B was implemented locally on 2026-10-18 on branch `feat/security-phase-b`, with no device evidence yet. Phases C–E wait for the demo freeze to end. Tracked as SEC-01 in [status](../status.md).
 
 ## Threat model
 
@@ -12,7 +12,7 @@ The attacker is a malicious nearby phone: a modified app or BLE tool that floods
 - One wire break (protocol v2, every test phone reinstalled together), then compatible changes only once the pilot beta starts.
 - Over-limit traffic is dropped, and an origin that keeps exceeding gets a cooldown. Limits charge the **origin** node, never the relay that forwarded the traffic. Per-link limits only shape traffic and never put a relay in a timeout.
 - Defaults:
-  - Per origin: 20 chat messages/min (burst 10), 1 new SOS per 2 min (SOS updates are a separate class), 6 sync requests/min, 30 presence pulses/min.
+  - Per origin: 15 chat messages/min (burst 20), 4 new SOS burst, refill 3/min (SOS updates are a separate class), 6 sync requests/min, 30 presence pulses/min.
   - Cooldown of 60 s after 3 violations.
   - Per link: 64 frames/s and 256 KiB/s.
 - Typed messages max 1000 characters; received media capped at 2 MB; developer mode in debug builds only.
@@ -44,6 +44,25 @@ The attacker is a malicious nearby phone: a modified app or BLE tool that floods
 - **Key and topology checks:** `MeshRouter` rejects sequence jumps beyond a window, and `PeerPublicKeyDirectory` pins only keys that pass `DirectIdentityPolicy.validate`.
 - **Advertisements:** parsed strictly, and a node ID claimed in an advertisement can't evict a link before that identity is admitted.
 
+As built, these changed from the outline:
+
+- SOS limits are charged after the SOS signature verifies, keyed by the signing-key prefix, not the claimed sender.
+- A direct payload whose origin differs from the link's admitted identity is rejected.
+- Relayed traffic is limited per origin and ingress link, so a spoof on one link can't throttle the victim on another.
+- A cooldown never blocks SOS, and is per (origin, traffic class): chat abuse cools down only chat, so presence and sync keep flowing.
+- A full L2CAP handler queue applies back-pressure (the reader waits up to 15 s before reading the next body, then closes the link with `L2CAP_QUEUE_STALL`) instead of dropping frames.
+- PING, PONG, PIECE and ACK are shaped per link only.
+- Topology sequences more than 10 min ahead of the local clock are rejected.
+- Validator text and ciphertext caps equal the frame cap, so long voice notes still fit.
+- Outgoing chat follows a shared sender budget of 15 (refill 15/min, one per 4 s) that composers show; the receiver burst is 20 (refill 15/min), a 5-message margin for BLE queue bunching.
+- Raising a new SOS follows a sender budget of 3 (refill 3/min, one per 20 s, `OutgoingSosBudget`). The SOS hub button shows "N of 3 left"; at 0 it is disabled and reads "Wait N s" (a race past the button still gets "SOS available in N seconds"). The receiver `SOS_NEW` limit is burst 4, refill 3/min, charged only for revision 1 of an unknown `sosId`; a refine or end that arrives first is charged as an update. Ending, refining and reopening the active SOS are never gated.
+- The first revision of an SOS this phone sees (live or by sync, whatever its number) raises the notification and alarm once if it is active, created within 10 min and not our own (node id or signing key). Ended, older and known alerts stay silent. `SOS_UPDATE` is burst 12, refill 10/min: a raise can charge 2 updates (its refine, then a late revision 1), so 3 raises/min need at most 6/min. The end of a known SOS is never limited. The new-vs-reopen decision and the token charge happen under the repository lock.
+
+Open limits:
+
+- Node IDs are 16-bit prefixes, so key pinning only filters malformed keys until Phase D/E.
+- A peer whose clock runs more than 10 min fast has its topology ignored.
+
 ## Phase C: storage (after the freeze)
 
 - SQLCipher through `SupportOpenHelperFactory`, keyed with 32 random bytes wrapped by a Keystore AES-GCM key and passed as a raw key (no slow key derivation). A one-time `sqlcipher_export` migration converts the existing plaintext database.
@@ -71,4 +90,4 @@ The attacker is a malicious nearby phone: a modified app or BLE tool that floods
 - Each phase step is one Conventional Commit.
 - After each step: targeted unit tests (JVM, fake clock; Tink with cleartext test keysets). After each phase: the full D10 gate.
 - An auditor reviews dependency, manifest and crypto steps.
-- Each phase has a phone card. Phase A: [security Phase A card](../testing/security-phase-a-card.md).
+- Each phase has a phone card. Phase A: [security Phase A card](../testing/security-phase-a-card.md). Phase B: [security Phase B card](../testing/security-phase-b-card.md).

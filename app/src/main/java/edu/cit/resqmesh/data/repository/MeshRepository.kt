@@ -30,6 +30,7 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.CancellationException
 
+@Suppress("LongParameterList")
 class MeshRepository(
     private val networkManager: MeshNetworkGateway,
     private val messageStore: MessageStore,
@@ -38,7 +39,10 @@ class MeshRepository(
     private val repositoryScope: CoroutineScope,
     private val readyPeerEvents: MeshReadyPeerEvents,
     private val peerNameStore: PeerNameStore,
-    private val sosRepository: SosRepository? = null
+    private val sosRepository: SosRepository? = null,
+    private val clock: () -> Long = System::currentTimeMillis,
+    private val chatBudget: edu.cit.resqmesh.core.network.ratelimit.OutgoingChatBudget =
+        edu.cit.resqmesh.core.network.ratelimit.OutgoingChatBudget(clock = clock)
 ) {
 
     private val _connectionStatus = MutableStateFlow("Ready to deploy Mesh Node.")
@@ -323,7 +327,8 @@ class MeshRepository(
         _publicSendFeedback,
         { myNodeName },
         ::readyConnectedDevices,
-        ::currentPeerName
+        ::currentPeerName,
+        chatBudget
     )
 
     private fun createBlockCoordinator() = MeshBlockCoordinator(
@@ -351,7 +356,8 @@ class MeshRepository(
         { myNodeName },
         ::readyConnectedDevices,
         ::recordPeerName,
-        outbound.outboxMutex
+        outbound.outboxMutex,
+        clock
     )
 
     private fun createConversationMedia() = MeshConversationMedia(

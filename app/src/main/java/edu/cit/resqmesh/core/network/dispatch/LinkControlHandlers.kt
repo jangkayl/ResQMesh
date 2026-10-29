@@ -7,14 +7,29 @@ import edu.cit.resqmesh.core.network.PayloadDispatcherCallback
 import edu.cit.resqmesh.core.network.CryptoManager
 import edu.cit.resqmesh.core.model.NodeIdentity
 import edu.cit.resqmesh.core.logging.AppLogger
+import edu.cit.resqmesh.core.logging.TerminalLogCategory
+import edu.cit.resqmesh.core.logging.TerminalLogLevel
 import kotlinx.serialization.encodeToByteArray
 import kotlinx.serialization.protobuf.ProtoBuf
 
 class GoodbyeHandler : PayloadHandler {
     override fun canHandle(payloadType: String) = payloadType == "GOODBYE"
     override fun handle(endpointId: String, payload: MeshPayload, payloadBytes: ByteArray, callback: PayloadDispatcherCallback) {
+        // Only the link's own admitted peer may close it; GOODBYE is link-local and never relayed.
+        val sender = payload.senderNodeId.ifBlank { NodeIdentity.idOf(payload.senderName).orEmpty() }
+        val admitted = callback.getAdmittedNodeId(endpointId)
+        if (sender.isBlank() || admitted == null || !sender.equals(admitted, ignoreCase = true)) {
+            AppLogger.event(
+                category = TerminalLogCategory.SECURITY,
+                event = "INBOUND_REJECT",
+                message = "INBOUND_REJECT type=GOODBYE reason=sender_not_admitted_peer",
+                level = TerminalLogLevel.WARN,
+                tag = "PAYLOAD_DISPATCHER",
+                endpoint = endpointId
+            )
+            return
+        }
         callback.onDeviceGoodbye(endpointId)
-        callback.broadcastPayload(payloadBytes, endpointId)
     }
 }
 

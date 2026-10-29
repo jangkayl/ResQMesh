@@ -20,11 +20,19 @@ object DirectIdentityPolicy {
         val nameId = NodeIdentity.idOf(payload.senderName) ?: return null
         val claimed = payload.senderNodeId.ifBlank { nameId }.uppercase()
         if (!claimed.matches(Regex("[0-9A-F]{4}")) || claimed != nameId) return null
-        val key = KeyFactory.getInstance("RSA").generatePublic(X509EncodedKeySpec(decode(payload.publicKey))) as? RSAPublicKey ?: return null
-        if (key.modulus.bitLength() < 2048) return null
-        val derived = MessageDigest.getInstance("SHA-256").digest(key.encoded).take(2).joinToString("") { "%02X".format(it) }
-        claimed.takeIf { it == derived }
+        claimed.takeIf { keyMatchesNodeId(claimed, payload.publicKey, decode) }
     }.getOrNull()
+
+    /** RSA >= 2048 whose SHA-256 prefix equals [nodeId]; never throws. */
+    fun keyMatchesNodeId(nodeId: String, publicKey: String, decode: (String) -> ByteArray): Boolean = runCatching {
+        if (publicKey.length !in 1..4096) return@runCatching false
+        val key = KeyFactory.getInstance("RSA").generatePublic(X509EncodedKeySpec(decode(publicKey))) as? RSAPublicKey
+            ?: return@runCatching false
+        if (key.modulus.bitLength() < 2048) return@runCatching false
+        val derived = MessageDigest.getInstance("SHA-256").digest(key.encoded).take(2)
+            .joinToString("") { "%02X".format(java.util.Locale.ROOT, it) }
+        nodeId.uppercase() == derived
+    }.getOrDefault(false)
 
     fun isBootstrap(payload: MeshPayload) =
         (payload.type == "SYSTEM" && payload.routePath.isEmpty() && payload.relayHopCount == 0) || payload.type == LinkIdentityAdmission.ACK

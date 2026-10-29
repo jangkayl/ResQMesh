@@ -60,6 +60,7 @@ fun ActiveChatScreen(
     val uiState by viewModel.uiState.collectAsState()
     val drafts by viewModel.privateDrafts.collectAsState()
     val isAcquiringLocation by viewModel.isAcquiringLocation.collectAsState()
+    val sendBudget by viewModel.chatBudgetState.collectAsState()
     val conversationEntry = uiState.privateMessages.entries.firstOrNull {
         NodeIdentity.key(it.key) == NodeIdentity.key(name)
     }
@@ -209,7 +210,8 @@ fun ActiveChatScreen(
                         }
                     },
                     mediaHelper = mediaHelper,
-                    isAcquiringLocation = isAcquiringLocation
+                    isAcquiringLocation = isAcquiringLocation,
+                    sendBudget = sendBudget
                 )
             }
         ) { innerPadding ->

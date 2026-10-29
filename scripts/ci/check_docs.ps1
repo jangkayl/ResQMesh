@@ -68,7 +68,7 @@ foreach ($path in $activeMarkdown) {
         $decodedTarget = [Uri]::UnescapeDataString($target).Trim('<', '>')
         $resolvedTarget = Join-Path (Split-Path -Parent $path) $decodedTarget
         if (-not (Test-Path -LiteralPath $resolvedTarget)) {
-            $relativeSource = [IO.Path]::GetRelativePath($root, $path)
+            $relativeSource = $path.Substring($root.Length).TrimStart('\', '/')
             $errors.Add("Broken link in $relativeSource -> $target")
         }
     }
@@ -78,6 +78,8 @@ $ignoredDocs = & git -C $root check-ignore docs/status.md 2>$null
 if ($LASTEXITCODE -eq 0 -and $ignoredDocs) {
     $errors.Add('Canonical docs are still ignored by Git.')
 }
+# check-ignore exits 1 when the file is not ignored; don't leak that as the script's exit code.
+$global:LASTEXITCODE = 0
 
 $claudePath = Join-Path $root 'CLAUDE.md'
 if (Test-Path -LiteralPath $claudePath -PathType Leaf) {
@@ -97,7 +99,9 @@ foreach ($path in $activeMarkdown) {
 $rows | Format-Table -AutoSize
 
 if ($errors.Count -gt 0) {
-    Write-Error ($errors -join [Environment]::NewLine)
+    $errors | ForEach-Object { Write-Host "ERROR: $_" }
+    exit 1
 }
 
 Write-Host 'Documentation checks passed.'
+exit 0

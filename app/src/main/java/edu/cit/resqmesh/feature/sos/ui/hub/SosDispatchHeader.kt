@@ -21,6 +21,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import edu.cit.resqmesh.core.ui.theme.ResQTheme
 import edu.cit.resqmesh.core.model.SosAlert
+import edu.cit.resqmesh.core.network.ratelimit.SosBudgetState
 import edu.cit.resqmesh.feature.comms.model.SosMeshStatus
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -35,6 +36,7 @@ internal fun SosDispatchHeader(
     myActiveSos: SosAlert?,
     onBack: () -> Unit,
     onCreate: () -> Unit,
+    raiseBudget: SosBudgetState,
     onOpen: (String) -> Unit
 ) {
     // Tactical Top Header
@@ -148,30 +150,7 @@ internal fun SosDispatchHeader(
             }
         }
     } else {
-        Button(
-            onClick = onCreate,
-            modifier = Modifier
-                .fillMaxWidth()
-                .heightIn(min = 54.dp),
-            shape = RoundedCornerShape(16.dp),
-            colors = ButtonDefaults.buttonColors(
-                containerColor = Color(0xFFB42318),
-                contentColor = Color.White
-            ),
-            elevation = ButtonDefaults.buttonElevation(defaultElevation = 4.dp)
-        ) {
-            Icon(
-                imageVector = Icons.Default.Warning,
-                contentDescription = null,
-                modifier = Modifier.size(22.dp)
-            )
-            Spacer(Modifier.width(10.dp))
-            Text(
-                text = "BROADCAST EMERGENCY SOS",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Black
-            )
-        }
+        SosRaiseButton(raiseBudget, onCreate)
     }
 
     Spacer(Modifier.height(14.dp))
@@ -185,3 +164,6 @@ internal fun SosDispatchHeader(
     Spacer(Modifier.height(14.dp))
 
 }
+
+/** Container color of the raise button. */
+internal val SosActionRed = Color(0xFFB42318)

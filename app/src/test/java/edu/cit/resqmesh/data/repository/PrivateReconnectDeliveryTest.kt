@@ -97,7 +97,8 @@ class PrivateReconnectDeliveryTest {
     private class Fixture(
         scope: CoroutineScope,
         val store: Store = Store(),
-        trusted: Boolean = true
+        trusted: Boolean = true,
+        clock: () -> Long = { 0L }
     ) {
         val properties = mutableMapOf<String, Any?>()
         val preferences = mutableMapOf<String, String>()
@@ -134,7 +135,7 @@ class PrivateReconnectDeliveryTest {
                 }
             } as SharedPreferences
         }
-        val keys = PeerPublicKeyDirectory(prefs).also {
+        val keys = PeerPublicKeyDirectory(prefs) { _, _ -> true }.also {
             if (trusted) it.observe("Bob#B001", "B001", firstKey)
         }
         val network = Proxy.newProxyInstance(MeshNetworkGateway::class.java.classLoader, arrayOf(MeshNetworkGateway::class.java)) { _, method, args ->
@@ -176,7 +177,7 @@ class PrivateReconnectDeliveryTest {
         val repo = MeshRepository(network, store, BlockRelationshipStore(prefs), keys, scope, MeshReadyPeerEvents(), object : PeerNameStore {
             override val names = flowOf(emptyMap<String, String>())
             override suspend fun observeFullName(fullName: String) {}
-        })
+        }, clock = clock)
         init {
             repo.startNode("Alice", "", "test", "A001")
             ready()
@@ -199,7 +200,7 @@ class PrivateReconnectDeliveryTest {
     }
 
     private fun TestScope.fixture(store: Store = Store(), trusted: Boolean = true) =
-        Fixture(backgroundScope, store, trusted)
+        Fixture(backgroundScope, store, trusted) { testScheduler.currentTime }
     private fun TestScope.tick(ms: Long = 3_000L) { advanceTimeBy(ms); runCurrent() }
 
     private fun Fixture.frame(stage: edu.cit.resqmesh.core.network.OutboundFrameEvent.Stage, wire: MeshPayload = transmissions.last()) {
@@ -236,7 +237,7 @@ class PrivateReconnectDeliveryTest {
         f.pendingRelayCustody = false
         f.network.onConversationMessage!!.invoke("ingress", packet); runCurrent()
         assertEquals(2, f.forwards.size)
-        assertEquals(3, f.receipts.size)
+        assertEquals(2, f.receipts.size)
     }
 
     @Test fun trackedReceiptDeadlineStartsOnlyAfterFullOriginTransmission() = runTest {

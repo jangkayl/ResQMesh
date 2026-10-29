@@ -27,7 +27,7 @@ Behavior and source ownership are in [architecture](architecture.md); accepted p
 | MEASURE-01 | Evidence pending | Repeated arrival/receipt counts, latency, sustained load/fallback and route-withdrawal coverage. |
 | SCALE-01 | Evidence pending | Five/ten-phone matrices, range and capacity. |
 | TRUST-01 | Work/evidence pending | First-contact verification and defined identity/security guarantees. |
-| SEC-01 | Phase A user-reported PASS | [Hardening plan](plans/security-hardening.md) phases B–E wait for the freeze ([Phase A card](testing/security-phase-a-card.md)). |
+| SEC-01 | Phase A user-reported PASS; Phase B on `feat/security-phase-b` (2026-10-18), gate passes, no device evidence; user-reported spam loss and SOS re-raise drop (2026-10-29) fixed by sender budgets | Run the [Phase B card](testing/security-phase-b-card.md) after the freeze, then merge. Phases C–E wait ([plan](plans/security-hardening.md)). SOS raises budgeted; sync-delivered active SOS alarm. |
 
 Basic block, incident, SOS and recovery checks have user-reported successes; their adversarial, load and repeated cases remain pending, not known defects. See the [physical checklist](testing/physical-reliability-tests.md).
 
@@ -42,7 +42,7 @@ Basic block, incident, SOS and recovery checks have user-reported successes; the
 Deployment target (user-confirmed 2026-10-17): capstone demo first, then a signed sideloaded pilot beta. Play Store is out of scope for now.
 
 1. **Candidate #2 (P0, done):** release `B84ACB1B…` from `42f1660` replaces the October 6 APK; [demo freeze card](testing/demo-freeze-card.md) parts 1–2 user-reported working (counts not supplied).
-2. **Demo freeze (P0, by about 2026-10-28):** run parts 3–4: rehearsal, backup recording and DELIVERY-01 captures without fixing. The [limitations](demo/known-limitations.md) and [user guide](demo/user-guide.md) are drafted. After the freeze, only separately approved blocker fixes go in.
+2. **Demo freeze (P0, by about 2026-10-28):** parts 3–4 user-reported done (capture folder and miss times not supplied, so DELIVERY-01 stays unanalysed). The [limitations](demo/known-limitations.md) and [user guide](demo/user-guide.md) are drafted. After the freeze, only separately approved blocker fixes go in.
 3. **Release engineering (P0 for beta, after the demo):** revision-plan P5 subset. R8 and backup-off are local (SEC-01); a minified smoke run and CI release build remain.
 4. **Reliability and trust (P0/P1 before beta):** fix DELIVERY-01, triage UX-01/MESH-02, resolve UI-02, run SEC-01 phases B–E (these replace envelope v2 and TRUST-01 verification), then an audit.
 5. **Beta gate (P1):** run the DEPLOY-01 matrix (upgrade path with migration tests, process death and OEM battery, device support, accessibility and a novice trial), then a small pilot that collects MEASURE-01 counts.

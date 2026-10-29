@@ -155,4 +155,18 @@
     <string name="community_sos_label">SOS alert</string>
     <string name="community_image_description">Shared image</string>
     <string name="community_location_shared">Location shared</string>
+    <string name="chat_budget_left">%1$d of %2$d left</string>
+    <string name="chat_budget_refill">" · +1 in %1$d s"</string>
+    <string name="chat_budget_wait">Wait %1$d s</string>
+    <plurals name="chat_budget_send_in">
+        <item quantity="one">Send available in %1$d second</item>
+        <item quantity="other">Send available in %1$d seconds</item>
+    </plurals>
+    <string name="sos_budget_left">%1$d of %2$d left</string>
+    <string name="sos_budget_refill">" · +1 in %1$d s"</string>
+    <string name="sos_budget_wait">" · Wait %1$d s"</string>
+    <plurals name="sos_budget_available_in">
+        <item quantity="one">SOS available in %1$d second</item>
+        <item quantity="other">SOS available in %1$d seconds</item>
+    </plurals>
 </resources>

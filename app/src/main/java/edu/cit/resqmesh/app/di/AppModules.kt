@@ -17,6 +17,11 @@ import edu.cit.resqmesh.core.map.verifier.ManifestVerifier
 import edu.cit.resqmesh.core.network.MeshNetworkGateway
 import edu.cit.resqmesh.core.network.NativeBleGateway
 import edu.cit.resqmesh.core.network.NativeBleManager
+import edu.cit.resqmesh.core.network.ratelimit.InboundGuards
+import edu.cit.resqmesh.core.network.ratelimit.OutgoingChatBudget
+import edu.cit.resqmesh.core.network.ratelimit.OutgoingSosBudget
+import edu.cit.resqmesh.feature.comms.viewmodel.RadioVoiceHold
+import edu.cit.resqmesh.core.network.ratelimit.RateLimitPolicy
 import edu.cit.resqmesh.core.service.MeshSessionController
 import edu.cit.resqmesh.core.audio.LiveAudioEngine
 import edu.cit.resqmesh.core.audio.MediaHelper
@@ -103,7 +108,11 @@ val platformModule = module {
 
 /** BLE transport. */
 val networkModule = module {
-    single { NativeBleManager(androidContext()) }
+    single { RateLimitPolicy() }
+    single { InboundGuards(get(), System::currentTimeMillis) }
+    single { OutgoingChatBudget(get(), System::currentTimeMillis) }
+    single { OutgoingSosBudget(get(), System::currentTimeMillis) }
+    single { NativeBleManager(androidContext(), get()) }
     single<MeshNetworkGateway> { NativeBleGateway(get()) }
 }
 
@@ -127,7 +136,8 @@ val repositoryModule = module {
             repositoryScope = get<AppCoroutineScope>().scope,
             readyPeerEvents = get(),
             peerNameStore = get(),
-            sosRepository = get()
+            sosRepository = get(),
+            chatBudget = get()
         )
     }
 
@@ -147,7 +157,8 @@ val repositoryModule = module {
             gateway = get(),
             peers = get(),
             scope = get<AppCoroutineScope>().scope,
-            sink = get()
+            sink = get(),
+            originGate = get<InboundGuards>().origins
         )
     }
     single(createdAtStart = true) {
@@ -219,6 +230,12 @@ val domainModule = module {
 
 /** ViewModels. */
 val viewModelModule = module {
+    single {
+        val useCases = get<MeshUseCases>()
+        RadioVoiceHold(get(), get<AppCoroutineScope>().scope) { channel, audio ->
+            useCases.sendPublicMessage.conversation("RADIO", channel, "", "Voice message", audio).isNotEmpty()
+        }
+    }
     viewModel { SetupViewModel(useCases = get(), identityProvider = get(), meshSessionController = get()) }
     viewModel { RadarViewModel(get()) }
     viewModel {
@@ -228,7 +245,10 @@ val viewModelModule = module {
             sosRepository = get(),
             conversationRepository = get(),
             raiseSos = get(),
-            sendPrivate = get()
+            sendPrivate = get(),
+            chatBudget = get(),
+            sosBudget = get(),
+            voiceHold = get()
         )
     }
     viewModel { WalkieTalkieViewModel(useCases = get(), mediaHelper = get(), liveAudioEngine = get()) }

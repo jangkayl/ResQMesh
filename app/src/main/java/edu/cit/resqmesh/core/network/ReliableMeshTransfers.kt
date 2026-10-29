@@ -6,6 +6,7 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToByteArray
 import kotlinx.serialization.decodeFromByteArray
 import kotlinx.serialization.protobuf.ProtoBuf
+import edu.cit.resqmesh.core.utils.collections.BoundedLruMap
 
 @Serializable
 internal data class TransferPiece(
@@ -43,10 +44,11 @@ internal class ReliableMeshTransfers(
     private val delivered = linkedMapOf<String, Long>()
     private val reserved = mutableMapOf<String, Int>()
     private val pendingInbound = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
-    private val relayRosters = java.util.concurrent.ConcurrentHashMap<String, Set<String>>()
-    private val forwardedPeers = java.util.concurrent.ConcurrentHashMap<String, MutableSet<String>>()
+    // Message-id state is LRU-bounded far above the journal (128 records) so live custody is never evicted.
+    private val relayRosters = BoundedLruMap<String, Set<String>>(MAX_TRACKED_MESSAGES)
+    private val forwardedPeers = BoundedLruMap<String, MutableSet<String>>(MAX_TRACKED_MESSAGES)
     private val relayFailures = mutableSetOf<Pair<String, String>>()
-    private val outgoingMessages = java.util.concurrent.ConcurrentHashMap<String, String>()
+    private val outgoingMessages = BoundedLruMap<String, String>(MAX_TRACKED_MESSAGES)
     private var timer = false
     @Volatile var busy = false
         private set
@@ -65,8 +67,8 @@ internal class ReliableMeshTransfers(
     } }
 
     fun hasPendingCustody(payloadId: String) = payloadId in pendingInbound
-    fun hasOutbound(messageId: String) = outgoingMessages.containsValue(messageId)
-    fun hasOutboundTo(peer: String) = outgoingMessages.keys.any { it.startsWith("$peer:") }
+    fun hasOutbound(messageId: String) = messageId in outgoingMessages.values()
+    fun hasOutboundTo(peer: String) = outgoingMessages.keys().any { it.startsWith("$peer:") }
     fun alreadyForwarded(payloadId: String, peer: String) = forwardedPeers[payloadId]?.contains(peer) == true
     fun relayTargets(payloadId: String, current: Set<String>): Set<String> {
         val roster = relayRosters.getOrPut(payloadId) { current.toSet() }
@@ -223,8 +225,13 @@ internal class ReliableMeshTransfers(
             if (record != null && (record.digest != packet.digest || record.size != packet.size)) return@execute
             if (record == null) {
                 record = TransferRecord(peer, packet.transferId, packet.digest, packet.size, false, "", "",
-                    packet.priority, now() + RETENTION_MS)
-                if (!journal.create(record)) { log("TRANSFER_OVERFLOW direction=inbound"); return@execute }
+                    // Priority is peer-supplied: only a frame that fits the control budget may claim it.
+                    packet.priority && packet.size <= TransferJournal.CONTROL_BYTES, now() + RETENTION_MS)
+                if (!journal.create(record)) {
+                    val quota = if (journal.peerOverQuota(record)) " reason=peer_quota peer=$peer" else ""
+                    log("TRANSFER_OVERFLOW direction=inbound$quota")
+                    return@execute
+                }
             }
             if (!record.stored) journal.putPiece(record, packet.index, packet.bytes)
             if (!record.complete && (0 until TransferJournal.pieceCount(record.size)).all { journal.hasPiece(record, it) }) {
@@ -317,8 +324,8 @@ internal class ReliableMeshTransfers(
         journal.prune()
         val retainedIds = journal.snapshot(false).map { it.payloadId }.toSet()
         pendingInbound.retainAll(retainedIds)
-        relayRosters.keys.retainAll(retainedIds)
-        forwardedPeers.keys.retainAll(retainedIds)
+        relayRosters.retainKeys { it in retainedIds }
+        forwardedPeers.retainKeys { it in retainedIds }
         relayFailures.removeAll { it.second !in retainedIds }
         if (!active()) {
             busy = false
@@ -416,6 +423,7 @@ internal class ReliableMeshTransfers(
         const val PIECE = "TRANSFER_PIECE"
         const val ACK = "TRANSFER_ACK"
         const val VERSION = 1
+        private const val MAX_TRACKED_MESSAGES = 1024
         const val WINDOW = 4
         const val ACK_WAIT_MS = 3_000L
         const val RETENTION_MS = 24 * 60 * 60 * 1000L
