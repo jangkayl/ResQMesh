@@ -33,7 +33,7 @@ Basic block, incident, SOS and recovery checks have user-reported successes; the
 
 **Layer boundaries / P2 subset** (`refactor/layer-boundaries`): behavior-neutral mappers, interfaces, use cases and a zero allowlist ([plan](plans/layer-boundaries.md)). The user reported the [smoke card](testing/layer-boundaries-smoke-card.md) passing on three phones (2026-10-17); merged.
 
-**Batch C hygiene / Phase 0** (branch `refactor/batch-c-hygiene`, stacked on Batch A): golden wire/table tests, leftover cleanup and archiving, catalog-only versions, Koin root in `app/di` split by layer, `core/utils` regrouped, and CI gates (androidTest compile, detekt baseline, boundary check). Local checks pass; the user reported all [smoke card](testing/batch-c-hygiene-smoke-card.md) steps working on 2026-10-17 (models and counts not supplied).
+**Batch C hygiene / Phase 0** (branch `refactor/batch-c-hygiene`): tests, cleanup and CI gates. Local checks pass; the user reported all [smoke card](testing/batch-c-hygiene-smoke-card.md) steps working on 2026-10-17 (models and counts not supplied).
 
 **Dead screens**: merged; device pending.
 
@@ -42,6 +42,8 @@ Basic block, incident, SOS and recovery checks have user-reported successes; the
 **Reconnect sync fix** (`fix/incident-reconnect-sync`): bounded sync, paced creation (D29); [card](testing/incident-reconnect-sync-card.md) pending.
 
 **Developer console** (branch `feat/developer-console`, [plan](plans/developer-mode.md)): Stage 1 (tabs, fast logger, export, release PIN unlock) and live follow are pushed; Stage 2 (hop, drop, failure, transfer and voice data, timeline) is built with local checks only and awaits the [phone card](testing/developer-mode-card.md). Stage 3 (signal and queue stats) is pending.
+
+**Unknown duplicate row** (`fix/unknown-duplicate-row`): the peer list keeps one row per peer and follows the surviving socket. JVM tests pass; [phone card](testing/unknown-duplicate-row-card.md) pending. Second-socket cause unmeasured.
 
 ## Next actions
 

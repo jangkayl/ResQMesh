@@ -140,16 +140,8 @@ internal class MeshPeerCoordinator(
 
         updatedList = when {
             // The surviving entry still adopts the freshly resolved name and identity.
-            duplicateRejected && existingByIdentity != null -> updatedList.map {
-                if (it.endpointId == existingByIdentity.endpointId) {
-                    it.copy(
-                        name = device.name,
-                        isProvisional = false,
-                        nodeId = device.nodeId.ifEmpty { it.nodeId },
-                        isPayloadReady = existingIsReady
-                    )
-                } else it
-            }
+            duplicateRejected && existingByIdentity != null ->
+                ConnectedPeerRows.mergeIntoKept(updatedList, existingByIdentity.endpointId, device, existingIsReady)
             duplicateRejected -> updatedList
             existingById != null -> {
                 if (existingById.name != device.name) {
@@ -193,9 +185,14 @@ internal class MeshPeerCoordinator(
             networkManager.hasReadyLinkToIdentity(disconnectedDevice.name)
         if (disconnectedDevice != null && !NodeIdentity.isPlaceholder(disconnectedDevice.name) && !peerStillReady) {
         }
-        _connectedDevices.value = _connectedDevices.value.filter {
-            it.endpointId != endpointId || peerStillReady && networkManager.hasLiveSocket(endpointId)
+        val keepRow = peerStillReady && networkManager.hasLiveSocket(endpointId)
+        val survivorEndpoint = disconnectedDevice?.takeIf { peerStillReady && !keepRow }?.let { device ->
+            device.nodeId.ifEmpty { NodeIdentity.idOf(device.name).orEmpty() }
+                .takeIf(String::isNotEmpty)?.let(networkManager::preferredEndpointForPeer)
         }
+        _connectedDevices.value = ConnectedPeerRows.afterDisconnect(
+            _connectedDevices.value, endpointId, keepRow, survivorEndpoint
+        )
         if (disconnectedDevice != null && !peerStillReady) {
             meshRouter.onDirectPeerLost(myNodeName, disconnectedDevice.name, readyConnectedDevices())
         }
