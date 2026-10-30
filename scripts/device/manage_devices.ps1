@@ -36,6 +36,8 @@ $repoRoot = (Resolve-Path "$PSScriptRoot\..\..").Path
 # Install options pick the variant; debug stays the default for testing.
 $variant = "debug"
 $apkPath = "$repoRoot\app\build\outputs\apk\debug\app-debug.apk"
+# Install options set this from the target phones; empty builds every ABI.
+$buildAbis = @()
 # Read the applicationId from Gradle so a package rename needs no script change.
 $gradleFile = "$repoRoot\app\build.gradle.kts"
 $package = "edu.cit.resqmesh"
@@ -58,6 +60,18 @@ function Get-ConnectedDevices {
     return $list
 }
 
+# Reads the identity fields in one shell call so a menu action does not repeat getprop per field.
+function Get-DeviceInfo {
+    param ([string]$DeviceId)
+    $props = @(& $adb -s $DeviceId shell "getprop ro.serialno; getprop ro.product.model; getprop ro.product.cpu.abilist" 2>$null)
+    return [PSCustomObject]@{
+        Id = $DeviceId
+        Serial = "$($props[0])".Trim()
+        Model = "$($props[1])".Trim()
+        Abi = ("$($props[2])".Trim() -split ",")[0]
+    }
+}
+
 function Get-DeduplicatedActiveDevices {
     $all = @(Get-ConnectedDevices)
     $active = @($all | Where-Object { $_.Status -eq "device" })
@@ -69,11 +83,11 @@ function Get-DeduplicatedActiveDevices {
     $seen = @{}
     $result = @()
     foreach ($d in $ordered) {
-        $serial = (& $adb -s $d.Id shell getprop ro.serialno 2>$null)
-        $key = if ($serial) { "$serial".Trim() } else { $d.Id }
+        $info = Get-DeviceInfo -DeviceId $d.Id
+        $key = if ($info.Serial) { $info.Serial } else { $d.Id }
         if (-not $seen.ContainsKey($key)) {
             $seen[$key] = $true
-            $result += $d
+            $result += $info
         }
     }
     return $result
@@ -181,6 +195,25 @@ function Select-BuildVariant {
     return $true
 }
 
+# Sets the ABIs to package from the target phones; any unknown ABI falls back to a universal build.
+function Set-BuildAbis {
+    param ([object[]]$Devices)
+    $abis = @($Devices | ForEach-Object { $_.Abi })
+    if ($abis -contains "") { $abis = @() }
+    $script:buildAbis = @($abis | Select-Object -Unique)
+}
+
+# Lists the ABIs inside the APK, so a phone-targeted build is not mistaken for a universal one.
+function Get-ApkAbis {
+    Add-Type -AssemblyName System.IO.Compression.FileSystem
+    $zip = [System.IO.Compression.ZipFile]::OpenRead($apkPath)
+    try {
+        return @($zip.Entries | ForEach-Object { if ($_.FullName -match "^lib/([^/]+)/") { $matches[1] } } | Sort-Object -Unique)
+    } finally {
+        $zip.Dispose()
+    }
+}
+
 function Show-BuildIdentity {
     if (-not (Test-Path $apkPath)) { return }
     Push-Location $repoRoot
@@ -193,6 +226,7 @@ function Show-BuildIdentity {
     }
     $hash = (Get-FileHash -LiteralPath $apkPath -Algorithm SHA256).Hash
     $built = (Get-Item -LiteralPath $apkPath).LastWriteTime
+    $abis = @(Get-ApkAbis)
     $state = if ($dirty) { " (uncommitted changes present)" } else { "" }
     Write-Host "`n--- Build identity (record this on the test card) ---" -ForegroundColor Cyan
     Write-Host "  Package : $package"
@@ -200,8 +234,13 @@ function Show-BuildIdentity {
     Write-Host "  Branch  : $branch"
     Write-Host "  Commit  : $commit$state"
     Write-Host "  Built   : $built"
+    Write-Host "  ABIs    : $($abis -join ', ')"
     Write-Host "  SHA-256 : $hash"
     Write-Host "------------------------------------------------------" -ForegroundColor Cyan
+    # MapLibre ships four ABIs, so fewer means a test build for specific phones.
+    if ($abis.Count -lt 4) {
+        Write-Host "Test build for these phones only. To share an APK, run .\gradlew.bat :app:assemble$((Get-Culture).TextInfo.ToTitleCase($variant)) for all ABIs." -ForegroundColor Yellow
+    }
 }
 
 function Ensure-ApkBuilt {
@@ -213,11 +252,15 @@ function Ensure-ApkBuilt {
         try {
             # Out-Host shows Gradle output without turning it into this function's return value.
             $task = if ($variant -eq "release") { "assembleRelease" } else { "assembleDebug" }
-            & $gradleCmd $task | Out-Host
+            $gradleArgs = @($task)
+            if ($buildAbis.Count -gt 0) { $gradleArgs += "-PdevAbi=$($buildAbis -join ',')" }
+            $buildTimer = [System.Diagnostics.Stopwatch]::StartNew()
+            & $gradleCmd @gradleArgs | Out-Host
             if ($LASTEXITCODE -ne 0) {
                 Write-Host "Gradle build failed with exit code $LASTEXITCODE." -ForegroundColor Red
                 return $false
             }
+            Write-Host ("Build took {0:N1} s." -f $buildTimer.Elapsed.TotalSeconds) -ForegroundColor DarkGray
         } finally {
             Pop-Location
         }
@@ -254,9 +297,41 @@ function Start-App {
     return ($out -match "Starting: Intent" -and $out -notmatch "Error")
 }
 
+# Runs one adb install per phone at once and returns each phone's output by device ID.
+# Prompts cannot share the console with parallel installs, so callers handle conflicts afterwards.
+function Install-ApkInParallel {
+    param ([object[]]$Devices)
+    $timer = [System.Diagnostics.Stopwatch]::StartNew()
+    $tempDir = New-Item -ItemType Directory -Path (Join-Path $env:TEMP "resqmesh-install-$PID")
+    $pending = @()
+    for ($i = 0; $i -lt $Devices.Count; $i++) {
+        $outFile = Join-Path $tempDir "$i.out"
+        $errFile = Join-Path $tempDir "$i.err"
+        $proc = Start-Process -FilePath $adb -ArgumentList @("-s", "`"$($Devices[$i].Id)`"", "install", "-r", "`"$apkPath`"") `
+            -NoNewWindow -PassThru -RedirectStandardOutput $outFile -RedirectStandardError $errFile
+        $pending += [PSCustomObject]@{ Device = $Devices[$i]; Process = $proc; OutFile = $outFile; ErrFile = $errFile }
+    }
+
+    $results = @{}
+    while ($pending.Count -gt 0) {
+        foreach ($job in @($pending | Where-Object { $_.Process.HasExited })) {
+            $text = ((Get-Content -LiteralPath $job.OutFile, $job.ErrFile -ErrorAction SilentlyContinue) -join " ").Trim()
+            $results[$job.Device.Id] = $text
+            $outcome = if ($text -match "\bSuccess\b") { "finished" } else { "needs attention" }
+            Write-Host ("  -> {0} ({1}): {2} after {3:N1} s" -f $job.Device.Model, $job.Device.Id, $outcome, $timer.Elapsed.TotalSeconds) -ForegroundColor Cyan
+        }
+        $pending = @($pending | Where-Object { -not $_.Process.HasExited })
+        if ($pending.Count -gt 0) { Start-Sleep -Milliseconds 200 }
+    }
+    Remove-Item -LiteralPath $tempDir -Recurse -Force -ErrorAction SilentlyContinue
+    return $results
+}
+
 function Install-App {
     param (
-        [string]$DeviceId
+        [string]$DeviceId,
+        # Output of an install that already ran; empty means install here.
+        [string]$PriorInstallOutput = ""
     )
 
     if (-not (Test-Path $apkPath)) {
@@ -267,8 +342,13 @@ function Install-App {
     $model = (& $adb -s $DeviceId shell getprop ro.product.model 2>$null)
     $modelStr = if ($model) { $model.Trim() } else { "Android Device" }
 
-    Write-Host "  -> Installing to $DeviceId ($modelStr)..." -ForegroundColor Cyan
-    $installOut = & $adb -s $DeviceId install -r $apkPath 2>&1
+    $installOut = $PriorInstallOutput
+    if (-not $installOut) {
+        Write-Host "  -> Installing to $DeviceId ($modelStr)..." -ForegroundColor Cyan
+        $installTimer = [System.Diagnostics.Stopwatch]::StartNew()
+        $installOut = & $adb -s $DeviceId install -r $apkPath 2>&1
+        Write-Host ("     Install step took {0:N1} s." -f $installTimer.Elapsed.TotalSeconds) -ForegroundColor DarkGray
+    }
     if ("$installOut" -match "INSTALL_FAILED_UPDATE_INCOMPATIBLE") {
         # The other variant is signed with a different key; replacing it means uninstalling, which wipes app data.
         Write-Host "     $modelStr has a build signed with another key (debug vs release)." -ForegroundColor Yellow
@@ -280,8 +360,8 @@ function Install-App {
         & $adb -s $DeviceId uninstall $package 2>&1 | Out-Null
         $installOut = & $adb -s $DeviceId install -r $apkPath 2>&1
     }
-    if ($LASTEXITCODE -ne 0 -or ($installOut -match "Failure|INSTALL_FAILED")) {
-        Write-Host "     Install failed: $installOut" -ForegroundColor Red
+    if ("$installOut" -notmatch "\bSuccess\b") {
+        Write-Host "     Install failed on ${modelStr}: $installOut" -ForegroundColor Red
         return $false
     }
     Write-Host "     Install succeeded." -ForegroundColor Green
@@ -299,7 +379,6 @@ function Install-AllDevices {
     Write-Host "`n=== Install & Launch on ALL Devices ===" -ForegroundColor Green
 
     if (-not (Select-BuildVariant)) { return }
-    if (-not (Confirm-ApkBuild)) { return }
 
     Sync-WirelessDevices
 
@@ -311,16 +390,23 @@ function Install-AllDevices {
 
     Write-Host "`nTargeting $($devs.Count) distinct active device(s):" -ForegroundColor Cyan
     for ($i = 0; $i -lt $devs.Count; $i++) {
-        $m = (& $adb -s $devs[$i].Id shell getprop ro.product.model 2>$null)
-        $mName = if ($m) { $m.Trim() } else { "Unknown" }
+        $mName = if ($devs[$i].Model) { $devs[$i].Model } else { "Unknown" }
         Write-Host "  [$($i+1)] $($devs[$i].Id) ($mName)" -ForegroundColor DarkCyan
     }
+
+    Set-BuildAbis -Devices $devs
+    if (-not (Confirm-ApkBuild)) { return }
+
+    Write-Host "`nInstalling on $($devs.Count) device(s) at once..." -ForegroundColor Cyan
+    $installTimer = [System.Diagnostics.Stopwatch]::StartNew()
+    $installResults = Install-ApkInParallel -Devices $devs
+    Write-Host ("All installs finished in {0:N1} s." -f $installTimer.Elapsed.TotalSeconds) -ForegroundColor DarkGray
 
     $successCount = 0
     for ($i = 0; $i -lt $devs.Count; $i++) {
         $targetId = [string]$devs[$i].Id
         Write-Host "`n[$($i + 1)/$($devs.Count)] Device: $targetId" -ForegroundColor Yellow
-        $ok = Install-App -DeviceId $targetId
+        $ok = Install-App -DeviceId $targetId -PriorInstallOutput $installResults[$targetId]
         if ($ok) { $successCount++ }
     }
 
@@ -343,9 +429,12 @@ function Install-SpecificDevice {
     if ($selection -match "^\d+$") {
         $idx = [int]$selection - 1
         if ($idx -ge 0 -and $idx -lt $active.Count) {
-            if ((Select-BuildVariant) -and (Confirm-ApkBuild)) {
-                Install-App -DeviceId ([string]$active[$idx].Id) | Out-Null
-                Write-Host "`nDone!" -ForegroundColor Green
+            if (Select-BuildVariant) {
+                Set-BuildAbis -Devices @(Get-DeviceInfo -DeviceId ([string]$active[$idx].Id))
+                if (Confirm-ApkBuild) {
+                    Install-App -DeviceId ([string]$active[$idx].Id) | Out-Null
+                    Write-Host "`nDone!" -ForegroundColor Green
+                }
             }
             return
         }

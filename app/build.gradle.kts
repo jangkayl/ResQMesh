@@ -35,6 +35,11 @@ android {
         buildConfigField("boolean", "BLE_L2CAP_ENABLED", "true")
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        // manage_devices.ps1 passes -PdevAbi to package only the connected phones' ABIs; plain builds stay universal.
+        providers.gradleProperty("devAbi").orNull?.let { abis ->
+            ndk { abiFilters += abis.split(",").map(String::trim).filter(String::isNotEmpty) }
+        }
     }
 
     signingConfigs {

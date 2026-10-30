@@ -1,6 +1,6 @@
 # Current status
 
-Last reviewed: 2026-10-17. Baseline: `a9a27ed` on `main` (also `origin/fix/incident-ui-ux`); docs work continues on `chore/context-routing`. This page owns the baseline, open issues and next actions. Build hashes and test counts live in [validation](validation.md).
+Last reviewed: 2026-10-17. Baseline: `a9a27ed` on `main` (also `origin/fix/incident-ui-ux`); docs work continues on `chore/context-routing`. Build hashes and test counts live in [validation](validation.md).
 
 ## Current objective
 
@@ -42,6 +42,8 @@ Basic block, incident, SOS and recovery checks have user-reported successes; the
 **Reconnect sync fix** (`fix/incident-reconnect-sync`): bounded sync, paced creation (D29); [card](testing/incident-reconnect-sync-card.md) pending.
 
 **Batch A cleanup** (branch `refactor/batch-a-cleanup`): dead incident UI removed, two thread-safety fixes, swallowed-exception logging, debug-only Logcat and named timer constants. Local checks pass; the user reported all [smoke card](testing/batch-a-cleanup-smoke-card.md) steps working on 2026-10-16 (build, models, counts not supplied). Remaining review work: revision-plan phases P1–P6.
+
+**Fast device install**: parallel, ABI-targeted installs; [card](testing/fast-device-install-card.md) pending.
 
 ## Next actions
 
