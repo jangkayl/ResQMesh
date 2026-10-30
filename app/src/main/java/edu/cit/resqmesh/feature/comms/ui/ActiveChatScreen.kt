@@ -120,19 +120,19 @@ fun ActiveChatScreen(
                 viewModel.rejectPendingPublicKeyChange(conversationName)
                 showKeyChangeDialog = false
             },
-            title = { Text("Recipient key changed") },
-            text = { Text("This device advertised a different encryption key. Accept it only after verifying the recipient through a separate channel, then resend your message.") },
+            title = { Text("This person's security code changed") },
+            text = { Text("This could be a new phone, or someone else. Check with them in another way first. Then send your message again.") },
             confirmButton = {
                 TextButton(onClick = {
                     viewModel.acceptPendingPublicKeyChange(conversationName)
                     showKeyChangeDialog = false
-                }) { Text("Accept new key") }
+                }) { Text("Yes, trust it") }
             },
             dismissButton = {
                 TextButton(onClick = {
                     viewModel.rejectPendingPublicKeyChange(conversationName)
                     showKeyChangeDialog = false
-                }) { Text("Keep existing key") }
+                }) { Text("No, keep old code") }
             }
         )
     }
