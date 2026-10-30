@@ -184,7 +184,7 @@ fun FullScreenSosAlarm(alertMessage: ChatMessage, onDismiss: () -> Unit, onViewM
                     letterSpacing = 0.5.sp
                 )
                 Text(
-                    "HIGH-PRIORITY MESH FLOOD ALERT",
+                    "SOMEONE NEEDS HELP",
                     fontFamily = FontFamily.Monospace,
                     fontSize = 12.sp,
                     color = Color.White.copy(alpha = 0.55f),
@@ -260,7 +260,7 @@ fun FullScreenSosAlarm(alertMessage: ChatMessage, onDismiss: () -> Unit, onViewM
                                     color = Color.White
                                 )
                                 Text(
-                                    "ORIGINATING NODE",
+                                    "SENT BY",
                                     fontFamily = FontFamily.Monospace,
                                     fontSize = 10.sp,
                                     color = red.copy(alpha = 0.9f)
@@ -306,9 +306,9 @@ fun FullScreenSosAlarm(alertMessage: ChatMessage, onDismiss: () -> Unit, onViewM
                                 Spacer(Modifier.width(6.dp))
                                 Text(
                                     if (hasLocation) {
-                                        "COORDINATES ACQUIRED: %.4f, %.4f".format(alertMessage.locationLat, alertMessage.locationLng)
+                                        "LOCATION FOUND: %.4f, %.4f".format(alertMessage.locationLat, alertMessage.locationLng)
                                     } else {
-                                        "GPS TELEMETRY UNAVAILABLE"
+                                        "NO LOCATION YET"
                                     },
                                     fontFamily = FontFamily.Monospace,
                                     fontWeight = FontWeight.Bold,
@@ -343,7 +343,7 @@ fun FullScreenSosAlarm(alertMessage: ChatMessage, onDismiss: () -> Unit, onViewM
                         Icon(Icons.Default.Map, contentDescription = null, tint = red)
                         Spacer(Modifier.width(10.dp))
                         Text(
-                            "PLOT TARGET ON TACTICAL MAP",
+                            "SHOW ON MAP",
                             fontWeight = FontWeight.Black,
                             fontFamily = FontFamily.Monospace,
                             fontSize = 13.sp,
@@ -452,7 +452,7 @@ private fun AcknowledgeSlideSlider(
 
             // Slider Label
             Text(
-                text = if (progress >= 0.85f) "RELEASE TO SILENCE" else "SLIDE TO ACKNOWLEDGE",
+                text = if (progress >= 0.85f) "LET GO TO STOP" else "SLIDE TO STOP ALARM",
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 48.dp)

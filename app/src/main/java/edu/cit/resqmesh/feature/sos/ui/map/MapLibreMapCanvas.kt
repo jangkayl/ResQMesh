@@ -115,7 +115,7 @@ internal fun MapLibreLocalMapContainer(
             val bearingStr = "BEARING %03d° %s".format(bearing.roundToInt(), bearingToCardinal(bearing.toDouble()))
             Pair(distStr, bearingStr)
         } else {
-            Pair("LOCATING...", "ACQUIRING GPS")
+            Pair("LOCATING...", "FINDING YOUR LOCATION…")
         }
     }
 

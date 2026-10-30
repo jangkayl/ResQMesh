@@ -180,7 +180,7 @@ internal fun MaplessSosFallback(
                 )
                 Spacer(Modifier.width(Spacing.Small))
                 Text(
-                    text = "Offline maps must be verified and downloaded prior to deployment. Coordinates transmitted via mesh remain valid and directly usable in navigation equipment or GPS devices.",
+                    text = "Download a map before an emergency. This location still works in any map or GPS app.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
