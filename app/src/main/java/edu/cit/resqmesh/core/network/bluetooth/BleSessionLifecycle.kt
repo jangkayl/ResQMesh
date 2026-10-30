@@ -1,7 +1,7 @@
 package edu.cit.resqmesh.core.network.bluetooth
 
 enum class MeshTransportState(val status: String) {
-    OFFLINE("Mesh is offline"),
+    OFFLINE("Not connected"),
     BLUETOOTH_OFF("Bluetooth is off — reconnection will resume when enabled"),
     PERMISSION_REQUIRED("Mesh needs permission — allow Nearby Devices and Location access"),
     STARTING("Starting Bluetooth mesh…"),

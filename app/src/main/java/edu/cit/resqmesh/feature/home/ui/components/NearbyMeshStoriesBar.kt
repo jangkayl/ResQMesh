@@ -75,7 +75,7 @@ internal fun NearbyMeshStoriesBar(
         ) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text(
-                    text = "Nearby Mesh Friends",
+                    text = "People Nearby",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface
@@ -142,7 +142,7 @@ internal fun NearbyMeshStoriesBar(
                             color = MaterialTheme.colorScheme.onSurface
                         )
                         Text(
-                            text = if (isNodeActive) "Recovery runs automatically when Bluetooth and permissions are available." else "Tap to check mesh permissions & status.",
+                            text = if (isNodeActive) "We will keep trying once Bluetooth is on." else "Tap to check mesh permissions & status.",
                             style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp),
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
