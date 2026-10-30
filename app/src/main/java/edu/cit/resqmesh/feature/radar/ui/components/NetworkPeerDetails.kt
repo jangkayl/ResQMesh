@@ -170,7 +170,7 @@ internal fun NetworkPeerDetails(
 
                 Text(
                     text = if (knownPath.isEmpty()) {
-                        "Opportunistic multi-hop routing will discover path evidence when packets are transmitted."
+                        "We will find a path when you send a message."
                     } else {
                         "Packets relay peer-to-peer across hardware radios without requiring internet or cellular connectivity."
                     },
@@ -205,7 +205,7 @@ internal fun NetworkPeerDetails(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Text(
-                        text = "AES-GCM VERIFIED",
+                        text = "SCRAMBLED",
                         fontFamily = FontFamily.Monospace,
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Black,
@@ -348,7 +348,7 @@ internal fun NetworkPeerDetails(
                 ) {
                     Box(contentAlignment = Alignment.Center) {
                         Text(
-                            text = if (node.isBlocked) "UNBLOCK PEER" else "BLOCK PEER",
+                            text = if (node.isBlocked) "UNBLOCK PERSON" else "BLOCK PERSON",
                             fontFamily = FontFamily.Monospace,
                             fontWeight = FontWeight.Bold,
                             fontSize = 11.sp,
@@ -368,7 +368,7 @@ internal fun NetworkPeerDetails(
         AlertDialog(
             onDismissRequest = { confirmBlock = false },
             title = { Text("Block ${node.label}?") },
-            text = { Text("This denies a direct link on both phones after acknowledgement. Each phone must unblock locally before direct contact can resume. Relayed messages may still be available.") },
+            text = { Text("Your phones will stop connecting directly. Each person must unblock to connect again. Messages may still pass through other phones.") },
             confirmButton = { TextButton(onClick = { confirmBlock = false; onBlock() }) { Text("Block", color = Color(0xFFFF5252)) } },
             dismissButton = { TextButton(onClick = { confirmBlock = false }) { Text("Cancel") } }
         )

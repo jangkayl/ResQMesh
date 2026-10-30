@@ -122,7 +122,7 @@ internal fun ExtractingProgressSection(extracting: MapPackageStatus.Extracting) 
                 fontWeight = FontWeight.Bold
             )
             Text(
-                text = "Unpacking PMTiles and tactical vector styles...",
+                text = "Getting your map ready...",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )

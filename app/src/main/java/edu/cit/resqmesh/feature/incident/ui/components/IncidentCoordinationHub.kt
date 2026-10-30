@@ -206,7 +206,7 @@ fun IncidentCoordinationHub(
 
                     if (!isLeadLocal && leadReachability == "Unreachable") {
                         Text(
-                            text = "⚠️ Helper currently unreachable via mesh. They may still be en route; state updates will sync upon reconnect.",
+                            text = "⚠️ We cannot reach your helper right now. They may still be coming.",
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.error
                         )
@@ -421,7 +421,7 @@ fun IncidentCoordinationHub(
                     tint = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Text(
-                    text = "Coordination events are signed with device keys and relayed peer-to-peer. Helpers are civilian volunteers, not verified emergency services.",
+                    text = "Helpers are volunteers, not official rescue teams.",
                     style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )

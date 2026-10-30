@@ -99,7 +99,7 @@ fun CreateIncidentSheet(
             attachedLocation = loc
             isAcquiringLocation = false
             if (loc == null) {
-                locationError = "Could not get a GPS fix. You can still report without location."
+                locationError = "We could not find your location. You can still send your report."
             }
         }
     }
@@ -217,7 +217,7 @@ fun CreateIncidentSheet(
                                     color = Color.White
                                 )
                                 Spacer(Modifier.width(10.dp))
-                                Text("Broadcasting to Mesh…", fontSize = 15.sp, fontWeight = FontWeight.Bold)
+                                Text("Sending…", fontSize = 15.sp, fontWeight = FontWeight.Bold)
                             } else if (reportWaitSeconds > 0) {
                                 Text(
                                     "Next report available in $reportWaitSeconds s",
@@ -225,7 +225,7 @@ fun CreateIncidentSheet(
                                     fontWeight = FontWeight.Bold
                                 )
                             } else {
-                                Text("Broadcast Request to Mesh Network", fontSize = 15.sp, fontWeight = FontWeight.Bold)
+                                Text("Send Request to People Nearby", fontSize = 15.sp, fontWeight = FontWeight.Bold)
                             }
                         }
                     }
@@ -381,7 +381,7 @@ fun CreateIncidentSheet(
                                         } else {
                                             Icon(Icons.Outlined.LocationOn, null, modifier = Modifier.size(14.dp))
                                             Spacer(Modifier.width(6.dp))
-                                            Text("Attach GPS", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                                            Text("Add my location", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
                                         }
                                     }
                                 }
@@ -411,7 +411,7 @@ fun CreateIncidentSheet(
                                                 modifier = Modifier.size(14.dp)
                                             )
                                             Text(
-                                                text = "GPS Attached",
+                                                text = "Location added",
                                                 style = MaterialTheme.typography.labelMedium.copy(
                                                     fontSize = 12.5.sp,
                                                     fontWeight = FontWeight.Bold

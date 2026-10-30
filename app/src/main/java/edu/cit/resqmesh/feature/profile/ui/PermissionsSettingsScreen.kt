@@ -167,7 +167,7 @@ fun PermissionsSettingsScreen(
         PermissionItemState(
             id = "bluetooth",
             title = "Nearby Devices (Bluetooth)",
-            description = "Discovers nearby peer nodes, establishes GATT client/server radio links, and advertises presence over BLE without internet.",
+            description = "Finds nearby phones and connects to them without internet.",
             icon = Icons.Outlined.Bluetooth,
             isGranted = isBluetoothGranted,
             permissionsToRequest = bluetoothPermissions
@@ -183,7 +183,7 @@ fun PermissionsSettingsScreen(
         PermissionItemState(
             id = "microphone",
             title = "Microphone Access",
-            description = "Enables half-duplex Tactical Walkie-Talkie (PTT) voice broadcast and recorded offline voice notes.",
+            description = "Lets you talk on the walkie-talkie and record voice notes.",
             icon = Icons.Outlined.Mic,
             isGranted = isMicrophoneGranted,
             permissionsToRequest = microphonePermissions
