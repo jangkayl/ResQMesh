@@ -2,6 +2,7 @@ package edu.cit.resqmesh.core.network.transport
 
 import edu.cit.resqmesh.core.network.MeshPayload
 import edu.cit.resqmesh.core.logging.trace.TraceDir
+import edu.cit.resqmesh.core.logging.trace.TraceGate
 import edu.cit.resqmesh.core.network.OutboundFrameEvent
 import edu.cit.resqmesh.core.network.PacketTraceEmitter
 import edu.cit.resqmesh.core.network.ReliableMeshTransfers
@@ -26,7 +27,8 @@ internal class OutboundFrameReporter(
     fun reportFrame(endpoint: String, bytes: ByteArray, stage: OutboundFrameEvent.Stage,
                             transport: String, queuedAt: Long = 0L, startedAt: Long = 0L) {
         val payload = runCatching { ProtoBuf.decodeFromByteArray<MeshPayload>(bytes) }.getOrNull() ?: return
-        PacketTraceEmitter.emit(payload, PacketTraceEmitter.stageOf(stage), TraceDir.OUT, bytes.size, transport)
+        PacketTraceEmitter.emit(payload, PacketTraceEmitter.stageOf(stage), TraceDir.OUT, bytes.size, transport,
+            nextHop = if (TraceGate.enabled) nodeIdForEndpoint(endpoint) else null)
         if (payload.type == ReliableMeshTransfers.PIECE) { reliableTransfers.frame(payload, stage); return }
         if (payload.type !in setOf("MESSAGE", "CONVERSATION")) return
         val now = System.currentTimeMillis()

@@ -14,12 +14,14 @@ import androidx.compose.ui.Modifier
 import edu.cit.resqmesh.core.logging.trace.PacketTrace
 import edu.cit.resqmesh.core.ui.components.feedback.ResQStatusChip
 import edu.cit.resqmesh.core.ui.theme.Spacing
+import edu.cit.resqmesh.feature.devtools.model.TimelineEntry
+import edu.cit.resqmesh.feature.devtools.model.TraceTimeline
 
 /** All fields of one packet plus this phone's raw events that share its packet key. */
 @Composable
 internal fun PacketDetail(
     packet: PacketTrace,
-    timeline: List<PacketTrace>,
+    timeline: List<TimelineEntry>,
     names: Map<String, String>,
     onClose: () -> Unit
 ) {
@@ -28,7 +30,7 @@ internal fun PacketDetail(
             Text("Packet detail", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
             TextButton(onClick = onClose) { Text("Back") }
         }
-        LabeledValue("Packet", packet.packetKey.ifEmpty { DASH })
+        LabeledValue("Packet", safeToken(packet.packetKey) ?: DASH)
         LabeledValue("Direction", packet.dir.name, mono = false)
         LabeledValue("Scope", packet.scope.name, mono = false)
         LabeledValue("Type", packet.type.name, mono = false)
@@ -39,10 +41,15 @@ internal fun PacketDetail(
         LabeledValue("Hop / TTL", hopLabel(packet))
         LabeledValue("Route length", packet.pathLen?.toString() ?: DASH)
         LabeledValue("Bytes", packet.bytes.toString())
-        LabeledValue("Transport", packet.transport ?: DASH)
+        progressLabel(packet)?.let { LabeledValue("Progress", it) }
+        LabeledValue("Transport", safeToken(packet.transport) ?: DASH)
         LabeledValue("Drop reason", packet.dropReason.name, mono = false)
         SectionTitle("Timeline (this phone only)")
-        timeline.forEach { e ->
+        if (timeline.size >= TraceTimeline.MAX_ENTRIES) {
+            Text("Showing the newest ${TraceTimeline.MAX_ENTRIES} events.", style = MaterialTheme.typography.labelSmall)
+        }
+        timeline.forEach { entry ->
+            val e = entry.event
             Row(Modifier.padding(vertical = Spacing.ExtraSmall)) {
                 Text(
                     formatTime(e.epochMs),
@@ -50,7 +57,7 @@ internal fun PacketDetail(
                     style = MaterialTheme.typography.labelMedium,
                     modifier = Modifier.weight(LABEL_WEIGHT)
                 )
-                ResQStatusChip("${e.dir.name} ${e.stage.name}", stageTone(e))
+                ResQStatusChip(entry.label, stageTone(e))
             }
         }
     }

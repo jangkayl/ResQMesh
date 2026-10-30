@@ -212,7 +212,8 @@ class NativeBleManager(
             event = { bytes, stage, queuedAt, startedAt -> handler.post {
                 reportFrame("", bytes, stage, "TRANSFER", queuedAt, startedAt)
             } },
-            log = { AppLogger.d("BLE_TRANSFER", it) }
+            log = { AppLogger.d("BLE_TRANSFER", it) },
+            trace = TransferTraceEmitter::transfer
         )
     }
     private val outboundDispatcher: NativeOutboundDispatcher = NativeOutboundDispatcher(
@@ -583,8 +584,8 @@ class NativeBleManager(
         dispatch = { endpoint, bytes -> payloadDispatcher.dispatch(endpoint, bytes) }
     )
 
-    fun processBinaryPayload(endpointId: String, payloadBytes: ByteArray) {
-        inboundPipeline.processBinaryPayload(endpointId, payloadBytes)
+    fun processBinaryPayload(endpointId: String, payloadBytes: ByteArray, transport: String? = null) {
+        inboundPipeline.processBinaryPayload(endpointId, payloadBytes, transport)
     }
 
     fun broadcastPayload(payloadBytes: ByteArray, excludeEndpointId: String? = null): BroadcastDispatchResult {

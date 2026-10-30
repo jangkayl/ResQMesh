@@ -20,7 +20,12 @@ data class PacketTrace(
     val pathLen: Int?,
     val bytes: Int,
     val transport: String?,
-    val dropReason: TraceDropReason = TraceDropReason.NONE
+    val dropReason: TraceDropReason = TraceDropReason.NONE,
+    /** Index of this phone (inbound) or the next hop (outbound) in a private directed route; null when unknown. */
+    val routeStep: Int? = null,
+    /** Piece progress of a transfer (acknowledged or held of total pieces); null for other events. */
+    val progress: Int? = null,
+    val total: Int? = null
 )
 
 /** Log line kept raw; timestamp formatting and MAC redaction happen when a snapshot is read. */

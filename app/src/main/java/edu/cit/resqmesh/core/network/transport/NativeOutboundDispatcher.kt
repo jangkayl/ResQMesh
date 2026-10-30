@@ -9,6 +9,7 @@ import edu.cit.resqmesh.core.network.DirectEndpoint
 import edu.cit.resqmesh.core.network.DirectSendPolicy
 import edu.cit.resqmesh.core.network.MeshPayload
 import edu.cit.resqmesh.core.network.OutboundFrameEvent
+import edu.cit.resqmesh.core.network.PacketTraceEmitter
 import edu.cit.resqmesh.core.network.ReliableMeshTransfers
 import edu.cit.resqmesh.core.network.TransferPiece
 import edu.cit.resqmesh.core.network.TransportDispatchResult
@@ -19,6 +20,7 @@ import edu.cit.resqmesh.core.network.bluetooth.state.MeshFrameCodec
 import edu.cit.resqmesh.core.network.bluetooth.state.RetainedFallbackQueue
 import edu.cit.resqmesh.core.network.bluetooth.state.payloadBytes
 import edu.cit.resqmesh.core.logging.AppLogger
+import edu.cit.resqmesh.core.logging.trace.TraceGate
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.decodeFromByteArray
 import kotlinx.serialization.protobuf.ProtoBuf
@@ -103,7 +105,7 @@ internal class NativeOutboundDispatcher(
             .map { it.uppercase() }.filter { it !in visited && !it.equals(excludedPeer, true) && endpointForPeer(it) != null }.toSet()
         val custody = p != null && excludeEndpointId != null && reliableTransfers.hasPendingCustody(p.id)
         val roster = if (custody) reliableTransfers.relayTargets(p!!.id, peers) else peers
-        return BroadcastDispatchResult(roster.associateWith { peer ->
+        val result = BroadcastDispatchResult(roster.associateWith { peer ->
             if (custody && reliableTransfers.alreadyForwarded(p!!.id, peer)) TransportDispatchResult.ACCEPTED
             else if (custody && peerTransferVersions[peer] == ReliableMeshTransfers.VERSION) {
                 reliableTransfers.offer(peer, payloadBytes, false, durableRelay = true)
@@ -111,6 +113,8 @@ internal class NativeOutboundDispatcher(
                 if (custody) sendLegacyRelay(peer, it, payloadBytes) else sendDirectPayload(it, payloadBytes)
             } ?: TransportDispatchResult.REJECTED_NOT_READY
         })
+        if (TraceGate.enabled) PacketTraceEmitter.broadcastRejected(p, payloadBytes.size, result.neighbors)
+        return result
     }
 
     private fun sendLegacyRelay(peer: String, endpoint: String, bytes: ByteArray): TransportDispatchResult {
@@ -171,20 +175,32 @@ internal class NativeOutboundDispatcher(
         } else sendRawPayload(selected, bytes, priority)
     }
 
+    /** Observe-only: records a rejected raw send. Returns [result] unchanged. */
+    private fun rejected(endpoint: String, bytes: ByteArray, result: TransportDispatchResult): TransportDispatchResult {
+        if (TraceGate.enabled) PacketTraceEmitter.sendRejected(bytes, endpoint, nodeIdForEndpoint(endpoint), result)
+        return result
+    }
+
     fun sendRawPayload(endpoint: String, bytes: ByteArray, priority: Boolean): TransportDispatchResult {
         if (!edu.cit.resqmesh.core.network.bluetooth.state.OutboundQueuePolicy.fitsSingleTransfer(bytes.size + Int.SIZE_BYTES, priority)) {
-            return TransportDispatchResult.REJECTED_INVALID_FRAME
+            return rejected(endpoint, bytes, TransportDispatchResult.REJECTED_INVALID_FRAME)
         }
-        if (!hasReadyEndpoint(endpoint)) return TransportDispatchResult.REJECTED_NOT_READY
+        if (!hasReadyEndpoint(endpoint)) return rejected(endpoint, bytes, TransportDispatchResult.REJECTED_NOT_READY)
         // The failed socket's accepted frames retain ownership before new ordinary work is admitted.
-        if (!priority && retainedFallback.hasPending(endpoint)) return TransportDispatchResult.REJECTED_QUEUE_FULL
+        if (!priority && retainedFallback.hasPending(endpoint)) {
+            return rejected(endpoint, bytes, TransportDispatchResult.REJECTED_QUEUE_FULL)
+        }
         val l2capResult = sendL2cap(endpoint, bytes, priority)
         if (l2capResult != TransportDispatchResult.REJECTED_NOT_READY) {
             if (l2capResult.accepted) reportFrame(endpoint, bytes, OutboundFrameEvent.Stage.QUEUED, "L2CAP")
+            else rejected(endpoint, bytes, l2capResult)
             return l2capResult
         }
-        val frame = MeshFrameCodec.encode(bytes) ?: return TransportDispatchResult.REJECTED_INVALID_FRAME
-        if (!transferCoordinator.enqueue(endpoint, GattTransfer(frame), priority)) return TransportDispatchResult.REJECTED_QUEUE_FULL
+        val frame = MeshFrameCodec.encode(bytes)
+            ?: return rejected(endpoint, bytes, TransportDispatchResult.REJECTED_INVALID_FRAME)
+        if (!transferCoordinator.enqueue(endpoint, GattTransfer(frame), priority)) {
+            return rejected(endpoint, bytes, TransportDispatchResult.REJECTED_QUEUE_FULL)
+        }
         reportFrame(endpoint, bytes, OutboundFrameEvent.Stage.QUEUED, "GATT")
         processNextPayload(endpoint)
         return TransportDispatchResult.ACCEPTED

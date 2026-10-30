@@ -1,23 +1,23 @@
-# Developer console card (Stage 1)
+# Developer console card (Stages 1 and 2)
 
 Prepared: 2026-10-31 on `feat/developer-console`. Status: local checks only; no device evidence yet. The user installs and operates the phones.
 
 Build identity: record the branch head commit, the debug APK hash, the release APK hash and the three phone models before running. Missing items stay unspecified.
 
-Stage 1 covers the console screens, fast logger, export and release unlock. Hop, TTL, drop reasons, voice traces, link RSSI and queue stats arrive in Stages 2 and 3: expect a dash for hop, TTL and next hop, an empty Voice tab and no RSSI. Those are not failures.
+Stage 1 covers the console screens, fast logger, export and release unlock; Stage 2 adds hop, route, drop, failure, transfer progress and voice data. Link RSSI and queue stats arrive in Stage 3: expect no RSSI. That is not a failure. A dash for hop or TTL is correct for private and non-relayed packets.
 
 ## Setup
 
-1. Add `resqmesh.devPin=<PIN of 8 or more ASCII characters>` to the gitignored `local.properties` (a shorter or non-ASCII value must fail the release build), then build the release APK. Build a second release APK without the line for step R5. Debug builds use `0000` when the line is absent.
+1. Add `resqmesh.devPin=<PIN of 8 or more ASCII characters>` to the gitignored `local.properties` (a shorter or non-ASCII value must fail the release build), then build the release APK. Build a second release APK without the line for step R5. Debug builds use `0000` only when `resqmesh.devPin` is absent; otherwise the configured PIN applies.
 2. Three phones A, B, C in a line A-B-C (A and C out of direct range), with the debug build installed. Start `scripts\device\capture_ble_logcat.ps1` on A.
 
 ## Debug build
 
 | Step | Action | Expected | Failure indicator |
 | --- | --- | --- | --- |
-| D1 | Profile, Developer Tools, switch on, enter `0000` | Badge appears; wrong PIN is rejected with a message | Accepts a wrong PIN; no badge |
+| D1 | Profile, Developer Tools, switch on, enter the debug PIN (`0000` only when `resqmesh.devPin` is absent) | Badge appears; wrong PIN is rejected with a message | Accepts a wrong PIN; no badge |
 | D2 | Tap the badge | Full-screen console with six bottom tabs; Back closes it | Missing tabs; Back does nothing |
-| D3 | From A, send public text, private text, an SOS and a voice note over 4 KiB | Packets tab shows OUT and IN cards with scope, type, bytes, transport; public destination "all"; hop and TTL dashes | Missing cards; wrong scope |
+| D3 | From A, send public text, private text, an SOS and a voice note over 4 KiB | Packets tab shows OUT and IN cards with scope, type, bytes, transport; public destination "all" | Missing cards; wrong scope |
 | D4 | Open Links | All links listed; READY shown as "Payload READY", earlier states as radio connected or connecting | A not-ready link shown as ready |
 | D5 | Overview | Link, error and ring counts match what you see | Counts static |
 | D6 | Cause an error (switch Bluetooth off on B) | Red dot on the badge for an ERROR entry; warnings alone give no dot | No dot; dot for warnings only |
@@ -30,6 +30,20 @@ Stage 1 covers the console screens, fast logger, export and release unlock. Hop,
 | D12 | Export Text, then CSV (top bar), choosing a location each time | Both files save; failure shows a message | Crash; silent failure |
 | D13 | Open both files | Only short IDs and marker lines; no peer names, no message text, no full MAC, no key material | Any name, text or full MAC |
 | D14 | During export and the file picker, watch links on A and B | No new disconnects; traffic continues | Link drops while the picker is open |
+
+## Stage 2: hop, drop, failure and voice data (debug build, A-B-C)
+
+| Step | Action | Expected | Failure indicator |
+| --- | --- | --- | --- |
+| S2-1 | Send public text from A, open the packet on B | Card shows `hop N · TTL left M` (only when TTL is above 0); on C the hop is higher | Hop shown with TTL 0; same hop on B and C |
+| S2-2 | Send private text A to C through B | A and B show `route step i/n` and a next hop; B does not show hop or TTL left | TTL left shown for private; no next hop |
+| S2-3 | Resend the same packet quickly, and send a burst from one peer | Duplicates and rate-limited traffic show DROPPED with a reason (DUPLICATE, ORIGIN_LIMIT, FRAME_RATE); drop rows are throttled, not one per packet | No reason; rings flooded by drops |
+| S2-4 | Switch C off, send private text from A to C | FAILED or expired row with a reason (SEND_NOT_READY, RETRIES_EXHAUSTED or EXPIRED_UNSENT) | Silent loss |
+| S2-5 | Send a voice note over 4 KiB from A to B | Packets shows piece progress such as 12/18 on collapsed rows; Voice tab shows size, scope, destination, progress and a reassembled entry on B | No progress; no Voice entry |
+| S2-6 | If reproducible, cause a mic failure on A or a playback failure on B | Voice tab shows RECORD_FAILED or PLAYBACK_FAILED with no file path or message text | No entry; path or text shown |
+| S2-7 | Send private audio A to C and look at B | B shows "content unknown"; A's own transfer rows say voice note and C shows a voice-note received event | B labels it voice |
+| S2-8 | Open a message and read the timeline on A, B and C | Queued, sent, relayed, received, dropped with reason, and receipts, for this phone only; route step where private | Another phone events shown; missing receipts |
+| S2-9 | Export Text and CSV | New columns (hop, ttl, path_len, route_step, progress, total, drop) present as numbers or dashes; no names, no full MAC, no text | Any name or full MAC |
 
 ## Release build with a configured PIN
 
@@ -46,7 +60,7 @@ Stage 1 covers the console screens, fast logger, export and release unlock. Hop,
 
 ## Regression on the release build (PIN configured)
 
-Run the same A-B-C traffic (public, private, SOS, voice note over 4 KiB) three times: console open, console closed with developer mode on, and developer mode off.
+Run the same A-B-C traffic (public, private, SOS, voice note over 4 KiB), including the Stage 2 steps, three times: console open, console closed with developer mode on, and developer mode off.
 
 Expected: delivery and timing comparable in all three, no new disconnects or crashes, and with developer mode off the badge is absent and Packets stays empty when re-enabled later.
 

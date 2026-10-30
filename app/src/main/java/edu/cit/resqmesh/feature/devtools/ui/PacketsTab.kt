@@ -27,6 +27,8 @@ import androidx.compose.runtime.produceState
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import edu.cit.resqmesh.feature.devtools.model.TraceRow
+import edu.cit.resqmesh.feature.devtools.model.TimelineEntry
+import edu.cit.resqmesh.feature.devtools.model.TraceTimeline
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -83,7 +85,9 @@ internal fun PacketsTab(
 
     val detail = selected
     if (detail != null) {
-        val timeline = packets.filter { it.packetKey == detail.packetKey && detail.packetKey.isNotEmpty() }
+        val timeline by produceState(emptyList<TimelineEntry>(), packets, detail) {
+            value = withContext(Dispatchers.Default) { TraceTimeline.build(packets, detail.packetKey) }
+        }
         PacketDetail(detail, timeline, names) { selected = null }
         return
     }

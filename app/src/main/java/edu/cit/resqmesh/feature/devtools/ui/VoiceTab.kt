@@ -17,7 +17,8 @@ internal fun VoiceTab(voice: List<PacketTrace>, names: Map<String, String>, paus
     if (voice.isEmpty()) {
         ResQEmptyState(
             title = "No voice traces",
-            message = "Voice-note transfer and record/playback events are not instrumented yet."
+            message = "Voice-note transfers (public audio, or notes this phone sends or opens), record and " +
+                "playback errors and media rejects appear here. Private audio at a relay shows as content unknown."
         )
         return
     }

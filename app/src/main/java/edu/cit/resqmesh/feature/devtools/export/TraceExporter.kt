@@ -12,7 +12,7 @@ object TraceExporter {
 
     private val packetHeader = listOf(
         "time", "dir", "scope", "type", "stage", "packet", "source", "dest", "next_hop",
-        "hop", "ttl", "path_len", "bytes", "transport", "drop"
+        "hop", "ttl", "path_len", "route_step", "progress", "total", "bytes", "transport", "drop"
     )
     private val logHeader = listOf("time", "level", "tag", "event", "message")
 
@@ -23,6 +23,7 @@ object TraceExporter {
         t.packetKey.ifEmpty { DASH }.let(LogSanitizer::token), t.sourceId?.let(LogSanitizer::token) ?: DASH,
         t.destId?.let(LogSanitizer::token) ?: DASH, t.nextHop?.let(LogSanitizer::token) ?: DASH,
         t.hop?.toString() ?: DASH, t.ttl?.toString() ?: DASH, t.pathLen?.toString() ?: DASH,
+        t.routeStep?.toString() ?: DASH, t.progress?.toString() ?: DASH, t.total?.toString() ?: DASH,
         t.bytes.toString(), t.transport?.let(LogSanitizer::token) ?: DASH, t.dropReason.name
     )
 

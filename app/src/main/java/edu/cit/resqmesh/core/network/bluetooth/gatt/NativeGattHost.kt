@@ -67,7 +67,7 @@ internal class NativeGattHost(private val manager: NativeBleManager) : GattClien
     override fun distinctLinkCount(): Int = manager.distinctLinkCount()
     override fun processNextPayload(macAddress: String): Unit = manager.processNextPayload(macAddress)
     override fun handleL2capConnection(macAddress: String, socket: BluetoothSocket): Unit = manager.handleL2capConnection(macAddress, socket)
-    override fun processBinaryPayload(endpointId: String, payloadBytes: ByteArray): Unit = manager.processBinaryPayload(endpointId, payloadBytes)
+    override fun processBinaryPayload(endpointId: String, payloadBytes: ByteArray): Unit = manager.processBinaryPayload(endpointId, payloadBytes, "GATT")
     override fun isDeviceBlocked(deviceName: String): Boolean = manager.isDeviceBlocked(deviceName)
     override fun trackPendingL2capSocket(socket: BluetoothSocket, generation: Long): Boolean = manager.trackPendingL2capSocket(socket, generation)
     override fun finishPendingL2capSocket(socket: BluetoothSocket): Unit = manager.finishPendingL2capSocket(socket)

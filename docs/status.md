@@ -41,13 +41,13 @@ Basic block, incident, SOS and recovery checks have user-reported successes; the
 
 **Reconnect sync fix** (`fix/incident-reconnect-sync`): bounded sync, paced creation (D29); [card](testing/incident-reconnect-sync-card.md) pending.
 
-**Developer console** (branch `feat/developer-console`, [plan](plans/developer-mode.md)): Stage 1 (tabs, fast logger, export, release PIN unlock) is built with local checks only and awaits the [phone card](testing/developer-mode-card.md). Stages 2 (hop and drop data) and 3 (signal and queue stats) are pending.
+**Developer console** (branch `feat/developer-console`, [plan](plans/developer-mode.md)): Stage 1 (tabs, fast logger, export, release PIN unlock) and live follow are pushed; Stage 2 (hop, drop, failure, transfer and voice data, timeline) is built with local checks only and awaits the [phone card](testing/developer-mode-card.md). Stage 3 (signal and queue stats) is pending.
 
 ## Next actions
 
 Deployment target (user-confirmed 2026-10-17): capstone demo first, then a signed sideloaded pilot beta. Play Store is out of scope for now.
 
-1. **Developer console:** run the Stage 1 phone card, then start Stage 2. Raise removing live push-to-talk when done.
+1. **Developer console:** run the Stage 1 and 2 phone card, then start Stage 3. Raise removing live push-to-talk when done.
 2. **Demo freeze (P0, by about 2026-10-28):** parts 3–4 user-reported done (capture folder and miss times not supplied, so DELIVERY-01 stays unanalysed). The [limitations](demo/known-limitations.md) and [user guide](demo/user-guide.md) are drafted. After the freeze, only separately approved blocker fixes go in.
 3. **Release engineering (P0 for beta, after the demo):** revision-plan P5 subset. R8 and backup-off are local (SEC-01); a minified smoke run and CI release build remain.
 4. **Reliability and trust (P0/P1 before beta):** fix DELIVERY-01, triage UX-01/MESH-02, resolve UI-02, run SEC-01 phases B–E (these replace envelope v2 and TRUST-01 verification), then an audit.

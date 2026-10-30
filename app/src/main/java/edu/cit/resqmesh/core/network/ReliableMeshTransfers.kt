@@ -1,5 +1,9 @@
 package edu.cit.resqmesh.core.network
 
+import edu.cit.resqmesh.core.logging.trace.TraceDir
+import edu.cit.resqmesh.core.logging.trace.TraceDropReason
+import edu.cit.resqmesh.core.logging.trace.TraceGate
+import edu.cit.resqmesh.core.logging.trace.TraceStage
 import java.io.File
 import java.util.UUID
 import kotlinx.serialization.Serializable
@@ -29,7 +33,8 @@ internal class ReliableMeshTransfers(
     private val response: (String, ByteArray) -> Unit,
     private val event: (ByteArray, OutboundFrameEvent.Stage, Long, Long) -> Unit,
     private val now: () -> Long = { System.currentTimeMillis() },
-    private val log: (String) -> Unit = {}
+    private val log: (String) -> Unit = {},
+    private val trace: (TransferTrace) -> Unit = {}
 ) {
     private lateinit var journal: TransferJournal
     private data class Flight(val record: TransferRecord, val bytes: ByteArray,
@@ -114,13 +119,17 @@ internal class ReliableMeshTransfers(
                 if (!journal.create(record, bytes)) {
                     if (durableRelay) relayFailures.add(peer to payload.id)
                     release(key); event(bytes, OutboundFrameEvent.Stage.FAILED, now(), 0)
-                    log("TRANSFER_OVERFLOW relay=$durableRelay"); return@execute
+                    log("TRANSFER_OVERFLOW relay=$durableRelay");
+                    traceFailure(peer, id, TraceDir.OUT, bytes.size, TraceDropReason.TRANSFER_OVERFLOW)
+                    return@execute
                 }
                 flights.putIfAbsent(key, Flight(journal.find(peer, id, true)!!, bytes,
                     queuedAt = now(), queried = existing == null))
                 committed = true
                 relayFailures.remove(peer to payload.id)
                 event(bytes, OutboundFrameEvent.Stage.QUEUED, now(), 0)
+                if (TraceGate.enabled) trace(TransferTrace(peer, id, TraceDir.OUT, TraceStage.QUEUED, bytes.size, 0,
+                    TransferJournal.pieceCount(bytes.size), messageId = record.messageId, payload = payload))
                 // A private relay can release inbound custody only after its onward record commits.
                 if (durableRelay) {
                     commitOnwardCustody(peer, payload)
@@ -131,6 +140,7 @@ internal class ReliableMeshTransfers(
                 if (durableRelay) relayFailures.add(peer to payload.id)
                 if (!committed) { release(key); event(bytes, OutboundFrameEvent.Stage.FAILED, now(), 0) }
                 log("TRANSFER_STORAGE_FAILED direction=outbound")
+                traceFailure(peer, id, TraceDir.OUT, bytes.size, TraceDropReason.TRANSFER_STORAGE)
                 if (committed) tick()
             }
         }
@@ -193,16 +203,19 @@ internal class ReliableMeshTransfers(
                     if (!flight.waitingStatus || packet.requestId != flight.queryNonce) return@execute
                     val count = TransferJournal.pieceCount(flight.record.size)
                     if (packet.bitmap.size != (count + 7) / 8) return@execute
+                    val before = flight.acknowledged.size
                     flight.acknowledged.clear(); flight.pending.clear(); flight.pendingWireIds.clear()
                     (0 until count).filter { packet.bitmap[it / 8].toInt() and (1 shl (it % 8)) != 0 }
                         .forEach { flight.acknowledged.add(it) }
                     flight.waitingStatus = false
+                    traceOutProgress(flight, flight.acknowledged.size > before)
                     if (packet.complete) finish(flight, true)
                     tick(); return@execute
                 }
-                flight.acknowledged.add(packet.index)
+                val grew = flight.acknowledged.add(packet.index)
                 flight.pending.remove(packet.index)
                 flight.pendingWireIds.remove(packet.index)
+                traceOutProgress(flight, grew)
                 if (packet.complete) finish(flight, true)
                 tick()
                 return@execute
@@ -230,14 +243,19 @@ internal class ReliableMeshTransfers(
                 if (!journal.create(record)) {
                     val quota = if (journal.peerOverQuota(record)) " reason=peer_quota peer=$peer" else ""
                     log("TRANSFER_OVERFLOW direction=inbound$quota")
+                    traceFailure(peer, packet.transferId, TraceDir.IN, packet.size, TraceDropReason.TRANSFER_OVERFLOW)
                     return@execute
                 }
             }
             if (!record.stored) journal.putPiece(record, packet.index, packet.bytes)
+            if (!record.stored) traceInProgress(peer, packet)
             if (!record.complete && (0 until TransferJournal.pieceCount(record.size)).all { journal.hasPiece(record, it) }) {
                 val bytes = journal.assemble(record)
                 if (TransferJournal.hash(bytes) != record.digest) {
                     journal.delete(record); log("TRANSFER_HASH_FAILED")
+                    traceFailure(
+                        peer, packet.transferId, TraceDir.IN, record.size, TraceDropReason.TRANSFER_HASH_FAILED
+                    )
                     send(peer, envelope(ACK, packet.copy(bytes = byteArrayOf(), reset = true)), true) { }
                     return@execute
                 }
@@ -251,13 +269,21 @@ internal class ReliableMeshTransfers(
                 pendingInbound.add(record.payloadId)
                 deliver(record)
                 log("TRANSFER_REASSEMBLED transfer=${record.id.take(12)} transmission=${record.payloadId} peer=$peer bytes=${record.size}")
+                if (TraceGate.enabled) {
+                    val pieces = TransferJournal.pieceCount(record.size)
+                    trace(TransferTrace(peer, record.id, TraceDir.IN, TraceStage.RECEIVED, record.size, pieces, pieces,
+                        messageId = record.messageId, payload = payload))
+                }
             } else if (record.stored) {
                 record.response?.let { response(peer, it) }
             }
             val ack = packet.copy(bytes = byteArrayOf(), complete = record.complete)
             send(peer, envelope(ACK, ack), true) { }
             tick()
-        } catch (_: Exception) { log("TRANSFER_STORAGE_FAILED direction=inbound") }
+        } catch (_: Exception) {
+            log("TRANSFER_STORAGE_FAILED direction=inbound")
+            traceFailure(peer, "", TraceDir.IN, 0, TraceDropReason.TRANSFER_STORAGE)
+        }
     }
 
     /** Piece retries start after local wire completion, not while queued behind another frame. */
@@ -401,12 +427,39 @@ internal class ReliableMeshTransfers(
         timer = true
         schedule(delay) { execute { timer = false; tick() } }
     }
+    /** [grew] is false for a replayed ACK or status, so a peer repeating itself records nothing. */
+    private fun traceOutProgress(flight: Flight, grew: Boolean) {
+        if (!TraceGate.enabled || !grew) return
+        val pieces = TransferJournal.pieceCount(flight.record.size)
+        if (!TransferProgress.shouldEmit(flight.acknowledged.size, pieces)) return
+        trace(TransferTrace(flight.record.peer, flight.record.id, TraceDir.OUT, TraceStage.STARTED, flight.record.size,
+            flight.acknowledged.size, pieces, messageId = flight.record.messageId))
+    }
+
+    private fun traceInProgress(peer: String, packet: TransferPiece) {
+        if (!TraceGate.enabled) return
+        val pieces = TransferJournal.pieceCount(packet.size)
+        val held = TransferTraceEmitter.inboundHeld(peer, packet.transferId, packet.index, pieces)
+        if (held < 0 || !TransferProgress.shouldEmit(held, pieces)) return
+        trace(TransferTrace(peer, packet.transferId, TraceDir.IN, TraceStage.STARTED, packet.size, held, pieces))
+    }
+
+    private fun traceFailure(peer: String, id: String, dir: TraceDir, size: Int, reason: TraceDropReason) {
+        if (TraceGate.enabled) trace(TransferTrace(peer, id, dir, TraceStage.FAILED, size, 0, 0, reason))
+    }
+
     private fun finish(flight: Flight, success: Boolean) {
         val key = "${flight.record.peer}:${flight.record.id}"
         flights.remove(key); release(key); journal.delete(flight.record)
         event(flight.bytes, if (success) OutboundFrameEvent.Stage.COMPLETED else OutboundFrameEvent.Stage.FAILED,
             flight.queuedAt, flight.startedAt)
         log("${if (success) "TRANSFER_CUSTODY_ACK" else "TRANSFER_EXPIRED"} transfer=${flight.record.id.take(12)} transmission=${flight.record.payloadId} peer=${flight.record.peer} bytes=${flight.record.size}")
+        if (TraceGate.enabled) trace(TransferTrace(flight.record.peer, flight.record.id, TraceDir.OUT,
+            if (success) TraceStage.COMPLETED else TraceStage.FAILED, flight.record.size,
+            if (success) TransferJournal.pieceCount(flight.record.size) else flight.acknowledged.size,
+            TransferJournal.pieceCount(flight.record.size),
+            if (success) TraceDropReason.NONE else TraceDropReason.TRANSFER_EXPIRED,
+            flight.record.messageId))
     }
     @Synchronized private fun release(key: String) { reserved.remove(key); outgoingMessages.remove(key) }
     private fun retryDelay(flight: Flight, index: Int): Long =

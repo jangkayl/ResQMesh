@@ -38,7 +38,7 @@ internal fun PacketRow(row: TraceRow, names: Map<String, String>, onClick: () ->
                 ResQStatusChip(if (t.dir == TraceDir.OUT) "OUT" else "IN", ResQStatusTone.Information)
                 val scopeTone = if (t.scope == TraceScope.PRIVATE) ResQStatusTone.Warning else ResQStatusTone.Neutral
                 ResQStatusChip(t.scope.name, scopeTone)
-                ResQStatusChip(t.type.name + if (row.count > 1) " ×${row.count}" else "", ResQStatusTone.Neutral)
+                ResQStatusChip(typeLabel(t) + if (row.count > 1) " ×${row.count}" else "", ResQStatusTone.Neutral)
                 Text(
                     formatTime(t.epochMs),
                     style = MaterialTheme.typography.labelSmall,
@@ -60,7 +60,8 @@ internal fun PacketRow(row: TraceRow, names: Map<String, String>, onClick: () ->
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    "${t.packetKey.ifEmpty { DASH }} · ${t.bytes} B · ${t.transport ?: DASH} · ${hopLabel(t)}",
+                    "${safeToken(t.packetKey) ?: DASH} · ${t.bytes} B · ${safeToken(t.transport) ?: DASH} · " +
+                        (progressLabel(t) ?: hopLabel(t)),
                     style = MaterialTheme.typography.labelSmall,
                     fontFamily = MonoFont,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,

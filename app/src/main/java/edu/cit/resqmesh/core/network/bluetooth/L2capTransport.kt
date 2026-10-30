@@ -20,7 +20,7 @@ class L2capTransport(
     private val store: BleStateStore,
     private val handler: Handler,
     private val hasLiveGattRole: (String) -> Boolean,
-    private val onPayload: (String, ByteArray) -> Unit,
+    private val onPayload: (String, ByteArray, String) -> Unit,
     private val onPromoteGattWork: (String) -> Unit,
     private val onSocketLost: (String) -> Unit,
     private val onWriteFailure: (String, ByteArray) -> Unit,
@@ -171,7 +171,7 @@ class L2capTransport(
                     }
                     AppLogger.d("BLE_MESH", "L2CAP Received $length bytes from $endpoint")
                     handler.post {
-                        try { if (isOwned()) onPayload(endpoint, payload) }
+                        try { if (isOwned()) onPayload(endpoint, payload, "L2CAP") }
                         finally {
                             incoming.decrementAndGet()
                             gate.release(length)

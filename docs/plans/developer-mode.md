@@ -1,6 +1,6 @@
 # Developer console plan
 
-Branch: `feat/developer-console`. Status: Stage 1 built with local checks only; phone card pending. No push or PR without an explicit request. Current state lives in [status](../status.md); accepted policy is D30 in [decisions](../decisions.md).
+Branch: `feat/developer-console`. Status: Stage 1 and live follow are pushed; Stage 2 (hop, drop, failure, transfer progress, voice, timeline) is built with local checks only; phone card pending. No push or PR without an explicit request. Current state lives in [status](../status.md); accepted policy is D30 in [decisions](../decisions.md).
 
 ## Goal
 
@@ -52,10 +52,10 @@ The console only observes mesh behavior; traces stay in memory and exports hold 
 2. Tabs, packet row and detail. Overview shows link, error and ring counts; Links shows all links with radio CONNECTED and payload READY distinct.
 3. Badge dot, long-press and `openDevTools(tab)`.
 4. Export, sanitizer and the `e.message` fixes.
-5. Two observe-only emits: `OutboundFrameReporter` before its filter and `NativeInboundPipeline` after decode. Hop and TTL show a dash until Stage 2.
+5. Two observe-only emits: `OutboundFrameReporter` before its filter and `NativeInboundPipeline` after decode.
 6. Release unlock: `resqmesh.devPin` in gitignored `local.properties` becomes a salted SHA-256 hash in `BuildConfig`; the plain PIN never ships. Debug falls back to `0000`. With no PIN in release, developer mode is unavailable and a stored flag is ignored.
 
-### Stage 2: hop and drop data (pending)
+### Stage 2: hop and drop data (built, local checks only)
 
 Route fields at the emits, drop reasons at dispatcher and pipeline returns, emits at broadcast and raw-send rejections and at outbound delivery failure and expiry, piece progress through a `trace` lambda on `ReliableMeshTransfers`, voice errors from `MediaHelper` and transfer failures, a defaulted transport parameter, and the finished timeline.
 
