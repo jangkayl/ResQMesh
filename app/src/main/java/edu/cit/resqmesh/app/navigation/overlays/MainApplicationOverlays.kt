@@ -9,10 +9,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.unit.dp
-import edu.cit.resqmesh.core.ui.components.debug.DebugTerminal
+import edu.cit.resqmesh.core.logging.AppLogger
+import edu.cit.resqmesh.feature.devtools.model.DevToolsTab
+import edu.cit.resqmesh.feature.devtools.ui.DevToolsScreen
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.material3.ExperimentalMaterial3Api
 
+@Suppress("LongParameterList")
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 internal fun BoxScope.MainApplicationOverlays(
@@ -22,17 +25,23 @@ internal fun BoxScope.MainApplicationOverlays(
     hasOwnSos: Boolean,
     isSOSActive: Boolean,
     publicSendSnackbar: androidx.compose.material3.SnackbarHostState,
-    onToggleTerminal: () -> Unit
+    devToolsTab: DevToolsTab?,
+    openDevTools: (DevToolsTab) -> Unit,
+    closeDevTools: () -> Unit
 ) {
-    if (isDeveloperMode && !hasIncomingSos && !hasMapAlert && !hasOwnSos && !isSOSActive) {
+    val devToolsAvailable = isDeveloperMode && !hasIncomingSos && !hasMapAlert && !hasOwnSos && !isSOSActive
+    val unseenErrors by AppLogger.errorCount.collectAsState()
+    // Leaving the available state (e.g. an SOS) closes the console so it does not reappear afterwards.
+    LaunchedEffect(devToolsAvailable) { if (!devToolsAvailable) closeDevTools() }
+    if (devToolsAvailable) {
         FloatingDeveloperBadge(
             modifier = Modifier
                 .align(Alignment.TopEnd)
                 .statusBarsPadding()
                 .padding(top = 8.dp, end = 12.dp),
-            onClick = {
-                onToggleTerminal()
-            }
+            showErrorDot = unseenErrors > 0,
+            onClick = { openDevTools(DevToolsTab.OVERVIEW) },
+            onLongClick = { openDevTools(DevToolsTab.ERRORS) }
         )
     }
 
@@ -41,5 +50,7 @@ internal fun BoxScope.MainApplicationOverlays(
         modifier = Modifier.align(Alignment.BottomCenter).padding(horizontal = 16.dp, vertical = 88.dp)
     )
 
-    DebugTerminal()
+    if (devToolsAvailable && devToolsTab != null) {
+        DevToolsScreen(initialTab = devToolsTab, onClose = closeDevTools)
+    }
 }

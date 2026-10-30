@@ -275,7 +275,6 @@ internal class BleTransportSessionController(
         val retiringLinks = store.links.snapshot()
         val endpoints = (store.activeConnections.keys + store.activeServerConnections.keys + store.connectedEndpointIds +
             retiringLinks.map { it.endpoint }).toSet()
-        AppLogger.clearLinks()
         radioController.stop()
 
         store.links.clear()

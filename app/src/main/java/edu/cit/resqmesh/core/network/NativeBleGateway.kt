@@ -79,4 +79,5 @@ class NativeBleGateway(private val manager: NativeBleManager) : MeshNetworkGatew
         manager.forceConnectToDevice(endpointId, endpointName)
     override fun rescan() = manager.rescan()
     override fun reconcileTransport() = manager.reconcileTransport()
+    override fun linkDiagnostics() = manager.linkDiagnostics()
 }

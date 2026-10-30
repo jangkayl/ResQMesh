@@ -95,7 +95,6 @@ class GattClientManager(
         val radioOwner = "client:${link.endpoint}:${link.generation}"
         beginRadioHandshake(radioOwner)
         AppLogger.d("BLE_MESH", "Link ${link.generation} CLIENT $macAddress ${link.peerNodeId ?: "unknown"}: CONNECTING")
-        AppLogger.updateLink(macAddress, peerName, "CLIENT", link.generation, "CONNECTING")
 
         val attempt = GattClientAttempt(manager, macAddress, peerName, epoch, link,
             payloadSetup, stablePeerId, useExplicitLeTransport, radioOwner,
@@ -118,7 +117,7 @@ class GattClientManager(
                 device.connectGatt(context, false, callback)
             }
         } catch (e: Exception) {
-            AppLogger.d("BLE_MESH", "Exception in connectGatt: ${e.message}")
+            AppLogger.d("BLE_MESH", "Exception in connectGatt: ${e.javaClass.simpleName}")
             attempt.finishConnectPhase("connectGatt threw")
             store.links.forget(link)
             return BleConnectStartResult.REJECTED

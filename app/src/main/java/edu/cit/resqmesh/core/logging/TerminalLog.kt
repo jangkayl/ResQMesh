@@ -54,15 +54,6 @@ data class TerminalLogEntry(
     }
 }
 
-data class TerminalLinkSnapshot(
-    val endpoint: String,
-    val peerName: String,
-    val role: String,
-    val generation: Long,
-    val state: String,
-    val transport: String = "GATT"
-)
-
 /**
  * Temporary compatibility mapping for existing log sites. New network diagnostics should call
  * [AppLogger.event] with an explicit category instead of relying on these message keywords.

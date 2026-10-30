@@ -44,7 +44,7 @@ internal class GattL2capAcceptor(
                             }
                         } catch (e: Exception) {
                             if (store.isNodeActive.get()) {
-                                AppLogger.d("BLE_MESH", "L2CAP Accept Thread error: ${e.message}")
+                                AppLogger.d("BLE_MESH", "L2CAP Accept Thread error: ${e.javaClass.simpleName}")
                             }
                             break
                         }
@@ -52,7 +52,7 @@ internal class GattL2capAcceptor(
                 }
                 l2capAcceptThread?.start()
             } catch (e: Exception) {
-                AppLogger.d("BLE_MESH", "Failed to start L2CAP server: ${e.message}")
+                AppLogger.d("BLE_MESH", "Failed to start L2CAP server: ${e.javaClass.simpleName}")
             }
         } else {
             AppLogger.d("BLE_MESH", "L2CAP CoC not supported on this Android version. Falling back to GATT exclusively.")

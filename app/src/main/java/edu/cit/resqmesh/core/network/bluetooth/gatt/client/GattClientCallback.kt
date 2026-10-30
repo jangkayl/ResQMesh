@@ -61,7 +61,6 @@ internal class GattClientCallback(
                 if (status == BluetoothGatt.GATT_SUCCESS) {
                     if (!store.links.transition(link, BleLinkState.CONFIGURING)) return
                     AppLogger.d("BLE_MESH", "Link ${link.generation} CLIENT $macAddress: CONFIGURING serviceStatus=$status")
-                    AppLogger.updateLink(macAddress, peerName, "CLIENT", link.generation, "CONFIGURING")
                     AppLogger.d("BLE_MESH", "GATT Services discovered for ${macAddress}. Ready to transmit.")
 
                     val service = gatt.getService(SERVICE_UUID)
@@ -136,7 +135,6 @@ internal class GattClientCallback(
                 if (status == BluetoothGatt.GATT_SUCCESS) {
                     if (!store.links.transition(link, BleLinkState.READY)) return
                     AppLogger.d("BLE_MESH", "Link ${link.generation} CLIENT $macAddress: READY descriptorStatus=$status")
-                    AppLogger.updateLink(macAddress, peerName, "CLIENT", link.generation, "READY")
                     AppLogger.d("BLE_MESH", "GATT descriptor written successfully for ${macAddress}.")
                     handler.post {
                         if (!isTransportGenerationCurrent(epoch)) return@post

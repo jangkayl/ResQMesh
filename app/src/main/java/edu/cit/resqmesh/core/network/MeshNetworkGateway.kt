@@ -90,4 +90,7 @@ interface MeshNetworkGateway {
     fun forceConnectToDevice(endpointId: String, endpointName: String)
     fun rescan()
     fun reconcileTransport() {}
+
+    /** Read-only snapshot of live links for the developer console. */
+    fun linkDiagnostics(): List<LinkDiagnostic> = emptyList()
 }

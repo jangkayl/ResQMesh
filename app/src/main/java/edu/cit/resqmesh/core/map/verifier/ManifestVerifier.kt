@@ -45,7 +45,7 @@ class Ed25519SignatureVerifier : SignatureVerifier {
             sig.update(data)
             sig.verify(signature)
         } catch (e: Exception) {
-            AppLogger.d("ManifestVerifier", "Ed25519 signature verification failed: ${e.message}")
+            AppLogger.d("ManifestVerifier", "Ed25519 signature verification failed: ${e.javaClass.simpleName}")
             false
         }
     }
@@ -66,7 +66,7 @@ class EcdsaSignatureVerifier : SignatureVerifier {
             sig.update(data)
             sig.verify(signature)
         } catch (e: Exception) {
-            AppLogger.d("ManifestVerifier", "ECDSA signature verification failed: ${e.message}")
+            AppLogger.d("ManifestVerifier", "ECDSA signature verification failed: ${e.javaClass.simpleName}")
             false
         }
     }
@@ -132,7 +132,7 @@ class ManifestVerifier(
             }
             digest.digest().joinToString("") { "%02x".format(it) }
         } catch (e: Exception) {
-            AppLogger.d("ManifestVerifier", "Failed to compute SHA-256 for file: ${e.message}")
+            AppLogger.d("ManifestVerifier", "Failed to compute SHA-256 for file: ${e.javaClass.simpleName}")
             null
         }
     }

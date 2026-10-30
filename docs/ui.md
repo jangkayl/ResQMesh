@@ -49,9 +49,9 @@ Never display debug plaintext, keys, ciphertext previews or sensitive location.
 
 Background mesh is opt-in. Home/notification distinguish Bluetooth off, permission required, starting, searching and connected. OFF clears readiness; Go offline cancels recovery.
 
-Home peer chips open matching stable-ID Network details. Blocked peers stay in Blocked Devices (Direct Link Denied), with relay messaging when a route exists. Debug terminal remains behind Debugging Mode; Settings owns offline maps.
+Home peer chips open matching stable-ID Network details. Blocked peers stay in Blocked Devices (Direct Link Denied), with relay messaging when a route exists. Settings owns offline maps.
 
-The terminal is bounded and session-only. Explicit categories are Connection, Sync, Transport, Routing, Security, System and Alerts. Summaries show endpoint/role/generation/readiness/transport; put heartbeat/relay chatter under Details. Newest first, pause follow while reading, and provide Latest/Sync jumps.
+The developer console is a memory-only tabbed screen ([plan](plans/developer-mode.md)); release hides it until seven taps on the app version, and only with a configured PIN.
 
 Screen sections live within their features; saveable state, launchers, effects and coroutine scopes stay with original owners. The map canvas owns one MapView/observer/subscription/cleanup. The [size ledger](../archive/docs-superseded-2026-10-16/handoffs/maintainability-size-inventory.md) records ownership; [validation](validation.md) records UI-02's existing navigation failures.
 

@@ -42,7 +42,6 @@ internal class GattClientConnectionEvents(
                 if (newState == BluetoothProfile.STATE_CONNECTED) {
                     if (!store.links.transition(link, BleLinkState.DISCOVERING)) return
                     AppLogger.d("BLE_MESH", "Link ${link.generation} CLIENT $macAddress: DISCOVERING radioStatus=$status")
-                    AppLogger.updateLink(macAddress, peerName, "CLIENT", link.generation, "DISCOVERING")
                     AppLogger.d("BLE_MESH", "GATT Socket locked with ${peerName}. Starting service discovery with default MTU.")
                     store.activeConnections[macAddress] = gatt
                     manager.scheduleAdvertisingUpdate()
@@ -110,7 +109,6 @@ internal class GattClientConnectionEvents(
                     }
                     store.links.transition(link, BleLinkState.DISCONNECTING)
                     AppLogger.d("BLE_MESH", "GATT Socket disconnected from ${peerName}.")
-                    AppLogger.removeLink(macAddress, "CLIENT", link.generation)
                     finishConnectPhase("disconnected")
                     store.activeConnections.remove(macAddress, gatt)
                     cleanupEndpointIfUnowned(macAddress)

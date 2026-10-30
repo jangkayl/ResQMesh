@@ -32,7 +32,7 @@ SYSTEM advertises transfer protocol 1. ReliableMeshTransfers journals MESSAGE/CO
 
 Maximum direct neighbors: three; unidentified endpoints occupy capacity separately. Admission retains 32 candidates, expires unobserved advertisements after eight seconds and reconsiders fresh candidates after isolation. A free third link can bridge unreachable clusters. Full-capacity reclamation requires idle transport, recent directed alternate paths preserving reachability, a responsive first hop, owned retirement and 60-second cooldown; otherwise defer. Connect Directly keeps block/duplicate/capacity guards.
 
-MeshRepository retains its public flows/router and initialization-time callback binding. MeshPeerCoordinator handles peer/name/topology updates; MeshOutboundDelivery owns the one mutex, conflated wake channel, worker and receipt progress. MeshInboundMessages shares that exact mutex for conversation storage. MeshBlockCoordinator owns retry jobs; MeshConversationMedia keeps channel/SOS-facing and audio coordination. Live identity/channel providers and narrow SOS reply capability retain existing policy.
+MeshRepository keeps public flows/router and initialization-time callback binding. MeshPeerCoordinator handles peer/name/topology updates, one row per peer (ConnectedPeerRows); MeshOutboundDelivery owns the one mutex, conflated wake channel, worker and receipt progress. MeshInboundMessages shares that exact mutex for conversation storage. MeshBlockCoordinator owns retry jobs; MeshConversationMedia keeps channel/SOS-facing and audio coordination. Identity/channel providers and SOS reply capability keep policy.
 
 ## Identity, routing and private delivery
 
@@ -84,4 +84,4 @@ Paths below are under `app/src/main/java/edu/cit/resqmesh/`:
 | Domain boundary | `core/model/`, `core/domain/{repository,incident,usecase}/`, `data/mapper/`, `data/repository/adapter/` |
 | Presentation | `app/navigation/`, `feature/*/{ui,viewmodel,model}/`, `core/ui/` |
 | Maps/session | `core/map/`, `core/service/` |
-| DI, audio, logging, notifications | `app/di/` (layer modules), `core/audio/`, `core/logging/`, `core/notification/`, `feature/sos/alert/` |
+| DI, audio, logging, notifications | `app/di/` (layer modules), `core/audio/`, `core/logging/{,trace/}`, `core/notification/`, `feature/sos/alert/` |
