@@ -1,6 +1,7 @@
 package edu.cit.resqmesh.feature.setup.viewmodel
 
 import android.Manifest
+import edu.cit.resqmesh.core.logging.trace.TraceGate
 import android.bluetooth.BluetoothManager
 import android.content.Context
 import android.content.pm.PackageManager
@@ -15,7 +16,9 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 import edu.cit.resqmesh.core.domain.repository.LocalUserRepository
 import edu.cit.resqmesh.core.service.MeshSessionController
@@ -56,13 +59,17 @@ class SetupViewModel(
         }
     }
 
+    private val pinLimiter = PinAttemptLimiter()
+
     fun initDeveloperMode(context: Context) {
         val prefs = context.getSharedPreferences("resqmesh_prefs", Context.MODE_PRIVATE)
         _isDeveloperModeEnabled.value = DeveloperModePolicy.isEnabled(
-            edu.cit.resqmesh.BuildConfig.DEBUG,
-            prefs.getBoolean("developer_mode_enabled", false)
+            edu.cit.resqmesh.BuildConfig.DEV_PIN_HASH,
+            prefs.getBoolean("developer_mode_enabled", false),
+            prefs.getString("developer_mode_hash", null)
         )
         _isLongRangeProfile.value = prefs.getBoolean("mesh_profile_long_range", true)
+        TraceGate.set(_isDeveloperModeEnabled.value)
     }
 
     fun setMeshProfile(context: Context, longRange: Boolean) {
@@ -73,23 +80,42 @@ class SetupViewModel(
         _isLongRangeProfile.value = longRange
     }
 
-    fun setDeveloperMode(context: Context, enabled: Boolean, pin: String? = null): Boolean {
-        if (enabled) {
-            if (!DeveloperModePolicy.acceptsPin(edu.cit.resqmesh.BuildConfig.DEBUG, pin)) return false
-            context.getSharedPreferences("resqmesh_prefs", Context.MODE_PRIVATE)
-                .edit()
-                .putBoolean("developer_mode_enabled", true)
-                .apply()
-            _isDeveloperModeEnabled.value = true
-            return true
-        } else {
-            context.getSharedPreferences("resqmesh_prefs", Context.MODE_PRIVATE)
-                .edit()
-                .putBoolean("developer_mode_enabled", false)
-                .apply()
-            _isDeveloperModeEnabled.value = false
-            return true
+    /** Seconds the PIN dialog stays locked after repeated wrong attempts; 0 when open. */
+    fun pinLockSeconds(): Int = pinLimiter.remainingLockSeconds()
+
+    /** Verifies the PIN off the main thread, then enables developer mode. */
+    suspend fun unlockDeveloperMode(context: Context, pin: String): Boolean {
+        val ok = pinLimiter.remainingLockSeconds() == 0 && withContext(Dispatchers.Default) {
+            DeveloperModePolicy.acceptsPin(
+                edu.cit.resqmesh.BuildConfig.DEV_PIN_HASH, edu.cit.resqmesh.BuildConfig.DEV_PIN_SALT, pin
+            )
         }
+        if (ok) {
+            pinLimiter.recordSuccess()
+            enableDeveloperMode(context)
+        } else {
+            pinLimiter.recordFailure()
+        }
+        return ok
+    }
+
+    private fun enableDeveloperMode(context: Context) {
+        context.getSharedPreferences("resqmesh_prefs", Context.MODE_PRIVATE)
+            .edit()
+            .putBoolean("developer_mode_enabled", true)
+            .putString("developer_mode_hash", edu.cit.resqmesh.BuildConfig.DEV_PIN_HASH)
+            .apply()
+        _isDeveloperModeEnabled.value = true
+        TraceGate.set(true)
+    }
+
+    fun disableDeveloperMode(context: Context) {
+        context.getSharedPreferences("resqmesh_prefs", Context.MODE_PRIVATE)
+            .edit()
+            .putBoolean("developer_mode_enabled", false)
+            .apply()
+        _isDeveloperModeEnabled.value = false
+        TraceGate.set(false)
     }
 
     suspend fun saveIdentity(context: Context, name: String, tag: String) {

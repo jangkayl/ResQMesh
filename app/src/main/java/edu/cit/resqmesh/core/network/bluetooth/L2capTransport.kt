@@ -179,7 +179,7 @@ class L2capTransport(
                     }
                 }
             } catch (error: Exception) {
-                AppLogger.d("BLE_MESH", "L2CAP stream disconnected for $endpoint: ${error.message}")
+                AppLogger.d("BLE_MESH", "L2CAP stream disconnected for $endpoint: ${error.javaClass.simpleName}")
             } finally {
                 gate.close()
                 readerDone.set(true)

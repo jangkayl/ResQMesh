@@ -141,7 +141,7 @@ object MapStyleValidator {
         val content = try {
             styleFile.readText()
         } catch (e: Exception) {
-            AppLogger.d("MapStyleValidator", "Failed to read style for runtime resolution: ${e.message}")
+            AppLogger.d("MapStyleValidator", "Failed to read style for runtime resolution: ${e.javaClass.simpleName}")
             return ""
         }
 
@@ -189,7 +189,7 @@ object MapStyleValidator {
 
             root.toString()
         } catch (e: Exception) {
-            AppLogger.d("MapStyleValidator", "JSON manipulation failed, returning raw text: ${e.message}")
+            AppLogger.d("MapStyleValidator", "JSON manipulation failed, returning raw text: ${e.javaClass.simpleName}")
             content
         }
     }

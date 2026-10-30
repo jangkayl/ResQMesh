@@ -143,7 +143,10 @@ internal class GattServerLinkEvents(
                                     AppLogger.d("BLE_MESH", "Link ${link.generation} SERVER $macAddress: CCCD setup timed out; closing unfinished link")
                                     finishRadioHandshake(radioOwner, "server setup timeout")
                                     try { gattServer?.cancelConnection(device) } catch (e: SecurityException) {
-                                        AppLogger.d("BLE_MESH", "Server setup timeout disconnect failed on $macAddress: ${e.message}")
+                                        AppLogger.d(
+                                            "BLE_MESH",
+                                            "Setup-timeout disconnect failed on $macAddress: ${e.javaClass.simpleName}"
+                                        )
                                     }
                                 }
                             }

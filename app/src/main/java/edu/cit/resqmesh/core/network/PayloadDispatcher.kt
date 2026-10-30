@@ -120,7 +120,7 @@ class PayloadDispatcher(
             AppLogger.event(
                 category = TerminalLogCategory.SYSTEM,
                 event = "PAYLOAD_PARSE_FAILED",
-                message = "Could not parse incoming payload: ${e.message}",
+                message = "Could not parse incoming payload: ${e.javaClass.simpleName}",
                 level = TerminalLogLevel.ERROR,
                 tag = "PAYLOAD_DISPATCHER",
                 endpoint = endpointId

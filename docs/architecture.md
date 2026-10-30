@@ -84,4 +84,4 @@ Paths below are under `app/src/main/java/edu/cit/resqmesh/`:
 | Domain boundary | `core/model/`, `core/domain/{repository,incident,usecase}/`, `data/mapper/`, `data/repository/adapter/` |
 | Presentation | `app/navigation/`, `feature/*/{ui,viewmodel,model}/`, `core/ui/` |
 | Maps/session | `core/map/`, `core/service/` |
-| DI, audio, logging, notifications | `app/di/` (layer modules), `core/audio/`, `core/logging/`, `core/notification/`, `feature/sos/alert/` |
+| DI, audio, logging, notifications | `app/di/` (layer modules), `core/audio/`, `core/logging/{,trace/}`, `core/notification/`, `feature/sos/alert/` |

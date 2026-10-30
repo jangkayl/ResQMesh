@@ -25,6 +25,7 @@ import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.Map
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import edu.cit.resqmesh.feature.setup.viewmodel.DeveloperModePolicy
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -44,6 +45,9 @@ import edu.cit.resqmesh.core.ui.theme.Spacing
 import edu.cit.resqmesh.feature.setup.viewmodel.SetupViewModel
 import edu.cit.resqmesh.feature.setup.viewmodel.MeshStartError
 import kotlinx.coroutines.launch
+
+private const val DEV_REVEAL_TAPS = 7
+private const val MAX_PIN_LENGTH = 64
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -71,6 +75,11 @@ fun ProfileScreen(
     var showPinDialog by remember { mutableStateOf(false) }
     var showPrivacyDialog by remember { mutableStateOf(false) }
     var pinInput by remember { mutableStateOf("") }
+    var verifyingPin by remember { mutableStateOf(false) }
+    var versionTaps by remember { mutableIntStateOf(0) }
+    val devToolsConfigured = DeveloperModePolicy.isConfigured(edu.cit.resqmesh.BuildConfig.DEV_PIN_HASH)
+    val showDevTools = devToolsConfigured &&
+        (edu.cit.resqmesh.BuildConfig.DEBUG || isDeveloperMode || versionTaps >= DEV_REVEAL_TAPS)
     var pinError by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(Unit) {
@@ -361,6 +370,13 @@ fun ProfileScreen(
                 DividerLine()
                 SettingRow(
                     icon = Icons.Default.Info,
+                    title = "App version",
+                    subtitle = edu.cit.resqmesh.BuildConfig.VERSION_NAME,
+                    onClick = { if (devToolsConfigured) versionTaps++ }
+                )
+                DividerLine()
+                SettingRow(
+                    icon = Icons.Default.Info,
                     title = "About ResQMesh",
                     subtitle = "Decentralized mesh architecture & technical specs",
                     onClick = onAbout
@@ -369,8 +385,8 @@ fun ProfileScreen(
         }
 
         // Section 4: Developer Mode (Conditional / PIN gated)
-        if (edu.cit.resqmesh.BuildConfig.DEBUG) item { SettingsLabel("DEVELOPER TOOLS") }
-        if (edu.cit.resqmesh.BuildConfig.DEBUG) item {
+        if (showDevTools) item { SettingsLabel("DEVELOPER TOOLS") }
+        if (showDevTools) item {
             SettingsCard {
                 SettingRow(
                     icon = Icons.Default.Terminal,
@@ -378,7 +394,7 @@ fun ProfileScreen(
                     subtitle = if (isDeveloperMode) "Active" else "Locked (requires PIN)",
                     onClick = {
                         if (isDeveloperMode) {
-                            viewModel.setDeveloperMode(context, false)
+                            viewModel.disableDeveloperMode(context)
                         } else {
                             pinInput = ""
                             pinError = null
@@ -394,7 +410,7 @@ fun ProfileScreen(
                                     pinError = null
                                     showPinDialog = true
                                 } else {
-                                    viewModel.setDeveloperMode(context, false)
+                                    viewModel.disableDeveloperMode(context)
                                 }
                             }
                         )
@@ -437,7 +453,7 @@ fun ProfileScreen(
             text = {
                 Column {
                     Text(
-                        "Enter the 4-digit PIN to enable developer debugging tools and the floating diagnostic overlay.",
+                        "Enter the developer PIN to enable the developer console.",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -445,7 +461,7 @@ fun ProfileScreen(
                     OutlinedTextField(
                         value = pinInput,
                         onValueChange = { input ->
-                            if (input.length <= 4 && input.all { it.isDigit() }) {
+                            if (input.length <= MAX_PIN_LENGTH) {
                                 pinInput = input
                                 pinError = null
                             }
@@ -456,7 +472,7 @@ fun ProfileScreen(
                         supportingText = pinError?.let { { Text(it, color = MaterialTheme.colorScheme.error) } },
                         visualTransformation = PasswordVisualTransformation(),
                         keyboardOptions = KeyboardOptions(
-                            keyboardType = KeyboardType.NumberPassword
+                            keyboardType = KeyboardType.Password
                         ),
                         modifier = Modifier.fillMaxWidth()
                     )
@@ -464,16 +480,26 @@ fun ProfileScreen(
             },
             confirmButton = {
                 Button(
+                    enabled = !verifyingPin,
                     onClick = {
-                        val success = viewModel.setDeveloperMode(context, true, pinInput)
-                        if (success) {
-                            showPinDialog = false
-                        } else {
-                            pinError = "Incorrect PIN. Access denied."
+                        verifyingPin = true
+                        scope.launch {
+                            val success = viewModel.unlockDeveloperMode(context, pinInput)
+                            verifyingPin = false
+                            if (success) {
+                                showPinDialog = false
+                            } else {
+                                val locked = viewModel.pinLockSeconds()
+                                pinError = if (locked > 0) {
+                                    "Too many attempts. Try again in $locked s."
+                                } else {
+                                    "Incorrect PIN. Access denied."
+                                }
+                            }
                         }
                     }
                 ) {
-                    Text("Unlock")
+                    Text(if (verifyingPin) "Checking…" else "Unlock")
                 }
             },
             dismissButton = {

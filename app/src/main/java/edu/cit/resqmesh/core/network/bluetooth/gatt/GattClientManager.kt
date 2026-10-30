@@ -118,7 +118,7 @@ class GattClientManager(
                 device.connectGatt(context, false, callback)
             }
         } catch (e: Exception) {
-            AppLogger.d("BLE_MESH", "Exception in connectGatt: ${e.message}")
+            AppLogger.d("BLE_MESH", "Exception in connectGatt: ${e.javaClass.simpleName}")
             attempt.finishConnectPhase("connectGatt threw")
             store.links.forget(link)
             return BleConnectStartResult.REJECTED

@@ -172,7 +172,7 @@ class BleRadioController(
             staleScanThresholdMs = nextStaleScanThreshold()
         } catch (error: Exception) {
             scanActive.set(false)
-            AppLogger.d("BLE_MESH", "Scanner start failed: ${error.message}")
+            AppLogger.d("BLE_MESH", "Scanner start failed: ${error.javaClass.simpleName}")
             scheduleFailedScanRetry()
         }
     }

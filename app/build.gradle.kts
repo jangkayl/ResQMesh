@@ -1,3 +1,5 @@
+import javax.crypto.SecretKeyFactory
+import javax.crypto.spec.PBEKeySpec
 import java.util.Properties
 
 plugins {
@@ -11,6 +13,32 @@ plugins {
 val keystoreProperties = Properties().apply {
     val file = rootProject.file("keystore.properties")
     if (file.exists()) file.inputStream().use { load(it) }
+}
+
+// Optional developer-mode PIN (gitignored local.properties: resqmesh.devPin=...). Only a salted
+// PBKDF2 hash reaches BuildConfig; the salt is a fixed non-secret so builds stay reproducible.
+val devPinSalt = "resqmesh-dev-pin-v1"
+val localProperties = Properties().apply {
+    val file = rootProject.file("local.properties")
+    if (file.exists()) file.inputStream().use { load(it) }
+}
+// Must match DeveloperModePolicy.hash: PBKDF2WithHmacSHA1, 150,000 iterations, 160 bits, ASCII PIN.
+fun devPinHash(pin: String): String {
+    if (pin.isEmpty()) return ""
+    val spec = PBEKeySpec(pin.toCharArray(), devPinSalt.toByteArray(Charsets.US_ASCII), 150_000, 160)
+    return SecretKeyFactory.getInstance("PBKDF2WithHmacSHA1").generateSecret(spec).encoded
+        .joinToString("") { "%02x".format(it) }
+}
+// Same vector as DeveloperModePolicyTest, so the two derivations cannot drift.
+check(devPinHash("known-PIN-4821") == "a9a37ddec1da4994002d80be9095b41ffaa08104") { "devPinHash drifted from DeveloperModePolicy" }
+val configuredDevPin: String = localProperties.getProperty("resqmesh.devPin").orEmpty().trim()
+if (configuredDevPin.any { it.code > 127 }) {
+    throw GradleException("resqmesh.devPin in local.properties must be ASCII only")
+}
+if (configuredDevPin.isNotEmpty() && configuredDevPin.length < 8 &&
+    gradle.startParameter.taskNames.any { it.contains("release", ignoreCase = true) }
+) {
+    throw GradleException("resqmesh.devPin in local.properties must be at least 8 characters for release builds")
 }
 
 ksp {
@@ -33,6 +61,8 @@ android {
         versionCode = 2
         versionName = "1.0.1"
         buildConfigField("boolean", "BLE_L2CAP_ENABLED", "true")
+        buildConfigField("String", "DEV_PIN_SALT", "\"$devPinSalt\"")
+        buildConfigField("String", "DEV_PIN_HASH", "\"${devPinHash(configuredDevPin)}\"")
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -53,6 +83,8 @@ android {
             // Diagnostic builds can exercise native GATT fallback on modern phones.
             val enabled = providers.gradleProperty("bleL2cap").orElse("true").get().toBooleanStrict()
             buildConfigField("boolean", "BLE_L2CAP_ENABLED", enabled.toString())
+            // Debug builds fall back to 0000 so developer mode works without setup.
+            buildConfigField("String", "DEV_PIN_HASH", "\"${devPinHash(configuredDevPin.ifEmpty { "0000" })}\"")
         }
         release {
             signingConfig = signingConfigs.findByName("release")

@@ -270,6 +270,7 @@ val viewModelModule = module {
     viewModel { WalkieTalkieViewModel(useCases = get(), mediaHelper = get(), liveAudioEngine = get()) }
     viewModel { OfflineMapViewModel(storageGuard = get(), downloader = get(), connectivityProvider = get()) }
     viewModel { AboutViewModel() }
+    viewModel { edu.cit.resqmesh.feature.devtools.viewmodel.DevToolsViewModel(get()) }
     viewModel { IncidentViewModel(incidentRepository = get(), identityManager = get(), incidentBudget = get()) }
 }
 

@@ -41,13 +41,13 @@ Basic block, incident, SOS and recovery checks have user-reported successes; the
 
 **Reconnect sync fix** (`fix/incident-reconnect-sync`): bounded sync, paced creation (D29); [card](testing/incident-reconnect-sync-card.md) pending.
 
-**Batch A cleanup** (branch `refactor/batch-a-cleanup`): dead incident UI removed, two thread-safety fixes, swallowed-exception logging, debug-only Logcat and named timer constants. Local checks pass; the user reported all [smoke card](testing/batch-a-cleanup-smoke-card.md) steps working on 2026-10-16 (build, models, counts not supplied). Remaining review work: revision-plan phases P1–P6.
+**Developer console** (branch `feat/developer-console`, [plan](plans/developer-mode.md)): Stage 1 (tabs, fast logger, export, release PIN unlock) is built with local checks only and awaits the [phone card](testing/developer-mode-card.md). Stages 2 (hop and drop data) and 3 (signal and queue stats) are pending.
 
 ## Next actions
 
 Deployment target (user-confirmed 2026-10-17): capstone demo first, then a signed sideloaded pilot beta. Play Store is out of scope for now.
 
-1. **Candidate #2 (P0, done):** release `B84ACB1B…` from `42f1660` replaces the October 6 APK; [demo freeze card](testing/demo-freeze-card.md) parts 1–2 user-reported working (counts not supplied).
+1. **Developer console:** run the Stage 1 phone card, then start Stage 2. Raise removing live push-to-talk when done.
 2. **Demo freeze (P0, by about 2026-10-28):** parts 3–4 user-reported done (capture folder and miss times not supplied, so DELIVERY-01 stays unanalysed). The [limitations](demo/known-limitations.md) and [user guide](demo/user-guide.md) are drafted. After the freeze, only separately approved blocker fixes go in.
 3. **Release engineering (P0 for beta, after the demo):** revision-plan P5 subset. R8 and backup-off are local (SEC-01); a minified smoke run and CI release build remain.
 4. **Reliability and trust (P0/P1 before beta):** fix DELIVERY-01, triage UX-01/MESH-02, resolve UI-02, run SEC-01 phases B–E (these replace envelope v2 and TRUST-01 verification), then an audit.
