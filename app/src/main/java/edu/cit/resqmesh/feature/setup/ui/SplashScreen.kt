@@ -135,7 +135,7 @@ private fun SplashContent(loadingProgress: Float) {
                         color = MaterialTheme.colorScheme.onBackground
                     )
                     Text(
-                        text = "OFFLINE MESH PROTOCOL",
+                        text = "WORKS WITHOUT INTERNET",
                         style = MaterialTheme.typography.labelSmall.copy(
                             fontSize = 10.sp,
                             letterSpacing = 1.5.sp,
@@ -316,7 +316,7 @@ private fun SplashContent(loadingProgress: Float) {
                         text = when {
                             loadingProgress < 0.35f -> "STARTING BLUETOOTH LE SCAN..."
                             loadingProgress < 0.75f -> "DISCOVERING NEARBY PEERS..."
-                            else -> "PROVISIONING LOCAL MESH..."
+                            else -> "GETTING READY..."
                         },
                         style = MaterialTheme.typography.labelSmall.copy(
                             fontSize = 11.sp,

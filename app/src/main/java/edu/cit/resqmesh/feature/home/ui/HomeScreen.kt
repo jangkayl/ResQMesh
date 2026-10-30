@@ -126,7 +126,7 @@ fun HomeScreenContent(
     criticalIncidentCount: Int = 0,
     modifier: Modifier = Modifier,
     nodes: List<NodeItemData> = emptyList(),
-    connectionStatus: String = if (isNodeActive) "Searching for nearby devices" else "Mesh is offline"
+    connectionStatus: String = if (isNodeActive) "Searching for nearby devices" else "Not connected"
 ) {
     val displayNodes = if (nodes.isNotEmpty()) nodes else remember(radarState) { classifyRadarNodes(radarState) }
     Column(
