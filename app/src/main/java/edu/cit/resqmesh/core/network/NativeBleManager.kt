@@ -1,5 +1,6 @@
 package edu.cit.resqmesh.core.network
 
+import edu.cit.resqmesh.core.network.bluetooth.peers.BleLinkDiagnostics
 import edu.cit.resqmesh.core.network.bluetooth.peers.BlePeerDirectory
 import edu.cit.resqmesh.core.network.bluetooth.peers.BleLinkRetirementController
 import edu.cit.resqmesh.core.network.bluetooth.session.BleTransportResources
@@ -489,6 +490,8 @@ class NativeBleManager(
     fun hasLiveSocket(endpointId: String): Boolean = peerDirectory.hasLiveSocket(endpointId)
 
     fun hasReadyEndpoint(endpointId: String): Boolean = peerDirectory.hasReadyEndpoint(endpointId)
+
+    fun linkDiagnostics() = BleLinkDiagnostics.read(store, peerDirectory, l2capTransport)
 
     /** Retire the data socket and compatibility state only after the last GATT role ends. */
     private val linkRetirement: BleLinkRetirementController = BleLinkRetirementController(

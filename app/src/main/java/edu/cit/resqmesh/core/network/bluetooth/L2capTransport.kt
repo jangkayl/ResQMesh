@@ -33,6 +33,8 @@ class L2capTransport(
     private val socketOwners = ConcurrentHashMap<String, List<BleLink>>()
     fun isUsable(endpoint: String): Boolean = store.activeL2capSockets[endpoint]?.isConnected == true &&
         store.links.ownsSocket(endpoint, socketOwners[endpoint].orEmpty())
+    /** Read-only: true while a payload writer exists for this endpoint's L2CAP socket. */
+    fun hasWriter(endpoint: String): Boolean = writers.containsKey(endpoint)
     fun isIdle(endpoint: String): Boolean = writers[endpoint]?.isIdle() != false &&
         (inboundFrames[endpoint]?.get() ?: 0) == 0
 
@@ -99,7 +101,6 @@ class L2capTransport(
                 handler.post { if (isOwned()) onWriteFailure(endpoint, payload) }
             }
         }
-        AppLogger.updateLinkTransport(endpoint, "GATT+L2CAP")
         handler.post { if (isOwned()) onPromoteGattWork(endpoint) }
         onConnected()
         val gate = L2capInboundGate()

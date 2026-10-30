@@ -76,7 +76,7 @@ fun DevToolsScreen(initialTab: DevToolsTab, onClose: () -> Unit, viewModel: DevT
     val snapshot by viewModel.snapshot.collectAsState()
     val names by viewModel.names.collectAsState()
     val paused by viewModel.paused.collectAsState()
-    val links by AppLogger.links.collectAsState()
+    val groups by viewModel.linkGroups.collectAsState()
     val unseenErrors by AppLogger.errorCount.collectAsState()
     val snackbar = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
@@ -122,8 +122,8 @@ fun DevToolsScreen(initialTab: DevToolsTab, onClose: () -> Unit, viewModel: DevT
         ) { padding ->
             Box(Modifier.padding(padding).fillMaxSize()) {
                 when (tab) {
-                    DevToolsTab.OVERVIEW -> OverviewTab(snapshot, links, unseenErrors)
-                    DevToolsTab.LINKS -> LinksTab(links)
+                    DevToolsTab.OVERVIEW -> OverviewTab(snapshot, groups, unseenErrors)
+                    DevToolsTab.LINKS -> LinksTab(groups)
                     DevToolsTab.PACKETS -> PacketsTab(snapshot.packets, names, paused, viewModel::setPaused)
                     DevToolsTab.VOICE -> VoiceTab(snapshot.voice, names, paused)
                     DevToolsTab.ERRORS -> ErrorsTab(snapshot.errors, paused)

@@ -1,4 +1,4 @@
-# Developer console card (Stages 1 and 2)
+# Developer console card (Stages 1 and 2, Links fix)
 
 Prepared: 2026-10-31 on `feat/developer-console`. Status: local checks only; no device evidence yet. The user installs and operates the phones.
 
@@ -18,7 +18,7 @@ Stage 1 covers the console screens, fast logger, export and release unlock; Stag
 | D1 | Profile, Developer Tools, switch on, enter the debug PIN (`0000` only when `resqmesh.devPin` is absent) | Badge appears; wrong PIN is rejected with a message | Accepts a wrong PIN; no badge |
 | D2 | Tap the badge | Full-screen console with six bottom tabs; Back closes it | Missing tabs; Back does nothing |
 | D3 | From A, send public text, private text, an SOS and a voice note over 4 KiB | Packets tab shows OUT and IN cards with scope, type, bytes, transport; public destination "all" | Missing cards; wrong scope |
-| D4 | Open Links | All links listed; READY shown as "Payload READY", earlier states as radio connected or connecting | A not-ready link shown as ready |
+| D4 | Open Links | One card per peer with its live paths; READY shown as "Payload READY", earlier states as radio connected or connecting | A not-ready link shown as ready |
 | D5 | Overview | Link, error and ring counts match what you see | Counts static |
 | D6 | Cause an error (switch Bluetooth off on B) | Red dot on the badge for an ERROR entry; warnings alone give no dot | No dot; dot for warnings only |
 | D7 | Long-press the badge | Opens Errors; the dot clears | Opens another tab; dot stays |
@@ -45,6 +45,21 @@ Stage 1 covers the console screens, fast logger, export and release unlock; Stag
 | S2-8 | Open a message and read the timeline on A, B and C | Queued, sent, relayed, received, dropped with reason, and receipts, for this phone only; route step where private | Another phone events shown; missing receipts |
 | S2-9 | Export Text and CSV | New columns (hop, ttl, path_len, route_step, progress, total, drop) present as numbers or dashes; no names, no full MAC, no text | Any name or full MAC |
 
+## Links tab: live state (debug build, A and B)
+
+The Links and Overview tabs read the live link registry once a second while open; a brief connect may never appear (history stays in Logs). Use at least two phones; repeat the reconnect steps several times. A clean build is not BLE proof.
+
+| Step | Action | Expected | Failure indicator |
+| --- | --- | --- | --- |
+| L1 | Connect A and B, open Links on both | One card per peer with the real name and short ID | Duplicate card; "Unknown" |
+| L2 | Turn Bluetooth off and on at B, or restart the app on B, several times | Exactly one card for B remains, no stale rows | Old rows stay; same peer twice |
+| L3 | Manually disconnect, then block a peer | The card disappears within about 2 seconds | Card stays |
+| L4 | Walk B out of range and back | Card clears on loss and returns once on reconnect | Stale card; duplicate on return |
+| L5 | Bring in a new peer C | "Identifying…" with a short endpoint changes to the real name without reopening the console | Stays identifying; "Unknown" |
+| L6 | While two live paths to one peer exist | Both paths show under one peer card | Two peer cards |
+| L7 | Close the L2CAP channel on a peer that had GATT+L2CAP | Path returns to GATT | Stays GATT+L2CAP |
+| L8 | Compare Links with Radar | Connected peers match | Different peers |
+
 ## Release build with a configured PIN
 
 | Step | Action | Expected | Failure indicator |
@@ -60,7 +75,7 @@ Stage 1 covers the console screens, fast logger, export and release unlock; Stag
 
 ## Regression on the release build (PIN configured)
 
-Run the same A-B-C traffic (public, private, SOS, voice note over 4 KiB), including the Stage 2 steps, three times: console open, console closed with developer mode on, and developer mode off.
+Run the same A-B-C traffic (public, private, SOS, voice note over 4 KiB), including the Stage 2 and L steps, three times: console open, console closed with developer mode on, and developer mode off.
 
 Expected: delivery and timing comparable in all three, no new disconnects or crashes, and with developer mode off the badge is absent and Packets stays empty when re-enabled later.
 

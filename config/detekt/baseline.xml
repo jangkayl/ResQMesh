@@ -3176,14 +3176,15 @@
     <ID>FunctionNaming:DevToolsScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun DevToolsScreen(initialTab: DevToolsTab, onClose: () -&gt; Unit, viewModel: DevToolsViewModel = koinViewModel())</ID>
     <ID>FunctionNaming:DeveloperBadge.kt$@OptIn(ExperimentalFoundationApi::class) @Composable internal fun FloatingDeveloperBadge( modifier: Modifier = Modifier, showErrorDot: Boolean = false, onClick: () -&gt; Unit, onLongClick: (() -&gt; Unit)? = null )</ID>
     <ID>FunctionNaming:ErrorsTab.kt$@Composable internal fun ErrorsTab(errors: List&lt;TerminalLogEntry&gt;, paused: Boolean)</ID>
-    <ID>FunctionNaming:LinksTab.kt$@Composable internal fun LinksTab(links: List&lt;TerminalLinkSnapshot&gt;)</ID>
+    <ID>FunctionNaming:LinksTab.kt$@Composable internal fun LinksTab(groups: List&lt;LinkGroup&gt;)</ID>
+    <ID>FunctionNaming:LinksTab.kt$@Composable private fun PathRow(path: LinkPath)</ID>
     <ID>FunctionNaming:LiveListBox.kt$@Composable internal fun LiveListBox( state: LazyListState, newestKey: Long?, paused: Boolean, newerThan: (Long) -&gt; Int, content: @Composable BoxScope.(Modifier) -&gt; Unit )</ID>
     <ID>FunctionNaming:LogEntryList.kt$@Composable private fun LogEntryCard(e: TerminalLogEntry)</ID>
     <ID>FunctionNaming:PacketsTab.kt$@Composable private fun PacketList( rows: List&lt;TraceRow&gt;, names: Map&lt;String, String&gt;, paused: Boolean, listState: LazyListState, onSelect: (PacketTrace) -&gt; Unit )</ID>
     <ID>FunctionNaming:LogEntryList.kt$@Composable internal fun LogEntryList( entries: List&lt;TerminalLogEntry&gt;, emptyTitle: String, emptyMessage: String, paused: Boolean )</ID>
     <ID>FunctionNaming:LogsTab.kt$@Composable internal fun LogsTab(logs: List&lt;TerminalLogEntry&gt;, paused: Boolean)</ID>
     <ID>FunctionNaming:MainApplicationOverlays.kt$@Suppress("LongParameterList") @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class) @Composable internal fun BoxScope.MainApplicationOverlays( isDeveloperMode: Boolean, hasIncomingSos: Boolean, hasMapAlert: Boolean, hasOwnSos: Boolean, isSOSActive: Boolean, publicSendSnackbar: androidx.compose.material3.SnackbarHostState, devToolsTab: DevToolsTab?, openDevTools: (DevToolsTab) -&gt; Unit, closeDevTools: () -&gt; Unit )</ID>
-    <ID>FunctionNaming:OverviewTab.kt$@Composable internal fun OverviewTab(snapshot: DevToolsSnapshot, links: List&lt;TerminalLinkSnapshot&gt;, unseenErrors: Int)</ID>
+    <ID>FunctionNaming:OverviewTab.kt$@Composable internal fun OverviewTab(snapshot: DevToolsSnapshot, groups: List&lt;LinkGroup&gt;, unseenErrors: Int)</ID>
     <ID>FunctionNaming:PacketDetail.kt$@Composable internal fun PacketDetail( packet: PacketTrace, timeline: List&lt;TimelineEntry&gt;, names: Map&lt;String, String&gt;, onClose: () -&gt; Unit )</ID>
     <ID>FunctionNaming:PacketRow.kt$@Composable internal fun PacketRow(row: TraceRow, names: Map&lt;String, String&gt;, onClick: () -&gt; Unit)</ID>
     <ID>FunctionNaming:PacketsTab.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable internal fun PacketsTab( packets: List&lt;PacketTrace&gt;, names: Map&lt;String, String&gt;, paused: Boolean, onPausedChange: (Boolean) -&gt; Unit )</ID>

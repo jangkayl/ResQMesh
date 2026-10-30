@@ -12,12 +12,15 @@ import edu.cit.resqmesh.core.logging.trace.TraceGate
 import edu.cit.resqmesh.core.logging.trace.TraceStore
 import edu.cit.resqmesh.core.logging.trace.shortId
 import edu.cit.resqmesh.feature.devtools.export.TraceExporter
+import edu.cit.resqmesh.feature.devtools.model.LinkGroup
+import edu.cit.resqmesh.feature.devtools.model.LinkGrouper
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
@@ -32,7 +35,7 @@ data class DevToolsSnapshot(
     val logs: List<TerminalLogEntry> = emptyList()
 )
 
-class DevToolsViewModel(useCases: MeshUseCases) : ViewModel() {
+class DevToolsViewModel(private val useCases: MeshUseCases) : ViewModel() {
     private val _paused = MutableStateFlow(false)
     val paused: StateFlow<Boolean> = _paused.asStateFlow()
 
@@ -59,6 +62,20 @@ class DevToolsViewModel(useCases: MeshUseCases) : ViewModel() {
         }
     }.flowOn(Dispatchers.Default)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), DevToolsSnapshot())
+
+    /**
+     * Live BLE links grouped by peer, read from the link registry about once per [LINKS_POLL_MS] while
+     * someone collects (it stops [STOP_TIMEOUT_MS] after the last collector leaves), off the main
+     * thread, and published only when the result changed. Nothing is stored in a shadow table.
+     */
+    val linkGroups: StateFlow<List<LinkGroup>> = flow {
+        while (true) {
+            emit(LinkGrouper.group(useCases.linkDiagnostics(), useCases.observePeerNames().value))
+            delay(LINKS_POLL_MS)
+        }
+    }.distinctUntilChanged()
+        .flowOn(Dispatchers.Default)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), emptyList())
 
     /** UI-only short node ID to display name. It is never passed to [TraceExporter]. */
     val names: StateFlow<Map<String, String>> = useCases.observeConnectedDevices()
@@ -104,6 +121,7 @@ class DevToolsViewModel(useCases: MeshUseCases) : ViewModel() {
 
     private companion object {
         const val POLL_MS = 250L
+        const val LINKS_POLL_MS = 1_000L
         const val GATE_OFF = -2L
         const val STOP_TIMEOUT_MS = 5_000L
     }

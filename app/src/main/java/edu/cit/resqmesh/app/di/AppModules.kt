@@ -228,7 +228,8 @@ val domainModule = module {
             observePublicMessages = ObservePublicMessagesUseCase(get()),
             observePrivateMessages = ObservePrivateMessagesUseCase(get()),
             observePeerNames = ObservePeerNamesUseCase(get()),
-            observeBlockedDeviceNames = ObserveBlockedDeviceNamesUseCase(get())
+            observeBlockedDeviceNames = ObserveBlockedDeviceNamesUseCase(get()),
+            linkDiagnostics = LinkDiagnosticsUseCase(get())
         )
     }
     single { RaiseSosUseCase(get(), get()) }

@@ -32,10 +32,11 @@ The console only observes mesh behavior; traces stay in memory and exports hold 
 ## Design
 
 - `core/logging/trace/` (no Android imports): `TraceGate`, `TraceRing`, `PacketTrace`, `TraceStore`, `TraceEnums`.
-- `feature/devtools/`: `DevToolsViewModel`, `TraceCollapser`, `TraceFilter`, `LogSanitizer`, `TraceExporter` and one UI file per tab plus `PacketRow` and `PacketDetail`.
+- `feature/devtools/`: `DevToolsViewModel`, `LinkGrouper`, `TraceCollapser`, `TraceFilter`, `LogSanitizer`, `TraceExporter` and one UI file per tab plus `PacketRow` and `PacketDetail`.
 - Lock-free rings by stream so heartbeats cannot evict errors: DATA 2000, CONTROL 1000, ERRORS 500, LOGS 1000, VOICE 300.
 - Emits store small typed events with no string formatting on hot paths. Timestamp formatting and MAC redaction happen at read time.
 - The ViewModel snapshots every 250 ms off the main thread only while the screen is subscribed, and skips when nothing changed. Pause freezes the published copy.
+- Links and Overview read live state, not a log-fed copy. `LinkDiagnostic` is built from `BleLinkRegistry` by `BleLinkDiagnostics` (read-only; `L2capTransport.hasWriter` gives GATT or GATT+L2CAP) and exposed through `MeshNetworkGateway.linkDiagnostics()` and a use case. The ViewModel polls about once a second only while collected, off the main thread, and publishes only changed results. `LinkGrouper` groups by node ID, then a non-placeholder identity key, then endpoint; a placeholder name never groups and no row says "Unknown" (unidentified shows "Identifying…"). The old `AppLogger` link table is removed; disconnect history stays in Logs.
 - `TraceGate.enabled` is pushed in from the application and `SetupViewModel`; `core/` never imports `DeveloperModePolicy`. Off means emits return at once and the rings clear.
 - `packetKey = targetMessageId.ifBlank { id }` links receipts to their message timeline.
 - `type` is an enum with OTHER, so peer-supplied strings are never formatted.
@@ -49,7 +50,7 @@ The console only observes mesh behavior; traces stay in memory and exports hold 
 ### Stage 1: screens, fast logger, export, release unlock (built)
 
 1. Gate, rings, store, ViewModel, collapser, filters, with JVM tests.
-2. Tabs, packet row and detail. Overview shows link, error and ring counts; Links shows all links with radio CONNECTED and payload READY distinct.
+2. Tabs, packet row and detail. Overview shows link, error and ring counts; Links shows one card per peer with its live paths, with radio CONNECTED and payload READY distinct.
 3. Badge dot, long-press and `openDevTools(tab)`.
 4. Export, sanitizer and the `e.message` fixes.
 5. Two observe-only emits: `OutboundFrameReporter` before its filter and `NativeInboundPipeline` after decode.
@@ -58,6 +59,10 @@ The console only observes mesh behavior; traces stay in memory and exports hold 
 ### Stage 2: hop and drop data (built, local checks only)
 
 Route fields at the emits, drop reasons at dispatcher and pipeline returns, emits at broadcast and raw-send rejections and at outbound delivery failure and expiry, piece progress through a `trace` lambda on `ReliableMeshTransfers`, voice errors from `MediaHelper` and transfer failures, a defaulted transport parameter, and the finished timeline.
+
+### Links fix (built, local checks only)
+
+Stale, duplicate and "Unknown" rows came from a log-fed link table that missed `removeLink` calls after retirement and keyed rows by endpoint. Phone steps L1-L8 are in the [card](../testing/developer-mode-card.md).
 
 ### Stage 3: signal and queue stats (pending)
 

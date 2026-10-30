@@ -61,7 +61,6 @@ internal class GattClientAttempt(
     val connectTimeoutRunnable = Runnable {
         if (!store.links.isCurrent(link)) return@Runnable
         AppLogger.d("BLE_MESH", "GATT Connection timed out after 15s. Forcing lock release for long-distance retry.")
-        AppLogger.removeLink(macAddress, "CLIENT", link.generation)
         finishConnectPhase("connect timeout")
         store.links.transition(link, BleLinkState.DISCONNECTING)
         try { retireTimedOutGatt() } catch (e: Exception) {}

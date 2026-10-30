@@ -5,7 +5,6 @@ import edu.cit.resqmesh.BuildConfig
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.FlowCollector
-import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.delay
 import edu.cit.resqmesh.core.logging.trace.LogTrace
 import edu.cit.resqmesh.core.logging.trace.TraceGate
@@ -17,9 +16,7 @@ import java.util.Locale
 
 @Suppress("TooManyFunctions")
 object AppLogger {
-    private val lock = Any()
-
-    /** Guards only the formatted-log cache and date format, so reading logs never blocks link updates. */
+    /** Guards only the formatted-log cache and date format, so reading logs never blocks writers. */
     private val logsLock = Any()
     private const val POLL_MS = 250L
 
@@ -64,8 +61,6 @@ object AppLogger {
     /** Redacted, formatted copy of the ERRORS ring (WARN and ERROR), oldest first. */
     fun errorsSnapshot(): List<TerminalLogEntry> = synchronized(logsLock) { TraceStore.errorsSnapshot().map(::toEntry) }
 
-    private val _links = MutableStateFlow<List<TerminalLinkSnapshot>>(emptyList())
-    val links: StateFlow<List<TerminalLinkSnapshot>> = _links.asStateFlow()
     private val timeFormat = SimpleDateFormat("HH:mm:ss.SSS", Locale.getDefault())
 
     fun d(tag: String, message: String) {
@@ -128,53 +123,6 @@ object AppLogger {
         role = t.role,
         isVerbose = t.isVerbose
     )
-
-    /** Maintains the terminal's live direct-link summary without creating duplicate log rows. */
-    fun updateLink(
-        endpoint: String,
-        peerName: String?,
-        role: String,
-        generation: Long,
-        state: String,
-        transport: String = "GATT"
-    ) {
-        synchronized(lock) {
-            val keyMatches: (TerminalLinkSnapshot) -> Boolean = {
-                it.endpoint == endpoint && it.role == role && it.generation == generation
-            }
-            val updated = TerminalLinkSnapshot(
-                endpoint = endpoint,
-                peerName = peerName?.takeUnless { it.isBlank() } ?: "Unknown",
-                role = role,
-                generation = generation,
-                state = state,
-                transport = transport
-            )
-            _links.value = _links.value.filterNot(keyMatches) + updated
-        }
-    }
-
-    fun removeLink(endpoint: String, role: String, generation: Long) {
-        synchronized(lock) {
-            _links.value = _links.value.filterNot {
-                it.endpoint == endpoint && it.role == role && it.generation == generation
-            }
-        }
-    }
-
-    fun updateLinkTransport(endpoint: String, transport: String) {
-        synchronized(lock) {
-            _links.value = _links.value.map { link ->
-                if (link.endpoint == endpoint) link.copy(transport = transport) else link
-            }
-        }
-    }
-
-    fun clearLinks() {
-        synchronized(lock) {
-            _links.value = emptyList()
-        }
-    }
 
     fun clear() {
         TraceStore.clearLogs()
