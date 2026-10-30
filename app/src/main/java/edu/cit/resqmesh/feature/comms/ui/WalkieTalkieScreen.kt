@@ -405,7 +405,7 @@ fun WalkieTalkieScreen(
 
         Text(
             text = when {
-                recording -> "Release button to broadcast voice"
+                recording -> "Let go to send your voice"
                 voiceHeld > 0 -> "$voiceHeld voice note(s) held. They send as the send budget refills."
                 else -> "Push and hold to transmit voice"
             },
