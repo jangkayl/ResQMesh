@@ -2,8 +2,10 @@ package edu.cit.resqmesh.data.repository
 
 import edu.cit.resqmesh.data.repository.mesh.MeshBlockCoordinator
 import edu.cit.resqmesh.data.repository.mesh.MeshConversationMedia
+import edu.cit.resqmesh.data.repository.mesh.InboundChatPayload
 import edu.cit.resqmesh.data.repository.mesh.MeshInboundMessages
 import edu.cit.resqmesh.data.repository.mesh.MeshOutboundDelivery
+import edu.cit.resqmesh.data.repository.mesh.OutgoingContent
 import edu.cit.resqmesh.data.repository.mesh.MeshPeerCoordinator
 import edu.cit.resqmesh.data.repository.mesh.SosReplyCapability
 import edu.cit.resqmesh.core.model.ChatMessage
@@ -204,7 +206,7 @@ class MeshRepository(
 
     private fun onNetworkLiveAudioChunk(sender: String, channelId: String, chunk: ByteArray): Unit = media.onNetworkLiveAudioChunk(sender, channelId, chunk)
 
-    private fun onNetworkMessageReceived(endpointId: String, msgId: String, sender: String, text: String, isPrivate: Boolean, isSystem: Boolean, img: String?, audio: String?, lat: Double?, lng: Double?, medium: String, routePath: List<String>, channelId: String): Unit = inbound.onNetworkMessageReceived(endpointId, msgId, sender, text, isPrivate, isSystem, img, audio, lat, lng, medium, routePath, channelId)
+    private fun onNetworkMessageReceived(endpointId: String, msgId: String, sender: String, text: String, isPrivate: Boolean, isSystem: Boolean, img: String?, audio: String?, lat: Double?, lng: Double?, medium: String, routePath: List<String>, channelId: String): Unit = inbound.onNetworkMessageReceived(InboundChatPayload(endpointId, msgId, sender, text, isPrivate, isSystem, img, audio, lat, lng, medium, routePath, channelId))
 
     private fun onNetworkMessageDelivered(msgId: String, readerName: String, returnRoute: List<String>): Unit = outbound.onNetworkMessageDelivered(msgId, readerName, returnRoute)
 
@@ -285,7 +287,7 @@ class MeshRepository(
     }
 
     fun sendPublicMessage(text: String, imageBase64: String?, audioBase64: String?, locationLat: Double? = null, locationLng: Double? = null, isSOS: Boolean = false, isSOSCancel: Boolean = false,
-        conversationKind: String = "COMMUNITY", channelId: String = "", sosId: String = ""): String = outbound.sendPublicMessage(text, imageBase64, audioBase64, locationLat, locationLng, isSOS, isSOSCancel, conversationKind, channelId, sosId)
+        conversationKind: String = "COMMUNITY", channelId: String = "", sosId: String = ""): String = outbound.sendPublicMessage(OutgoingContent(text, imageBase64, audioBase64, locationLat, locationLng), isSOS, isSOSCancel, conversationKind, channelId, sosId)
 
 
 
@@ -297,7 +299,7 @@ class MeshRepository(
 
     fun rejectPendingPublicKeyChange(peerName: String): Boolean = inbound.rejectPendingPublicKeyChange(peerName)
 
-    fun sendPrivateMessage(targetName: String, text: String, imageBase64: String?, audioBase64: String?, locationLat: Double? = null, locationLng: Double? = null): Boolean = outbound.sendPrivateMessage(targetName, text, imageBase64, audioBase64, locationLat, locationLng)
+    fun sendPrivateMessage(targetName: String, text: String, imageBase64: String?, audioBase64: String?, locationLat: Double? = null, locationLng: Double? = null): Boolean = outbound.sendPrivateMessage(targetName, OutgoingContent(text, imageBase64, audioBase64, locationLat, locationLng))
 
     private fun createPeerCoordinator() = MeshPeerCoordinator(
         networkManager,

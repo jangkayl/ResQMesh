@@ -1,5 +1,6 @@
 package edu.cit.resqmesh.data.repository
 
+import edu.cit.resqmesh.data.local.entity.EventValidationStatus
 import edu.cit.resqmesh.data.local.entity.DomainEventEntity
 import edu.cit.resqmesh.data.local.entity.IncidentEntity
 import edu.cit.resqmesh.data.local.entity.IncidentOfferEntity
@@ -74,12 +75,12 @@ class IncidentSyncSnapshot(
     incidents: List<IncidentEntity>,
     offers: List<IncidentOfferEntity>,
 ) {
-    val events = history.filter { it.entityType == "INCIDENT" && it.validationStatus == "ACCEPTED" }
+    val events = history.filter { it.entityType == "INCIDENT" && it.validationStatus == EventValidationStatus.ACCEPTED }
         .sortedBy { it.eventId }
     private val incidentMap = incidents.associateBy { it.incidentId }
     // Orphans (events whose incident is unknown) never count: one unresolvable event must not block COMPLETE.
     val pending = history.count {
-        it.entityType == "INCIDENT" && !it.applied && it.validationStatus != "REJECTED" && it.entityId in incidentMap
+        it.entityType == "INCIDENT" && !it.applied && it.validationStatus != EventValidationStatus.REJECTED && it.entityId in incidentMap
     }
     private val eventGroups = events.groupBy { it.entityId }
     private val offerGroups = offers.groupBy { it.incidentId }

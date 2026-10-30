@@ -1,5 +1,7 @@
 package edu.cit.resqmesh.data.repository.incident
 
+import edu.cit.resqmesh.data.local.entity.EventValidationStatus
+import edu.cit.resqmesh.core.model.HELP_WORKFLOW_VERSION
 import edu.cit.resqmesh.core.model.EventType
 import edu.cit.resqmesh.core.model.Incident
 import edu.cit.resqmesh.data.mapper.toModel
@@ -94,7 +96,7 @@ internal class IncidentEventIngestor(
         var prior = domainEventDao.getEventById(event.eventId)
         // Invalid first arrivals cannot reserve an ID against a later authentic original, and an
         // authentic event rejected against an older projection is re-validated on every arrival.
-        if (prior?.validationStatus == "REJECTED") {
+        if (prior?.validationStatus == EventValidationStatus.REJECTED) {
             domainEventDao.deleteRejectedEvent(event.eventId)
             prior = null
         }
@@ -107,7 +109,7 @@ internal class IncidentEventIngestor(
         val stored = domainEventDao.getEventById(event.eventId)
         val result = when {
             applied || stored?.applied == true -> IncidentIngestionResult.APPLIED
-            stored != null && stored.validationStatus != "REJECTED" -> IncidentIngestionResult.DEFERRED
+            stored != null && stored.validationStatus != EventValidationStatus.REJECTED -> IncidentIngestionResult.DEFERRED
             else -> IncidentIngestionResult.REJECTED
         }
         if (result == IncidentIngestionResult.APPLIED) {
@@ -132,13 +134,13 @@ internal class IncidentEventIngestor(
 
     private suspend fun applyIncomingEventProjection(event: DomainEventEntity): Boolean {
         val existingIncident = incidentDao.getIncidentById(event.entityId)
-        if (existingIncident?.workflowVersion == 2 && event.eventType !in IncidentHelpWorkflow.TYPES &&
+        if (existingIncident?.workflowVersion == HELP_WORKFLOW_VERSION && event.eventType !in IncidentHelpWorkflow.TYPES &&
             event.eventType !in setOf(EventType.INCIDENT_RESOLVED.name, EventType.INCIDENT_CANCELLED.name)) {
             return rejectIncoming(event, "legacy action is not allowed on a helper workflow")
         }
         if (event.eventType in IncidentHelpWorkflow.TYPES ||
             (event.eventType in setOf(EventType.INCIDENT_RESOLVED.name, EventType.INCIDENT_CANCELLED.name) &&
-                existingIncident?.workflowVersion == 2)) {
+                existingIncident?.workflowVersion == HELP_WORKFLOW_VERSION)) {
             return if (rebuilding) helpWorkflow?.applyDuringReplay(event) ?: false else helpWorkflow?.apply(event) ?: false
         }
         return if (database != null) database.withTransaction { applyLegacyProjection(event) }
@@ -169,7 +171,7 @@ internal class IncidentEventIngestor(
         suspend fun rebuild() {
             suspend fun work() {
                 val original = domainEventDao.getEventsForEntity(incidentId)
-                    .filter { it.validationStatus == "ACCEPTED" }
+                    .filter { it.validationStatus == EventValidationStatus.ACCEPTED }
                 if (original.none { it.eventType == EventType.INCIDENT_CREATED.name }) return
                 incidentDao.deleteIncident(incidentId)
                 offerDao?.deleteForIncident(incidentId)

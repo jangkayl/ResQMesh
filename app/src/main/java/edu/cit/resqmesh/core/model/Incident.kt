@@ -2,6 +2,9 @@ package edu.cit.resqmesh.core.model
 
 import kotlinx.serialization.Serializable
 
+/** Incidents at this workflow version use signed reporter/helper coordination. */
+const val HELP_WORKFLOW_VERSION = 2
+
 @Serializable
 enum class IncidentState {
     OPEN,

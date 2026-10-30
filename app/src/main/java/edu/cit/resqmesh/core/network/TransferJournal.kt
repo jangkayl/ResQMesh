@@ -35,7 +35,7 @@ internal class TransferJournal(private val root: File, private val now: () -> Lo
             runCatching {
                 val file = recover(File(directory, "record"))
                 val record = ProtoBuf.decodeFromByteArray<TransferRecord>(file.readBytes())
-                require(record.size in 1..MAX_BYTES && record.id.length <= 128 && record.peer.length <= 128)
+                require(record.size in 1..MAX_BYTES && record.id.length <= MAX_KEY_FIELD_LENGTH && record.peer.length <= MAX_KEY_FIELD_LENGTH)
                 require(directory.name == key(record))
                 records[key(record)] = record
             }.onFailure { recoveryFailures++; removeDirectory(directory) }
@@ -74,7 +74,7 @@ internal class TransferJournal(private val root: File, private val now: () -> Lo
         val ordinary = pending.filterNot { it.priority }
         val lane = if (record.priority) pending.filter { it.priority } else ordinary
         val laneBytes = lane.sumOf { it.size.toLong() } + record.size
-        val laneFull = if (record.priority) laneBytes > CONTROL_BYTES else ordinary.size >= 120 || laneBytes > MAX_BYTES
+        val laneFull = if (record.priority) laneBytes > CONTROL_BYTES else ordinary.size >= MAX_ORDINARY_PENDING || laneBytes > MAX_BYTES
         return pending.size >= MAX_PENDING || laneFull
     }
 
@@ -110,10 +110,10 @@ internal class TransferJournal(private val root: File, private val now: () -> Lo
     fun applicationStored(record: TransferRecord, response: ByteArray?) = record.copy(
         applicationStored = true, response = response ?: record.response).also(::write)
     fun stored(record: TransferRecord, response: ByteArray? = null) {
-        write(record.copy(stored = true, response = response?.takeIf { it.size <= 4096 }))
+        write(record.copy(stored = true, response = response?.takeIf { it.size <= MAX_RESPONSE_BYTES }))
         directory(record).listFiles().orEmpty().filter { it.name.startsWith("p") }.forEach { it.delete() }
         // Completed markers can be evicted; the application still deduplicates logical messages.
-        records.values.filter { it.stored }.sortedBy { it.expiresAt }.dropLast(256).toList().forEach(::delete)
+        records.values.filter { it.stored }.sortedBy { it.expiresAt }.dropLast(MAX_STORED_MARKERS).toList().forEach(::delete)
     }
     fun delete(record: TransferRecord) { records.remove(key(record)); removeDirectory(directory(record)) }
     fun prune() = records.values.filter { it.expiresAt <= now() }.toList().forEach(::delete)
@@ -147,6 +147,11 @@ internal class TransferJournal(private val root: File, private val now: () -> Lo
         const val PIECE_BYTES = 1024
         const val MAX_BYTES = 2 * 1024 * 1024
         const val MAX_PENDING = 128
+        /** Keeps room in the pool for priority transfers. */
+        private const val MAX_ORDINARY_PENDING = 120
+        private const val MAX_KEY_FIELD_LENGTH = 128
+        private const val MAX_RESPONSE_BYTES = 4096
+        private const val MAX_STORED_MARKERS = 256
         const val CONTROL_BYTES = 64 * 1024
         const val PEER_SHARE_PERCENT = 25
         private const val PERCENT = 100

@@ -14,7 +14,7 @@ class RetainedFallbackQueue<T>(
     @Synchronized fun retain(endpoint: String, frames: List<T>) {
         if (frames.isEmpty()) return
         val queue = pending.getOrPut(endpoint) { ArrayDeque() }
-        frames.forEach { queue.addLast(Entry(it, now() + 24 * 60 * 60 * 1000L)) }
+        frames.forEach { queue.addLast(Entry(it, now() + RETENTION_MS)) }
         flush()
     }
 
@@ -33,7 +33,7 @@ class RetainedFallbackQueue<T>(
         }
         if (!timer && pending.isNotEmpty()) {
             timer = true
-            schedule(200L) { synchronized(this) { timer = false; flush() } }
+            schedule(FLUSH_DELAY_MS) { synchronized(this) { timer = false; flush() } }
         }
     }
 
@@ -43,3 +43,6 @@ class RetainedFallbackQueue<T>(
 
     @Synchronized fun clear() { pending.keys.toList().forEach(::retire) }
 }
+
+private const val RETENTION_MS = 24 * 60 * 60 * 1000L
+private const val FLUSH_DELAY_MS = 200L

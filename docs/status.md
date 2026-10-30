@@ -4,7 +4,7 @@ Last reviewed: 2026-10-17. Baseline: `a9a27ed` on `main` (also `origin/fix/incid
 
 ## Current objective
 
-Prepare for the capstone demo (within two weeks of 2026-10-16) and deployment readiness. Documentation consistency is done; the code/architecture review produced the [revision plan](plans/code-architecture-revision.md): behavior-neutral Phase 0 before the demo, behavior-touching phases after the freeze. UI/UX and mesh concerns are user-reported but not yet described.
+Prepare for the capstone demo (within two weeks of 2026-10-16) and deployment readiness. The code/architecture review produced the [revision plan](plans/code-architecture-revision.md): behavior-neutral Phase 0 before the demo, behavior-touching phases after the freeze. UI/UX and mesh concerns are user-reported but not yet described.
 
 ## Working by user report
 
@@ -40,6 +40,8 @@ Basic block, incident, SOS and recovery checks have user-reported successes; the
 **Location controls** (`feat/location-controls`): local checks pass; [card](testing/location-controls-card.md) pending. Incident alerts: [card](testing/incident-notifications-card.md).
 
 **Reconnect sync fix** (`fix/incident-reconnect-sync`): bounded sync, paced creation (D29); [card](testing/incident-reconnect-sync-card.md) pending.
+
+**Code smells refactor:** [card](testing/code-smells-refactor-card.md) pending.
 
 **Batch A cleanup** (branch `refactor/batch-a-cleanup`): dead incident UI removed, two thread-safety fixes, swallowed-exception logging, debug-only Logcat and named timer constants. Local checks pass; the user reported all [smoke card](testing/batch-a-cleanup-smoke-card.md) steps working on 2026-10-16 (build, models, counts not supplied). Remaining review work: revision-plan phases P1–P6.
 

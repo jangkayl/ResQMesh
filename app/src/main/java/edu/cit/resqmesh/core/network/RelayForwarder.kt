@@ -8,7 +8,7 @@ class RelayForwarder(
     private val endpointForNode: (String) -> String?,
     private val dispatch: (String, ByteArray, Boolean) -> TransportDispatchResult,
     private val schedule: (Long, () -> Unit) -> Unit,
-    private val now: () -> Long = { System.nanoTime() / 1_000_000L },
+    private val now: () -> Long = { System.nanoTime() / NANOS_PER_MILLI },
     private val log: (String) -> Unit = {}
 ) {
     private data class Key(val transmission: String, val node: String)
@@ -34,9 +34,9 @@ class RelayForwarder(
             return result
         }
         val at = now()
-        pending[key] = Work(bytes, priority, at + 10_000L).also {
+        pending[key] = Work(bytes, priority, at + WORK_DEADLINE_MS).also {
             it.lastAttemptAt = at
-            it.nextAt = at + 250L
+            it.nextAt = at + FIRST_RETRY_MS
         }
         log("RELAY_RETAINED transmission=$id nextHop=${key.node} reason=$result")
         arm()
@@ -53,7 +53,7 @@ class RelayForwarder(
 
     @Synchronized fun wake() {
         val at = now()
-        pending.values.forEach { it.nextAt = minOf(it.nextAt, maxOf(at, it.lastAttemptAt + 100L)) }
+        pending.values.forEach { it.nextAt = minOf(it.nextAt, maxOf(at, it.lastAttemptAt + MIN_ATTEMPT_SPACING_MS)) }
         arm()
     }
 
@@ -72,7 +72,7 @@ class RelayForwarder(
                 work.lastAttemptAt = at
                 log("RELAY_RETRY transmission=${key.transmission} nextHop=${key.node} attempt=${work.attempts} result=$result")
                 if (!retryable(result)) iterator.remove()
-                else work.nextAt = at + (250L shl (work.attempts - 1).coerceAtMost(3)).coerceAtMost(2_000L)
+                else work.nextAt = at + (FIRST_RETRY_MS shl (work.attempts - 1).coerceAtMost(MAX_BACKOFF_DOUBLINGS)).coerceAtMost(MAX_RETRY_MS)
             }
         }
         arm()
@@ -100,3 +100,10 @@ class RelayForwarder(
         timerToken++
     }
 }
+
+private const val NANOS_PER_MILLI = 1_000_000L
+private const val WORK_DEADLINE_MS = 10_000L
+private const val FIRST_RETRY_MS = 250L
+private const val MIN_ATTEMPT_SPACING_MS = 100L
+private const val MAX_RETRY_MS = 2_000L
+private const val MAX_BACKOFF_DOUBLINGS = 3

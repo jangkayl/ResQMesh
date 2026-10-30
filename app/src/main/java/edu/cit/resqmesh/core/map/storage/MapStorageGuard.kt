@@ -37,6 +37,8 @@ class MapStorageGuard(
         const val DEFAULT_SAFETY_BUFFER_BYTES = 50L * 1024 * 1024 // 50 MB safety margin
     }
 
+    private fun packageDirectory(version: Int) = File(packagesDir, "cebu-v$version")
+
     /**
      * Checks if storage has sufficient bytes for downloading and extracting the package.
      */
@@ -107,7 +109,7 @@ class MapStorageGuard(
         return try {
             val manifestJson = activePointerFile.readText()
             val manifest = MapPackageManifest.fromJson(manifestJson)
-            val packageDir = File(packagesDir, "cebu-v${manifest.version}")
+            val packageDir = packageDirectory(manifest.version)
             val pmtilesFile = File(packageDir, PMTILES_FILENAME)
             val styleFile = File(packageDir, STYLE_FILENAME)
 
@@ -133,7 +135,7 @@ class MapStorageGuard(
      * Returns the validated directory, or null if extraction/validation fails.
      */
     fun extractPackageZip(zipInputStream: InputStream, version: Int): File? {
-        val targetDir = File(packagesDir, "cebu-v$version")
+        val targetDir = packageDirectory(version)
         val tempExtractDir = File(packagesDir, "cebu-v$version.tmp")
 
         try {
@@ -142,65 +144,76 @@ class MapStorageGuard(
             }
             tempExtractDir.mkdirs()
 
-            ZipInputStream(zipInputStream).use { zis ->
-                var entry = zis.nextEntry
-                while (entry != null) {
-                    val entryFile = File(tempExtractDir, entry.name)
-                    // Guard against Zip Slip vulnerability
-                    if (!entryFile.canonicalPath.startsWith(tempExtractDir.canonicalPath)) {
-                        throw SecurityException("Zip entry attempted path traversal: ${entry.name}")
-                    }
-
-                    if (entry.isDirectory) {
-                        entryFile.mkdirs()
-                    } else {
-                        entryFile.parentFile?.mkdirs()
-                        FileOutputStream(entryFile).use { fos ->
-                            zis.copyTo(fos)
-                        }
-                    }
-                    zis.closeEntry()
-                    entry = zis.nextEntry
-                }
-            }
-
-            val pmtilesFile = File(tempExtractDir, PMTILES_FILENAME)
-            val styleFile = File(tempExtractDir, STYLE_FILENAME)
-            if (!pmtilesFile.exists() || !styleFile.exists()) {
-                AppLogger.d(
-                    "MapStorageGuard",
-                    "Extracted package missing required assets: pmtiles=${pmtilesFile.exists()}, style=${styleFile.exists()}"
-                )
+            unpackZip(zipInputStream, tempExtractDir)
+            if (!hasValidAssets(tempExtractDir)) {
                 tempExtractDir.deleteRecursively()
                 return null
             }
-
-            // Validate style for zero-network policy and local dependency integrity
-            val styleValidation = MapStyleValidator.validate(tempExtractDir, styleFile)
-            if (styleValidation is MapStyleValidator.ValidationResult.Invalid) {
-                AppLogger.d(
-                    "MapStorageGuard",
-                    "Extracted package style validation failed: ${styleValidation.reason}"
-                )
-                tempExtractDir.deleteRecursively()
-                return null
-            }
-
-            // Replace destination directory
-            if (targetDir.exists()) {
-                targetDir.deleteRecursively()
-            }
-            if (!tempExtractDir.renameTo(targetDir)) {
-                // Fallback copy if atomic rename fails across boundaries
-                tempExtractDir.copyRecursively(targetDir, overwrite = true)
-                tempExtractDir.deleteRecursively()
-            }
+            replaceDirectory(targetDir, tempExtractDir)
 
             return targetDir
         } catch (e: Exception) {
             AppLogger.d("MapStorageGuard", "Failed to extract package zip: ${e.message}")
             tempExtractDir.deleteRecursively()
             return null
+        }
+    }
+
+    private fun unpackZip(zipInputStream: InputStream, destinationDir: File) {
+        ZipInputStream(zipInputStream).use { zis ->
+            var entry = zis.nextEntry
+            while (entry != null) {
+                val entryFile = File(destinationDir, entry.name)
+                // Guard against Zip Slip vulnerability
+                if (!entryFile.canonicalPath.startsWith(destinationDir.canonicalPath)) {
+                    throw SecurityException("Zip entry attempted path traversal: ${entry.name}")
+                }
+
+                if (entry.isDirectory) {
+                    entryFile.mkdirs()
+                } else {
+                    entryFile.parentFile?.mkdirs()
+                    FileOutputStream(entryFile).use { fos ->
+                        zis.copyTo(fos)
+                    }
+                }
+                zis.closeEntry()
+                entry = zis.nextEntry
+            }
+        }
+    }
+
+    private fun hasValidAssets(extractedDir: File): Boolean {
+        val pmtilesFile = File(extractedDir, PMTILES_FILENAME)
+        val styleFile = File(extractedDir, STYLE_FILENAME)
+        if (!pmtilesFile.exists() || !styleFile.exists()) {
+            AppLogger.d(
+                "MapStorageGuard",
+                "Extracted package missing required assets: pmtiles=${pmtilesFile.exists()}, style=${styleFile.exists()}"
+            )
+            return false
+        }
+
+        // Validate style for zero-network policy and local dependency integrity
+        val styleValidation = MapStyleValidator.validate(extractedDir, styleFile)
+        if (styleValidation is MapStyleValidator.ValidationResult.Invalid) {
+            AppLogger.d(
+                "MapStorageGuard",
+                "Extracted package style validation failed: ${styleValidation.reason}"
+            )
+            return false
+        }
+        return true
+    }
+
+    private fun replaceDirectory(targetDir: File, sourceDir: File) {
+        if (targetDir.exists()) {
+            targetDir.deleteRecursively()
+        }
+        if (!sourceDir.renameTo(targetDir)) {
+            // Fallback copy if atomic rename fails across boundaries
+            sourceDir.copyRecursively(targetDir, overwrite = true)
+            sourceDir.deleteRecursively()
         }
     }
 
@@ -212,16 +225,13 @@ class MapStorageGuard(
         val tempPointerFile = File(baseDir, "active_package.json.tmp")
         return try {
             tempPointerFile.writeText(manifest.toJson())
-            if (tempPointerFile.renameTo(activePointerFile)) {
-                // Clean up any older versions
-                pruneOldPackages(retainedVersion = manifest.version)
-                true
-            } else {
+            if (!tempPointerFile.renameTo(activePointerFile)) {
                 tempPointerFile.copyTo(activePointerFile, overwrite = true)
                 tempPointerFile.delete()
-                pruneOldPackages(retainedVersion = manifest.version)
-                true
             }
+            // Clean up any older versions
+            pruneOldPackages(retainedVersion = manifest.version)
+            true
         } catch (e: Exception) {
             AppLogger.d("MapStorageGuard", "Failed to activate package atomically: ${e.message}")
             tempPointerFile.delete()
@@ -235,12 +245,28 @@ class MapStorageGuard(
     private fun pruneOldPackages(retainedVersion: Int) {
         try {
             packagesDir.listFiles()?.forEach { file ->
-                if (file.isDirectory && file.name != "cebu-v$retainedVersion") {
+                if (file.isDirectory && file.name != packageDirectory(retainedVersion).name) {
                     file.deleteRecursively()
                 }
             }
         } catch (e: Exception) {
             AppLogger.d("MapStorageGuard", "Failed to prune old packages: ${e.message}")
+        }
+    }
+
+    private fun readActiveManifestOrNull(): MapPackageManifest? = try {
+        MapPackageManifest.fromJson(activePointerFile.readText())
+    } catch (e: Exception) {
+        null
+    }
+
+    private fun deleteActivePointerAndPackage() {
+        if (!activePointerFile.exists()) return
+        val manifest = readActiveManifestOrNull()
+        activePointerFile.delete()
+        val packageDir = manifest?.let { packageDirectory(it.version) } ?: return
+        if (packageDir.exists()) {
+            packageDir.deleteRecursively()
         }
     }
 
@@ -250,20 +276,7 @@ class MapStorageGuard(
      */
     fun deleteActivePackage(): Boolean {
         return try {
-            if (activePointerFile.exists()) {
-                val manifest = try {
-                    MapPackageManifest.fromJson(activePointerFile.readText())
-                } catch (e: Exception) {
-                    null
-                }
-                activePointerFile.delete()
-                manifest?.let {
-                    val packageDir = File(packagesDir, "cebu-v${it.version}")
-                    if (packageDir.exists()) {
-                        packageDir.deleteRecursively()
-                    }
-                }
-            }
+            deleteActivePointerAndPackage()
             cleanStaging()
             true
         } catch (e: Exception) {

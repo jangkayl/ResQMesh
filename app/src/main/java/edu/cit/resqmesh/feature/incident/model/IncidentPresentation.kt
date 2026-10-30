@@ -1,5 +1,6 @@
 package edu.cit.resqmesh.feature.incident.model
 
+import edu.cit.resqmesh.core.model.HELP_WORKFLOW_VERSION
 import edu.cit.resqmesh.core.model.EventType
 import edu.cit.resqmesh.core.model.DomainEvent
 import edu.cit.resqmesh.core.model.Incident
@@ -72,7 +73,7 @@ fun incidentPresentation(incident: Incident, offers: List<IncidentOffer>, userId
     identityError: String? = null): IncidentPresentation {
     // Room's incident and offer flows can emit separately. Never render a withdrawn helper
     // as selected while the repaired incident projection is reaching the screen.
-    if (incident.workflowVersion == 2 && incident.status !in setOf("RESOLVED", "CANCELLED") &&
+    if (incident.workflowVersion == HELP_WORKFLOW_VERSION && incident.status !in setOf("RESOLVED", "CANCELLED") &&
         offers.any { it.offerId == incident.selectionOfferId && (it.withdrawn ||
             it.revision > (incident.selectionOfferRevision ?: Long.MAX_VALUE)) }) {
         return incidentPresentation(incident.copy(status = "OPEN", selectionId = null, selectionOfferId = null,
@@ -85,8 +86,8 @@ fun incidentPresentation(incident: Incident, offers: List<IncidentOffer>, userId
         identityLoading -> "Checking your identity…"
         identityError != null -> identityError
         userId == null -> "Your identity is unavailable. Retry or reopen the app."
-        incident.workflowVersion == 2 && key == null -> "Your signing identity is unavailable. Retry or reopen the app."
-        incident.workflowVersion == 2 && userId == incident.creatorId && !reporter ->
+        incident.workflowVersion == HELP_WORKFLOW_VERSION && key == null -> "Your signing identity is unavailable. Retry or reopen the app."
+        incident.workflowVersion == HELP_WORKFLOW_VERSION && userId == incident.creatorId && !reporter ->
             "This incident belongs to another signing identity. Renaming cannot restore access."
         else -> null
     }
@@ -114,7 +115,7 @@ fun incidentPresentation(incident: Incident, offers: List<IncidentOffer>, userId
         else -> null
     }
     val secondary = mutableListOf<IncidentAction>()
-    val primary = if (terminal || identityProblem != null) null else if (incident.workflowVersion == 2) {
+    val primary = if (terminal || identityProblem != null) null else if (incident.workflowVersion == HELP_WORKFLOW_VERSION) {
         when {
             reporterAuthority -> {
                 if (incident.selectionId != null) secondary += IncidentAction.REVOKE
@@ -197,7 +198,7 @@ fun incidentPresentation(incident: Incident, offers: List<IncidentOffer>, userId
         status = when (incident.status) {
             "OPEN" -> "Looking for help"
             "AWAITING_HELPER" -> "Awaiting confirmation"
-            "RESPONDING" -> if (incident.workflowVersion == 2) "Helper confirmed" else "Responding"
+            "RESPONDING" -> if (incident.workflowVersion == HELP_WORKFLOW_VERSION) "Helper confirmed" else "Responding"
             "ACKNOWLEDGED" -> "Request acknowledged"
             "ASSIGNED" -> "Responder assigned"
             "RESOLVED" -> "Resolved"

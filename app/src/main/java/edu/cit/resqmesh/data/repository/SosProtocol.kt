@@ -25,7 +25,7 @@ object SosProtocol {
     val json = Json { encodeDefaults = true; ignoreUnknownKeys = false }
     fun hash(value: String): String = MessageDigest.getInstance("SHA-256")
         .digest(value.toByteArray(Charsets.UTF_8)).joinToString("") { "%02x".format(it) }
-    fun prefix(key: String) = "SOS-${hash(key).take(24)}-"
+    fun prefix(key: String) = "SOS-${hash(key).take(KEY_PREFIX_HEX_LENGTH)}-"
     /**
      * Phones without network time can drift by minutes, so only a createdAt far ahead of the local
      * clock is refused; it would otherwise sort ahead of real alerts indefinitely.
@@ -36,8 +36,8 @@ object SosProtocol {
         p.sosId == e.sosId && p.id == e.eventId && p.senderNodeId.equals(e.originNodeId, ignoreCase = true)
     fun futureDated(e: SosEvent, now: Long): Boolean = e.createdAt > now + MAX_FUTURE_SKEW_MS
     fun valid(e: SosEvent): Boolean = e.sosId.startsWith(prefix(e.signingKey)) &&
-        e.sosId.length in 65..100 && e.eventId.length in 1..100 && e.originNodeId.length in 1..100 &&
-        e.signingKey.length in 1..1024 && e.originName.length in 1..160 &&
+        e.sosId.length in MIN_SOS_ID_LENGTH..MAX_ID_LENGTH && e.eventId.length in 1..MAX_ID_LENGTH && e.originNodeId.length in 1..MAX_ID_LENGTH &&
+        e.signingKey.length in 1..MAX_SIGNING_KEY_LENGTH && e.originName.length in 1..MAX_ORIGIN_NAME_LENGTH &&
         e.emergencyType.length in 1..80 && e.revision > 0 && e.createdAt > 0 && e.updatedAt >= e.createdAt &&
         (e.revision != 1L || !e.ended) && ((e.latitude == null) == (e.longitude == null)) &&
         (e.latitude == null || (e.latitude.isFinite() && e.latitude in -90.0..90.0)) &&
@@ -60,3 +60,9 @@ internal fun sosTransition(current: edu.cit.resqmesh.data.local.entity.SosAlertE
     if (e.revision <= current.revision || (current.ended && !e.ended)) return SosIngestion.STALE
     return SosIngestion.APPLIED
 }
+
+private const val KEY_PREFIX_HEX_LENGTH = 24
+private const val MIN_SOS_ID_LENGTH = 65
+private const val MAX_ID_LENGTH = 100
+private const val MAX_SIGNING_KEY_LENGTH = 1024
+private const val MAX_ORIGIN_NAME_LENGTH = 160

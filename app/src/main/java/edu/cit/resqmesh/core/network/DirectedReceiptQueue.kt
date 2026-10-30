@@ -15,11 +15,11 @@ internal class DirectedReceiptQueue(
 
     fun offer(payload: MeshPayload) {
         val key = "${payload.type}:${payload.targetMessageId}:${payload.reader}:${payload.directedRouteNodeIds}"
-        if (!pending.containsKey(key) && pending.size >= 128) {
+        if (!pending.containsKey(key) && pending.size >= MAX_PENDING_RECEIPTS) {
             log("PRIVATE_RECEIPT_RETRY capacity reached; duplicate replay remains available")
             return
         }
-        pending[key] = Entry(payload, pending[key]?.expires ?: (now() + 24 * 60 * 60 * 1000L))
+        pending[key] = Entry(payload, pending[key]?.expires ?: (now() + RECEIPT_RETENTION_MS))
         attempt(key)
         arm()
     }
@@ -35,7 +35,7 @@ internal class DirectedReceiptQueue(
         if (timer || pending.isEmpty()) return
         timer = true
         val captured = epoch
-        schedule(5_000L) {
+        schedule(RETRY_INTERVAL_MS) {
             if (captured != epoch) return@schedule
             timer = false
             wake()
@@ -43,3 +43,7 @@ internal class DirectedReceiptQueue(
     }
     fun clear() { pending.clear(); timer = false; epoch++ }
 }
+
+private const val MAX_PENDING_RECEIPTS = 128
+private const val RECEIPT_RETENTION_MS = 24 * 60 * 60 * 1000L
+private const val RETRY_INTERVAL_MS = 5_000L
