@@ -121,7 +121,6 @@ internal class GattServerLinkEvents(
                         link.serverDevice = device
                         store.links.transition(link, BleLinkState.CONFIGURING)
                         AppLogger.d("BLE_MESH", "Link ${link.generation} SERVER $macAddress ${link.peerNodeId ?: "unknown"}: CONFIGURING radioStatus=$status")
-                        AppLogger.updateLink(macAddress, peerName, "SERVER", link.generation, "CONFIGURING")
                         val setupDeadline = object : Runnable {
                             override fun run() {
                                 if (!store.links.isCurrent(link) || link.state != BleLinkState.CONFIGURING) return
@@ -143,7 +142,10 @@ internal class GattServerLinkEvents(
                                     AppLogger.d("BLE_MESH", "Link ${link.generation} SERVER $macAddress: CCCD setup timed out; closing unfinished link")
                                     finishRadioHandshake(radioOwner, "server setup timeout")
                                     try { gattServer?.cancelConnection(device) } catch (e: SecurityException) {
-                                        AppLogger.d("BLE_MESH", "Server setup timeout disconnect failed on $macAddress: ${e.message}")
+                                        AppLogger.d(
+                                            "BLE_MESH",
+                                            "Setup-timeout disconnect failed on $macAddress: ${e.javaClass.simpleName}"
+                                        )
                                     }
                                 }
                             }
@@ -201,7 +203,6 @@ internal class GattServerLinkEvents(
                         finishRadioHandshake("server:${link.endpoint}:${link.generation}", "server disconnected")
                         AppLogger.d("BLE_MESH", "Link ${link.generation} SERVER $macAddress: DISCONNECTING radioStatus=$status")
                         AppLogger.d("BLE_MESH", "Server: Device ${macAddress} disconnected.")
-                        AppLogger.removeLink(macAddress, "SERVER", link.generation)
                         store.activeServerConnections.remove(macAddress, device)
                         store.links.forget(link)
                         cleanupEndpointIfUnowned(macAddress)

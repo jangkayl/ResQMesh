@@ -228,7 +228,8 @@ val domainModule = module {
             observePublicMessages = ObservePublicMessagesUseCase(get()),
             observePrivateMessages = ObservePrivateMessagesUseCase(get()),
             observePeerNames = ObservePeerNamesUseCase(get()),
-            observeBlockedDeviceNames = ObserveBlockedDeviceNamesUseCase(get())
+            observeBlockedDeviceNames = ObserveBlockedDeviceNamesUseCase(get()),
+            linkDiagnostics = LinkDiagnosticsUseCase(get())
         )
     }
     single { RaiseSosUseCase(get(), get()) }
@@ -270,6 +271,7 @@ val viewModelModule = module {
     viewModel { WalkieTalkieViewModel(useCases = get(), mediaHelper = get(), liveAudioEngine = get()) }
     viewModel { OfflineMapViewModel(storageGuard = get(), downloader = get(), connectivityProvider = get()) }
     viewModel { AboutViewModel() }
+    viewModel { edu.cit.resqmesh.feature.devtools.viewmodel.DevToolsViewModel(get()) }
     viewModel { IncidentViewModel(incidentRepository = get(), identityManager = get(), incidentBudget = get()) }
 }
 

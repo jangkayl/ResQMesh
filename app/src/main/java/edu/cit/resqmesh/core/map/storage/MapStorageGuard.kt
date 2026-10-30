@@ -69,7 +69,7 @@ class MapStorageGuard(
                     val stat = StatFs(baseDir.path)
                     stat.availableBytes
                 } catch (e: Exception) {
-                    AppLogger.d("MapStorageGuard", "Failed to query storage: ${e.message}")
+                    AppLogger.d("MapStorageGuard", "Failed to query storage: ${e.javaClass.simpleName}")
                     0L
                 }
             }
@@ -91,7 +91,7 @@ class MapStorageGuard(
         try {
             stagingDir.listFiles()?.forEach { it.deleteRecursively() }
         } catch (e: Exception) {
-            AppLogger.d("MapStorageGuard", "Failed to clean staging dir: ${e.message}")
+            AppLogger.d("MapStorageGuard", "Failed to clean staging dir: ${e.javaClass.simpleName}")
         }
     }
 
@@ -123,7 +123,7 @@ class MapStorageGuard(
                 MapPackageStatus.NotInstalled
             }
         } catch (e: Exception) {
-            AppLogger.d("MapStorageGuard", "Failed to read active package manifest: ${e.message}")
+            AppLogger.d("MapStorageGuard", "Failed to read active package manifest: ${e.javaClass.simpleName}")
             MapPackageStatus.NotInstalled
         }
     }
@@ -198,7 +198,7 @@ class MapStorageGuard(
 
             return targetDir
         } catch (e: Exception) {
-            AppLogger.d("MapStorageGuard", "Failed to extract package zip: ${e.message}")
+            AppLogger.d("MapStorageGuard", "Failed to extract package zip: ${e.javaClass.simpleName}")
             tempExtractDir.deleteRecursively()
             return null
         }
@@ -223,7 +223,7 @@ class MapStorageGuard(
                 true
             }
         } catch (e: Exception) {
-            AppLogger.d("MapStorageGuard", "Failed to activate package atomically: ${e.message}")
+            AppLogger.d("MapStorageGuard", "Failed to activate package atomically: ${e.javaClass.simpleName}")
             tempPointerFile.delete()
             false
         }
@@ -240,7 +240,7 @@ class MapStorageGuard(
                 }
             }
         } catch (e: Exception) {
-            AppLogger.d("MapStorageGuard", "Failed to prune old packages: ${e.message}")
+            AppLogger.d("MapStorageGuard", "Failed to prune old packages: ${e.javaClass.simpleName}")
         }
     }
 
@@ -267,7 +267,7 @@ class MapStorageGuard(
             cleanStaging()
             true
         } catch (e: Exception) {
-            AppLogger.d("MapStorageGuard", "Failed to delete active package: ${e.message}")
+            AppLogger.d("MapStorageGuard", "Failed to delete active package: ${e.javaClass.simpleName}")
             false
         }
     }

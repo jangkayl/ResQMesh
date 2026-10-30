@@ -16,35 +16,47 @@ import androidx.compose.material.icons.filled.Terminal
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.graphics.Color
+import androidx.compose.foundation.background
+import androidx.compose.material3.MaterialTheme
+import edu.cit.resqmesh.core.ui.theme.ResQTheme
 import androidx.compose.ui.unit.dp
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 internal fun FloatingDeveloperBadge(
     modifier: Modifier = Modifier,
+    showErrorDot: Boolean = false,
     onClick: () -> Unit,
     onLongClick: (() -> Unit)? = null
 ) {
     Surface(
         modifier = modifier
             .size(38.dp)
-            .border(1.5.dp, Color(0xFF00FF00), CircleShape)
+            .border(1.5.dp, MaterialTheme.colorScheme.primary, CircleShape)
             .combinedClickable(
                 onClick = onClick,
                 onLongClick = onLongClick
             ),
         shape = CircleShape,
-        color = Color(0xEE121814),
+        color = MaterialTheme.colorScheme.surfaceVariant,
         shadowElevation = 8.dp
     ) {
         Box(contentAlignment = Alignment.Center) {
             Icon(
                 imageVector = Icons.Default.Terminal,
                 contentDescription = "Developer Debug Mode",
-                tint = Color(0xFF00FF00),
+                tint = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.size(19.dp)
             )
+            if (showErrorDot) {
+                Box(
+                    Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(5.dp)
+                        .size(9.dp)
+                        .background(ResQTheme.colors.sos, CircleShape)
+                )
+            }
         }
     }
 }

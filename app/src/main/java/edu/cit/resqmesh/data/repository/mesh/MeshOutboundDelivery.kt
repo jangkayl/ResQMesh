@@ -8,6 +8,13 @@ import edu.cit.resqmesh.core.network.ratelimit.OutgoingChatBudget
 import edu.cit.resqmesh.core.network.OutboundFrameEvent
 import edu.cit.resqmesh.core.network.MeshNetworkGateway
 import edu.cit.resqmesh.core.logging.AppLogger
+import edu.cit.resqmesh.core.logging.trace.TraceDir
+import edu.cit.resqmesh.core.logging.trace.TraceDropReason
+import edu.cit.resqmesh.core.logging.trace.TraceStage
+import edu.cit.resqmesh.core.network.TransferTraceEmitter
+import edu.cit.resqmesh.core.logging.trace.TraceScope
+import edu.cit.resqmesh.core.logging.trace.TraceType
+import edu.cit.resqmesh.core.network.PacketTraceEmitter
 import kotlinx.serialization.decodeFromByteArray
 import kotlinx.serialization.protobuf.ProtoBuf
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -47,6 +54,14 @@ internal class MeshOutboundDelivery(
     private val chatBudget: OutgoingChatBudget = OutgoingChatBudget()
 ) {
     private val myNodeName get() = localName()
+    private fun traceOutcome(id: String, scope: TraceScope, reason: TraceDropReason) =
+        PacketTraceEmitter.localOutcome(id, scope, TraceType.OTHER, reason)
+
+    /** The sender knows its own note is voice, even when private audio is encrypted on the wire. */
+    private fun traceSentVoice(id: String, scope: TraceScope) =
+        TransferTraceEmitter.voice(TraceDir.OUT, TraceStage.QUEUED, scope, id, TraceDropReason.NONE, "local")
+
+    private fun scopeOf(targetName: String?) = if (targetName != null) TraceScope.PRIVATE else TraceScope.PUBLIC
     private fun readyConnectedDevices() = readyPeers()
     private fun currentPeerName(name: String) = resolveName(name)
 
@@ -128,6 +143,7 @@ internal class MeshOutboundDelivery(
             }
             if ((privateAcceptedAttempts[messageId] ?: 0) >= 3) {
                 messageStore.markFailed(messageId)
+                traceOutcome(messageId, TraceScope.PRIVATE, TraceDropReason.RETRIES_EXHAUSTED)
                 privateAcceptedAttempts.remove(messageId)
             } else {
                 messageStore.markPending(messageId)
@@ -173,11 +189,13 @@ internal class MeshOutboundDelivery(
                     (message.conversationKind == "SOS" && sosRepository?.canReply(message.sosId) != true))) {
                 messageStore.expirePending(message.id)
                 prepaid.remove(message.id)
+                traceOutcome(message.id, scopeOf(targetName), TraceDropReason.EXPIRED_UNSENT)
                 continue
             }
             if (now - message.timestamp > OUTBOX_EXPIRY_MS) {
                 messageStore.expirePending(message.id)
                 prepaid.remove(message.id)
+                traceOutcome(message.id, scopeOf(targetName), TraceDropReason.EXPIRED_UNSENT)
                 continue
             }
             if (targetName != null) {
@@ -266,6 +284,7 @@ internal class MeshOutboundDelivery(
                 } else if (result.neighbors.values.any { it == edu.cit.resqmesh.core.network.TransportDispatchResult.REJECTED_INVALID_FRAME }) {
                     messageStore.expirePending(message.id)
                     prepaid.remove(message.id)
+                    traceOutcome(message.id, TraceScope.PUBLIC, TraceDropReason.SEND_INVALID_FRAME)
                 } else {
                     retryRejectedDispatch = true
                 }
@@ -314,6 +333,7 @@ internal class MeshOutboundDelivery(
 
         val message = ChatMessage(messageId, myNodeName, text, imageBase64, audioBase64, locationLat, locationLng, true, false, timestamp,
             conversationKind = conversationKind, channelId = channelId, sosId = sosId, senderNodeId = networkManager.myNodeId)
+        if (audioBase64 != null) traceSentVoice(messageId, TraceScope.PUBLIC)
         prepaid.add(messageId)
         repositoryScope.launch {
             outboxMutex.withLock {
@@ -332,6 +352,7 @@ internal class MeshOutboundDelivery(
                 } else if (result.neighbors.values.any { it == edu.cit.resqmesh.core.network.TransportDispatchResult.REJECTED_INVALID_FRAME }) {
                     messageStore.expirePending(messageId)
                     prepaid.remove(messageId)
+                    traceOutcome(messageId, TraceScope.PUBLIC, TraceDropReason.SEND_INVALID_FRAME)
                 } else {
                     scheduleOutboxRetry()
                 }
@@ -408,6 +429,7 @@ internal class MeshOutboundDelivery(
             return false
         }
 
+        if (audioBase64 != null) traceSentVoice(msgId, TraceScope.PRIVATE)
         val delivery = PrivateDeliveryPlanner.select(currentTarget, directedRouteList, readyDevices)
         val isDirect = readyDevices.any { NodeIdentity.matches(it.name, currentTarget) }
         val message = ChatMessage(msgId, myNodeName, text, imageBase64, audioBase64, locationLat, locationLng, true, true, timestamp, isHopped = !isDirect, outboundRoute = directedRouteList)

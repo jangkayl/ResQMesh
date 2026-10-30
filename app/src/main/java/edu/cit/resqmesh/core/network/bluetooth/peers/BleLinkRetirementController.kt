@@ -84,7 +84,6 @@ internal class BleLinkRetirementController(
 
     fun retireServerLink(link: edu.cit.resqmesh.core.network.bluetooth.state.BleLink) {
         if (!store.retireServerOwnership(link) { finishRadioHandshake(it, "server transfer retirement") }) return
-        AppLogger.removeLink(link.endpoint, "SERVER", link.generation)
         if (!store.links.hasLiveRole(link.endpoint, BleLinkRole.CLIENT)) {
             link.serverDevice?.let { try { gattServer?.cancelConnection(it) } catch (_: SecurityException) {} }
         }

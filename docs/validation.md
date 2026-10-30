@@ -38,7 +38,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\ci\check_docs.ps1
 git diff --check
 ```
 
-Signed release APK: copy `keystore.properties.example` to the gitignored `keystore.properties` (keystore kept outside the repository), then run `.\gradlew.bat :app:assembleRelease`; without it the APK is unsigned. Debug and release signatures differ, so switching needs an uninstall, which clears data. `scripts\device\manage_devices.ps1` options 5/6 offer Debug (default) or Release and reinstall a differently signed variant only after a typed `YES`; option 9 clears data and 10 uninstalls everywhere. It launches with `am start` because `monkey` re-enables auto-rotate.
+Signed release APK: copy `keystore.properties.example` to the gitignored `keystore.properties` (keystore kept outside the repository), then run `.\gradlew.bat :app:assembleRelease`; without it the APK is unsigned. Debug and release signatures differ, so switching clears data. `scripts\device\manage_devices.ps1` options 5/6 offer Debug or Release and replace a differently signed variant only after typed `YES`; options 9/10 clear data/uninstall everywhere. It launches with `am start` because `monkey` re-enables auto-rotate. Options 5/6 package target-phone ABIs; share plain Gradle APKs ([card](testing/fast-device-install-card.md)).
 
 ## Historical local milestones
 

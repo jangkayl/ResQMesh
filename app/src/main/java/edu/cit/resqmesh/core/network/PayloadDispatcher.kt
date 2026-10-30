@@ -17,6 +17,7 @@ import edu.cit.resqmesh.core.logging.AppLogger
 import edu.cit.resqmesh.core.logging.LogFields
 import edu.cit.resqmesh.core.logging.TerminalLogCategory
 import edu.cit.resqmesh.core.logging.TerminalLogLevel
+import edu.cit.resqmesh.core.logging.trace.TraceDropReason
 import kotlinx.serialization.decodeFromByteArray
 import kotlinx.serialization.encodeToByteArray
 import kotlinx.serialization.protobuf.ProtoBuf
@@ -67,25 +68,41 @@ class PayloadDispatcher(
     private fun admit(endpointId: String, payload: MeshPayload) =
         originGate.admit(endpointId, payload, callback.getMyNodeId(), callback.getAdmittedNodeId(endpointId))
 
+    /** Observe-only drop event; transport is unknown here and the emitter is a no-op when tracing is off. */
+    private fun drop(payload: MeshPayload, reason: TraceDropReason, endpointId: String, payloadBytes: ByteArray) =
+        PacketTraceEmitter.drop(payload, reason, endpointId, payloadBytes.size, null)
+
     fun dispatch(endpointId: String, payloadBytes: ByteArray) {
         try {
             val decoded = ProtoBuf.decodeFromByteArray<MeshPayload>(payloadBytes)
-            val payload = validated(endpointId, decoded) ?: return
+            val payload = validated(endpointId, decoded) ?: run {
+                drop(decoded, TraceDropReason.VALIDATOR_REJECTED, endpointId, payloadBytes)
+                return
+            }
             // Relay handlers forward the raw bytes, so a clamped TTL must be re-encoded.
             val relayBytes = if (payload === decoded) payloadBytes else ProtoBuf.encodeToByteArray(payload)
 
             // 1. DUPLICATE MESSAGE CHECK (THE BOUNCER)
-            if (payload.id.isEmpty()) return
+            if (payload.id.isEmpty()) {
+                drop(payload, TraceDropReason.EMPTY_ID, endpointId, payloadBytes)
+                return
+            }
             // SOS validates signatures before dedup/relay. Conversation storage owns durable
             // dedup so duplicate retries can still receive receipts after a lost acknowledgement.
             if (payload.type in setOf("SOS_EVENT", "SOS_SYNC_REQ", "SOS_SYNC_RES")) {
                 // SOS_EVENT is rate limited by SosRepository once its signature verified.
-                if (payload.type != "SOS_EVENT" && !admit(endpointId, payload)) return
+                if (payload.type != "SOS_EVENT" && !admit(endpointId, payload)) {
+                    drop(payload, TraceDropReason.ORIGIN_LIMIT, endpointId, payloadBytes)
+                    return
+                }
                 callback.onSosPacket(endpointId, payload)
                 return
             }
             if (payload.type == "CONVERSATION") {
-                if (!admit(endpointId, payload)) return
+                if (!admit(endpointId, payload)) {
+                    drop(payload, TraceDropReason.ORIGIN_LIMIT, endpointId, payloadBytes)
+                    return
+                }
                 callback.onConversationMessage(endpointId, payload)
                 return
             }
@@ -96,16 +113,26 @@ class PayloadDispatcher(
                     payload.targetNodeId.isBlank() && edu.cit.resqmesh.core.model.NodeIdentity.matches(payload.targetName, callback.getMyDeviceName()))
             // The recipient store deduplicates private rows, then replays lost receipts.
             val seenBefore = callback.getSeenIdCache().contains(msgId)
-            if (seenBefore && !localPrivate && !callback.hasPendingCustody(msgId)) return
+            if (seenBefore && !localPrivate && !callback.hasPendingCustody(msgId)) {
+                drop(payload, TraceDropReason.DUPLICATE, endpointId, payloadBytes)
+                return
+            }
 
             val sender = payload.senderName
-            if (sender == callback.getMyDeviceName()) return
-            if (!admit(endpointId, payload)) return
+            if (sender == callback.getMyDeviceName()) {
+                drop(payload, TraceDropReason.SELF_ORIGIN, endpointId, payloadBytes)
+                return
+            }
+            if (!admit(endpointId, payload)) {
+                drop(payload, TraceDropReason.ORIGIN_LIMIT, endpointId, payloadBytes)
+                return
+            }
             // Only admitted ids are remembered, so a rate-limited payload can be retried with the same id.
             callback.getSeenIdCache().markSeen(msgId)
 
             // 2. STRATEGY ROUTING LOGIC
             val handler = handlers.firstOrNull { it.canHandle(payload.type) }
+            if (handler == null) drop(payload, TraceDropReason.NO_HANDLER, endpointId, payloadBytes)
             handler?.handle(endpointId, payload, relayBytes, callback)
                 ?: AppLogger.event(
                     category = TerminalLogCategory.SYSTEM,
@@ -120,7 +147,7 @@ class PayloadDispatcher(
             AppLogger.event(
                 category = TerminalLogCategory.SYSTEM,
                 event = "PAYLOAD_PARSE_FAILED",
-                message = "Could not parse incoming payload: ${e.message}",
+                message = "Could not parse incoming payload: ${e.javaClass.simpleName}",
                 level = TerminalLogLevel.ERROR,
                 tag = "PAYLOAD_DISPATCHER",
                 endpoint = endpointId

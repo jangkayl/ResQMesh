@@ -44,13 +44,6 @@ internal class GattServerAttributeRequests(
                         store.links.transition(link, BleLinkState.READY)) {
                         finishRadioHandshake("server:${link.endpoint}:${link.generation}", "server ready")
                         AppLogger.d("BLE_MESH", "Link ${link.generation} SERVER ${device.address}: READY CCCD indications enabled")
-                        AppLogger.updateLink(
-                            device.address,
-                            store.connectedEndpointNames[device.address],
-                            "SERVER",
-                            link.generation,
-                            "READY"
-                        )
                         handler.post {
                             if (!ownsServer()) return@post
                             if (store.links.isCurrent(link) && link.state == BleLinkState.READY) {

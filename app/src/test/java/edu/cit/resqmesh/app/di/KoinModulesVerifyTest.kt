@@ -35,6 +35,8 @@ import org.koin.test.verify.verify
  */
 @OptIn(KoinExperimentalAPI::class)
 class KoinModulesVerifyTest {
+    // Length is the extraTypes list, not logic.
+    @Suppress("LongMethod")
     @Test
     fun appModulesDependencyGraphIsComplete() {
         module { includes(appModules) }.verify(
@@ -93,7 +95,8 @@ class KoinModulesVerifyTest {
                 ObservePublicMessagesUseCase::class,
                 ObservePrivateMessagesUseCase::class,
                 ObservePeerNamesUseCase::class,
-                ObserveBlockedDeviceNamesUseCase::class
+                ObserveBlockedDeviceNamesUseCase::class,
+                LinkDiagnosticsUseCase::class
             )
         )
     }
