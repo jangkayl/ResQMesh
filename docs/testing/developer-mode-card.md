@@ -23,6 +23,7 @@ Stage 1 covers the console screens, fast logger, export and release unlock. Hop,
 | D6 | Cause an error (switch Bluetooth off on B) | Red dot on the badge for an ERROR entry; warnings alone give no dot | No dot; dot for warnings only |
 | D7 | Long-press the badge | Opens Errors; the dot clears | Opens another tab; dot stays |
 | D8 | Packets: use each filter chip, search a short ID and a type, then pause | Matching rows only; pause freezes the list while traffic continues; resume catches up | Filters ignored; list keeps moving while paused |
+| D8b | During traffic, watch Packets, Errors and Logs, scroll down, then return to the top | LIVE chip keeps the newest row on screen; scrolling down stops the list moving and shows Go to latest with a growing new-entry count; the button or returning to the top resumes live | Must scroll for new rows; list jumps while reading |
 | D9 | Tap a message packet | Detail shows all fields and a timeline of this phone's events with the same ID | Empty timeline for a sent message |
 | D10 | Heartbeats | Adjacent heartbeats or pieces collapse into one row with a count; failures never collapse | Failures merged |
 | D11 | Logs and Errors tabs | Newest first; MACs appear shortened | Full MAC visible |

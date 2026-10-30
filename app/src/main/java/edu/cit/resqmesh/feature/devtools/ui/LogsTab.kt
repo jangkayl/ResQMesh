@@ -4,6 +4,6 @@ import androidx.compose.runtime.Composable
 import edu.cit.resqmesh.core.logging.TerminalLogEntry
 
 @Composable
-internal fun LogsTab(logs: List<TerminalLogEntry>) {
-    LogEntryList(logs, "No logs yet", "Application log lines appear here while developer mode is on.")
+internal fun LogsTab(logs: List<TerminalLogEntry>, paused: Boolean) {
+    LogEntryList(logs, "No logs yet", "Application log lines appear here while developer mode is on.", paused)
 }

@@ -8,8 +8,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
@@ -77,6 +79,7 @@ internal fun PacketsTab(
     var type by remember { mutableStateOf<TraceType?>(null) }
     var transport by remember { mutableStateOf<String?>(null) }
     var selected by remember { mutableStateOf<PacketTrace?>(null) }
+    val listState = rememberLazyListState()
 
     val detail = selected
     if (detail != null) {
@@ -118,12 +121,32 @@ internal fun PacketsTab(
                 message = if (paused) "Paused." else "Traffic appears here while developer mode is on."
             )
         } else {
-            LazyColumn(
-                contentPadding = PaddingValues(Spacing.Medium),
-                verticalArrangement = Arrangement.spacedBy(Spacing.Small)
-            ) {
-                items(rows, key = { it.first.seq }) { row -> PacketRow(row, names) { selected = row.last } }
-            }
+            PacketList(rows, names, paused, listState) { selected = it }
+        }
+    }
+}
+
+@Composable
+private fun PacketList(
+    rows: List<TraceRow>,
+    names: Map<String, String>,
+    paused: Boolean,
+    listState: LazyListState,
+    onSelect: (PacketTrace) -> Unit
+) {
+    LiveListBox(
+        listState,
+        rows.first().last.seq,
+        paused,
+        newerThan = { key -> rows.takeWhile { it.last.seq > key }.size }
+    ) { listModifier ->
+        LazyColumn(
+            modifier = listModifier,
+            state = listState,
+            contentPadding = PaddingValues(Spacing.Medium),
+            verticalArrangement = Arrangement.spacedBy(Spacing.Small)
+        ) {
+            items(rows, key = { it.first.seq }) { row -> PacketRow(row, names) { onSelect(row.last) } }
         }
     }
 }

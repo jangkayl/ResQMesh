@@ -125,9 +125,9 @@ fun DevToolsScreen(initialTab: DevToolsTab, onClose: () -> Unit, viewModel: DevT
                     DevToolsTab.OVERVIEW -> OverviewTab(snapshot, links, unseenErrors)
                     DevToolsTab.LINKS -> LinksTab(links)
                     DevToolsTab.PACKETS -> PacketsTab(snapshot.packets, names, paused, viewModel::setPaused)
-                    DevToolsTab.VOICE -> VoiceTab(snapshot.voice, names)
-                    DevToolsTab.ERRORS -> ErrorsTab(snapshot.errors)
-                    DevToolsTab.LOGS -> LogsTab(snapshot.logs)
+                    DevToolsTab.VOICE -> VoiceTab(snapshot.voice, names, paused)
+                    DevToolsTab.ERRORS -> ErrorsTab(snapshot.errors, paused)
+                    DevToolsTab.LOGS -> LogsTab(snapshot.logs, paused)
                 }
             }
         }
