@@ -117,7 +117,7 @@ internal fun SlideToBroadcastSlider(
                 horizontalArrangement = Arrangement.Center
             ) {
                 Text(
-                    text = "SLIDE TO BROADCAST SOS",
+                    text = "SLIDE TO SEND SOS",
                     fontFamily = FontFamily.Monospace,
                     fontWeight = FontWeight.ExtraBold,
                     fontSize = 12.sp,

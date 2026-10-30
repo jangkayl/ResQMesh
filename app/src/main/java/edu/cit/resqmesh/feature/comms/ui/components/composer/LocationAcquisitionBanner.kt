@@ -56,7 +56,7 @@ internal fun LocationAcquisitionBanner(
                     Spacer(Modifier.width(10.dp))
                     Column {
                         Text(
-                            text = "ACQUIRING GPS LOCK...",
+                            text = "FINDING YOUR LOCATION…",
                             style = MaterialTheme.typography.labelSmall,
                             fontFamily = FontFamily.Monospace,
                             fontWeight = FontWeight.Bold,

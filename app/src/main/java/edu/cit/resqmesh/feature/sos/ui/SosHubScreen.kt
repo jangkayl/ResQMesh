@@ -202,7 +202,7 @@ fun SosHubScreen(
                             )
                             Spacer(Modifier.height(6.dp))
                             Text(
-                                text = "Your phone is actively listening on offline mesh radio frequencies. Any emergency SOS alert broadcast in your area will appear here immediately.",
+                                text = "Your phone is listening for help calls nearby. Any SOS will show up here right away.",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 textAlign = TextAlign.Center,

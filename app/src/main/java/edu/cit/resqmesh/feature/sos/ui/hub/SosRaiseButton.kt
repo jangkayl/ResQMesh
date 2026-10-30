@@ -67,7 +67,7 @@ internal fun SosRaiseButton(budget: SosBudgetState, onCreate: () -> Unit) {
         Spacer(Modifier.width(10.dp))
         Column {
             Text(
-                text = "BROADCAST EMERGENCY SOS",
+                text = "SEND SOS FOR HELP",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Black
             )
