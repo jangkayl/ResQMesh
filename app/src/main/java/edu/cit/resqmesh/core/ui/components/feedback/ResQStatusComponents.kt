@@ -185,7 +185,7 @@ fun ResQEmptyState(
             fontWeight = FontWeight.SemiBold,
             textAlign = TextAlign.Center
         )
-        Spacer(Modifier.height(Spacing.ExtraSmall))
+        Spacer(Modifier.height(Spacing.Small))
         Text(
             text = message,
             style = MaterialTheme.typography.bodyMedium,
