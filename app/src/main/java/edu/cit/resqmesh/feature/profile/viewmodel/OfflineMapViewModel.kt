@@ -9,6 +9,7 @@ import edu.cit.resqmesh.core.map.model.MapPackageManifest
 import edu.cit.resqmesh.core.map.model.MapPackageStatus
 import edu.cit.resqmesh.core.map.storage.MapStorageGuard
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -115,8 +116,10 @@ class OfflineMapViewModel(
             )
         }
 
-        downloadJob?.cancel()
+        val previousJob = downloadJob
         downloadJob = viewModelScope.launch {
+            // Two downloads must never write the same staging file.
+            previousJob?.cancelAndJoin()
             downloader.downloadAndInstallPackage(
                 manifestUrl = catalogEntry.manifestUrl,
                 signatureUrl = catalogEntry.signatureUrl,
@@ -186,22 +189,29 @@ class OfflineMapViewModel(
     }
 
     fun deletePackage() {
-        downloadJob?.cancel()
+        val activeJob = downloadJob
         downloadJob = null
-        val deleted = storageGuard.deleteActivePackage()
-        if (deleted) {
-            refreshStatus()
-        } else {
-            _uiState.update {
-                it.copy(errorMessage = "Failed to delete offline map package.")
+        viewModelScope.launch {
+            activeJob?.cancelAndJoin()
+            val deleted = storageGuard.deleteActivePackage()
+            if (deleted) {
+                refreshStatus()
+            } else {
+                _uiState.update {
+                    it.copy(errorMessage = "Failed to delete offline map package.")
+                }
             }
         }
     }
 
     fun cancelDownload() {
-        downloadJob?.cancel()
+        val activeJob = downloadJob
         downloadJob = null
-        storageGuard.cleanStaging()
-        refreshStatus()
+        viewModelScope.launch {
+            // Staging is cleaned only after the copy loop has stopped writing to it.
+            activeJob?.cancelAndJoin()
+            storageGuard.cleanStaging()
+            refreshStatus()
+        }
     }
 }

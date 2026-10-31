@@ -8,9 +8,13 @@ import edu.cit.resqmesh.core.map.model.MapPackageStatus
 import edu.cit.resqmesh.core.map.storage.MapStorageGuard
 import edu.cit.resqmesh.core.map.verifier.ManifestVerifier
 import edu.cit.resqmesh.core.logging.AppLogger
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.ProducerScope
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.flow.flowOn
@@ -63,7 +67,7 @@ class DefaultHttpTransport : HttpTransport {
         private const val MAX_REDIRECTS = 5
         private const val HTTP_TEMPORARY_REDIRECT = 307
         private const val HTTP_PERMANENT_REDIRECT = 308
-        private const val COPY_BUFFER_BYTES = 8192
+        private const val COPY_BUFFER_BYTES = 64 * 1024
         private val REDIRECT_CODES = setOf(
             HttpURLConnection.HTTP_MOVED_PERM, HttpURLConnection.HTTP_MOVED_TEMP,
             HttpURLConnection.HTTP_SEE_OTHER, HTTP_TEMPORARY_REDIRECT, HTTP_PERMANENT_REDIRECT
@@ -101,6 +105,7 @@ class DefaultHttpTransport : HttpTransport {
     override suspend fun fetchBytes(urlString: String): ByteArray? {
         return try {
             val connection = openConnectionWithRedirects(urlString)
+            currentCoroutineContext().ensureActive()
             val responseCode = connection.responseCode
             if (responseCode != HttpURLConnection.HTTP_OK) {
                 AppLogger.d("DefaultHttpTransport", "Fetch bytes failed with HTTP $responseCode for $urlString")
@@ -108,6 +113,8 @@ class DefaultHttpTransport : HttpTransport {
                 return null
             }
             connection.inputStream.use { it.readBytes() }
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             AppLogger.d("DefaultHttpTransport", "Failed to fetch bytes from $urlString: ${e.javaClass.simpleName}")
             null
@@ -145,6 +152,8 @@ class DefaultHttpTransport : HttpTransport {
                     val buffer = ByteArray(COPY_BUFFER_BYTES)
                     var read: Int
                     while (input.read(buffer).also { read = it } != -1) {
+                        // Blocking reads never suspend, so a cancelled download must stop itself here.
+                        currentCoroutineContext().ensureActive()
                         fos.write(buffer, 0, read)
                         bytesReadTotal += read
                         onProgress(bytesReadTotal, totalBytes)
@@ -162,6 +171,8 @@ class DefaultHttpTransport : HttpTransport {
             }
 
             true
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             AppLogger.d("DefaultHttpTransport", "Error downloading to file: ${e.javaClass.simpleName}")
             false
@@ -171,7 +182,7 @@ class DefaultHttpTransport : HttpTransport {
 
 /**
  * Downloads, verifies, and installs the offline map package according to strict safety rules:
- * - Downloads to staging `.part` file.
+ * - Downloads to staging `.part` file, resuming it across bounded automatic retries.
  * - Checks Wi-Fi requirement.
  * - Verifies Ed25519 manifest signature against maintainer public key.
  * - Computes and verifies SHA-256 digest of package zip.
@@ -185,7 +196,8 @@ class MapPackageDownloader(
     private val verifier: ManifestVerifier,
     private val connectivityProvider: ConnectivityProvider,
     private val httpTransport: HttpTransport = DefaultHttpTransport(),
-    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
+    private val retryDelayMs: Long = DEFAULT_RETRY_DELAY_MS
 ) {
 
     /**
@@ -261,7 +273,11 @@ class MapPackageDownloader(
         currentStatus: MapPackageStatus
     ): File? {
         val stagingFile = storageGuard.getStagingFile("cebu-v${manifest.version}.zip")
-        val resumeOffset = if (stagingFile.exists()) stagingFile.length() else 0L
+        // A staging file larger than the package cannot be resumed.
+        if (stagingFile.length() > manifest.byteLength) {
+            stagingFile.delete()
+        }
+        val resumeOffset = stagingFile.length()
 
         send(MapPackageStatus.Downloading(
             progressPercent = percentOf(resumeOffset, manifest.byteLength),
@@ -269,29 +285,21 @@ class MapPackageDownloader(
             totalBytes = manifest.byteLength
         ))
 
-        val downloadSuccess = httpTransport.downloadToFile(
-            urlString = manifest.assetUrl,
-            destinationFile = stagingFile,
-            resumeOffset = resumeOffset,
-            onProgress = { downloaded, total ->
-                val totalExpected = if (total > 0) total else manifest.byteLength
-                trySend(
-                    MapPackageStatus.Downloading(
-                        progressPercent = percentOf(downloaded, totalExpected).coerceIn(0, PERCENT),
-                        bytesDownloaded = downloaded,
-                        totalBytes = totalExpected
-                    )
-                )
-            }
-        )
-
-        if (!downloadSuccess || !stagingFile.exists()) {
+        // A complete staging file has nothing left to request; a Range past its end would fail.
+        val alreadyComplete = stagingFile.exists() && resumeOffset == manifest.byteLength
+        if (!alreadyComplete && !downloadWithRetry(manifest, stagingFile)) {
+            send(MapPackageStatus.Error("Download interrupted or failed.", currentStatus))
+            return null
+        }
+        if (!stagingFile.exists()) {
             send(MapPackageStatus.Error("Download interrupted or failed.", currentStatus))
             return null
         }
 
         send(MapPackageStatus.Verifying("Verifying package SHA-256 checksum"))
+        val hashStartNanos = System.nanoTime()
         val isHashValid = verifier.verifyPackageHash(stagingFile, manifest.sha256)
+        AppLogger.d(TAG, "Hash check took ${elapsedMs(hashStartNanos)} ms")
         if (!isHashValid) {
             stagingFile.delete()
             send(MapPackageStatus.Error("Package checksum verification failed. File corrupted.", currentStatus))
@@ -300,6 +308,54 @@ class MapPackageDownloader(
         return stagingFile
     }
 
+    /** Downloads the package, resuming from the staged bytes after each failed attempt. */
+    private suspend fun ProducerScope<MapPackageStatus>.downloadWithRetry(
+        manifest: MapPackageManifest,
+        stagingFile: File
+    ): Boolean {
+        var lastPercent = -1
+        for (attempt in 1..MAX_DOWNLOAD_ATTEMPTS) {
+            val startOffset = stagingFile.length()
+            val startNanos = System.nanoTime()
+            val succeeded = httpTransport.downloadToFile(
+                urlString = manifest.assetUrl,
+                destinationFile = stagingFile,
+                resumeOffset = startOffset,
+                onProgress = { downloaded, total ->
+                    val totalExpected = if (total > 0) total else manifest.byteLength
+                    val percent = percentOf(downloaded, totalExpected).coerceIn(0, PERCENT)
+                    // One update per percent keeps the main thread free during the copy loop.
+                    if (percent != lastPercent) {
+                        lastPercent = percent
+                        trySend(
+                            MapPackageStatus.Downloading(
+                                progressPercent = percent,
+                                bytesDownloaded = downloaded,
+                                totalBytes = totalExpected
+                            )
+                        )
+                    }
+                }
+            )
+            logDownloadAttempt(attempt, stagingFile.length() - startOffset, startNanos, succeeded)
+            if (succeeded) return true
+            if (attempt < MAX_DOWNLOAD_ATTEMPTS) delay(retryDelayMs * attempt)
+        }
+        return false
+    }
+
+    private fun logDownloadAttempt(attempt: Int, bytes: Long, startNanos: Long, succeeded: Boolean) {
+        val durationMs = elapsedMs(startNanos)
+        val kilobytesPerSecond = if (durationMs > 0) bytes / durationMs else 0L
+        AppLogger.d(
+            TAG,
+            "Download attempt $attempt succeeded=$succeeded bytes=$bytes durationMs=$durationMs " +
+                "avgKBps=$kilobytesPerSecond"
+        )
+    }
+
+    private fun elapsedMs(startNanos: Long): Long = (System.nanoTime() - startNanos) / NANOS_PER_MILLI
+
     /** Steps 7-9: extracts to versioned storage, then atomically activates the new package. */
     private suspend fun ProducerScope<MapPackageStatus>.installPackage(
         manifest: MapPackageManifest,
@@ -307,6 +363,7 @@ class MapPackageDownloader(
         currentStatus: MapPackageStatus
     ) {
         send(MapPackageStatus.Extracting(EXTRACTING_PROGRESS_PERCENT))
+        val extractStartNanos = System.nanoTime()
         val packageDir = try {
             FileInputStream(stagingFile).use { fis ->
                 storageGuard.extractPackageZip(fis, manifest.version)
@@ -314,6 +371,7 @@ class MapPackageDownloader(
         } catch (e: Exception) {
             null
         }
+        AppLogger.d(TAG, "Extraction took ${elapsedMs(extractStartNanos)} ms")
 
         if (packageDir == null) {
             stagingFile.delete()
@@ -336,8 +394,12 @@ class MapPackageDownloader(
     private fun percentOf(done: Long, total: Long): Int = if (total > 0) ((done * PERCENT) / total).toInt() else 0
 
     private companion object {
+        const val TAG = "MapPackageDownloader"
         const val PERCENT = 100
         const val ESTIMATED_EXPANSION_FACTOR = 2
         const val EXTRACTING_PROGRESS_PERCENT = 50
+        const val MAX_DOWNLOAD_ATTEMPTS = 3
+        const val DEFAULT_RETRY_DELAY_MS = 2_000L
+        const val NANOS_PER_MILLI = 1_000_000L
     }
 }

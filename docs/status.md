@@ -8,7 +8,7 @@ Prepare for the capstone demo (within two weeks of 2026-10-16) and deployment re
 
 ## Working by user report
 
-The current candidate is the October 6 APK `1AE82B6C...`; the user reports F1–F14 PASS on it, including the incident UI repair cases. Earlier October 4 reports cover four-phone text/receipts/notes/SOS, recovery, background, blocking, incidents and offline maps. Models, counts, timings and transport coverage were not supplied, so these are qualitative results, not measured rates. Details are in [validation](validation.md).
+The current candidate is the October 6 APK `1AE82B6C...`; the user reports F1–F14 PASS on it, including the incident UI repair cases. Earlier October 4 reports cover four-phone text/receipts/notes/SOS, recovery, background, blocking, incidents and offline maps. Models, counts, timings and transport coverage were not supplied, so these are qualitative results, not measured rates.
 
 ## Implemented
 
@@ -43,7 +43,7 @@ Basic block, incident, SOS and recovery checks have user-reported successes; the
 
 **Code smells refactor:** [card](testing/code-smells-refactor-card.md) pending.
 
-**Batch A cleanup** (`refactor/batch-a-cleanup`): the user reported all [smoke card](testing/batch-a-cleanup-smoke-card.md) steps working on 2026-10-16. Remaining review work: revision-plan phases P1–P6.
+**Batch A cleanup** (`refactor/batch-a-cleanup`): the user reported all [smoke card](testing/batch-a-cleanup-smoke-card.md) steps working on 2026-10-16.
 
 **Developer console** (branch `feat/developer-console`, [plan](plans/developer-mode.md)): Stage 1 and live follow are pushed; Stage 2 (traces, timeline) has local checks only and awaits the [phone card](testing/developer-mode-card.md). Stage 3 (signal and queue stats) is pending.
 
@@ -54,6 +54,8 @@ Basic block, incident, SOS and recovery checks have user-reported successes; the
 **Relay image delivery** (`feat/image-quality`): late public media forwarding and sender-free completion; [card](testing/relay-image-delivery-card.md) pending.
 
 **Image quality** (`feat/image-quality`): user-rated quality good; [card](testing/image-quality-card.md) pending.
+
+**Map download** (`fix/map-download-reliability`): user-reported slowness; speed unmeasured; [card](testing/map-download-reliability-card.md) pending.
 
 ## Next actions
 

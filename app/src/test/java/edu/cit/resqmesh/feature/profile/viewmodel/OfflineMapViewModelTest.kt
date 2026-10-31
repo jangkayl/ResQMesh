@@ -14,6 +14,7 @@ import edu.cit.resqmesh.feature.sos.ui.SosMapViewState
 import edu.cit.resqmesh.feature.sos.ui.resolveSosMapViewState
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
@@ -273,6 +274,57 @@ class OfflineMapViewModelTest {
         val state = viewModel.uiState.value
         assertEquals(MapPackageStatus.NotInstalled, state.packageStatus)
         assertNull(state.activeManifest)
+    }
+
+    @Test
+    fun cancelDownload_cleansStagingOnlyAfterDownloadStops() = runTest {
+        val fakeVerifier = ManifestVerifier(
+            signatureVerifier = object : SignatureVerifier {
+                override fun verify(data: ByteArray, signature: ByteArray, publicKey: ByteArray) = true
+            }
+        )
+        val manifest = createSampleManifest(version = 1)
+        var transportStopped = false
+        var stagingExistedWhenStopped = false
+
+        val fakeTransport = object : HttpTransport {
+            override suspend fun fetchBytes(urlString: String): ByteArray = manifest.toJson().toByteArray()
+            override suspend fun downloadToFile(
+                urlString: String,
+                destinationFile: File,
+                resumeOffset: Long,
+                onProgress: (Long, Long) -> Unit
+            ): Boolean {
+                destinationFile.writeBytes(byteArrayOf(1, 2, 3))
+                try {
+                    awaitCancellation()
+                } finally {
+                    stagingExistedWhenStopped = destinationFile.exists()
+                    transportStopped = true
+                }
+            }
+        }
+
+        val downloader = MapPackageDownloader(
+            storageGuard = storageGuard,
+            verifier = fakeVerifier,
+            connectivityProvider = connectivityProvider,
+            httpTransport = fakeTransport,
+            ioDispatcher = testDispatcher
+        )
+        val viewModel = OfflineMapViewModel(storageGuard, downloader, connectivityProvider)
+
+        viewModel.startDownload()
+        advanceUntilIdle()
+        assertTrue(viewModel.uiState.value.isDownloadingOrInstalling)
+
+        viewModel.cancelDownload()
+        advanceUntilIdle()
+
+        assertTrue(transportStopped)
+        assertTrue(stagingExistedWhenStopped)
+        assertFalse(storageGuard.getStagingFile("cebu-v1.zip").exists())
+        assertFalse(viewModel.uiState.value.isDownloadingOrInstalling)
     }
 
     @Test

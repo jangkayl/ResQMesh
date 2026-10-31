@@ -160,7 +160,7 @@ class MapStorageGuard(
     }
 
     private fun unpackZip(zipInputStream: InputStream, destinationDir: File) {
-        ZipInputStream(zipInputStream).use { zis ->
+        ZipInputStream(zipInputStream.buffered()).use { zis ->
             var entry = zis.nextEntry
             while (entry != null) {
                 val entryFile = File(destinationDir, entry.name)
