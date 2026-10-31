@@ -219,7 +219,7 @@ internal fun IncidentPrimaryActions(
                             .fillMaxWidth()
                             .defaultMinSize(minHeight = 56.dp)
                     ) {
-                        Text("Acknowledge request", fontSize = 16.sp)
+                        Text("I saw this request", fontSize = 16.sp)
                     }
                 }
                 IncidentAction.ASSIGN -> {
@@ -274,7 +274,7 @@ internal fun IncidentPrimaryActions(
                                 .fillMaxWidth()
                                 .defaultMinSize(minHeight = 56.dp)
                         ) {
-                            Text("Waiting for helper offers on mesh", fontSize = 15.sp)
+                            Text("Waiting for someone to offer help", fontSize = 15.sp)
                         }
                     } else if (incident.status == "RESPONDING" && presentation.selectedOffer?.helperKey == localSigningKey) {
                         // Confirmed helper explanation

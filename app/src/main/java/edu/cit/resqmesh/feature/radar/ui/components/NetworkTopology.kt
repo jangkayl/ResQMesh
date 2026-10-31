@@ -60,13 +60,13 @@ internal fun NetworkTopology(topology: Map<String, Set<String>>, onBack: () -> U
             Spacer(Modifier.width(12.dp))
             Column {
                 Text(
-                    text = "Network Topology",
+                    text = "Who Is Connected",
                     style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.ExtraBold,
                     color = MaterialTheme.colorScheme.onBackground
                 )
                 Text(
-                    text = "Active multi-hop routes discovered across the mesh.",
+                    text = "How phones are linked right now.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )

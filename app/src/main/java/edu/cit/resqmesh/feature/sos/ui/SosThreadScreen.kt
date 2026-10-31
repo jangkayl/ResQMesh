@@ -140,7 +140,7 @@ fun SosThreadScreen(
             },
             text = {
                 Text(
-                    text = "Reachable devices on the mesh will be instructed to stop this emergency alert. Disconnected devices will learn it has ended upon reconnecting.",
+                    text = "Phones we can reach will stop this alert. Other phones will find out when they reconnect.",
                     style = MaterialTheme.typography.bodyMedium
                 )
             },

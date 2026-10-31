@@ -75,7 +75,7 @@ fun RadioHistoryScreen(vm: CommunicationViewModel, media: MediaHelper, onBack: (
                         fontWeight = FontWeight.Bold
                     )
                     Text(
-                        text = "Offline voice notes & chatter by channel",
+                        text = "Voice notes and messages for each channel",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )

@@ -272,7 +272,7 @@ internal fun CommunityHeader(channelId: String, onBack: () -> Unit, onChannelSel
             }
             Column {
                 Text(stringResource(R.string.community_title), style = MaterialTheme.typography.titleMedium)
-                Text("Public conversation across the reachable mesh", style = MaterialTheme.typography.labelSmall)
+                Text("Messages for everyone nearby", style = MaterialTheme.typography.labelSmall)
             }
         }
     }

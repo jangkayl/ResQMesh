@@ -18,9 +18,9 @@ Last reviewed: 2026-10-06. Baseline: see [status](status.md). Use Compose/Materi
 
 | Label | Required evidence |
 | --- | --- |
-| Online (Direct) | Payload READY plus recent inbound progress |
+| Connected (Direct) | Payload READY plus recent inbound progress |
 | Checking connection | Existing direct role lacks recent response while recovery is pending |
-| Reachable / Relayed | Usable path through a READY first hop |
+| Through another phone | Usable path through a READY first hop |
 | Nearby | Recent advertisement without a usable direct link |
 | Offline | Previously known peer has no direct, routed or nearby state |
 | Connecting / Handshaking | Setup incomplete; no direct-ready/private-send claim |

@@ -72,7 +72,10 @@ fun ResQButton(
             disabledContainerColor = if (variant == ButtonVariant.Primary) {
                 MaterialTheme.colorScheme.primary.copy(alpha = 0.16f)
             } else containerColor.copy(alpha = 0.5f),
-            disabledContentColor = contentColor.copy(alpha = 0.5f)
+            // Filled variants fade toward the canvas, so their white content would wash out in Daylight.
+            disabledContentColor = if (variant == ButtonVariant.Primary || variant == ButtonVariant.Destructive) {
+                MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+            } else contentColor.copy(alpha = 0.5f)
         ),
         border = border,
         contentPadding = contentPadding,

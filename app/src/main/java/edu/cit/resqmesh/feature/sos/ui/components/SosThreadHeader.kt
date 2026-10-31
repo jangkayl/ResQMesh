@@ -229,7 +229,7 @@ internal fun ExpandedSosHeader(
                                 alert.latitude != null -> "Pinned (${String.format(java.util.Locale.US, "%.4f, %.4f", alert.latitude, alert.longitude)}) · ±${alert.accuracyMeters?.toInt() ?: "?"}m"
                                 locationWithheld -> "Location not shared"
                                 alert.ended -> "Location telemetry unavailable"
-                                else -> "Acquiring GPS location..."
+                                else -> "Finding your location…"
                             },
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,

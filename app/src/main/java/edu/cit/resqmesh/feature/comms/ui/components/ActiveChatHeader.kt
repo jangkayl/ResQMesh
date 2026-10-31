@@ -35,7 +35,7 @@ fun ActiveChatHeader(
     onBack: () -> Unit,
     onDelete: () -> Unit
 ) {
-    val statusLabel = if (isDirect) "Direct ready" else "Reachable via mesh"
+    val statusLabel = if (isDirect) "Connected" else "Through another phone"
     val statusTone = if (isDirect) ResQStatusTone.Success else ResQStatusTone.Information
     val statusIcon = if (isDirect) Icons.Outlined.WifiTethering else Icons.Outlined.Route
 
@@ -63,7 +63,7 @@ fun ActiveChatHeader(
             ) {
                 ResQStatusChip(label = statusLabel, tone = statusTone, icon = statusIcon)
                 Text(
-                    text = "Status follows current mesh evidence",
+                    text = "Updates as people move nearby",
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )

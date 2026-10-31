@@ -5,7 +5,6 @@ import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -33,7 +32,6 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -182,9 +180,8 @@ private fun ResQIslandNavItem(
     selected: Boolean,
     onClick: () -> Unit
 ) {
-    val interactionSource = remember { MutableInteractionSource() }
     val animatedIconColor by animateColorAsState(
-        targetValue = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.65f),
+        targetValue = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.85f),
         label = "iconColor"
     )
     val animatedBgColor by animateColorAsState(
@@ -195,17 +192,13 @@ private fun ResQIslandNavItem(
     Surface(
         modifier = Modifier
             .clip(RoundedCornerShape(20.dp))
-            .clickable(
-                interactionSource = interactionSource,
-                indication = null,
-                onClick = onClick
-            ),
+            .clickable(onClick = onClick),
         shape = RoundedCornerShape(20.dp),
         color = animatedBgColor,
         border = if (selected) BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.4f)) else null
     ) {
         Column(
-            modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp),
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
@@ -216,12 +209,12 @@ private fun ResQIslandNavItem(
                 tint = animatedIconColor
             )
 
-            Spacer(Modifier.height(3.dp))
+            Spacer(Modifier.height(4.dp))
 
-            // Neon glowing active indicator dot
+            // Neon glowing active indicator dot; the slot stays reserved so the icon never shifts.
             Box(
                 modifier = Modifier
-                    .size(if (selected) 4.dp else 0.dp)
+                    .size(4.dp)
                     .clip(CircleShape)
                     .background(if (selected) MaterialTheme.colorScheme.primary else Color.Transparent)
             )

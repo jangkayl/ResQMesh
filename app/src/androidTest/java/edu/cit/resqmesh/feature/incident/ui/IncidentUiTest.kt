@@ -169,7 +169,7 @@ class IncidentUiTest {
                 )
             }
         }
-        rule.onNodeWithText("Broadcast Request to Mesh Network").assertIsDisplayed()
+        rule.onNodeWithText("Send Request to People Nearby").assertIsDisplayed()
         rule.onNodeWithText("Could not save. Try again.").performScrollTo().assertIsDisplayed()
 
         // Enter Title
@@ -183,7 +183,7 @@ class IncidentUiTest {
         rule.onNodeWithText("Serious").performScrollTo().performClick()
 
         // Submit
-        rule.onNodeWithText("Broadcast Request to Mesh Network").performClick()
+        rule.onNodeWithText("Send Request to People Nearby").performClick()
         assertEquals(listOf("Need transport", "Medical", "Serious", ""), submitted)
         screenshot("report-daylight")
     }
@@ -502,7 +502,7 @@ class IncidentUiTest {
                 )
             }
         }
-        rule.onNodeWithText("Acknowledge request").performScrollTo().performClick()
+        rule.onNodeWithText("I saw this request").performScrollTo().performClick()
         assertEquals(true, acknowledged)
     }
 
@@ -590,7 +590,7 @@ class IncidentUiTest {
         rule.onNodeWithText("Serious").performScrollTo().performClick()
         restoration.emulateSavedInstanceStateRestore()
         rule.onNodeWithText("Need transport").performScrollTo().assertIsDisplayed()
-        rule.onNodeWithText("Broadcast Request to Mesh Network").assertIsDisplayed().performClick()
+        rule.onNodeWithText("Send Request to People Nearby").assertIsDisplayed().performClick()
         rule.runOnIdle { assertEquals(listOf("Need transport", "Medical", "Serious", ""), submitted) }
     }
 
