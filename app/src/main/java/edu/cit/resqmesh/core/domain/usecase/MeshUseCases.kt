@@ -26,7 +26,6 @@ data class MeshUseCases(
     val acceptPendingPublicKeyChange: AcceptPendingPublicKeyChangeUseCase,
     val rejectPendingPublicKeyChange: RejectPendingPublicKeyChangeUseCase,
     val deleteConversationWith: DeleteConversationWithUseCase,
-    val broadcastLiveAudioChunk: BroadcastLiveAudioChunkUseCase,
     val broadcastSeenReceipt: BroadcastSeenReceiptUseCase,
     val clearSosAlert: ClearSosAlertUseCase,
 
@@ -37,7 +36,6 @@ data class MeshUseCases(
     val observeScannedDevices: ObserveScannedDevicesUseCase,
     val observeIncomingSosAlert: ObserveIncomingSosAlertUseCase,
     val observeIncomingVoiceMessage: ObserveIncomingVoiceMessageUseCase,
-    val observeIncomingLiveAudioChunk: ObserveIncomingLiveAudioChunkUseCase,
     val observeKnownNodes: ObserveKnownNodesUseCase,
     val observeTopology: ObserveTopologyUseCase,
     val observePublicMessages: ObservePublicMessagesUseCase,
@@ -127,12 +125,6 @@ class DeleteConversationWithUseCase(private val repository: MeshNodeRepository) 
     }
 }
 
-class BroadcastLiveAudioChunkUseCase(private val repository: MeshNodeRepository) {
-    operator fun invoke(chunk: ByteArray) {
-        repository.broadcastLiveAudioChunk(chunk)
-    }
-}
-
 class BroadcastSeenReceiptUseCase(private val repository: MeshNodeRepository) {
     operator fun invoke(messageId: String, isPrivate: Boolean, targetName: String? = null) {
         repository.broadcastSeenReceipt(messageId, isPrivate, targetName)
@@ -171,10 +163,6 @@ class ObserveIncomingSosAlertUseCase(private val repository: MeshNodeRepository)
 
 class ObserveIncomingVoiceMessageUseCase(private val repository: MeshNodeRepository) {
     operator fun invoke(): SharedFlow<ChatMessage> = repository.incomingVoiceMessage
-}
-
-class ObserveIncomingLiveAudioChunkUseCase(private val repository: MeshNodeRepository) {
-    operator fun invoke(): SharedFlow<Pair<String, ByteArray>> = repository.incomingLiveAudioChunk
 }
 
 class ObserveKnownNodesUseCase(private val repository: MeshNodeRepository) {

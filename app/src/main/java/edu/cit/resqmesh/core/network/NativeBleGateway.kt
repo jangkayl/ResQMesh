@@ -25,7 +25,6 @@ class NativeBleGateway(private val manager: NativeBleManager) : MeshNetworkGatew
     override var onDeviceScanRemoved by manager::onDeviceScanRemoved
     override var onMessageReceived by manager::onMessageReceived
     override var onMessageSeen by manager::onMessageSeen
-    override var onLiveAudioChunk by manager::onLiveAudioChunk
     override var onMessageDelivered by manager::onMessageDelivered
     override var onPublicKeyReceived by manager::onPublicKeyReceived
     override var onRoutingTableReceived by manager::onRoutingTableReceived
@@ -41,7 +40,6 @@ class NativeBleGateway(private val manager: NativeBleManager) : MeshNetworkGatew
     override var onEventSyncRequest by manager::onEventSyncRequest
     override var onEventSyncResponse by manager::onEventSyncResponse
     override var checkRouteExists by manager::checkRouteExists
-    override var stpNeighborsProvider by manager::stpNeighborsProvider
 
     override fun startMeshNode(teamKey: String) = manager.startMeshNode(teamKey)
     override fun stopMeshNode() = manager.stopMeshNode()

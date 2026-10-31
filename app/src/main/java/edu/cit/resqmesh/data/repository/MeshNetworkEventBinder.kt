@@ -28,8 +28,6 @@ internal fun bindMeshNetworkEvents(gateway: MeshNetworkGateway, callbacks: MeshN
     gateway.onDeviceScanRemoved = callbacks.onDeviceScanRemoved
     gateway.onSosCancelled = callbacks.onSosCancelled
     gateway.onConversationMessage = callbacks.onConversationMessage
-    gateway.stpNeighborsProvider = callbacks.stpNeighborsProvider
-    gateway.onLiveAudioChunk = callbacks.onLiveAudioChunk
     gateway.onMessageReceived = callbacks.onMessageReceived
     gateway.onMessageDelivered = callbacks.onMessageDelivered
     gateway.onMessageSeen = callbacks.onMessageSeen
@@ -54,8 +52,6 @@ internal class MeshNetworkCallbacks(
     val onDeviceScanRemoved: (String) -> Unit,
     val onSosCancelled: () -> Unit,
     val onConversationMessage: (String, MeshPayload) -> Unit,
-    val stpNeighborsProvider: () -> Set<String>,
-    val onLiveAudioChunk: (String, String, ByteArray) -> Unit,
     val onMessageReceived: (String, String, String, String, Boolean, Boolean, String?, String?, Double?, Double?, String, List<String>, String) -> Unit,
     val onMessageDelivered: (String, String, List<String>) -> Unit,
     val onMessageSeen: (String, String) -> Unit

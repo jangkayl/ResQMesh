@@ -303,8 +303,4 @@ internal class MeshPeerCoordinator(
     fun onNetworkDeviceScanRemoved(id: String): Unit = run {
         _scannedDevices.value = _scannedDevices.value.filter { it.endpointId != id }
     }
-
-    fun networkSpanningTreeNeighbors(): Set<String> = run {
-        meshRouter.getSpanningTreeNeighbors(myNodeName, readyConnectedDevices())
-    }
 }

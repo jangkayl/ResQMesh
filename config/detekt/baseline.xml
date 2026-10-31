@@ -109,7 +109,6 @@
     <ID>CyclomaticComplexMethod:MeshInboundMessages.kt$MeshInboundMessages$private suspend fun isAcceptableConversation(p: MeshPayload): Boolean</ID>
     <ID>CyclomaticComplexMethod:MeshPeerCoordinator.kt$MeshPeerCoordinator$fun onNetworkDeviceConnected(device: ConnectedDevice): Unit</ID>
     <ID>CyclomaticComplexMethod:MeshRouter.kt$MeshRouter$@Synchronized fun updateTopology( senderName: String, senderNodeId: String, connectedNodes: List&lt;String&gt;, connectedNodeIds: List&lt;String&gt;, myNodeName: String, topologySequence: Long = 0L ): Boolean</ID>
-    <ID>CyclomaticComplexMethod:MeshRouter.kt$MeshRouter$fun getSpanningTreeNeighbors(myNodeName: String, connectedDevices: List&lt;ConnectedDevice&gt;): Set&lt;String&gt;</ID>
     <ID>CyclomaticComplexMethod:MeshRouter.kt$MeshRouter$fun recalculateKnownNodes(myNodeName: String, connectedDevices: List&lt;ConnectedDevice&gt;)</ID>
     <ID>CyclomaticComplexMethod:MeshRouter.kt$MeshRouter$private fun rootedStablePaths( myNodeName: String, connectedDevices: List&lt;ConnectedDevice&gt;, maxTopologyAgeMs: Long = Long.MAX_VALUE, now: Long = System.currentTimeMillis() ): Map&lt;String, List&lt;String&gt;&gt;</ID>
     <ID>CyclomaticComplexMethod:NativeInboundPipeline.kt$NativeInboundPipeline$fun processBinaryPayload(endpointId: String, payloadBytes: ByteArray, transport: String? = null)</ID>
@@ -520,8 +519,7 @@
     <ID>LongParameterList:MapExpandedDetails.kt$( state: SosMapViewState.MapReady, alertMessage: ChatMessage, activeTab: CoordinateFormatTab, context: Context, onTabChanged: (CoordinateFormatTab) -&gt; Unit, onEngageNavigation: () -&gt; Unit )</ID>
     <ID>LongParameterList:MapPackageDetails.kt$( state: OfflineMapUiState, onDownload: () -&gt; Unit, onDownloadCellular: () -&gt; Unit, onCancel: () -&gt; Unit, onDelete: () -&gt; Unit, onRetry: () -&gt; Unit )</ID>
     <ID>LongParameterList:MeshBlockCoordinator.kt$MeshBlockCoordinator$( private val networkManager: MeshNetworkGateway, private val blockStore: BlockRelationshipStore, private val publicKeys: PeerPublicKeyDirectory, private val repositoryScope: CoroutineScope, private val meshRouter: MeshRouter, private val localName: () -&gt; String, private val blockedNames: () -&gt; MutableStateFlow&lt;Set&lt;String&gt;&gt;, private val readyPeers: () -&gt; List&lt;ConnectedDevice&gt; )</ID>
-    <ID>LongParameterList:MeshConversationMedia.kt$MeshConversationMedia$( private val networkManager: MeshNetworkGateway, private val repositoryScope: CoroutineScope, private val meshRouter: MeshRouter, private val _currentChannelId: MutableStateFlow&lt;String&gt;, private val _connectedDevices: MutableStateFlow&lt;List&lt;ConnectedDevice&gt;&gt;, private val _incomingSosAlert: MutableStateFlow&lt;ChatMessage?&gt;, private val incomingLiveAudioChunk: kotlinx.coroutines.flow.MutableSharedFlow&lt;Pair&lt;String, ByteArray&gt;&gt;, private val localName: () -&gt; String, private val readyPeers: () -&gt; List&lt;ConnectedDevice&gt; )</ID>
-    <ID>LongParameterList:MeshNetworkEventBinder.kt$MeshNetworkCallbacks$( val onStatusChanged: (String) -&gt; Unit, val onOutboundFrame: (OutboundFrameEvent) -&gt; Unit, val onTransportStateChanged: (MeshTransportState) -&gt; Unit, val onDeviceConnected: (ConnectedDevice) -&gt; Unit, val onDeviceDisconnected: (String) -&gt; Unit, val onDeviceLivenessChanged: (String, Boolean) -&gt; Unit, val onPublicKeyReceived: (String, String, String) -&gt; Unit, val onRoutingTableReceived: (String, String, List&lt;String&gt;, List&lt;String&gt;, Long) -&gt; Unit, val onDeviceBlocked: (String) -&gt; Unit, val onDeviceUnblocked: (String) -&gt; Unit, val onBlockRequest: (String, MeshPayload, BlockControlEnvelope) -&gt; Unit, val onBlockAck: (String, MeshPayload, BlockControlEnvelope) -&gt; Unit, val checkRouteExists: (String) -&gt; Boolean, val canRetireForBridge: (String) -&gt; Boolean, val onDeviceScanned: (ScanEvent) -&gt; Unit, val onDeviceScanRemoved: (String) -&gt; Unit, val onSosCancelled: () -&gt; Unit, val onConversationMessage: (String, MeshPayload) -&gt; Unit, val stpNeighborsProvider: () -&gt; Set&lt;String&gt;, val onLiveAudioChunk: (String, String, ByteArray) -&gt; Unit, val onMessageReceived: (String, String, String, String, Boolean, Boolean, String?, String?, Double?, Double?, String, List&lt;String&gt;, String) -&gt; Unit, val onMessageDelivered: (String, String, List&lt;String&gt;) -&gt; Unit, val onMessageSeen: (String, String) -&gt; Unit )</ID>
+    <ID>LongParameterList:MeshNetworkEventBinder.kt$MeshNetworkCallbacks$( val onStatusChanged: (String) -&gt; Unit, val onOutboundFrame: (OutboundFrameEvent) -&gt; Unit, val onTransportStateChanged: (MeshTransportState) -&gt; Unit, val onDeviceConnected: (ConnectedDevice) -&gt; Unit, val onDeviceDisconnected: (String) -&gt; Unit, val onDeviceLivenessChanged: (String, Boolean) -&gt; Unit, val onPublicKeyReceived: (String, String, String) -&gt; Unit, val onRoutingTableReceived: (String, String, List&lt;String&gt;, List&lt;String&gt;, Long) -&gt; Unit, val onDeviceBlocked: (String) -&gt; Unit, val onDeviceUnblocked: (String) -&gt; Unit, val onBlockRequest: (String, MeshPayload, BlockControlEnvelope) -&gt; Unit, val onBlockAck: (String, MeshPayload, BlockControlEnvelope) -&gt; Unit, val checkRouteExists: (String) -&gt; Boolean, val canRetireForBridge: (String) -&gt; Boolean, val onDeviceScanned: (ScanEvent) -&gt; Unit, val onDeviceScanRemoved: (String) -&gt; Unit, val onSosCancelled: () -&gt; Unit, val onConversationMessage: (String, MeshPayload) -&gt; Unit, val onMessageReceived: (String, String, String, String, Boolean, Boolean, String?, String?, Double?, Double?, String, List&lt;String&gt;, String) -&gt; Unit, val onMessageDelivered: (String, String, List&lt;String&gt;) -&gt; Unit, val onMessageSeen: (String, String) -&gt; Unit )</ID>
     <ID>LongParameterList:MeshPeerCoordinator.kt$MeshPeerCoordinator$( private val networkManager: MeshNetworkGateway, private val publicKeys: PeerPublicKeyDirectory, private val readyPeerEvents: MeshReadyPeerEvents, private val meshRouter: MeshRouter, private val _connectionStatus: MutableStateFlow&lt;String&gt;, private val _transportState: MutableStateFlow&lt;MeshTransportState&gt;, private val _connectedDevices: MutableStateFlow&lt;List&lt;ConnectedDevice&gt;&gt;, private val _scannedDevices: MutableStateFlow&lt;List&lt;ScannedDevice&gt;&gt;, private val recentPeerNames: MutableStateFlow&lt;Map&lt;String, String&gt;&gt;, private val peerNames: StateFlow&lt;Map&lt;String, String&gt;&gt;, private val observedPeerNames: Channel&lt;String&gt;, private val localName: () -&gt; String, private val wakeOutbox: () -&gt; Unit )</ID>
     <ID>LongParameterList:MeshRouter.kt$MeshRouter$( senderName: String, senderNodeId: String, connectedNodes: List&lt;String&gt;, connectedNodeIds: List&lt;String&gt;, myNodeName: String, topologySequence: Long = 0L )</ID>
     <ID>LongParameterList:MeshUseCases.kt$SendPrivateMessageUseCase$(targetName: String, text: String, imageBase64: String?, audioBase64: String?, locationLat: Double? = null, locationLng: Double? = null)</ID>
@@ -852,51 +850,6 @@
     <ID>MagicNumber:LegacyIncidentSync.kt$LegacyIncidentSync$4</ID>
     <ID>MagicNumber:LegacyIncidentSync.kt$LegacyIncidentSync$4_000</ID>
     <ID>MagicNumber:LegacyIncidentSync.kt$LegacyIncidentSync$8_000</ID>
-    <ID>MagicNumber:LiveAudioEngine.kt$LiveAudioEngine$0xFF</ID>
-    <ID>MagicNumber:LiveAudioEngine.kt$LiveAudioEngine$0xff</ID>
-    <ID>MagicNumber:LiveAudioEngine.kt$LiveAudioEngine$10</ID>
-    <ID>MagicNumber:LiveAudioEngine.kt$LiveAudioEngine$11</ID>
-    <ID>MagicNumber:LiveAudioEngine.kt$LiveAudioEngine$12</ID>
-    <ID>MagicNumber:LiveAudioEngine.kt$LiveAudioEngine$13</ID>
-    <ID>MagicNumber:LiveAudioEngine.kt$LiveAudioEngine$14</ID>
-    <ID>MagicNumber:LiveAudioEngine.kt$LiveAudioEngine$15</ID>
-    <ID>MagicNumber:LiveAudioEngine.kt$LiveAudioEngine$16</ID>
-    <ID>MagicNumber:LiveAudioEngine.kt$LiveAudioEngine$16000</ID>
-    <ID>MagicNumber:LiveAudioEngine.kt$LiveAudioEngine$17</ID>
-    <ID>MagicNumber:LiveAudioEngine.kt$LiveAudioEngine$18</ID>
-    <ID>MagicNumber:LiveAudioEngine.kt$LiveAudioEngine$19</ID>
-    <ID>MagicNumber:LiveAudioEngine.kt$LiveAudioEngine$20</ID>
-    <ID>MagicNumber:LiveAudioEngine.kt$LiveAudioEngine$21</ID>
-    <ID>MagicNumber:LiveAudioEngine.kt$LiveAudioEngine$22</ID>
-    <ID>MagicNumber:LiveAudioEngine.kt$LiveAudioEngine$23</ID>
-    <ID>MagicNumber:LiveAudioEngine.kt$LiveAudioEngine$24</ID>
-    <ID>MagicNumber:LiveAudioEngine.kt$LiveAudioEngine$25</ID>
-    <ID>MagicNumber:LiveAudioEngine.kt$LiveAudioEngine$26</ID>
-    <ID>MagicNumber:LiveAudioEngine.kt$LiveAudioEngine$27</ID>
-    <ID>MagicNumber:LiveAudioEngine.kt$LiveAudioEngine$28</ID>
-    <ID>MagicNumber:LiveAudioEngine.kt$LiveAudioEngine$29</ID>
-    <ID>MagicNumber:LiveAudioEngine.kt$LiveAudioEngine$3</ID>
-    <ID>MagicNumber:LiveAudioEngine.kt$LiveAudioEngine$30</ID>
-    <ID>MagicNumber:LiveAudioEngine.kt$LiveAudioEngine$31</ID>
-    <ID>MagicNumber:LiveAudioEngine.kt$LiveAudioEngine$32</ID>
-    <ID>MagicNumber:LiveAudioEngine.kt$LiveAudioEngine$33</ID>
-    <ID>MagicNumber:LiveAudioEngine.kt$LiveAudioEngine$34</ID>
-    <ID>MagicNumber:LiveAudioEngine.kt$LiveAudioEngine$35</ID>
-    <ID>MagicNumber:LiveAudioEngine.kt$LiveAudioEngine$36</ID>
-    <ID>MagicNumber:LiveAudioEngine.kt$LiveAudioEngine$37</ID>
-    <ID>MagicNumber:LiveAudioEngine.kt$LiveAudioEngine$38</ID>
-    <ID>MagicNumber:LiveAudioEngine.kt$LiveAudioEngine$39</ID>
-    <ID>MagicNumber:LiveAudioEngine.kt$LiveAudioEngine$4</ID>
-    <ID>MagicNumber:LiveAudioEngine.kt$LiveAudioEngine$40</ID>
-    <ID>MagicNumber:LiveAudioEngine.kt$LiveAudioEngine$41</ID>
-    <ID>MagicNumber:LiveAudioEngine.kt$LiveAudioEngine$42</ID>
-    <ID>MagicNumber:LiveAudioEngine.kt$LiveAudioEngine$43</ID>
-    <ID>MagicNumber:LiveAudioEngine.kt$LiveAudioEngine$44</ID>
-    <ID>MagicNumber:LiveAudioEngine.kt$LiveAudioEngine$5</ID>
-    <ID>MagicNumber:LiveAudioEngine.kt$LiveAudioEngine$6</ID>
-    <ID>MagicNumber:LiveAudioEngine.kt$LiveAudioEngine$7</ID>
-    <ID>MagicNumber:LiveAudioEngine.kt$LiveAudioEngine$8</ID>
-    <ID>MagicNumber:LiveAudioEngine.kt$LiveAudioEngine$9</ID>
     <ID>MagicNumber:LocalIdentityManager.kt$LocalIdentityManager$8</ID>
     <ID>MagicNumber:ManifestVerifier.kt$Ed25519SignatureVerifier$32</ID>
     <ID>MagicNumber:ManifestVerifier.kt$ManifestVerifier$8192</ID>
@@ -1277,16 +1230,6 @@
     <ID>MagicNumber:VisualHolographicPathMap.kt$2200</ID>
     <ID>MagicNumber:VisualHolographicPathMap.kt$8</ID>
     <ID>MagicNumber:VisualHolographicPathMap.kt$8f</ID>
-    <ID>MagicNumber:VoiceCodec.kt$VoiceCodec$0x07</ID>
-    <ID>MagicNumber:VoiceCodec.kt$VoiceCodec$0x100</ID>
-    <ID>MagicNumber:VoiceCodec.kt$VoiceCodec$0x80</ID>
-    <ID>MagicNumber:VoiceCodec.kt$VoiceCodec$0xFF</ID>
-    <ID>MagicNumber:VoiceCodec.kt$VoiceCodec$132</ID>
-    <ID>MagicNumber:VoiceCodec.kt$VoiceCodec$3</ID>
-    <ID>MagicNumber:VoiceCodec.kt$VoiceCodec$32767</ID>
-    <ID>MagicNumber:VoiceCodec.kt$VoiceCodec$4</ID>
-    <ID>MagicNumber:VoiceCodec.kt$VoiceCodec$7</ID>
-    <ID>MagicNumber:VoiceCodec.kt$VoiceCodec$8</ID>
     <ID>MagicNumber:WalkieTalkieScreen.kt$0.5f</ID>
     <ID>MagicNumber:WalkieTalkieScreen.kt$0xFFD32F2F</ID>
     <ID>MagicNumber:WalkieTalkieScreen.kt$0xFFFF7A29</ID>
@@ -1715,16 +1658,6 @@
     <ID>MaxLineLength:LinkControlHandlers.kt$if (!payload.isPrivate || !payload.isEncrypted || payload.encryptedData.isNullOrBlank() || payload.encryptedKey.isNullOrBlank()) return null</ID>
     <ID>MaxLineLength:LinkIdentityAdmission.kt$LinkIdentityAdmission$private fun owns(link: BleLink, session: Session)</ID>
     <ID>MaxLineLength:LinkIdentityAdmission.kt$LinkIdentityAdmission$val entry = sessions.entries.firstOrNull { it.key.endpoint == endpoint &amp;&amp; it.value.frameId == frameId } ?: return</ID>
-    <ID>MaxLineLength:LiveAudioEngine.kt$LiveAudioEngine$header[0] = 'R'.code.toByte()</ID>
-    <ID>MaxLineLength:LiveAudioEngine.kt$LiveAudioEngine$header[12] = 'f'.code.toByte()</ID>
-    <ID>MaxLineLength:LiveAudioEngine.kt$LiveAudioEngine$header[24] = (sampleRate and 0xff).toByte()</ID>
-    <ID>MaxLineLength:LiveAudioEngine.kt$LiveAudioEngine$header[28] = (byteRate and 0xff).toByte()</ID>
-    <ID>MaxLineLength:LiveAudioEngine.kt$LiveAudioEngine$header[36] = 'd'.code.toByte()</ID>
-    <ID>MaxLineLength:LiveAudioEngine.kt$LiveAudioEngine$header[40] = (totalAudioLen and 0xff).toByte()</ID>
-    <ID>MaxLineLength:LiveAudioEngine.kt$LiveAudioEngine$header[4] = (totalDataLen and 0xff).toByte()</ID>
-    <ID>MaxLineLength:LiveAudioEngine.kt$LiveAudioEngine$header[8] = 'W'.code.toByte()</ID>
-    <ID>MaxLineLength:LiveAudioEngine.kt$LiveAudioEngine$if</ID>
-    <ID>MaxLineLength:LiveAudioHandler.kt$LiveAudioHandler$override</ID>
     <ID>MaxLineLength:LocalIdentityManager.kt$LocalIdentityManager$AppLogger.d("IDENTITY", "NAME_UPDATED userIdUnchanged=true deviceIdUnchanged=true storedKeyUnchanged=true")</ID>
     <ID>MaxLineLength:LocalIdentityManager.kt$LocalIdentityManager$check(userDao.updateDisplayName(existing.userId, cleanName) == 1) { "Local identity could not be updated" }</ID>
     <ID>MaxLineLength:LocationAcquisitionBanner.kt$style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp, fontFamily = FontFamily.Monospace)</ID>
@@ -1817,14 +1750,12 @@
     <ID>MaxLineLength:MeshRepository.kt$MeshRepository$private fun onNetworkBlockRequest(endpointId: String, payload: MeshPayload, envelope: BlockControlEnvelope): Unit</ID>
     <ID>MaxLineLength:MeshRepository.kt$MeshRepository$private fun onNetworkConversationMessage(endpoint: String, payload: MeshPayload): Unit</ID>
     <ID>MaxLineLength:MeshRepository.kt$MeshRepository$private fun onNetworkDeviceLivenessChanged(endpointId: String, responsive: Boolean): Unit</ID>
-    <ID>MaxLineLength:MeshRepository.kt$MeshRepository$private fun onNetworkLiveAudioChunk(sender: String, channelId: String, chunk: ByteArray): Unit</ID>
     <ID>MaxLineLength:MeshRepository.kt$MeshRepository$private fun onNetworkMessageDelivered(msgId: String, readerName: String, returnRoute: List&lt;String&gt;): Unit</ID>
     <ID>MaxLineLength:MeshRepository.kt$MeshRepository$private fun onNetworkMessageReceived(endpointId: String, msgId: String, sender: String, text: String, isPrivate: Boolean, isSystem: Boolean, img: String?, audio: String?, lat: Double?, lng: Double?, medium: String, routePath: List&lt;String&gt;, channelId: String): Unit</ID>
     <ID>MaxLineLength:MeshRepository.kt$MeshRepository$private fun onNetworkMessageSeen(msgId: String, readerName: String): Unit</ID>
     <ID>MaxLineLength:MeshRepository.kt$MeshRepository$private fun onNetworkPublicKeyReceived(senderName: String, senderNodeId: String, key: String): Unit</ID>
     <ID>MaxLineLength:MeshRepository.kt$MeshRepository$private fun onNetworkRoutingTableReceived(senderName: String, senderNodeId: String, connectedNodes: List&lt;String&gt;, connectedNodeIds: List&lt;String&gt;, topologySequence: Long): Unit</ID>
     <ID>MaxLineLength:MeshRepository.kt$MeshRepository$private fun onNetworkTransportStateChanged(state: MeshTransportState): Unit</ID>
-    <ID>MaxLineLength:MeshRepository.kt$MeshRepository$val incomingLiveAudioChunk = kotlinx.coroutines.flow.MutableSharedFlow&lt;Pair&lt;String, ByteArray&gt;&gt;(extraBufferCapacity = 100)</ID>
     <ID>MaxLineLength:MeshRouter.kt$MeshRouter$fun</ID>
     <ID>MaxLineLength:MeshRouterStableIdentityTest.kt$MeshRouterStableIdentityTest$"Me#AAAA"</ID>
     <ID>MaxLineLength:MeshRouterStableIdentityTest.kt$MeshRouterStableIdentityTest$router.findShortestPath(me, target, listOf(ConnectedDevice("endpoint", "Old relay label#BBBB", nodeId = "BBBB", isPayloadReady = true)))</ID>
@@ -1943,7 +1874,6 @@
     <ID>MaxLineLength:PermissionsSettingsScreen.kt$border = BorderStroke(1.dp, if (item.isGranted) ResQTheme.colors.success.copy(alpha = 0.35f) else MaterialTheme.colorScheme.error.copy(alpha = 0.35f))</ID>
     <ID>MaxLineLength:PermissionsSettingsScreen.kt$color = if (item.isGranted) ResQTheme.colors.success.copy(alpha = 0.12f) else MaterialTheme.colorScheme.error.copy(alpha = 0.12f)</ID>
     <ID>MaxLineLength:PermissionsSettingsScreen.kt$description = "Discovers nearby peer nodes, establishes GATT client/server radio links, and advertises presence over BLE without internet."</ID>
-    <ID>MaxLineLength:PermissionsSettingsScreen.kt$description = "Enables half-duplex Tactical Walkie-Talkie (PTT) voice broadcast and recorded offline voice notes."</ID>
     <ID>MaxLineLength:PermissionsSettingsScreen.kt$description = "Required to display persistent background mesh status and alert you immediately when high-priority SOS distress beacons arrive."</ID>
     <ID>MaxLineLength:PermissionsSettingsScreen.kt$description = "Supports BLE discovery on applicable Android versions. SOS may include a location when the phone can provide one; precise location needs its separate grant."</ID>
     <ID>MaxLineLength:PermissionsSettingsScreen.kt$text</ID>
@@ -2634,7 +2564,6 @@
     <ID>WildcardImport:KoinModulesVerifyTest.kt$import edu.cit.resqmesh.core.domain.usecase.*</ID>
     <ID>WildcardImport:LinkIdentityAdmissionTest.kt$import edu.cit.resqmesh.core.network.bluetooth.state.*</ID>
     <ID>WildcardImport:LinkIdentityAdmissionTest.kt$import org.junit.Assert.*</ID>
-    <ID>WildcardImport:LiveAudioEngine.kt$import kotlinx.coroutines.*</ID>
     <ID>WildcardImport:LocalIdentityManagerTest.kt$import org.junit.Assert.*</ID>
     <ID>WildcardImport:LocationAcquisitionBanner.kt$import androidx.compose.animation.*</ID>
     <ID>WildcardImport:LocationAcquisitionBanner.kt$import androidx.compose.animation.core.*</ID>

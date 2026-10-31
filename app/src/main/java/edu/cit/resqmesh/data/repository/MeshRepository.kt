@@ -71,7 +71,6 @@ class MeshRepository(
     val incomingVoiceMessage = kotlinx.coroutines.flow.MutableSharedFlow<ChatMessage>(extraBufferCapacity = 10)
     private val _publicSendFeedback = kotlinx.coroutines.flow.MutableSharedFlow<String>(extraBufferCapacity = 8)
     val publicSendFeedback: kotlinx.coroutines.flow.SharedFlow<String> = _publicSendFeedback
-    val incomingLiveAudioChunk = kotlinx.coroutines.flow.MutableSharedFlow<Pair<String, ByteArray>>(extraBufferCapacity = 100)
 
     fun clearSosAlert() = media.clearSosAlert()
 
@@ -157,8 +156,6 @@ class MeshRepository(
                 onDeviceScanRemoved = ::onNetworkDeviceScanRemoved,
                 onSosCancelled = ::onNetworkSosCancelled,
                 onConversationMessage = ::onNetworkConversationMessage,
-                stpNeighborsProvider = ::networkSpanningTreeNeighbors,
-                onLiveAudioChunk = ::onNetworkLiveAudioChunk,
                 onMessageReceived = ::onNetworkMessageReceived,
                 onMessageDelivered = ::onNetworkMessageDelivered,
                 onMessageSeen = ::onNetworkMessageSeen
@@ -202,9 +199,7 @@ class MeshRepository(
 
     private fun onNetworkConversationMessage(endpoint: String, payload: MeshPayload): Unit = inbound.onNetworkConversationMessage(endpoint, payload)
 
-    private fun networkSpanningTreeNeighbors(): Set<String> = peers.networkSpanningTreeNeighbors()
 
-    private fun onNetworkLiveAudioChunk(sender: String, channelId: String, chunk: ByteArray): Unit = media.onNetworkLiveAudioChunk(sender, channelId, chunk)
 
     private fun onNetworkMessageReceived(endpointId: String, msgId: String, sender: String, text: String, isPrivate: Boolean, isSystem: Boolean, img: String?, audio: String?, lat: Double?, lng: Double?, medium: String, routePath: List<String>, channelId: String): Unit = inbound.onNetworkMessageReceived(InboundChatPayload(endpointId, msgId, sender, text, isPrivate, isSystem, img, audio, lat, lng, medium, routePath, channelId))
 
@@ -276,7 +271,6 @@ class MeshRepository(
 
 
     @Synchronized
-    fun broadcastLiveAudioChunk(chunk: ByteArray) = media.broadcastLiveAudioChunk(chunk)
 
     fun forceConnect(endpointId: String, endpointName: String) {
         networkManager.forceConnectToDevice(endpointId, endpointName)
@@ -363,14 +357,7 @@ class MeshRepository(
     )
 
     private fun createConversationMedia() = MeshConversationMedia(
-        networkManager,
-        repositoryScope,
-        meshRouter,
         _currentChannelId,
-        _connectedDevices,
-        _incomingSosAlert,
-        incomingLiveAudioChunk,
-        { myNodeName },
-        ::readyConnectedDevices
+        _incomingSosAlert
     )
 }

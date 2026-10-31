@@ -44,7 +44,7 @@ CI repeats debug build, unit tests, Lint, Android-test compilation, detekt (base
 
 ## D11: Mutual direct-link denial, independent local release
 
-Stable-ID block requests/ACKs establish denial before direct teardown. Both phones persist their own records and unblock locally. Relayed text/private/SOS/receipts/audio remain allowed. Basic behavior has user-reported success; loss/retry and repeated coverage remain bounded by validation. This is a routing-debug policy, not authenticated security.
+Stable-ID block requests/ACKs establish denial before direct teardown. Both phones persist records and unblock locally. Relayed text/private/SOS/receipts/audio remain allowed. See validation. This is a routing-debug policy, not authenticated security.
 
 ## D12: Conservative recovery and cluster bridging
 
@@ -123,3 +123,7 @@ Sync (protocol 3) carries open and 24 h closed incidents, at most 100, with full
 ## D30: Release developer console
 
 Hidden; requires build-set PIN. [Plan](plans/developer-mode.md).
+
+## D31: No live PTT
+
+Voice notes only; older `LIVE_AUDIO` drops. `liveAudioChunk` carries transfers.

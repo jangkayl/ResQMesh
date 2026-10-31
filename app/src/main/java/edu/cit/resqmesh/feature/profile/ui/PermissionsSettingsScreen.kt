@@ -183,7 +183,7 @@ fun PermissionsSettingsScreen(
         PermissionItemState(
             id = "microphone",
             title = "Microphone Access",
-            description = "Lets you talk on the walkie-talkie and record voice notes.",
+            description = "Lets you record voice notes.",
             icon = Icons.Outlined.Mic,
             isGranted = isMicrophoneGranted,
             permissionsToRequest = microphonePermissions

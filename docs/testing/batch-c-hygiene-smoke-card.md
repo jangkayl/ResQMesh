@@ -18,7 +18,7 @@ At least two phones (A, B), plus C for the relay step if available. Bluetooth on
 2. **READY:** A and B reach payload READY, with the usual `BLE_MESH` markers.
 3. **Private message:** A sends private text to B. Expect it to arrive on B and show DELIVERED on A.
 4. **Voice note:** A records a note over 4 KiB to B. Expect complete playback on B (audio files moved).
-5. **Walkie-talkie:** on the Radio channel, hold to talk A→B. Expect live audio on B.
+5. **Radio voice note:** on a radio channel with the monitor on at B, hold to record on A and release. Expect the note to autoplay on B.
 6. **SOS:** A starts SOS, B receives the alarm and silences it locally, then A ends it. Expect the alarm, notification and siren stop as before (SOS alert controller moved).
 7. **Notifications:** with B backgrounded, send a private message from A. Expect a MessagingStyle notification on B (notification helper moved).
 8. **Incidents and map:** open the incident list, view an incident, and open the offline map. Expect no missing UI.

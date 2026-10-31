@@ -67,7 +67,7 @@
     <string name="mission_metric_relay">RELAY</string>
     <string name="mission_metric_nearby">NEARBY</string>
     <string name="mission_voice_title">Voice Comms</string>
-    <string name="mission_voice_description">Tactical PTT · Direct</string>
+    <string name="mission_voice_description">Voice notes · Radio channels</string>
     <string name="mission_topology_title">Live Mesh Topology</string>
     <string name="mission_topology_description">Real-time routing matrix</string>
     <string name="mission_active_nodes">Linked Peers</string>

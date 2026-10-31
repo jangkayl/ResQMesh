@@ -17,7 +17,6 @@ interface MeshNodeRepository {
     val scannedDevices: StateFlow<List<ScannedDevice>>
     val incomingSosAlert: StateFlow<ChatMessage?>
     val incomingVoiceMessage: SharedFlow<ChatMessage>
-    val incomingLiveAudioChunk: SharedFlow<Pair<String, ByteArray>>
     val publicSendFeedback: SharedFlow<String>
     val knownNodes: StateFlow<List<KnownNode>>
     val topology: StateFlow<Map<String, Set<String>>>
@@ -62,7 +61,6 @@ interface MeshNodeRepository {
     fun acceptPendingPublicKeyChange(peerName: String): Boolean
     fun rejectPendingPublicKeyChange(peerName: String): Boolean
     fun deleteConversationWith(peerName: String)
-    fun broadcastLiveAudioChunk(chunk: ByteArray)
     fun broadcastSeenReceipt(messageId: String, isPrivate: Boolean, targetName: String? = null)
     fun clearSosAlert()
 }

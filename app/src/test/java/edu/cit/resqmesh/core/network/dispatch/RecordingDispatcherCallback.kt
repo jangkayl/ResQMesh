@@ -29,7 +29,6 @@ internal class RecordingDispatcherCallback(
     override fun getEndpointMedium(endpointId: String) = "BLE"
     override fun getConnectedEndpointIdByName(name: String): String? = null
     override fun getConnectedEndpointIdByNodeId(nodeId: String): String? = null
-    override fun getStpNeighbors(): Set<String> = emptySet()
     override fun sendDirectPayload(endpointId: String, payload: ByteArray) = TransportDispatchResult.ACCEPTED
     override fun sendPriorityPayload(endpointId: String, payload: ByteArray) = TransportDispatchResult.ACCEPTED
     override fun sendGattPayload(endpointId: String, payload: ByteArray) {}
@@ -44,7 +43,6 @@ internal class RecordingDispatcherCallback(
     override fun onMessageReceived(endpointId: String, msgId: String, senderName: String, text: String, isPrivate: Boolean, isSystem: Boolean, imageBase64: String?, audioBase64: String?, locationLat: Double?, locationLng: Double?, medium: String, routePath: List<String>, channelId: String) {
         received += msgId
     }
-    override fun onLiveAudioChunk(sender: String, channelId: String, chunk: ByteArray) {}
     override fun onDeviceNameSync(endpointId: String, realName: String) {}
     override fun onDeviceGoodbye(endpointId: String) { goodbyes += endpointId }
     override fun onSosCancelled() {}

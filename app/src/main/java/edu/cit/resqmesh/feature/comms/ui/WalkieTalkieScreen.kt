@@ -62,9 +62,9 @@ fun WalkieTalkieScreen(
     val voiceHeld by commsViewModel.voiceHeld.collectAsState()
     val holdFull = voiceHeld >= edu.cit.resqmesh.feature.comms.viewmodel.RadioVoiceHold.CAPACITY
     val budgetWaiting = sendBudget.remaining <= 0
-    val pttBlocked = budgetWaiting || holdFull
+    val recordBlocked = budgetWaiting || holdFull
     val waitDescription = edu.cit.resqmesh.feature.comms.ui.components.composer.chatBudgetWaitDescription(sendBudget)
-    val latestWaiting by androidx.compose.runtime.rememberUpdatedState(pttBlocked)
+    val latestWaiting by androidx.compose.runtime.rememberUpdatedState(recordBlocked)
     var recordingDestination by remember { mutableStateOf(channel) }
     var channelsOpen by remember { mutableStateOf(false) }
     val haptics = LocalHapticFeedback.current
@@ -130,7 +130,7 @@ fun WalkieTalkieScreen(
     val pressScale by animateFloatAsState(
         targetValue = if (recording) 0.94f else 1f,
         animationSpec = spring(stiffness = 550f, dampingRatio = 0.65f),
-        label = "ptt scale"
+        label = "record scale"
     )
 
     BoxWithConstraints(Modifier.fillMaxSize()) {
@@ -232,7 +232,7 @@ fun WalkieTalkieScreen(
                             .background(ResQTheme.colors.sos)
                     )
                     Text(
-                        text = "TRANSMITTING LIVE",
+                        text = "RECORDING VOICE NOTE",
                         color = ResQTheme.colors.sos,
                         fontWeight = FontWeight.Bold,
                         style = MaterialTheme.typography.labelLarge
@@ -251,7 +251,7 @@ fun WalkieTalkieScreen(
                 }
             } else {
                 Text(
-                    text = if (receiverOn) "READY · HOLD BUTTON TO TALK" else "CHANNEL $channel STANDBY",
+                    text = if (receiverOn) "READY · HOLD BUTTON TO RECORD" else "CHANNEL $channel STANDBY",
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     style = MaterialTheme.typography.labelMedium,
                     fontWeight = FontWeight.Bold
@@ -261,7 +261,7 @@ fun WalkieTalkieScreen(
 
         Spacer(Modifier.height(16.dp))
 
-        // Center Modern Push-To-Talk Button with Gradient & Concentric Glow Ripples
+        // Center Modern Hold-To-Record Button with Gradient & Concentric Glow Ripples
         Box(
             contentAlignment = Alignment.Center,
             modifier = Modifier.size(240.dp)
@@ -390,7 +390,7 @@ fun WalkieTalkieScreen(
                                     edu.cit.resqmesh.R.string.chat_budget_wait,
                                     sendBudget.waitSeconds()
                                 )
-                                else -> "HOLD TO TALK"
+                                else -> "HOLD TO RECORD"
                             },
                             style = MaterialTheme.typography.labelMedium.copy(letterSpacing = 1.2.sp),
                             fontWeight = FontWeight.ExtraBold,
@@ -407,7 +407,7 @@ fun WalkieTalkieScreen(
             text = when {
                 recording -> "Let go to send your voice"
                 voiceHeld > 0 -> "$voiceHeld voice note(s) held. They send as the send budget refills."
-                else -> "Push and hold to transmit voice"
+                else -> "Hold to record a voice note"
             },
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.Bold,

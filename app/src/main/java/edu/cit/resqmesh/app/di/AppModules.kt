@@ -23,7 +23,6 @@ import edu.cit.resqmesh.core.network.ratelimit.OutgoingSosBudget
 import edu.cit.resqmesh.feature.comms.viewmodel.RadioVoiceHold
 import edu.cit.resqmesh.core.network.ratelimit.RateLimitPolicy
 import edu.cit.resqmesh.core.service.MeshSessionController
-import edu.cit.resqmesh.core.audio.LiveAudioEngine
 import edu.cit.resqmesh.core.audio.MediaHelper
 import edu.cit.resqmesh.core.notification.NotificationHelper
 import edu.cit.resqmesh.core.notification.SosAlertNotifier
@@ -98,13 +97,6 @@ val platformModule = module {
             verifier = get(),
             connectivityProvider = get()
         )
-    }
-
-    single {
-        val repository = get<MeshRepository>()
-        LiveAudioEngine(androidContext()) { chunk ->
-            repository.broadcastLiveAudioChunk(chunk)
-        }
     }
 }
 
@@ -212,7 +204,6 @@ val domainModule = module {
             acceptPendingPublicKeyChange = AcceptPendingPublicKeyChangeUseCase(get()),
             rejectPendingPublicKeyChange = RejectPendingPublicKeyChangeUseCase(get()),
             deleteConversationWith = DeleteConversationWithUseCase(get()),
-            broadcastLiveAudioChunk = BroadcastLiveAudioChunkUseCase(get()),
             broadcastSeenReceipt = BroadcastSeenReceiptUseCase(get()),
             clearSosAlert = ClearSosAlertUseCase(get()),
             observeConnectionStatus = ObserveConnectionStatusUseCase(get()),
@@ -222,7 +213,6 @@ val domainModule = module {
             observeScannedDevices = ObserveScannedDevicesUseCase(get()),
             observeIncomingSosAlert = ObserveIncomingSosAlertUseCase(get()),
             observeIncomingVoiceMessage = ObserveIncomingVoiceMessageUseCase(get()),
-            observeIncomingLiveAudioChunk = ObserveIncomingLiveAudioChunkUseCase(get()),
             observeKnownNodes = ObserveKnownNodesUseCase(get()),
             observeTopology = ObserveTopologyUseCase(get()),
             observePublicMessages = ObservePublicMessagesUseCase(get()),
@@ -268,7 +258,7 @@ val viewModelModule = module {
             locationPreferences = get()
         )
     }
-    viewModel { WalkieTalkieViewModel(useCases = get(), mediaHelper = get(), liveAudioEngine = get()) }
+    viewModel { WalkieTalkieViewModel(useCases = get(), mediaHelper = get()) }
     viewModel { OfflineMapViewModel(storageGuard = get(), downloader = get(), connectivityProvider = get()) }
     viewModel { AboutViewModel() }
     viewModel { edu.cit.resqmesh.feature.devtools.viewmodel.DevToolsViewModel(get()) }
