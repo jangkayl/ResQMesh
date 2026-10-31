@@ -5,6 +5,8 @@ import edu.cit.resqmesh.core.model.ConnectedDevice
 import edu.cit.resqmesh.core.model.KnownNode
 import edu.cit.resqmesh.core.model.ScannedDevice
 import edu.cit.resqmesh.core.domain.repository.MeshNodeRepository
+import edu.cit.resqmesh.core.network.LinkDiagnostic
+import edu.cit.resqmesh.core.network.MeshNetworkGateway
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -41,7 +43,8 @@ data class MeshUseCases(
     val observePublicMessages: ObservePublicMessagesUseCase,
     val observePrivateMessages: ObservePrivateMessagesUseCase,
     val observePeerNames: ObservePeerNamesUseCase,
-    val observeBlockedDeviceNames: ObserveBlockedDeviceNamesUseCase
+    val observeBlockedDeviceNames: ObserveBlockedDeviceNamesUseCase,
+    val linkDiagnostics: LinkDiagnosticsUseCase
 )
 
 class StartNodeUseCase(private val repository: MeshNodeRepository) {
@@ -193,6 +196,11 @@ class ObservePrivateMessagesUseCase(private val repository: MeshNodeRepository) 
 
 class ObservePeerNamesUseCase(private val repository: MeshNodeRepository) {
     operator fun invoke(): StateFlow<Map<String, String>> = repository.peerNames
+}
+
+/** One-shot read of the live BLE links; the developer console polls it. */
+class LinkDiagnosticsUseCase(private val gateway: MeshNetworkGateway) {
+    operator fun invoke(): List<LinkDiagnostic> = gateway.linkDiagnostics()
 }
 
 class ObserveBlockedDeviceNamesUseCase(private val repository: MeshNodeRepository) {

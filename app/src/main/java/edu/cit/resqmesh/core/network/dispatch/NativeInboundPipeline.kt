@@ -3,6 +3,10 @@ package edu.cit.resqmesh.core.network.dispatch
 import android.os.Handler
 import edu.cit.resqmesh.core.model.ConnectedDevice
 import edu.cit.resqmesh.core.model.NodeIdentity
+import edu.cit.resqmesh.core.logging.trace.TraceDir
+import edu.cit.resqmesh.core.logging.trace.TraceDropReason
+import edu.cit.resqmesh.core.logging.trace.TraceStage
+import edu.cit.resqmesh.core.network.PacketTraceEmitter
 import edu.cit.resqmesh.core.network.ReliableMeshTransfers
 import edu.cit.resqmesh.core.network.bluetooth.state.BleLinkRole
 import edu.cit.resqmesh.core.network.bluetooth.state.BleStateStore
@@ -38,27 +42,45 @@ internal class NativeInboundPipeline(
     private val onDeviceConnected get() = connectedListener()
     private val onDeviceLivenessChanged get() = livenessListener()
 
-    fun processBinaryPayload(endpointId: String, payloadBytes: ByteArray) {
+    fun processBinaryPayload(endpointId: String, payloadBytes: ByteArray, transport: String? = null) {
         val capturedGeneration = transportGeneration
         val receivingLinks = BleLinkRole.entries.mapNotNull { store.links.current(endpointId, it) }
         if (!isTransportGenerationCurrent(capturedGeneration) || !hasLiveSocket(endpointId)) {
             AppLogger.d("BLE_MESH", "Dropping payload from unowned endpoint $endpointId")
+            PacketTraceEmitter.drop(null, TraceDropReason.UNOWNED_LINK, endpointId, payloadBytes.size, transport)
             return
         }
         try {
             val payload = kotlinx.serialization.protobuf.ProtoBuf.decodeFromByteArray(edu.cit.resqmesh.core.network.MeshPayload.serializer(), payloadBytes)
             if (payload.type in setOf(ReliableMeshTransfers.PIECE, ReliableMeshTransfers.ACK)) {
-                val peer = nodeIdForEndpoint(endpointId)?.uppercase() ?: return
+                val peer = nodeIdForEndpoint(endpointId)?.uppercase() ?: run {
+                    PacketTraceEmitter.drop(
+                        payload, TraceDropReason.TRANSFER_GUARD, endpointId, payloadBytes.size, transport
+                    )
+                    return
+                }
                 if (!hasReadyEndpoint(endpointId) || !store.links.isIdentityAdmitted(endpointId) ||
                     isDeviceBlocked(store.connectedEndpointNames[endpointId].orEmpty()) ||
                     peerTransferVersions[peer] != ReliableMeshTransfers.VERSION ||
-                    payload.targetNodeId.isNotBlank() && !payload.targetNodeId.equals(myNodeId, true)) return
+                    payload.targetNodeId.isNotBlank() && !payload.targetNodeId.equals(myNodeId, true)) {
+                    PacketTraceEmitter.drop(
+                        payload, TraceDropReason.TRANSFER_GUARD, endpointId, payloadBytes.size, transport
+                    )
+                    return
+                }
+                PacketTraceEmitter.emit(payload, TraceStage.RECEIVED, TraceDir.IN, payloadBytes.size, transport,
+                    selfId = myNodeId)
                 reliableTransfers.receive(peer, payload)
                 return
             }
             // PIECE/ACK frames returned above: a 2 MiB transfer is ~2048 one-KiB pieces, far above 64 frames/s,
             // and their volume is already bounded by the bytes/s budget and the transfer window.
-            if (!store.guards.admitFrame("$endpointId/frames")) return
+            if (!store.guards.admitFrame("$endpointId/frames")) {
+                PacketTraceEmitter.drop(payload, TraceDropReason.FRAME_RATE, endpointId, payloadBytes.size, transport)
+                return
+            }
+            PacketTraceEmitter.emit(payload, TraceStage.RECEIVED, TraceDir.IN, payloadBytes.size, transport,
+                selfId = myNodeId)
             onDeviceLivenessChanged?.invoke(endpointId, true)
             if (payload.type != "PONG") removeHeartbeat(endpointId)
 
@@ -121,7 +143,7 @@ internal class NativeInboundPipeline(
                 }
             }
         } catch (e: Exception) {
-            AppLogger.d("BLE_MESH", "Failed to decode payload for auto-rename: ${e.message}")
+            AppLogger.d("BLE_MESH", "Failed to decode payload for auto-rename: ${e.javaClass.simpleName}")
         }
 
         dispatch(endpointId, payloadBytes)

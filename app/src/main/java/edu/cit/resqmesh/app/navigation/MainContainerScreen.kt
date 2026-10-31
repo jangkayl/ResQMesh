@@ -31,7 +31,6 @@ import edu.cit.resqmesh.core.ui.components.layout.ResQDestination
 import androidx.compose.foundation.layout.Box
 import edu.cit.resqmesh.core.ui.theme.AppAppearance
 import edu.cit.resqmesh.core.ui.theme.ResQMotion
-import edu.cit.resqmesh.core.logging.AppLogger
 import androidx.compose.ui.platform.LocalContext
 import edu.cit.resqmesh.core.notification.NotificationHelper
 
@@ -141,6 +140,7 @@ fun MainContainerScreen(
     }
 
     val isDeveloperMode by setupViewModel.isDeveloperModeEnabled.collectAsState()
+    var devToolsTab by remember { mutableStateOf<edu.cit.resqmesh.feature.devtools.model.DevToolsTab?>(null) }
 
     LaunchedEffect(Unit) {
         setupViewModel.initDeveloperMode(context)
@@ -423,6 +423,8 @@ fun MainContainerScreen(
         }
 
         MainApplicationOverlays(isDeveloperMode, incomingSosAlert != null, mapSosAlert != null, activeSosMessageId != null, isSOSActive, publicSendSnackbar,
-            onToggleTerminal = { AppLogger.toggleTerminal() })
+            devToolsTab = devToolsTab,
+            openDevTools = { devToolsTab = it },
+            closeDevTools = { devToolsTab = null })
     }
 }

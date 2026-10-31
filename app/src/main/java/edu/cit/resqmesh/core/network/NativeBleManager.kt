@@ -1,5 +1,6 @@
 package edu.cit.resqmesh.core.network
 
+import edu.cit.resqmesh.core.network.bluetooth.peers.BleLinkDiagnostics
 import edu.cit.resqmesh.core.network.bluetooth.peers.BlePeerDirectory
 import edu.cit.resqmesh.core.network.bluetooth.peers.BleLinkRetirementController
 import edu.cit.resqmesh.core.network.bluetooth.session.BleTransportResources
@@ -212,7 +213,8 @@ class NativeBleManager(
             event = { bytes, stage, queuedAt, startedAt -> handler.post {
                 reportFrame("", bytes, stage, "TRANSFER", queuedAt, startedAt)
             } },
-            log = { AppLogger.d("BLE_TRANSFER", it) }
+            log = { AppLogger.d("BLE_TRANSFER", it) },
+            trace = TransferTraceEmitter::transfer
         )
     }
     private val outboundDispatcher: NativeOutboundDispatcher = NativeOutboundDispatcher(
@@ -489,6 +491,8 @@ class NativeBleManager(
 
     fun hasReadyEndpoint(endpointId: String): Boolean = peerDirectory.hasReadyEndpoint(endpointId)
 
+    fun linkDiagnostics() = BleLinkDiagnostics.read(store, peerDirectory, l2capTransport)
+
     /** Retire the data socket and compatibility state only after the last GATT role ends. */
     private val linkRetirement: BleLinkRetirementController = BleLinkRetirementController(
         store, handler, transportResources, peerDirectory, outboundDispatcher, { reliableTransfers },
@@ -583,8 +587,8 @@ class NativeBleManager(
         dispatch = { endpoint, bytes -> payloadDispatcher.dispatch(endpoint, bytes) }
     )
 
-    fun processBinaryPayload(endpointId: String, payloadBytes: ByteArray) {
-        inboundPipeline.processBinaryPayload(endpointId, payloadBytes)
+    fun processBinaryPayload(endpointId: String, payloadBytes: ByteArray, transport: String? = null) {
+        inboundPipeline.processBinaryPayload(endpointId, payloadBytes, transport)
     }
 
     fun broadcastPayload(payloadBytes: ByteArray, excludeEndpointId: String? = null): BroadcastDispatchResult {

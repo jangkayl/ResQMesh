@@ -8,6 +8,11 @@ import android.media.MediaRecorder
 import android.os.Build
 import android.util.Base64
 import edu.cit.resqmesh.core.logging.AppLogger
+import edu.cit.resqmesh.core.logging.trace.TraceDir
+import edu.cit.resqmesh.core.logging.trace.TraceDropReason
+import edu.cit.resqmesh.core.logging.trace.TraceScope
+import edu.cit.resqmesh.core.logging.trace.TraceStage
+import edu.cit.resqmesh.core.network.TransferTraceEmitter
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import java.io.ByteArrayOutputStream
@@ -18,6 +23,9 @@ class MediaHelper(private val context: Context) {
     private var mediaRecorder: MediaRecorder? = null
     private var audioFile: File? = null
     private var mediaPlayer: MediaPlayer? = null
+
+    private fun traceVoice(dir: TraceDir, reason: TraceDropReason) =
+        TransferTraceEmitter.voice(dir, TraceStage.FAILED, TraceScope.UNKNOWN, "", reason, "media")
 
     // --- AUDIO LOGIC ---
     fun startRecording(): Boolean {
@@ -35,6 +43,7 @@ class MediaHelper(private val context: Context) {
             true
         } catch (e: Exception) {
             AppLogger.d("MediaHelper", "Failed to start recording: ${e.javaClass.simpleName}")
+            traceVoice(TraceDir.OUT, TraceDropReason.RECORD_FAILED)
             false
         }
     }
@@ -46,9 +55,11 @@ class MediaHelper(private val context: Context) {
             mediaRecorder = null
 
             val audioBytes = audioFile?.readBytes()
+            if (audioBytes == null) traceVoice(TraceDir.OUT, TraceDropReason.RECORD_FAILED)
             if (audioBytes != null) Base64.encodeToString(audioBytes, Base64.NO_WRAP) else null
         } catch (e: Exception) {
             AppLogger.d("MediaHelper", "Failed to stop recording: ${e.javaClass.simpleName}")
+            traceVoice(TraceDir.OUT, TraceDropReason.RECORD_FAILED)
             null
         }
     }
@@ -137,6 +148,11 @@ class MediaHelper(private val context: Context) {
                 setDataSource(tempPlayFile.absolutePath)
                 prepare()
                 if (isRadio && radioResumePositionMs > 0) seekTo(radioResumePositionMs)
+                // Observe only: returning false keeps the default behaviour (the completion listener still runs).
+                setOnErrorListener { _, _, _ ->
+                    traceVoice(TraceDir.IN, TraceDropReason.PLAYBACK_FAILED)
+                    false
+                }
                 setOnCompletionListener {
                     releasePlayer()
                     if (isRadio) {
@@ -153,6 +169,7 @@ class MediaHelper(private val context: Context) {
             _currentRadioSpeaker.value = if (isRadio) radioQueue.current?.sender else null
         } catch (e: Exception) {
             AppLogger.d("MediaHelper", "Playback failed: ${e.javaClass.simpleName}")
+            traceVoice(TraceDir.IN, TraceDropReason.PLAYBACK_FAILED)
             releasePlayer()
             if (isRadio) {
                 radioQueue.completeCurrent()

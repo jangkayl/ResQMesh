@@ -1,8 +1,12 @@
 package edu.cit.resqmesh.data.repository.mesh
 
 import edu.cit.resqmesh.core.logging.AppLogger
+import edu.cit.resqmesh.core.logging.trace.TraceDropReason
+import edu.cit.resqmesh.core.logging.trace.TraceScope
+import edu.cit.resqmesh.core.logging.trace.TraceType
 import edu.cit.resqmesh.core.network.MeshNetworkGateway
 import edu.cit.resqmesh.core.network.OutboundFrameEvent
+import edu.cit.resqmesh.core.network.PacketTraceEmitter
 import edu.cit.resqmesh.data.repository.MessageStore
 import edu.cit.resqmesh.data.repository.PrivateTransferProgress
 import edu.cit.resqmesh.data.repository.mesh.MeshDeliveryConstants.MAX_PRIVATE_ACCEPTED_ATTEMPTS
@@ -77,6 +81,9 @@ internal class PrivateReceiptWatch(
         }
         if ((acceptedAttempts[messageId] ?: 0) >= MAX_PRIVATE_ACCEPTED_ATTEMPTS) {
             messageStore.markFailed(messageId)
+            PacketTraceEmitter.localOutcome(
+                messageId, TraceScope.PRIVATE, TraceType.OTHER, TraceDropReason.RETRIES_EXHAUSTED
+            )
             acceptedAttempts.remove(messageId)
         } else {
             messageStore.markPending(messageId)

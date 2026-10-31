@@ -37,7 +37,7 @@ class AndroidConnectivityProvider(private val context: Context) : ConnectivityPr
             caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) ||
                     caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_METERED)
         } catch (e: Exception) {
-            AppLogger.d("AndroidConnectivityProvider", "Failed to check connectivity: ${e.message}")
+            AppLogger.d("AndroidConnectivityProvider", "Failed to check connectivity: ${e.javaClass.simpleName}")
             false
         }
     }
@@ -109,7 +109,7 @@ class DefaultHttpTransport : HttpTransport {
             }
             connection.inputStream.use { it.readBytes() }
         } catch (e: Exception) {
-            AppLogger.d("DefaultHttpTransport", "Failed to fetch bytes from $urlString: ${e.message}")
+            AppLogger.d("DefaultHttpTransport", "Failed to fetch bytes from $urlString: ${e.javaClass.simpleName}")
             null
         }
     }
@@ -163,7 +163,7 @@ class DefaultHttpTransport : HttpTransport {
 
             true
         } catch (e: Exception) {
-            AppLogger.d("DefaultHttpTransport", "Error downloading to file: ${e.message}")
+            AppLogger.d("DefaultHttpTransport", "Error downloading to file: ${e.javaClass.simpleName}")
             false
         }
     }

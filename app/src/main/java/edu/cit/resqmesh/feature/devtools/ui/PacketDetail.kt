@@ -1,0 +1,64 @@
+package edu.cit.resqmesh.feature.devtools.ui
+
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
+import edu.cit.resqmesh.core.logging.trace.PacketTrace
+import edu.cit.resqmesh.core.ui.components.feedback.ResQStatusChip
+import edu.cit.resqmesh.core.ui.theme.Spacing
+import edu.cit.resqmesh.feature.devtools.model.TimelineEntry
+import edu.cit.resqmesh.feature.devtools.model.TraceTimeline
+
+/** All fields of one packet plus this phone's raw events that share its packet key. */
+@Composable
+internal fun PacketDetail(
+    packet: PacketTrace,
+    timeline: List<TimelineEntry>,
+    names: Map<String, String>,
+    onClose: () -> Unit
+) {
+    Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(Spacing.Medium)) {
+        Row {
+            Text("Packet detail", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+            TextButton(onClick = onClose) { Text("Back") }
+        }
+        LabeledValue("Packet", safeToken(packet.packetKey) ?: DASH)
+        LabeledValue("Direction", packet.dir.name, mono = false)
+        LabeledValue("Scope", packet.scope.name, mono = false)
+        LabeledValue("Type", packet.type.name, mono = false)
+        LabeledValue("Stage", packet.stage.name, mono = false)
+        LabeledValue("Source", peerLabel(packet.sourceId, names), mono = false)
+        LabeledValue("Destination", destLabel(packet, names), mono = false)
+        LabeledValue("Next hop", peerLabel(packet.nextHop, names), mono = false)
+        LabeledValue("Hop / TTL", hopLabel(packet))
+        LabeledValue("Route length", packet.pathLen?.toString() ?: DASH)
+        LabeledValue("Bytes", packet.bytes.toString())
+        progressLabel(packet)?.let { LabeledValue("Progress", it) }
+        LabeledValue("Transport", safeToken(packet.transport) ?: DASH)
+        LabeledValue("Drop reason", packet.dropReason.name, mono = false)
+        SectionTitle("Timeline (this phone only)")
+        if (timeline.size >= TraceTimeline.MAX_ENTRIES) {
+            Text("Showing the newest ${TraceTimeline.MAX_ENTRIES} events.", style = MaterialTheme.typography.labelSmall)
+        }
+        timeline.forEach { entry ->
+            val e = entry.event
+            Row(Modifier.padding(vertical = Spacing.ExtraSmall)) {
+                Text(
+                    formatTime(e.epochMs),
+                    fontFamily = MonoFont,
+                    style = MaterialTheme.typography.labelMedium,
+                    modifier = Modifier.weight(LABEL_WEIGHT)
+                )
+                ResQStatusChip(entry.label, stageTone(e))
+            }
+        }
+    }
+}

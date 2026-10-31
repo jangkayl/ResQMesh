@@ -52,7 +52,7 @@ Recovery must not destroy healthy routes: Bluetooth OFF suspends and ON rebuilds
 
 ## D13: MapLibre and local PMTiles
 
-MapLibre Native/local PMTiles replaces osmdroid and bulk public raster downloads. Local map display and SOS map use have user-reported offline success.
+MapLibre Native/local PMTiles replaces osmdroid and bulk public raster downloads.
 
 ## D14: Offline manifest signatures
 
@@ -119,3 +119,7 @@ New Critical/Serious incidents notify everyone unless toggled off; reporter/help
 ## D29: Bounded incident sync, paced creation
 
 Sync (protocol 3) carries open and 24 h closed incidents, at most 100, with full history; older stay local. Sync is never rate limited. Per signing key, reports are paced 3 then 1/20 s and offer changes 5/min per incident; receivers pace live broadcasts only; withdrawals and lead decisions are exempt.
+
+## D30: Release developer console
+
+Hidden; requires build-set PIN. [Plan](plans/developer-mode.md).

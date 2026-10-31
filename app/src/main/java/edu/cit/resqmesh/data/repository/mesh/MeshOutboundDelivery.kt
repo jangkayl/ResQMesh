@@ -10,6 +10,13 @@ import edu.cit.resqmesh.core.network.OutboundFrameEvent
 import edu.cit.resqmesh.core.network.TransportDispatchResult
 import edu.cit.resqmesh.core.network.MeshNetworkGateway
 import edu.cit.resqmesh.core.logging.AppLogger
+import edu.cit.resqmesh.core.logging.trace.TraceDir
+import edu.cit.resqmesh.core.logging.trace.TraceDropReason
+import edu.cit.resqmesh.core.logging.trace.TraceStage
+import edu.cit.resqmesh.core.network.TransferTraceEmitter
+import edu.cit.resqmesh.core.logging.trace.TraceScope
+import edu.cit.resqmesh.core.logging.trace.TraceType
+import edu.cit.resqmesh.core.network.PacketTraceEmitter
 import kotlinx.serialization.decodeFromByteArray
 import kotlinx.serialization.protobuf.ProtoBuf
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -56,6 +63,14 @@ internal class MeshOutboundDelivery(
     private val chatBudget: OutgoingChatBudget = OutgoingChatBudget()
 ) {
     private val myNodeName get() = localName()
+    private fun traceOutcome(id: String, scope: TraceScope, reason: TraceDropReason) =
+        PacketTraceEmitter.localOutcome(id, scope, TraceType.OTHER, reason)
+
+    /** The sender knows its own note is voice, even when private audio is encrypted on the wire. */
+    private fun traceSentVoice(id: String, scope: TraceScope) =
+        TransferTraceEmitter.voice(TraceDir.OUT, TraceStage.QUEUED, scope, id, TraceDropReason.NONE, "local")
+
+    private fun scopeOf(targetName: String?) = if (targetName != null) TraceScope.PRIVATE else TraceScope.PUBLIC
     private fun readyConnectedDevices() = readyPeers()
     private fun currentPeerName(name: String) = resolveName(name)
 
@@ -141,6 +156,7 @@ internal class MeshOutboundDelivery(
         for ((message, targetName) in pendingMessages) {
             if (isUnsendablePublic(message, targetName) || now - message.timestamp > OUTBOX_EXPIRY_MS) {
                 expire(message.id)
+                traceOutcome(message.id, scopeOf(targetName), TraceDropReason.EXPIRED_UNSENT)
                 continue
             }
             if (targetName != null) retryPrivate(message, targetName, readyDevices, pass)
@@ -252,6 +268,7 @@ internal class MeshOutboundDelivery(
         }
         if (result.neighbors.values.any { it == TransportDispatchResult.REJECTED_INVALID_FRAME }) {
             expire(messageId)
+            traceOutcome(messageId, TraceScope.PUBLIC, TraceDropReason.SEND_INVALID_FRAME)
             return false
         }
         return true
@@ -293,6 +310,7 @@ internal class MeshOutboundDelivery(
         val message = ChatMessage(messageId, myNodeName, content.text, content.imageBase64, content.audioBase64,
             content.locationLat, content.locationLng, true, false, timestamp,
             conversationKind = conversationKind, channelId = channelId, sosId = sosId, senderNodeId = networkManager.myNodeId)
+        if (content.audioBase64 != null) traceSentVoice(messageId, TraceScope.PUBLIC)
         prepaid.add(messageId)
         repositoryScope.launch {
             outboxMutex.withLock {
@@ -360,6 +378,7 @@ internal class MeshOutboundDelivery(
             return false
         }
 
+        if (content.audioBase64 != null) traceSentVoice(msgId, TraceScope.PRIVATE)
         val delivery = PrivateDeliveryPlanner.select(currentTarget, directedRouteList, readyDevices)
         val isDirect = readyDevices.any { NodeIdentity.matches(it.name, currentTarget) }
         val message = ChatMessage(msgId, myNodeName, content.text, content.imageBase64, content.audioBase64,

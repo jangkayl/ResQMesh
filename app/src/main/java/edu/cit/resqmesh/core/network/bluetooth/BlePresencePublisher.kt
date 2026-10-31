@@ -101,7 +101,7 @@ internal class BlePresencePublisher(
             )
             broadcastPriorityPayload(payloadBytes)
         } catch (e: Exception) {
-            AppLogger.d("BLE_MESH", "Failed to send system pulse: ${e.message}")
+            AppLogger.d("BLE_MESH", "Failed to send system pulse: ${e.javaClass.simpleName}")
         }
     }
 }

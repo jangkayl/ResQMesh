@@ -133,7 +133,7 @@ internal class LegacyIncidentSync(
                 dispatchLegacyPayload(endpointId, bytes)
             }
         } catch (e: Exception) {
-            AppLogger.d("INCIDENT_REPO", "Failed handling sync request: ${e.message}")
+            AppLogger.d("INCIDENT_REPO", "Failed handling sync request: ${e.javaClass.simpleName}")
         }
     }
 
@@ -157,7 +157,7 @@ internal class LegacyIncidentSync(
                 startReconciliationWithPeer(endpointId)
             }
         } catch (e: Exception) {
-            AppLogger.d("INCIDENT_REPO", "Failed handling sync response: ${e.message}")
+            AppLogger.d("INCIDENT_REPO", "Failed handling sync response: ${e.javaClass.simpleName}")
         }
     }
 

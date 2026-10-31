@@ -5,6 +5,11 @@ import edu.cit.resqmesh.core.network.PayloadDispatcherCallback
 import edu.cit.resqmesh.core.network.CryptoManager
 import edu.cit.resqmesh.core.model.NodeIdentity
 import edu.cit.resqmesh.core.logging.AppLogger
+import edu.cit.resqmesh.core.logging.trace.TraceDir
+import edu.cit.resqmesh.core.logging.trace.TraceDropReason
+import edu.cit.resqmesh.core.logging.trace.TraceScope
+import edu.cit.resqmesh.core.logging.trace.TraceStage
+import edu.cit.resqmesh.core.network.TransferTraceEmitter
 import kotlinx.serialization.encodeToByteArray
 import kotlinx.serialization.protobuf.ProtoBuf
 import android.util.Base64
@@ -65,6 +70,17 @@ class StandardMessageHandler : PayloadHandler {
         const val ATTACHMENT_UNAVAILABLE = "[Attachment unavailable]"
     }
 
+    /** Only audio rejects go to the Voice ring; an image reject is not a voice event. */
+    private fun rejectTrace(reason: TraceDropReason, endpointId: String, msgId: String, isAudio: Boolean) {
+        if (isAudio) {
+            TransferTraceEmitter.voice(TraceDir.IN, TraceStage.DROPPED, TraceScope.UNKNOWN, msgId, reason, endpointId)
+        }
+    }
+
+    /** Only this phone, as public receiver or private recipient, knows the content is a voice note. */
+    private fun voiceNote(msgId: String, scope: TraceScope, endpointId: String) =
+        TransferTraceEmitter.voice(TraceDir.IN, TraceStage.RECEIVED, scope, msgId, TraceDropReason.NONE, endpointId)
+
     override fun canHandle(payloadType: String) = !listOf("SYSTEM", "SEEN", "DELIVERED", "GOODBYE", "BLOCK", "UNBLOCK", "LIVE_AUDIO").contains(payloadType)
 
     override fun handle(endpointId: String, payload: MeshPayload, payloadBytes: ByteArray, callback: PayloadDispatcherCallback) {
@@ -76,13 +92,14 @@ class StandardMessageHandler : PayloadHandler {
 
         var text = payload.text
         var mediaRejected = false
-        fun inflateMedia(raw: ByteArray?): String? {
+        fun inflateMedia(raw: ByteArray?, isAudio: Boolean): String? {
             if (isPrivate || raw == null) return null
             return when (val r = BinaryCompressor.decompressBounded(raw)) {
                 is BinaryCompressor.BoundedResult.Ok -> Base64.encodeToString(r.bytes, Base64.DEFAULT)
                 is BinaryCompressor.BoundedResult.TooLarge -> {
                     mediaRejected = true
                     AppLogger.d("PayloadDispatcher", "MEDIA_REJECT reason=too_large bytes=${r.bytes}")
+                    rejectTrace(TraceDropReason.MEDIA_REJECT_TOO_LARGE, endpointId, msgId, isAudio)
                     null
                 }
                 is BinaryCompressor.BoundedResult.Corrupt -> {
@@ -91,12 +108,14 @@ class StandardMessageHandler : PayloadHandler {
                         "PayloadDispatcher",
                         "MEDIA_REJECT reason=corrupt bytes=${r.bytes} cause=${r.cause}"
                     )
+                    rejectTrace(TraceDropReason.MEDIA_REJECT_CORRUPT, endpointId, msgId, isAudio)
                     null
                 }
             }
         }
-        var imageBase64 = inflateMedia(payload.imageBytes)
-        var audioBase64 = inflateMedia(payload.audioBytes)
+        var imageBase64 = inflateMedia(payload.imageBytes, isAudio = false)
+        var audioBase64 = inflateMedia(payload.audioBytes, isAudio = true)
+        if (audioBase64 != null) voiceNote(msgId, TraceScope.PUBLIC, endpointId)
         if (mediaRejected) text = if (text.isBlank()) ATTACHMENT_UNAVAILABLE else "$text\n$ATTACHMENT_UNAVAILABLE"
         var locationLat = if (isPrivate) null else payload.locationLat
         var locationLng = if (isPrivate) null else payload.locationLng
@@ -165,6 +184,7 @@ class StandardMessageHandler : PayloadHandler {
 
         if (isPrivate) {
             if (isTarget) {
+                if (audioBase64 != null) voiceNote(msgId, TraceScope.PRIVATE, endpointId)
                 callback.onMessageReceived(endpointId, msgId, sender, text, isPrivate, false, imageBase64, audioBase64, locationLat, locationLng, medium, routePath, payload.channelId)
             } else {
                 AppLogger.d(
