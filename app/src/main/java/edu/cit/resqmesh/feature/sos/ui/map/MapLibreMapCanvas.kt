@@ -3,7 +3,6 @@ package edu.cit.resqmesh.feature.sos.ui.map
 import edu.cit.resqmesh.core.location.LocationClientFactory
 import org.koin.java.KoinJavaComponent
 import android.location.Location
-import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.*
 import androidx.compose.animation.fadeIn
@@ -11,7 +10,6 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.draggable
@@ -20,16 +18,15 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -40,7 +37,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import edu.cit.resqmesh.core.location.LocationClient
 import edu.cit.resqmesh.core.map.storage.MapStyleValidator
 import edu.cit.resqmesh.core.model.ChatMessage
-import edu.cit.resqmesh.core.ui.theme.ResQTheme
+import edu.cit.resqmesh.core.ui.theme.ResQSize
 import edu.cit.resqmesh.core.ui.theme.SignalRed
 import edu.cit.resqmesh.core.ui.theme.Spacing
 import org.maplibre.android.MapLibre
@@ -55,15 +52,21 @@ import org.maplibre.android.geometry.LatLngBounds
 import org.maplibre.android.maps.MapLibreMap
 import org.maplibre.android.maps.MapView
 import org.maplibre.android.maps.Style
-import java.util.Locale
-import kotlin.math.roundToInt
-import edu.cit.resqmesh.feature.sos.ui.CoordinateFormatTab
+import org.maplibre.android.style.layers.PropertyFactory
+import org.maplibre.android.style.layers.SymbolLayer
 import edu.cit.resqmesh.feature.sos.ui.SosMapViewState
-import edu.cit.resqmesh.feature.sos.ui.bearingToCardinal
+import edu.cit.resqmesh.feature.sos.ui.describeDistance
+import edu.cit.resqmesh.feature.sos.ui.mapLocationTitle
+import edu.cit.resqmesh.feature.sos.ui.mapPinLabel
 import edu.cit.resqmesh.feature.sos.ui.map.MapExpandedDetails
 import edu.cit.resqmesh.feature.sos.ui.map.MapCollapsedPreview
+import edu.cit.resqmesh.feature.sos.ui.map.createHospitalMarkerBitmap
 import edu.cit.resqmesh.feature.sos.ui.map.createMyLocationMarkerBitmap
 import edu.cit.resqmesh.feature.sos.ui.map.createSosMarkerBitmap
+
+/** Style layer that draws hospitals and clinics, and the app-drawn icon that replaces its sprite. */
+private const val HOSPITAL_LAYER_ID = "pois-emergency"
+private const val HOSPITAL_ICON_ID = "resq-hospital"
 
 @Composable
 internal fun MapLibreLocalMapContainer(
@@ -83,8 +86,12 @@ internal fun MapLibreLocalMapContainer(
     var myLocation by remember { mutableStateOf<Location?>(null) }
     var mapLibreInstance by remember { mutableStateOf<MapLibreMap?>(null) }
     var mapBearing by remember { mutableFloatStateOf(0f) }
-    var activeTab by remember { mutableStateOf(CoordinateFormatTab.DECIMAL) }
     var isSheetExpanded by remember { mutableStateOf(true) }
+    var isMyLocationUnavailable by remember { mutableStateOf(false) }
+    var sheetHeightPx by remember { mutableIntStateOf(0) }
+    var hasFramedBothLocations by remember { mutableStateOf(false) }
+    val density = LocalDensity.current
+    val navigationBarBottomPx = WindowInsets.navigationBars.getBottom(density)
 
     // User location markers/vector line references
     var userMarker by remember { mutableStateOf<Marker?>(null) }
@@ -99,23 +106,23 @@ internal fun MapLibreLocalMapContainer(
         locationClient.requestPinpointLocation { pinpoint ->
             if (pinpoint != null) {
                 myLocation = pinpoint
+            } else if (myLocation == null) {
+                isMyLocationUnavailable = true
             }
         }
     }
 
-    // Dynamic distance & bearing calculation between User and SOS Beacon
-    val telemetry = remember(myLocation, state.lat, state.lng) {
+    // Dynamic distance & direction between the user and the location
+    val distanceSummary = remember(myLocation, isMyLocationUnavailable, state.lat, state.lng) {
         val userLoc = myLocation
         if (userLoc != null) {
             val results = FloatArray(2)
             Location.distanceBetween(userLoc.latitude, userLoc.longitude, state.lat, state.lng, results)
-            val dist = results[0]
-            val bearing = (results[1] + 360f) % 360f
-            val distStr = if (dist < 1000f) "${dist.roundToInt()} m" else String.format(Locale.US, "%.1f km", dist / 1000f)
-            val bearingStr = "BEARING %03d° %s".format(bearing.roundToInt(), bearingToCardinal(bearing.toDouble()))
-            Pair(distStr, bearingStr)
+            describeDistance(results[0], (results[1] + 360f) % 360f)
+        } else if (isMyLocationUnavailable) {
+            Pair("Can't find your location", "Check that location is turned on.")
         } else {
-            Pair("LOCATING...", "FINDING YOUR LOCATION…")
+            Pair("Finding your location…", "")
         }
     }
 
@@ -142,15 +149,18 @@ internal fun MapLibreLocalMapContainer(
         }
     }
 
-    // Function to smart-fit camera to show both user and SOS target
-    fun frameTacticalCorridor(map: MapLibreMap) {
+    // Fit the camera to both the user and the target, clear of the header and bottom sheet
+    fun frameBothLocations(map: MapLibreMap) {
         val userLoc = myLocation
         if (userLoc != null) {
             val bounds = LatLngBounds.Builder()
                 .include(LatLng(userLoc.latitude, userLoc.longitude))
                 .include(LatLng(state.lat, state.lng))
                 .build()
-            map.animateCamera(CameraUpdateFactory.newLatLngBounds(bounds, 180))
+            val edgePx = with(density) { 56.dp.roundToPx() }
+            val topPx = with(density) { 180.dp.roundToPx() }
+            val bottomPx = sheetHeightPx + navigationBarBottomPx + edgePx
+            map.animateCamera(CameraUpdateFactory.newLatLngBounds(bounds, edgePx, topPx, edgePx, bottomPx))
         } else {
             map.animateCamera(CameraUpdateFactory.newLatLngZoom(LatLng(state.lat, state.lng), 15.0))
         }
@@ -171,12 +181,12 @@ internal fun MapLibreLocalMapContainer(
         userMarker = map.addMarker(
             MarkerOptions()
                 .position(LatLng(userLoc.latitude, userLoc.longitude))
-                .title("YOU")
-                .snippet("My Current Location")
+                .title("You")
+                .snippet("Your location")
                 .icon(myLocationIcon)
         )
 
-        // Draw tactical connecting range vector line in high-vis Safety Orange
+        // Straight line to the target in high-vis Safety Orange
         rangePolyline = map.addPolyline(
             PolylineOptions()
                 .add(LatLng(userLoc.latitude, userLoc.longitude))
@@ -184,6 +194,12 @@ internal fun MapLibreLocalMapContainer(
                 .color(android.graphics.Color.parseColor("#FF9100"))
                 .width(3.5f)
         )
+
+        // The style usually loads before the first fix, so frame both once the fix arrives.
+        if (!hasFramedBothLocations && map.style?.isFullyLoaded == true) {
+            hasFramedBothLocations = true
+            frameBothLocations(map)
+        }
     }
 
     Box(modifier = modifier.fillMaxSize()) {
@@ -215,115 +231,39 @@ internal fun MapLibreLocalMapContainer(
                             Style.Builder().fromUri("file://${state.styleFile.absolutePath}")
                         }
 
-                        mapLibreMap.setStyle(styleBuilder) {
-                            // SOS Beacon Target Marker with distinct Signal Red custom icon
-                            val sosIcon = IconFactory.getInstance(context).fromBitmap(createSosMarkerBitmap(context, "SOS"))
+                        mapLibreMap.setStyle(styleBuilder) { style ->
+                            // A new image name, so a late sprite load cannot restore the placeholder square.
+                            style.addImage(HOSPITAL_ICON_ID, createHospitalMarkerBitmap(context))
+                            (style.getLayer(HOSPITAL_LAYER_ID) as? SymbolLayer)
+                                ?.setProperties(PropertyFactory.iconImage(HOSPITAL_ICON_ID))
+
+                            // Target marker, distinct from the user's own marker
+                            val sosIcon = IconFactory.getInstance(context)
+                                .fromBitmap(createSosMarkerBitmap(context, mapPinLabel(alertMessage)))
                             mapLibreMap.addMarker(
                                 MarkerOptions()
                                     .position(LatLng(state.lat, state.lng))
-                                    .title("SOS: ${alertMessage.senderName}")
-                                    .snippet(alertMessage.text.ifBlank { "Emergency beacon" })
+                                    .title("${mapLocationTitle(alertMessage)}: ${alertMessage.senderName}")
+                                    .snippet(alertMessage.text.ifBlank { mapLocationTitle(alertMessage) })
                                     .icon(sosIcon)
                             )
 
                             // Initial camera framing
-                            frameTacticalCorridor(mapLibreMap)
+                            frameBothLocations(mapLibreMap)
                         }
                     }
                 }
             }
         )
 
-        // Top Tactical Glass Bar (Cleaned up, no NVG/AMB filters)
+        // Top Header
         Column(
             modifier = Modifier
                 .align(Alignment.TopCenter)
                 .fillMaxWidth()
                 .statusBarsPadding()
         ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = Spacing.Medium, vertical = Spacing.Small),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                IconButton(
-                    onClick = onBack,
-                    modifier = Modifier
-                        .size(42.dp)
-                        .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.85f), CircleShape)
-                        .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f), CircleShape)
-                ) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = "Back",
-                        tint = MaterialTheme.colorScheme.onSurface
-                    )
-                }
-
-                Spacer(Modifier.width(Spacing.Small))
-
-                Column(modifier = Modifier.weight(1f)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        val infiniteTransition = rememberInfiniteTransition(label = "pulse")
-                        val alpha by infiniteTransition.animateFloat(
-                            initialValue = 0.3f,
-                            targetValue = 1f,
-                            animationSpec = infiniteRepeatable(
-                                animation = tween(600, easing = LinearEasing),
-                                repeatMode = RepeatMode.Reverse
-                            ),
-                            label = "alpha"
-                        )
-                        Box(
-                            modifier = Modifier
-                                .size(8.dp)
-                                .background(SignalRed.copy(alpha = alpha), CircleShape)
-                        )
-                        Spacer(Modifier.width(6.dp))
-                        Text(
-                            text = "SOS TACTICAL",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Black,
-                            letterSpacing = 1.sp,
-                            color = SignalRed
-                        )
-                    }
-                    Text(
-                        text = "BEACON: ${alertMessage.senderName.uppercase()}",
-                        style = MaterialTheme.typography.labelSmall,
-                        fontFamily = FontFamily.Monospace,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-
-                // Air-Gapped Offline Verified Pill
-                Surface(
-                    shape = RoundedCornerShape(6.dp),
-                    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, ResQTheme.colors.success.copy(alpha = 0.4f))
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(4.dp)
-                                .background(ResQTheme.colors.success, CircleShape)
-                        )
-                        Text(
-                            text = "OFFLINE v${state.manifest.version}",
-                            style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp),
-                            fontFamily = FontFamily.Monospace,
-                            fontWeight = FontWeight.Bold,
-                            color = ResQTheme.colors.success
-                        )
-                    }
-                }
-            }
+            MapHeader(alertMessage = alertMessage, onBack = onBack)
 
             // Sub-bar with Compass Rose
             Row(
@@ -339,10 +279,9 @@ internal fun MapLibreLocalMapContainer(
                     border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.35f)),
                     shadowElevation = 4.dp,
                     modifier = Modifier
-                        .size(36.dp)
-                        .clickable {
+                        .size(ResQSize.MinimumTouchTarget)
+                        .clickable(onClickLabel = "Point north") {
                             mapLibreInstance?.animateCamera(CameraUpdateFactory.bearingTo(0.0))
-                            Toast.makeText(context, "Aligned to True North", Toast.LENGTH_SHORT).show()
                         }
                 ) {
                     Box(contentAlignment = Alignment.Center) {
@@ -371,30 +310,27 @@ internal fun MapLibreLocalMapContainer(
             }
         }
 
-        val fabBottomPadding by animateDpAsState(
-            targetValue = if (isSheetExpanded) 250.dp else 90.dp,
-            animationSpec = tween(durationMillis = 280, easing = FastOutSlowInEasing),
-            label = "fabBottomPadding"
-        )
-
-        // Floating Target Re-Center Action Button (Frames tactical corridor between you & beacon)
+        // Floating re-center button, kept just above the bottom sheet
         FloatingActionButton(
             onClick = {
                 val map = mapLibreInstance ?: return@FloatingActionButton
-                frameTacticalCorridor(map)
-                Toast.makeText(context, "Tactical corridor framed", Toast.LENGTH_SHORT).show()
+                frameBothLocations(map)
             },
             modifier = Modifier
                 .align(Alignment.BottomEnd)
-                .padding(end = Spacing.Medium, bottom = fabBottomPadding)
-                .size(42.dp),
-            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f),
+                .navigationBarsPadding()
+                .padding(
+                    end = Spacing.Medium,
+                    bottom = with(density) { sheetHeightPx.toDp() } + Spacing.Medium
+                )
+                .size(ResQSize.MinimumTouchTarget),
+            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f),
             contentColor = SignalRed,
             shape = CircleShape
         ) {
             Icon(
                 imageVector = Icons.Default.GpsFixed,
-                contentDescription = "Fit Tactical Corridor",
+                contentDescription = "Show you and this location",
                 modifier = Modifier.size(24.dp)
             )
         }
@@ -405,6 +341,7 @@ internal fun MapLibreLocalMapContainer(
                 .align(Alignment.BottomCenter)
                 .fillMaxWidth()
                 .navigationBarsPadding()
+                .onSizeChanged { sheetHeightPx = it.height }
                 .draggable(
                     state = rememberDraggableState { delta ->
                         if (delta > 20) {
@@ -448,8 +385,10 @@ internal fun MapLibreLocalMapContainer(
                     )
                 }
 
-                MapCollapsedPreview(alertMessage, telemetry, isSheetExpanded) { isSheetExpanded = !isSheetExpanded }
-                // Expanded Section: Coordinates Tabs, 1-Tap Copy, Telemetry & Action Buttons
+                MapCollapsedPreview(alertMessage, distanceSummary, isSheetExpanded) {
+                    isSheetExpanded = !isSheetExpanded
+                }
+                // Expanded Section: location details and actions
                 AnimatedVisibility(
                     visible = isSheetExpanded,
                     enter = slideInVertically(
@@ -461,13 +400,14 @@ internal fun MapLibreLocalMapContainer(
                         animationSpec = tween(durationMillis = 280, easing = FastOutSlowInEasing)
                     ) + fadeOut(animationSpec = tween(durationMillis = 180))
                 ) {
-                    MapExpandedDetails(state, alertMessage, activeTab, context,
-                        onTabChanged = { activeTab = it },
-                        onEngageNavigation = navigate@{
-                            val map = mapLibreInstance ?: return@navigate
+                    MapExpandedDetails(
+                        state = state,
+                        alertMessage = alertMessage,
+                        onShowOnMap = showOnMap@{
+                            val map = mapLibreInstance ?: return@showOnMap
                             map.animateCamera(CameraUpdateFactory.newLatLngZoom(LatLng(state.lat, state.lng), 16.5))
-                            Toast.makeText(context, "Locking on beacon (${telemetry.second})", Toast.LENGTH_SHORT).show()
-                        })
+                        }
+                    )
                 }
             }
         }

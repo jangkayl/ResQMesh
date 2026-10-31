@@ -85,7 +85,7 @@ class SosMapScreenTest {
         assertEquals(123.885437, fallback.lng, 0.000001)
         assertEquals("10.31570° N", fallback.formattedLat)
         assertEquals("123.88544° E", fallback.formattedLng)
-        assertEquals("Cebu offline map not installed", fallback.statusMessage)
+        assertEquals("No map on this phone yet", fallback.statusMessage)
         assertTrue(fallback.isFallbackActive)
     }
 
@@ -99,7 +99,7 @@ class SosMapScreenTest {
         val fallback = state as SosMapViewState.MaplessFallback
         assertEquals("12.04637° S", fallback.formattedLat)
         assertEquals("77.04279° W", fallback.formattedLng)
-        assertEquals("Cebu offline map not installed", fallback.statusMessage)
+        assertEquals("No map on this phone yet", fallback.statusMessage)
     }
 
     @Test
@@ -114,7 +114,7 @@ class SosMapScreenTest {
 
         assertTrue(state is SosMapViewState.MaplessFallback)
         val fallback = state as SosMapViewState.MaplessFallback
-        assertEquals("Map download in progress", fallback.statusMessage)
+        assertEquals("Your map is downloading", fallback.statusMessage)
         assertEquals(10.315696, fallback.lat, 0.000001)
     }
 

@@ -13,6 +13,8 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import org.maplibre.android.maps.Style
 
+private const val HOSPITAL_ICON_SIZE_DP = 20
+
 internal fun createMyLocationMarkerBitmap(context: Context): Bitmap {
     val density = context.resources.displayMetrics.density
     val sizePx = (36 * density).toInt()
@@ -39,6 +41,32 @@ internal fun createMyLocationMarkerBitmap(context: Context): Bitmap {
     // Pinpoint white center dot
     paint.color = AndroidColor.WHITE
     canvas.drawCircle(center, center, 3.5f * density, paint)
+
+    return bitmap
+}
+
+/**
+ * Hospital and clinic icon. Replaces the solid placeholder square in the map package sprite,
+ * and stays smaller than the SOS pin so the two are never confused.
+ */
+internal fun createHospitalMarkerBitmap(context: Context): Bitmap {
+    val density = context.resources.displayMetrics.density
+    val sizePx = (HOSPITAL_ICON_SIZE_DP * density).toInt()
+    val bitmap = Bitmap.createBitmap(sizePx, sizePx, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(bitmap)
+    val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+    val size = sizePx.toFloat()
+    val center = size / 2f
+    val corner = 5 * density
+
+    paint.color = AndroidColor.WHITE
+    canvas.drawRoundRect(0f, 0f, size, size, corner, corner, paint)
+
+    val armLength = 6 * density
+    val armWidth = 2 * density
+    paint.color = AndroidColor.parseColor("#D50000")
+    canvas.drawRect(center - armWidth, center - armLength, center + armWidth, center + armLength, paint)
+    canvas.drawRect(center - armLength, center - armWidth, center + armLength, center + armWidth, paint)
 
     return bitmap
 }

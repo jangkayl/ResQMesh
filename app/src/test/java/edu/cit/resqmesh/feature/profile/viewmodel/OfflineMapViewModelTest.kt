@@ -376,7 +376,7 @@ class OfflineMapViewModelTest {
         val initialMapState = resolveSosMapViewState(sosAlert, storageGuard.getActivePackageStatus())
         assertTrue(initialMapState is SosMapViewState.MaplessFallback)
         val initialFallback = initialMapState as SosMapViewState.MaplessFallback
-        assertEquals("Cebu offline map not installed", initialFallback.statusMessage)
+        assertEquals("No map on this phone yet", initialFallback.statusMessage)
 
         // 2. Download and verify package via Downloader
         val fakeVerifier = ManifestVerifier(

@@ -15,6 +15,7 @@ import edu.cit.resqmesh.feature.comms.ui.ActiveChatScreen
 import edu.cit.resqmesh.feature.comms.ui.PublicChatTab
 import edu.cit.resqmesh.feature.radar.ui.NetworkScreen
 import edu.cit.resqmesh.feature.sos.ui.SOSBroadcastScreen
+import edu.cit.resqmesh.feature.sos.ui.INCIDENT_MAP_ID_PREFIX
 import edu.cit.resqmesh.feature.sos.ui.SosMapScreen
 import edu.cit.resqmesh.feature.profile.ui.ProfileScreen
 import edu.cit.resqmesh.feature.profile.ui.AboutScreen
@@ -343,7 +344,7 @@ fun MainContainerScreen(
                             onDirectChat = { peerName -> activeChatNode = peerName },
                             onViewLocation = { lat, lng, reporter, description ->
                                 mapSosAlert = edu.cit.resqmesh.core.model.ChatMessage(
-                                    id = "incident_map_${System.currentTimeMillis()}",
+                                    id = INCIDENT_MAP_ID_PREFIX + System.currentTimeMillis(),
                                     senderName = reporter,
                                     text = description,
                                     imageBase64 = null,

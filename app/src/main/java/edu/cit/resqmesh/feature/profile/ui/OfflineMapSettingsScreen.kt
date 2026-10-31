@@ -2,7 +2,7 @@ package edu.cit.resqmesh.feature.profile.ui
 
 import edu.cit.resqmesh.feature.profile.ui.offlinemap.MapPackageOverviewCard
 import edu.cit.resqmesh.feature.profile.ui.offlinemap.PackageTechnicalDetailsCard
-import edu.cit.resqmesh.feature.profile.ui.offlinemap.TacticalDeploymentGuidanceCard
+import edu.cit.resqmesh.feature.profile.ui.offlinemap.OfflineUseNoteCard
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -34,10 +34,10 @@ fun OfflineMapSettingsScreen(
         AlertDialog(
             onDismissRequest = { showDeleteConfirm = false },
             icon = { Icon(Icons.Default.DeleteForever, contentDescription = null, tint = SignalRed) },
-            title = { Text("Delete Offline Map?", fontWeight = FontWeight.Bold) },
+            title = { Text("Delete map?", fontWeight = FontWeight.Bold) },
             text = {
                 Text(
-                    "Deleting the Cebu offline vector map will revert the SOS map to mapless coordinate fallback until downloaded again.",
+                    "You'll see SOS locations as numbers until you download the map again.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -98,8 +98,8 @@ fun OfflineMapSettingsScreen(
                         color = MaterialTheme.colorScheme.onSurface
                     )
                     Text(
-                        text = if (returnToSosAlert) "Return to this SOS alert after setup"
-                        else "Local vector packages for disconnected operations",
+                        text = if (returnToSosAlert) "Go back to the SOS after downloading"
+                        else "Download a map that works without internet",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -135,11 +135,11 @@ fun OfflineMapSettingsScreen(
                     onRetry = { viewModel.retry() }
                 )
 
-                // Package Details & Verification Card
+                // Collapsed Technical Details
                 PackageTechnicalDetailsCard(state = state)
 
-                // Tactical Deployment Guidance Card
-                TacticalDeploymentGuidanceCard()
+                // Offline Use Note
+                OfflineUseNoteCard()
             }
         }
     }

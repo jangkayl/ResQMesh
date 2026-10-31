@@ -1,18 +1,21 @@
 package edu.cit.resqmesh.feature.profile.ui.offlinemap
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import edu.cit.resqmesh.core.map.model.MapPackageStatus
+import edu.cit.resqmesh.core.ui.theme.ResQSize
 import edu.cit.resqmesh.core.ui.theme.SafetyOrange
 import edu.cit.resqmesh.core.ui.theme.SignalAmber
 import edu.cit.resqmesh.core.ui.theme.SignalGreen
@@ -29,6 +32,9 @@ import edu.cit.resqmesh.feature.profile.ui.offlinemap.DownloadingProgressSection
 import edu.cit.resqmesh.feature.profile.ui.offlinemap.VerifyingProgressSection
 import edu.cit.resqmesh.feature.profile.ui.offlinemap.ExtractingProgressSection
 import edu.cit.resqmesh.feature.profile.ui.offlinemap.InstalledActiveSection
+
+private const val SPEC_LABEL_WEIGHT = 0.4f
+private const val SPEC_VALUE_WEIGHT = 0.6f
 
 @Composable
 internal fun MapPackageOverviewCard(
@@ -97,23 +103,21 @@ internal fun MapPackageOverviewCard(
                     )
                 }
                 state.packageStatus is MapPackageStatus.Verifying -> {
-                    VerifyingProgressSection(verifying = state.packageStatus)
+                    VerifyingProgressSection()
                 }
                 state.packageStatus is MapPackageStatus.Extracting -> {
                     ExtractingProgressSection(extracting = state.packageStatus)
                 }
                 state.packageStatus is MapPackageStatus.Installed -> {
                     InstalledActiveSection(
-                        installed = state.packageStatus,
                         isUpdateAvailable = state.isUpdateAvailable,
-                        targetVersion = state.catalogEntry.targetVersion,
                         onUpdate = onDownload,
                         onDelete = onDelete
                     )
                 }
                 state.packageStatus is MapPackageStatus.Error -> {
                     GenericErrorSection(
-                        message = state.packageStatus.message,
+                        message = friendlyMapError(state.packageStatus.message),
                         onRetry = onRetry
                     )
                 }
@@ -135,13 +139,16 @@ internal fun StatusBadge(
     isUpdateAvailable: Boolean
 ) {
     val (label, bg, fg) = when {
-        isUpdateAvailable -> Triple("UPDATE AVAILABLE", SignalAmber.copy(alpha = 0.15f), SignalAmber)
-        status is MapPackageStatus.Installed -> Triple("ACTIVE & VERIFIED", SignalGreen.copy(alpha = 0.15f), SignalGreen)
-        status is MapPackageStatus.Downloading -> Triple("DOWNLOADING", SafetyOrange.copy(alpha = 0.15f), SafetyOrange)
-        status is MapPackageStatus.Verifying -> Triple("VERIFYING", SafetyOrange.copy(alpha = 0.15f), SafetyOrange)
-        status is MapPackageStatus.Extracting -> Triple("EXTRACTING", SafetyOrange.copy(alpha = 0.15f), SafetyOrange)
-        status is MapPackageStatus.Error -> Triple("ERROR", SignalRed.copy(alpha = 0.15f), SignalRed)
-        else -> Triple("NOT INSTALLED", MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.15f), MaterialTheme.colorScheme.onSurfaceVariant)
+        isUpdateAvailable -> Triple("Update available", SignalAmber.copy(alpha = 0.15f), SignalAmber)
+        status is MapPackageStatus.Installed -> Triple("Ready", SignalGreen.copy(alpha = 0.15f), SignalGreen)
+        status is MapPackageStatus.Downloading -> Triple("Downloading", SafetyOrange.copy(alpha = 0.15f), SafetyOrange)
+        status is MapPackageStatus.Verifying -> Triple("Checking", SafetyOrange.copy(alpha = 0.15f), SafetyOrange)
+        status is MapPackageStatus.Extracting -> Triple("Installing", SafetyOrange.copy(alpha = 0.15f), SafetyOrange)
+        status is MapPackageStatus.Error -> Triple("Didn't finish", SignalRed.copy(alpha = 0.15f), SignalRed)
+        else -> {
+            val neutral = MaterialTheme.colorScheme.onSurfaceVariant
+            Triple("Not downloaded", neutral.copy(alpha = 0.15f), neutral)
+        }
     }
 
     Surface(
@@ -161,36 +168,58 @@ internal fun StatusBadge(
 
 @Composable
 internal fun PackageTechnicalDetailsCard(state: OfflineMapUiState) {
+    var isExpanded by rememberSaveable { mutableStateOf(false) }
+
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(20.dp),
         color = MaterialTheme.colorScheme.surface,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
     ) {
-        Column(
-            modifier = Modifier.padding(Spacing.Large),
-            verticalArrangement = Arrangement.spacedBy(Spacing.Small)
-        ) {
-            Text(
-                text = "PACKAGE SPECIFICATIONS",
-                style = MaterialTheme.typography.labelMedium,
-                fontWeight = FontWeight.Bold,
-                color = SafetyOrange,
-                letterSpacing = 1.sp
-            )
-            Spacer(Modifier.height(4.dp))
-            SpecRow("Coverage", state.catalogEntry.coverageArea)
-            SpecRow("Zoom Levels", "${state.catalogEntry.minZoom} to ${state.catalogEntry.maxZoom}")
-            SpecRow("Renderer", "MapLibre Native Android (Local PMTiles)")
-            SpecRow("Data Attribution", "© OpenStreetMap contributors, ODbL")
-            SpecRow("Integrity Engine", "Ed25519 Signatures + SHA-256 Checksums")
-            SpecRow("Network Access", "Zero runtime network requests after install")
+        Column(modifier = Modifier.padding(horizontal = Spacing.Large, vertical = Spacing.Small)) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = ResQSize.MinimumTouchTarget)
+                    .clickable(onClickLabel = if (isExpanded) "Hide technical details" else "Show technical details") {
+                        isExpanded = !isExpanded
+                    },
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    text = "Technical details",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Icon(
+                    imageVector = if (isExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            if (isExpanded) {
+                Column(
+                    modifier = Modifier.padding(bottom = Spacing.Small),
+                    verticalArrangement = Arrangement.spacedBy(Spacing.Small)
+                ) {
+                    state.activeManifest?.let { SpecRow("Map version", "${it.version}") }
+                    SpecRow("Coverage", state.catalogEntry.coverageArea)
+                    SpecRow("Zoom levels", "${state.catalogEntry.minZoom} to ${state.catalogEntry.maxZoom}")
+                    SpecRow("Map engine", "MapLibre Native")
+                    SpecRow("Map data", "© OpenStreetMap contributors, ODbL")
+                    SpecRow("Download checks", "ECDSA P-256 signature, SHA-256 checksum")
+                    SpecRow("Internet use", "None after download")
+                }
+            }
         }
     }
 }
 
 @Composable
-internal fun TacticalDeploymentGuidanceCard() {
+internal fun OfflineUseNoteCard() {
     Surface(
         shape = RoundedCornerShape(16.dp),
         color = MaterialTheme.colorScheme.surfaceVariant,
@@ -209,7 +238,7 @@ internal fun TacticalDeploymentGuidanceCard() {
             )
             Spacer(Modifier.width(Spacing.Medium))
             Text(
-                text = "ResQMesh offline vector maps are pre-compiled and signed for zero-trust deployment. Once downloaded over Wi-Fi, map assets remain completely local and never phone home.",
+                text = "Once downloaded, the map works without internet.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -223,19 +252,22 @@ internal fun SpecRow(label: String, value: String) {
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 2.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
+        horizontalArrangement = Arrangement.spacedBy(Spacing.Medium),
+        verticalAlignment = Alignment.Top
     ) {
         Text(
             text = label,
             style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.weight(SPEC_LABEL_WEIGHT)
         )
         Text(
             text = value,
             style = MaterialTheme.typography.bodySmall,
             fontWeight = FontWeight.SemiBold,
-            color = MaterialTheme.colorScheme.onSurface
+            textAlign = TextAlign.End,
+            color = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.weight(SPEC_VALUE_WEIGHT)
         )
     }
 }

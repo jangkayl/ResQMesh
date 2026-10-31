@@ -2,7 +2,7 @@ package edu.cit.resqmesh.feature.sos.ui
 
 import edu.cit.resqmesh.feature.sos.ui.map.createMyLocationMarkerBitmap as createMyLocationMarkerBitmapSection
 import edu.cit.resqmesh.feature.sos.ui.map.createSosMarkerBitmap as createSosMarkerBitmapSection
-import edu.cit.resqmesh.feature.sos.ui.map.TacticalHeaderBar
+import edu.cit.resqmesh.feature.sos.ui.map.MapHeader
 import edu.cit.resqmesh.feature.sos.ui.map.MaplessSosFallback as MaplessSosFallbackSection
 import edu.cit.resqmesh.feature.sos.ui.map.NoLocationFallback
 import edu.cit.resqmesh.feature.sos.ui.map.MapLibreLocalMapContainer
@@ -47,10 +47,7 @@ fun SosMapScreen(
                         .statusBarsPadding()
                         .navigationBarsPadding()
                 ) {
-                    TacticalHeaderBar(
-                        senderName = alertMessage.senderName,
-                        onBack = onBack
-                    )
+                    MapHeader(alertMessage = alertMessage, onBack = onBack)
                     NoLocationFallback(alertMessage = alertMessage)
                 }
             }
@@ -63,10 +60,7 @@ fun SosMapScreen(
                         .statusBarsPadding()
                         .navigationBarsPadding()
                 ) {
-                    TacticalHeaderBar(
-                        senderName = alertMessage.senderName,
-                        onBack = onBack
-                    )
+                    MapHeader(alertMessage = alertMessage, onBack = onBack)
                     MaplessSosFallback(
                         alertMessage = alertMessage,
                         state = viewState,

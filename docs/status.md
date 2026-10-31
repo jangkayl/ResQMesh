@@ -43,7 +43,7 @@ Basic block, incident, SOS and recovery checks have user-reported successes; the
 
 **Code smells refactor:** [card](testing/code-smells-refactor-card.md) pending.
 
-**Batch A cleanup** (`refactor/batch-a-cleanup`): the user reported all [smoke card](testing/batch-a-cleanup-smoke-card.md) steps working on 2026-10-16.
+**Batch A cleanup**: the user reported all [smoke card](testing/batch-a-cleanup-smoke-card.md) steps working on 2026-10-16.
 
 **Developer console** (branch `feat/developer-console`, [plan](plans/developer-mode.md)): Stage 1 and live follow are pushed; Stage 2 (traces, timeline) has local checks only and awaits the [phone card](testing/developer-mode-card.md). Stage 3 (signal and queue stats) is pending.
 
@@ -57,9 +57,11 @@ Basic block, incident, SOS and recovery checks have user-reported successes; the
 
 **Map download** (`fix/map-download-reliability`): user-reported slowness; speed unmeasured; [card](testing/map-download-reliability-card.md) pending.
 
+**Map page UX** (`fix/map-page-ux`): [card](testing/map-page-ux-card.md) pending.
+
 ## Next actions
 
-Deployment target (user-confirmed 2026-10-17): capstone demo first, then a signed sideloaded pilot beta. Play Store is out of scope for now.
+Deployment target (user-confirmed 2026-10-17): capstone demo first, then a signed sideloaded pilot beta. Play Store is out of scope.
 
 1. **Developer console:** run the Stage 1–2 phone card, then start Stage 3. Then run [PTT removal](testing/live-ptt-removal-card.md) and [voice limit](testing/voice-note-limit-card.md) cards.
 2. **Demo freeze (P0, by about 2026-10-28):** parts 3–4 user-reported done (capture folder and miss times not supplied, so DELIVERY-01 stays unanalysed). The [limitations](demo/known-limitations.md) and [user guide](demo/user-guide.md) are drafted. After the freeze, only separately approved blocker fixes go in.
