@@ -13,9 +13,6 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import edu.cit.resqmesh.feature.comms.ui.components.composer.ComposerAttachmentPreview
 import edu.cit.resqmesh.feature.comms.ui.components.composer.ComposerActionPopup
-import android.net.Uri
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.BorderStroke
@@ -32,6 +29,7 @@ import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Image
 import androidx.compose.material.icons.outlined.LocationOn
 import androidx.compose.material.icons.outlined.Mic
+import androidx.compose.material.icons.outlined.PhotoCamera
 import androidx.compose.material.icons.outlined.Stop
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -41,7 +39,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.res.stringResource
@@ -55,7 +52,10 @@ import edu.cit.resqmesh.core.model.ChatMessage
 import edu.cit.resqmesh.core.model.NodeIdentity
 import edu.cit.resqmesh.core.ui.components.layout.ResQGlassSurface
 import edu.cit.resqmesh.core.ui.theme.ResQTheme
+import edu.cit.resqmesh.core.audio.ImageQuality
 import edu.cit.resqmesh.core.audio.MediaHelper
+import edu.cit.resqmesh.core.network.ratelimit.ImageBudgetState
+import edu.cit.resqmesh.feature.comms.ui.components.composer.rememberComposerImage
 
 /**
  * Modern Context-Aware Chat Composer with Floating Action Bubble.
@@ -74,7 +74,7 @@ fun ChatInput(
     inputText: String,
     onTextChange: (String) -> Unit,
     pendingImage: String?,
-    onImageSelected: (String) -> Unit,
+    onImageSelected: (String, ImageQuality) -> Unit,
     onClearImage: () -> Unit,
     pendingAudio: String?,
     onClearAudio: () -> Unit,
@@ -87,16 +87,11 @@ fun ChatInput(
     replyingTo: ChatMessage? = null,
     onCancelReply: () -> Unit = {},
     maxInputLength: Int = TextField.MESSAGE.maxLength,
-    sendBudget: ChatBudgetState? = null
+    sendBudget: ChatBudgetState? = null,
+    imageBudget: ImageBudgetState? = null
 ) {
-    val context = LocalContext.current
     val haptics = LocalHapticFeedback.current
-    val imagePicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
-        uri?.let {
-            val bitmap = android.graphics.BitmapFactory.decodeStream(context.contentResolver.openInputStream(it))
-            if (bitmap != null) onImageSelected(mediaHelper.compressBitmapToBase64(bitmap))
-        }
-    }
+    val image = rememberComposerImage(mediaHelper, pendingImage, onImageSelected)
 
     val isTyping = inputText.isNotEmpty()
     var isPopupExpanded by remember { mutableStateOf(false) }
@@ -110,7 +105,8 @@ fun ChatInput(
 
     val budgetWaiting = sendBudget != null && sendBudget.remaining <= 0
     val hasContent = inputText.isNotBlank() || pendingImage != null || pendingAudio != null
-    val canSend = hasContent && !isRecording && !budgetWaiting
+    val imageWaiting = pendingImage != null && (imageBudget?.waitMsFor(image.quality.credits) ?: 0L) > 0
+    val canSend = hasContent && !isRecording && !budgetWaiting && !imageWaiting && !image.encoding
 
     // Dynamic morphing calculation based on content length and line count
     val lineCount = remember(inputText) { inputText.count { it == '\n' } + 1 }
@@ -225,12 +221,17 @@ fun ChatInput(
 
         LocationAcquisitionBanner(isAcquiringLocation)
 
-        ComposerAttachmentPreview(pendingImage, pendingAudio, onClearImage, onClearAudio)
+        ComposerAttachmentPreview(pendingImage, pendingAudio, onClearImage, onClearAudio, image, imageBudget)
 
         ComposerActionPopup(isTyping, isPopupExpanded, isAcquiringLocation,
             onPickImage = {
                                 haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                imagePicker.launch("image/*")
+                                image.pickFromGallery()
+                                isPopupExpanded = false
+                            },
+            onTakePhoto = {
+                                haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                image.takePhoto()
                                 isPopupExpanded = false
                             },
             onPickLocation = {
@@ -270,12 +271,24 @@ fun ChatInput(
                         modifier = Modifier.padding(bottom = 2.dp)
                     ) {
                         IconButton(
-                            onClick = { imagePicker.launch("image/*") },
+                            onClick = image.pickFromGallery,
                             modifier = Modifier.size(38.dp)
                         ) {
                             Icon(
                                 imageVector = Icons.Outlined.Image,
                                 contentDescription = stringResource(R.string.private_chat_add_image_action),
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+
+                        IconButton(
+                            onClick = image.takePhoto,
+                            modifier = Modifier.size(38.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Outlined.PhotoCamera,
+                                contentDescription = stringResource(R.string.composer_take_photo),
                                 tint = MaterialTheme.colorScheme.primary,
                                 modifier = Modifier.size(20.dp)
                             )

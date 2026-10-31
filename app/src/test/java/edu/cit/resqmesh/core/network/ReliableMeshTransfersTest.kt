@@ -28,6 +28,8 @@ class ReliableMeshTransfersTest {
             val logs = mutableListOf<String>()
             var autoStore = true
             var onward: ((ByteArray) -> Unit)? = null
+            var neighbors = setOf<String>()
+            val blockedPeers = mutableSetOf<String>()
             lateinit var engine: ReliableMeshTransfers
             init {
                 nodes[name] = this
@@ -54,7 +56,8 @@ class ReliableMeshTransfersTest {
                         onward?.invoke(bytes)
                         if (autoStore) engine.stored(payload.targetMessageId.ifBlank { payload.id })
                     }, response = { _, _ -> logs.add("RECEIPT_REPLAY") },
-                    event = { _, stage, _, _ -> events.add(stage) }, now = { time }, log = { logs.add(it) })
+                    event = { _, stage, _, _ -> events.add(stage) }, now = { time }, log = { logs.add(it) },
+                    blocked = { it in blockedPeers }, relayPeers = { neighbors })
                 starting = false
                 boot.forEach { it() }
             }
@@ -76,6 +79,107 @@ class ReliableMeshTransfersTest {
         fun payload(id: String = "note", size: Int = 8192) = ProtoBuf.encodeToByteArray(
             MeshPayload(id = id, type = "CONVERSATION", conversationKind = "RADIO",
                 audioBytes = ByteArray(size) { (it % 251).toByte() }))
+    }
+
+    private val relayMark = "RELAY_ROSTER"
+    private fun imageFrame(route: List<String> = listOf("B#B")) = ProtoBuf.encodeToByteArray(MeshPayload(
+        id = "note", type = "MESSAGE", senderName = "Origin#A", routePath = route, imageBytes = ByteArray(8192)))
+    private fun World.relayed(a: World.Node, b: World.Node) {
+        a.engine.offer("B", imageFrame(emptyList()), false); pump()
+        assertEquals(1, b.arrived.size)
+    }
+
+    @Test fun peerReadyOnlyAfterFirstRelayStillGetsTheImage() {
+        val w = World(); val a = w.Node("A"); val b = w.Node("B"); val c = w.Node("C", online = false)
+        w.relayed(a, b)
+        assertEquals(emptySet<String>(), b.engine.relayTargets("note", emptySet(), imageFrame()))
+        assertFalse(b.engine.hasPendingCustody("note"))
+        assertTrue(b.engine.hasRelayHold("note"))
+        c.online = true; b.neighbors = setOf("C")
+        b.engine.wake("C", reconcile = false); w.pump()
+        assertEquals(listOf("B#B"), c.arrived.single().routePath)
+        assertTrue(b.logs.any { it.contains("$relayMark payload=note event=late chosen=C") })
+    }
+
+    @Test fun emptyRosterKeepsTheCopyUntilTheWindowEndsThenReleasesIt() {
+        val w = World(); val a = w.Node("A"); val b = w.Node("B"); val c = w.Node("C", online = false)
+        w.relayed(a, b)
+        b.engine.relayTargets("note", emptySet(), imageFrame())
+        w.advance(ReliableMeshTransfers.RELAY_HOLD_MS - 10_000)
+        assertTrue(b.engine.hasRelayHold("note"))
+        w.advance(10_000); w.advance(5_000)
+        assertFalse(b.engine.hasRelayHold("note"))
+        assertTrue(b.logs.any { it.contains("event=expired") })
+        c.online = true; b.neighbors = setOf("C")
+        b.engine.wake("C", reconcile = false); w.pump()
+        assertTrue(c.arrived.isEmpty())
+    }
+
+    @Test fun acceptedPeerSenderAndVisitedPeersAreNeverForwardedAgain() {
+        val w = World(); val a = w.Node("A"); val b = w.Node("B"); val c = w.Node("C"); val d = w.Node("D")
+        c.onward = { c.engine.relayTargets("note", emptySet()) }
+        w.relayed(a, b)
+        b.engine.relayTargets("note", setOf("C"), imageFrame(listOf("D#D", "B#B")))
+        b.engine.offer("C", imageFrame(listOf("D#D", "B#B")), false, durableRelay = true); w.pump()
+        assertEquals(1, c.arrived.size)
+        b.neighbors = setOf("A", "C", "D")
+        repeat(3) { b.engine.wake(); w.advance(5_000); w.pump() }
+        assertEquals(1, c.arrived.size)
+        assertTrue(d.arrived.isEmpty())
+        assertTrue(b.logs.any { it.contains("A:sender") && it.contains("C:forwarded") && it.contains("D:visited") })
+    }
+
+    @Test fun rosterLogRepeatsOnlyWhenTheDecisionChanges() {
+        val w = World(); val a = w.Node("A")
+        repeat(5) { a.engine.logRoster("note", "first", setOf("B"), mapOf("C" to "not_ready")) }
+        a.engine.logRoster("note", "first", setOf("B", "C"), emptyMap())
+        assertEquals(2, a.logs.count { it.startsWith(relayMark) })
+    }
+
+    @Test fun senderDisconnectAfterCompletionStillDeliversAndForwards() {
+        val w = World(); val a = w.Node("A"); val b = w.Node("B"); val c = w.Node("C")
+        b.onward = { bytes -> b.engine.relayTargets("note", setOf("C"), bytes)
+            b.engine.offer("C", bytes, false, durableRelay = true) }
+        b.autoStore = false
+        var cut = false
+        w.drop = { wire ->
+            if (wire.to == "B" && wire.payload.type == ReliableMeshTransfers.PIECE && !cut) {
+                // The final piece arrives while the link back to the sender is already gone.
+                val piece = ProtoBuf.decodeFromByteArray<TransferPiece>(wire.payload.liveAudioChunk!!)
+                if (piece.index == TransferJournal.pieceCount(piece.size) - 1) { a.online = false; cut = true }
+            }
+            false
+        }
+        w.relayed(a, b); w.pump()
+        assertEquals(1, c.arrived.size)
+    }
+
+    @Test fun blockedSenderStaysRefusedUntilTheBlockEnds() {
+        val w = World(); val a = w.Node("A"); val b = w.Node("B")
+        b.blockedPeers += "A"
+        a.engine.offer("B", imageFrame(emptyList()), false); w.pump()
+        a.online = false
+        b.engine.wake("A"); w.advance(ReliableMeshTransfers.ACK_WAIT_MS)
+        assertTrue(b.arrived.isEmpty())
+        b.blockedPeers.clear()
+        b.engine.wake("A")
+        assertEquals(1, b.arrived.size)
+    }
+
+    @Test fun restartKeepsTheLateForwardWindowAndAcceptedPeers() {
+        val w = World(); val a = w.Node("A"); val b = w.Node("B"); val c = w.Node("C")
+        val d = w.Node("D", online = false)
+        w.relayed(a, b)
+        b.engine.relayTargets("note", setOf("C"), imageFrame())
+        b.engine.offer("C", imageFrame(), false, durableRelay = true); w.pump()
+        b.online = false
+        val restarted = w.Node("B", b.root); w.pump()
+        assertTrue(restarted.engine.hasRelayHold("note"))
+        assertTrue(restarted.engine.alreadyForwarded("note", "C"))
+        d.online = true; restarted.neighbors = setOf("C", "D")
+        restarted.engine.wake("D", reconcile = false); w.pump()
+        assertEquals(1, c.arrived.size)
+        assertEquals(1, d.arrived.size)
     }
 
     @Test fun piecesReassembleExactlyAndCustodyDoesNotInventDeliveryReceipt() {

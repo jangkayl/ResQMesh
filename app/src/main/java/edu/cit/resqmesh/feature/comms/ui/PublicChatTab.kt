@@ -77,6 +77,7 @@ fun PublicChatTab(
     val channelId by viewModel.currentChannelId.collectAsState()
     val isAcquiringLocation by viewModel.isAcquiringLocation.collectAsState()
     val sendBudget by viewModel.chatBudgetState.collectAsState()
+    val imageBudget by viewModel.imageBudgetState.collectAsState()
 
     BackHandler {
         onBack()
@@ -90,6 +91,7 @@ fun PublicChatTab(
     }
     LaunchedEffect(uiState.publicMessages.lastOrNull()?.id) { viewModel.read("COMMUNITY") }
     var pendingImage by remember { mutableStateOf<String?>(null) }
+    var pendingImageQuality by remember { mutableStateOf(edu.cit.resqmesh.core.audio.ImageQuality.STANDARD) }
     var pendingAudio by remember { mutableStateOf<String?>(null) }
     var isRecording by remember { mutableStateOf(false) }
     var replyingToMessage by remember { mutableStateOf<ChatMessage?>(null) }
@@ -156,7 +158,7 @@ fun PublicChatTab(
                     inputText = inputText,
                     onTextChange = { inputText = it; draftRestored = true; viewModel.draft("COMMUNITY", it) },
                     pendingImage = pendingImage,
-                    onImageSelected = { pendingImage = it },
+                    onImageSelected = { image, quality -> pendingImage = image; pendingImageQuality = quality },
                     onClearImage = { pendingImage = null },
                     pendingAudio = pendingAudio,
                     onClearAudio = { pendingAudio = null },
@@ -194,8 +196,8 @@ fun PublicChatTab(
                             rawMessage
                         }
                         if (finalMessage.isNotBlank() || pendingImage != null || pendingAudio != null) {
-                            // False means the send budget is empty: keep the text, image, audio and reply as typed.
-                            if (viewModel.sendPublicMessage(finalMessage, pendingImage, pendingAudio)) {
+                            // False means nothing was sent: keep the text, image, audio and reply as typed.
+                            if (viewModel.sendPublicMessage(finalMessage, pendingImage, pendingAudio, pendingImageQuality)) {
                                 inputText = ""
                                 viewModel.draft("COMMUNITY", "")
                                 pendingImage = null
@@ -216,7 +218,8 @@ fun PublicChatTab(
                     },
                     mediaHelper = mediaHelper,
                     isAcquiringLocation = isAcquiringLocation,
-                    sendBudget = sendBudget
+                    sendBudget = sendBudget,
+                    imageBudget = imageBudget
                 )
             }
         ) { innerPadding ->

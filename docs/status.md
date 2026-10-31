@@ -1,6 +1,6 @@
 # Current status
 
-Last reviewed: 2026-10-17. Baseline: `a9a27ed` on `main` (also `origin/fix/incident-ui-ux`); docs work continues on `chore/context-routing`. Build hashes and test counts live in [validation](validation.md).
+Last reviewed: 2026-10-17. Baseline: `a9a27ed` on `main` (also `origin/fix/incident-ui-ux`). Build hashes and test counts live in [validation](validation.md).
 
 ## Current objective
 
@@ -19,9 +19,9 @@ Behavior and source ownership are in [architecture](architecture.md); accepted p
 | ID | State | Outstanding work |
 | --- | --- | --- |
 | UX-01 | User-reported concern; details pending | UI/UX issues not yet described. Record screens, steps and screenshots when supplied. |
-| PERF-01 | User-reported lag on app open; fixes local, device evidence pending | Source review: 3 s splash, keystore on Main, per-scan Home recomposition, logger list copies, BLE parsing on the main looper. The first four are fixed in `3b234bf`; BLE threading is deferred because of mesh risk. The user reported the `3b234bf` debug APK as less laggy on 2026-10-17, with some lag remaining. On one phone, adb measurement shows a 3.3 s debug cold start against 0.8 s for a release build of the same source ([validation](validation.md)), so the remaining lag is mostly debug overhead. Demo and beta builds should use the release variant. Release builds keep app Logcat markers debug-only, so capture sessions still need debug builds. The two-phone mesh steps of the [startup lag card](testing/startup-lag-card.md) are pending. |
+| PERF-01 | User-reported lag on app open; fixes local, device evidence pending | Source review: 3 s splash, keystore on Main, per-scan Home recomposition, logger list copies, BLE parsing on the main looper. The first four are fixed in `3b234bf`; BLE threading is deferred because of mesh risk. The user reported the `3b234bf` debug APK as less laggy on 2026-10-17, with some lag remaining. Adb on one phone shows 3.3 s debug against 0.8 s release cold start ([validation](validation.md)), so the remaining lag is mostly debug overhead. Demo and beta builds should use the release variant. Release builds keep app Logcat markers debug-only, so capture sessions still need debug builds. The two-phone mesh steps of the [startup lag card](testing/startup-lag-card.md) are pending. |
 | MESH-02 | User-reported concern; details pending | Mesh issues beyond DELIVERY-01 not yet described. Record topology, APK, times and focused captures when supplied. |
-| DELIVERY-01 | User-reported failure; investigation deferred | On A→B→C→D, public/private text or voice sometimes fails to reach D. Cause unknown; keys, forwarding and blocking are hypotheses only. |
+| DELIVERY-01 | User-reported failure; relay fix local, device evidence pending | On A→B→C→D, public/private text or voice sometimes fails to reach D; public images sometimes miss across a hop. Cause unproven. |
 | UI-02 | Local failures; acceptance blocked | Four emulator navigation assertions fail on both the pre-refactor baseline and the current candidate. |
 | DEPLOY-01 | Evidence/work pending (replaces RELEASE-01) | Release signing, upgrade path, install guide, process-death/OEM/background battery matrix, accessibility and novice usability. |
 | MEASURE-01 | Evidence pending | Repeated arrival/receipt counts, latency, sustained load/fallback and route-withdrawal coverage. |
@@ -33,7 +33,7 @@ Basic block, incident, SOS and recovery checks have user-reported successes; the
 
 **Layer boundaries / P2 subset** (`refactor/layer-boundaries`, [plan](plans/layer-boundaries.md)): The user reported the [smoke card](testing/layer-boundaries-smoke-card.md) passing on three phones (2026-10-17); merged.
 
-**Batch C hygiene / Phase 0** (`refactor/batch-c-hygiene`): the user reported all [smoke card](testing/batch-c-hygiene-smoke-card.md) steps working on 2026-10-17 (models and counts not supplied).
+**Batch C hygiene / Phase 0** (`refactor/batch-c-hygiene`): the user reported all [smoke card](testing/batch-c-hygiene-smoke-card.md) steps working on 2026-10-17.
 
 **Dead screens**: merged; device pending.
 
@@ -43,13 +43,17 @@ Basic block, incident, SOS and recovery checks have user-reported successes; the
 
 **Code smells refactor:** [card](testing/code-smells-refactor-card.md) pending.
 
-**Batch A cleanup** (`refactor/batch-a-cleanup`): the user reported all [smoke card](testing/batch-a-cleanup-smoke-card.md) steps working on 2026-10-16 (build, models, counts not supplied). Remaining review work: revision-plan phases P1–P6.
+**Batch A cleanup** (`refactor/batch-a-cleanup`): the user reported all [smoke card](testing/batch-a-cleanup-smoke-card.md) steps working on 2026-10-16. Remaining review work: revision-plan phases P1–P6.
 
 **Developer console** (branch `feat/developer-console`, [plan](plans/developer-mode.md)): Stage 1 and live follow are pushed; Stage 2 (traces, timeline) has local checks only and awaits the [phone card](testing/developer-mode-card.md). Stage 3 (signal and queue stats) is pending.
 
 **Unknown duplicate row** (`fix/unknown-duplicate-row`): the peer list keeps one row per peer and follows the surviving socket. JVM tests pass; [phone card](testing/unknown-duplicate-row-card.md) pending. Second-socket cause unmeasured.
 
-**Fast device install**: parallel, ABI-targeted installs; [card](testing/fast-device-install-card.md) pending.
+**Fast device install**: [card](testing/fast-device-install-card.md) pending.
+
+**Relay image delivery** (`feat/image-quality`): late public media forwarding and sender-free completion; [card](testing/relay-image-delivery-card.md) pending.
+
+**Image quality** (`feat/image-quality`): user-rated quality good; [card](testing/image-quality-card.md) pending.
 
 ## Next actions
 

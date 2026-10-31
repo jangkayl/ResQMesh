@@ -3,10 +3,14 @@ package edu.cit.resqmesh.core.audio
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.Matrix
 import android.media.MediaPlayer
 import android.media.MediaRecorder
+import android.net.Uri
 import android.os.Build
 import android.util.Base64
+import androidx.core.content.FileProvider
+import androidx.exifinterface.media.ExifInterface
 import edu.cit.resqmesh.core.logging.AppLogger
 import edu.cit.resqmesh.core.logging.trace.TraceDir
 import edu.cit.resqmesh.core.logging.trace.TraceDropReason
@@ -18,11 +22,14 @@ import kotlinx.coroutines.flow.StateFlow
 import java.io.ByteArrayOutputStream
 import java.io.File
 
+private const val CAPTURE_DIR = "captures"
+
 class MediaHelper(private val context: Context) {
 
     private var mediaRecorder: MediaRecorder? = null
     private var audioFile: File? = null
     private var mediaPlayer: MediaPlayer? = null
+    private val captureAuthority = "${context.packageName}.fileprovider"
 
     private val _recordingLimitReached = MutableStateFlow(false)
     val recordingLimitReached: StateFlow<Boolean> = _recordingLimitReached
@@ -202,17 +209,68 @@ class MediaHelper(private val context: Context) {
     }
 
     // --- IMAGE LOGIC ---
-    fun compressBitmapToBase64(bitmap: Bitmap): String {
-        val maxImageSize = 150f
-        val ratio = Math.min(maxImageSize / bitmap.width, maxImageSize / bitmap.height)
-        val width = Math.round(ratio * bitmap.width)
-        val height = Math.round(ratio * bitmap.height)
-
-        val scaledBitmap = Bitmap.createScaledBitmap(bitmap, width, height, true)
-        val outputStream = ByteArrayOutputStream()
-        scaledBitmap.compress(Bitmap.CompressFormat.JPEG, 20, outputStream)
-        return Base64.encodeToString(outputStream.toByteArray(), Base64.NO_WRAP)
+    /** Blocking; call off the main thread. Returns null when the image cannot be read. */
+    fun compressImageUriToBase64(uri: Uri, level: ImageQuality = ImageQuality.STANDARD): String? {
+        return try {
+            val bitmap = decodeUpright(uri, level) ?: return null
+            val (width, height) = ImageEncodingPolicy.scaledSize(bitmap.width, bitmap.height, level)
+            val scaled = Bitmap.createScaledBitmap(bitmap, width, height, true)
+            if (scaled !== bitmap) bitmap.recycle()
+            val encoded = ImageEncodingPolicy.encodeWithinTarget(level) { quality -> encodeWebp(scaled, quality) }
+            scaled.recycle()
+            encoded.takeIf { it.isNotEmpty() }?.let { Base64.encodeToString(it, Base64.NO_WRAP) }
+        } catch (e: Exception) {
+            AppLogger.d("MediaHelper", "Image compression failed: ${e.javaClass.simpleName}")
+            null
+        }
     }
+
+    /** Creates a private temp file for the camera app, clearing older captures except [keep]. */
+    fun createCaptureUri(keep: Uri?): Uri {
+        val dir = File(context.cacheDir, CAPTURE_DIR).apply { mkdirs() }
+        dir.listFiles()?.filter { it.name != keep?.lastPathSegment }?.forEach { it.delete() }
+        val file = File(dir, "capture_${System.currentTimeMillis()}.jpg").apply { createNewFile() }
+        return FileProvider.getUriForFile(context, captureAuthority, file)
+    }
+
+    /** Deletes a temp capture; other URIs, such as gallery picks, are left alone. */
+    fun deleteCapture(uri: Uri?) {
+        if (uri?.authority != captureAuthority) return
+        uri.lastPathSegment?.let { File(File(context.cacheDir, CAPTURE_DIR), File(it).name).delete() }
+    }
+
+    private fun decodeUpright(uri: Uri, level: ImageQuality): Bitmap? {
+        val resolver = context.contentResolver
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        resolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, bounds) }
+        val options = BitmapFactory.Options().apply {
+            inSampleSize = ImageEncodingPolicy.sampleSize(bounds.outWidth, bounds.outHeight, level)
+        }
+        val decoded = resolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, options) }
+        return decoded?.let { applyExifOrientation(it, uri) }
+    }
+
+    private fun applyExifOrientation(decoded: Bitmap, uri: Uri): Bitmap {
+        val exif = context.contentResolver.openInputStream(uri)?.use { ExifInterface(it) } ?: return decoded
+        val matrix = Matrix().apply {
+            if (exif.isFlipped) postScale(-1f, 1f)
+            postRotate(exif.rotationDegrees.toFloat())
+        }
+        val upright = Bitmap.createBitmap(decoded, 0, 0, decoded.width, decoded.height, matrix, true)
+        if (upright !== decoded) decoded.recycle()
+        return upright
+    }
+
+    private fun encodeWebp(bitmap: Bitmap, quality: Int): ByteArray {
+        val outputStream = ByteArrayOutputStream()
+        bitmap.compress(webpFormat(), quality, outputStream)
+        return outputStream.toByteArray()
+    }
+
+    @Suppress("DEPRECATION") // WEBP is the only lossy WebP format below API 30.
+    private fun webpFormat(): Bitmap.CompressFormat =
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) Bitmap.CompressFormat.WEBP_LOSSY
+        else Bitmap.CompressFormat.WEBP
 
     fun decodeBase64ToBitmap(base64String: String): Bitmap? {
         return try {

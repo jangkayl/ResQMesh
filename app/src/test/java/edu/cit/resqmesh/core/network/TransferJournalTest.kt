@@ -21,6 +21,21 @@ class TransferJournalTest {
         assertEquals(42.toByte(), reopened.assemble(record).last())
     }
 
+    @Test fun relayHoldSurvivesReopeningAndOldestHoldIsEvictedAtTheByteBudget() {
+        val root = temporary.newFolder(); val journal = TransferJournal(root) { 1000 }
+        val first = record(id = "first"); val second = record(id = "second")
+        journal.create(first); journal.create(second.copy(peer = "other"))
+        val onward = ByteArray(TransferJournal.MAX_BYTES / 2 + 1)
+        assertTrue(journal.holdRelay(first, onward, 2000, listOf("A")).isEmpty())
+        val reopened = TransferJournal(root) { 1000 }
+        val held = reopened.relayHolds().single()
+        assertEquals(onward.size, reopened.relayBytes(held).size)
+        assertEquals(listOf("A"), held.relayVisited)
+        val evicted = reopened.holdRelay(second.copy(peer = "other"), onward, 3000, emptyList())
+        assertEquals(listOf("first"), evicted.map { it.id })
+        assertEquals(listOf("second"), reopened.relayHolds().map { it.id })
+    }
+
     @Test fun duplicatePieceNeverOverwritesCommittedBytes() {
         val journal = TransferJournal(temporary.newFolder()) { 1000 }; val record = record()
         journal.create(record)

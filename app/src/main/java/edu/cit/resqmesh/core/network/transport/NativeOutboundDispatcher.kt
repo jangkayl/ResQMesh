@@ -5,6 +5,7 @@ import android.os.Handler
 import android.os.Looper
 import edu.cit.resqmesh.core.model.NodeIdentity
 import edu.cit.resqmesh.core.network.BroadcastDispatchResult
+import edu.cit.resqmesh.core.network.DetachedSender
 import edu.cit.resqmesh.core.network.DirectEndpoint
 import edu.cit.resqmesh.core.network.DirectSendPolicy
 import edu.cit.resqmesh.core.network.MeshPayload
@@ -13,6 +14,7 @@ import edu.cit.resqmesh.core.network.PacketTraceEmitter
 import edu.cit.resqmesh.core.network.ReliableMeshTransfers
 import edu.cit.resqmesh.core.network.TransferPiece
 import edu.cit.resqmesh.core.network.TransportDispatchResult
+import edu.cit.resqmesh.core.network.relayVisited
 import edu.cit.resqmesh.core.network.bluetooth.state.BleStateStore
 import edu.cit.resqmesh.core.network.bluetooth.state.GattTransfer
 import edu.cit.resqmesh.core.network.bluetooth.state.GattTransferCoordinator
@@ -94,17 +96,37 @@ internal class NativeOutboundDispatcher(
             (p.type == ReliableMeshTransfers.PIECE && ProtoBuf.decodeFromByteArray<TransferPiece>(p.liveAudioChunk!!).let { it.priority || it.status })
     }.getOrDefault(false)
 
+    /** Identified, unblocked neighbors a held relay may still reach right now. */
+    fun readyRelayPeers(): Set<String> = (store.activeConnections.keys + store.activeServerConnections.keys).distinct()
+        .filter(hasReadyEndpoint).mapNotNull(nodeIdForEndpoint).map { it.uppercase() }
+        .filter { endpointForPeer(it) != null }.toSet()
+
+    private fun relaySkips(roster: Set<String>, excludedPeer: String?, visited: Set<String>): Map<String, String> =
+        (store.activeConnections.keys + store.activeServerConnections.keys).distinct().mapNotNull(nodeIdForEndpoint)
+            .map { it.uppercase() }.filter { it !in roster }.associateWith { peer ->
+                when {
+                    peer.equals(excludedPeer, true) -> "sender"
+                    peer in visited -> "visited"
+                    else -> "not_ready"
+                }
+            }
+
     fun broadcastPayload(payloadBytes: ByteArray, excludeEndpointId: String? = null): BroadcastDispatchResult {
         cacheOutgoingMessageId(payloadBytes)
         val p = runCatching { ProtoBuf.decodeFromByteArray<MeshPayload>(payloadBytes) }.getOrNull()
-        val excludedPeer = excludeEndpointId?.let(nodeIdForEndpoint)
-        val visited = if (p != null && !p.isPrivate && p.type in setOf("MESSAGE", "CONVERSATION"))
-            (p.routePath + p.senderName).mapNotNull(NodeIdentity::idOf).map { it.uppercase() }.toSet() else emptySet()
+        val excludedPeer = DetachedSender.peerOf(excludeEndpointId) ?: excludeEndpointId?.let(nodeIdForEndpoint)
+        val publicContent = p != null && !p.isPrivate && p.type in setOf("MESSAGE", "CONVERSATION")
+        val visited = if (publicContent) p!!.relayVisited() else emptySet()
         val peers = (store.activeConnections.keys + store.activeServerConnections.keys).distinct()
             .filter { it != excludeEndpointId && hasReadyEndpoint(it) }.mapNotNull(nodeIdForEndpoint)
             .map { it.uppercase() }.filter { it !in visited && !it.equals(excludedPeer, true) && endpointForPeer(it) != null }.toSet()
         val custody = p != null && excludeEndpointId != null && reliableTransfers.hasPendingCustody(p.id)
-        val roster = if (custody) reliableTransfers.relayTargets(p!!.id, peers) else peers
+        // Small text keeps the frozen roster alone: late forwarding is for media that has no later sync.
+        val media = publicContent && (p!!.imageBytes != null || p.audioBytes != null)
+        val roster = if (custody) {
+            reliableTransfers.relayTargets(p!!.id, peers, payloadBytes.takeIf { media })
+        } else peers
+        if (custody) reliableTransfers.logRoster(p!!.id, "first", roster, relaySkips(roster, excludedPeer, visited))
         val result = BroadcastDispatchResult(roster.associateWith { peer ->
             if (custody && reliableTransfers.alreadyForwarded(p!!.id, peer)) TransportDispatchResult.ACCEPTED
             else if (custody && peerTransferVersions[peer] == ReliableMeshTransfers.VERSION) {

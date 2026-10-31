@@ -13,6 +13,9 @@ data class RateLimitPolicy(
     // Sender-side pacing for outgoing chat (OutgoingChatBudget): the same 15/min refill, burst 15.
     val chatSendPerMin: Double = 15.0,
     val chatSendBurst: Double = 15.0,
+    // Sender-side image pacing (OutgoingImageBudget): 6 Standard or 3 High back to back, then a credit every 10 s.
+    val imageSendPerMin: Double = 6.0,
+    val imageSendBurst: Double = 6.0,
     // Receiver burst is the sender's 3 raises (OutgoingSosBudget) plus 1 margin for BLE queue bunching.
     val sosNewPerMin: Double = 3.0,
     val sosNewBurst: Double = 4.0,

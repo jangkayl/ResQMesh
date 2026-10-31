@@ -1,6 +1,7 @@
 package edu.cit.resqmesh.core.network.dispatch
 
 import android.os.Handler
+import edu.cit.resqmesh.core.network.DetachedSender
 import edu.cit.resqmesh.core.network.MeshPayload
 import edu.cit.resqmesh.core.network.ReliableMeshTransfers
 import edu.cit.resqmesh.core.network.bluetooth.state.BleStateStore
@@ -16,8 +17,10 @@ class NativeInboundPipelineTest {
         val store = BleStateStore()
         val versions = edu.cit.resqmesh.core.utils.collections.BoundedLruMap<String, Int>(16)
         val calls = mutableListOf<String>()
+        val dispatched = mutableListOf<String>()
         var current = true
         var live = true
+        var livePeerEndpoint: String? = null
         var liveness: ((String, Boolean) -> Unit)? = { _, _ -> calls += "old-listener" }
         val pipeline = NativeInboundPipeline(
             store = store,
@@ -28,6 +31,7 @@ class NativeInboundPipelineTest {
             isTransportGenerationCurrent = { current },
             hasLiveSocket = { live },
             nodeIdForEndpoint = { "B002" },
+            endpointForPeer = { livePeerEndpoint },
             hasReadyEndpoint = { true },
             isDeviceBlocked = { false },
             transfers = { error("The transfer journal must stay lazy in this scenario") },
@@ -37,10 +41,38 @@ class NativeInboundPipelineTest {
             sendSystemPulse = { calls += "pulse" },
             connectedListener = { { calls += "connected" } },
             livenessListener = { liveness },
-            dispatch = { _, _ -> calls += "dispatch" }
+            dispatch = { endpoint, _ -> calls += "dispatch"; dispatched += endpoint }
         )
 
         fun receive(payload: MeshPayload) = pipeline.processBinaryPayload("endpoint", ProtoBuf.encodeToByteArray(payload))
+    }
+
+    @Test fun completedTransferDispatchesWithoutItsSenderLink() {
+        val f = Fixture()
+        f.store.isNodeActive.set(true)
+        f.pipeline.processCompletedTransfer("B002", ProtoBuf.encodeToByteArray(MeshPayload(id = "image")))
+        assertEquals(listOf(DetachedSender.endpointOf("B002")), f.dispatched)
+        assertEquals("B002", DetachedSender.peerOf(f.dispatched.single()))
+    }
+
+    @Test fun completedTransferPrefersTheLiveLink() {
+        val f = Fixture()
+        f.store.isNodeActive.set(true)
+        f.livePeerEndpoint = "endpoint"
+        val bytes = ProtoBuf.encodeToByteArray(MeshPayload(id = "image", type = "CONVERSATION"))
+        f.pipeline.processCompletedTransfer("B002", bytes)
+        assertEquals(listOf("endpoint"), f.dispatched)
+    }
+
+    @Test fun completedTransferFromBlockedPeerOrStoppedNodeIsRefused() {
+        val f = Fixture()
+        val bytes = ProtoBuf.encodeToByteArray(MeshPayload(id = "image"))
+        f.store.isNodeActive.set(false)
+        f.pipeline.processCompletedTransfer("B002", bytes)
+        f.store.isNodeActive.set(true)
+        f.store.blockedDevices["B002"] = true
+        f.pipeline.processCompletedTransfer("B002", bytes)
+        assertTrue(f.dispatched.isEmpty())
     }
 
     @Test fun frameFloodOnOneLinkIsDroppedAfterTheFramesPerSecondBudget() {
