@@ -2,6 +2,8 @@ package edu.cit.resqmesh.feature.radar.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import edu.cit.resqmesh.core.model.ConnectedDevice
+import edu.cit.resqmesh.core.model.KnownNode
 import edu.cit.resqmesh.core.model.NodeIdentity
 import edu.cit.resqmesh.core.ui.model.RadarUiState
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -66,7 +68,14 @@ class RadarViewModel(private val useCases: edu.cit.resqmesh.core.domain.usecase.
         }
         viewModelScope.launch {
             useCases.observeKnownNodes().collect { known ->
-                _uiState.update { it.copy(knownNodes = known) }
+                val previous = _uiState.value
+                val now = System.currentTimeMillis()
+                val retained = recentOfflineAfterRouteChange(
+                    previous.recentOfflineDevices, previous.knownNodes, known, previous.connectedDevices
+                )
+                known.forEach { offlineSince.remove(NodeIdentity.key(it.name)) }
+                retained.forEach { offlineSince.getOrPut(NodeIdentity.key(it.name)) { now } }
+                _uiState.update { it.copy(knownNodes = known, recentOfflineDevices = retained) }
             }
         }
         viewModelScope.launch {
@@ -95,4 +104,25 @@ class RadarViewModel(private val useCases: edu.cit.resqmesh.core.domain.usecase.
     fun forceConnect(endpointId: String, endpointName: String) {
         useCases.forceConnect(endpointId, endpointName)
     }
+}
+
+/**
+ * A routed peer with no remaining route or link becomes recently offline, the same as a lost direct
+ * peer. This means unreachable from this phone; the mesh sends no proof that the peer itself stopped.
+ */
+internal fun recentOfflineAfterRouteChange(
+    recentOffline: List<ConnectedDevice>,
+    previousKnown: List<KnownNode>,
+    known: List<KnownNode>,
+    connected: List<ConnectedDevice>
+): List<ConnectedDevice> {
+    val lostRouted = previousKnown
+        .filter { node ->
+            !node.isDirect &&
+                known.none { NodeIdentity.matches(it.name, node.name) } &&
+                connected.none { NodeIdentity.matches(it.name, node.name) }
+        }
+        .map { ConnectedDevice(endpointId = "", name = it.name) }
+    return (recentOffline.filter { device -> known.none { NodeIdentity.matches(it.name, device.name) } } + lostRouted)
+        .distinctBy { NodeIdentity.key(it.name) }
 }
