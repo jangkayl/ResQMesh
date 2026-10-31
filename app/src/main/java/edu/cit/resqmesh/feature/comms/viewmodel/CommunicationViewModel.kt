@@ -26,7 +26,10 @@ import edu.cit.resqmesh.core.domain.usecase.messaging.PrivateSendResult
 import edu.cit.resqmesh.core.domain.usecase.messaging.SendPrivateChatMessageUseCase
 import edu.cit.resqmesh.core.domain.usecase.sos.RaiseSosUseCase
 import edu.cit.resqmesh.core.network.ratelimit.ChatBudgetState
+import edu.cit.resqmesh.core.audio.ImageQuality
+import edu.cit.resqmesh.core.network.ratelimit.ImageBudgetState
 import edu.cit.resqmesh.core.network.ratelimit.OutgoingChatBudget
+import edu.cit.resqmesh.core.network.ratelimit.OutgoingImageBudget
 import edu.cit.resqmesh.core.model.SosRaiseResult
 import edu.cit.resqmesh.core.network.ratelimit.OutgoingSosBudget
 import edu.cit.resqmesh.core.network.ratelimit.SosBudgetState
@@ -43,6 +46,7 @@ class CommunicationViewModel(
     private val raiseSos: RaiseSosUseCase,
     private val sendPrivate: SendPrivateChatMessageUseCase,
     private val chatBudget: OutgoingChatBudget,
+    private val imageBudget: OutgoingImageBudget,
     private val sosBudget: OutgoingSosBudget,
     private val voiceHold: RadioVoiceHold,
     private val locationPreferences: edu.cit.resqmesh.core.location.LocationPreferences
@@ -85,6 +89,18 @@ class CommunicationViewModel(
             }
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(BUDGET_STOP_TIMEOUT_MS), chatBudget.state.value)
+
+    /** Image budget for the composers. Ticks once a second only while collected and not full. */
+    val imageBudgetState: StateFlow<ImageBudgetState> = channelFlow {
+        imageBudget.refresh()
+        launch { imageBudget.state.collect { send(it) } }
+        imageBudget.state.map { it.remaining < it.capacity }.distinctUntilChanged().collectLatest { notFull ->
+            while (notFull) {
+                delay(BUDGET_TICK_MS)
+                imageBudget.refresh()
+            }
+        }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(BUDGET_STOP_TIMEOUT_MS), imageBudget.state.value)
 
     private val sosGate = SosRaiseGate(sosBudget)
 
@@ -235,15 +251,26 @@ class CommunicationViewModel(
         }
     }
 
-    /** Returns false only when the send budget is empty: nothing was sent and the caller must keep its text. */
-    fun sendPublicMessage(text: String, imageBase64: String? = null, audioBase64: String? = null): Boolean {
+    /** Returns true only when the message was sent; otherwise the caller must keep its text and attachments. */
+    fun sendPublicMessage(
+        text: String,
+        imageBase64: String? = null,
+        audioBase64: String? = null,
+        imageQuality: ImageQuality = ImageQuality.STANDARD
+    ): Boolean {
+        val credits = if (imageBase64 != null) imageQuality.credits else 0
+        if (!imageBudget.canAfford(credits)) return false
         val clean = checkedMessageText(text)
         val admission = if (clean == null) ChatSendGate.Admission.DEBOUNCED
         else sendGate.admit("public:${mediaKind(imageBase64, audioBase64)}")
+        var sent = false
         if (clean != null && admission == ChatSendGate.Admission.GO) {
-            sendGate.settle(useCases.sendPublicMessage(clean, imageBase64, audioBase64).isNotEmpty())
+            imageBudget.tryConsume(credits)
+            sent = useCases.sendPublicMessage(clean, imageBase64, audioBase64).isNotEmpty()
+            sendGate.settle(sent)
+            if (!sent) imageBudget.refund(credits)
         }
-        return admission != ChatSendGate.Admission.NO_BUDGET
+        return sent
     }
 
     val publicSendFeedback = kotlinx.coroutines.flow.merge(useCases.sendPublicMessage.feedback, sosErrors)
@@ -332,14 +359,22 @@ class CommunicationViewModel(
         targetName: String,
         text: String,
         imageBase64: String? = null,
-        audioBase64: String? = null
+        audioBase64: String? = null,
+        imageQuality: ImageQuality = ImageQuality.STANDARD
     ): Boolean {
         val key = "private:$targetName:${mediaKind(imageBase64, audioBase64)}"
+        val credits = if (imageBase64 != null) imageQuality.credits else 0
         // No token: send nothing, keep the draft and show no error; the composer shows the wait.
-        if (sendGate.admit(key, markNow = false) != ChatSendGate.Admission.GO) return false
+        val admitted = imageBudget.canAfford(credits) &&
+            sendGate.admit(key, markNow = false) == ChatSendGate.Admission.GO
+        if (!admitted) return false
+        imageBudget.tryConsume(credits)
         val result = sendPrivate(targetName, text, imageBase64, audioBase64)
         if (result !is PrivateSendResult.TooLong) sendGate.mark(key)
-        if (result != PrivateSendResult.Sent) sendGate.refund()
+        if (result != PrivateSendResult.Sent) {
+            sendGate.refund()
+            imageBudget.refund(credits)
+        }
         return when (result) {
             PrivateSendResult.Sent -> true
             PrivateSendResult.NeedsKeyVerification -> {

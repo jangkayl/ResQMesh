@@ -61,6 +61,7 @@ fun ActiveChatScreen(
     val drafts by viewModel.privateDrafts.collectAsState()
     val isAcquiringLocation by viewModel.isAcquiringLocation.collectAsState()
     val sendBudget by viewModel.chatBudgetState.collectAsState()
+    val imageBudget by viewModel.imageBudgetState.collectAsState()
     val conversationEntry = uiState.privateMessages.entries.firstOrNull {
         NodeIdentity.key(it.key) == NodeIdentity.key(name)
     }
@@ -80,6 +81,7 @@ fun ActiveChatScreen(
     val latestMessageId = sortedMessages.firstOrNull()?.id
     val snackbarHostState = remember { SnackbarHostState() }
     var pendingImage by remember { mutableStateOf<String?>(null) }
+    var pendingImageQuality by remember { mutableStateOf(edu.cit.resqmesh.core.audio.ImageQuality.STANDARD) }
     var pendingAudio by remember { mutableStateOf<String?>(null) }
     var isRecording by remember { mutableStateOf(false) }
     var replyingToMessage by remember { mutableStateOf<ChatMessage?>(null) }
@@ -159,7 +161,7 @@ fun ActiveChatScreen(
                     inputText = drafts[conversationName] ?: drafts[name].orEmpty(),
                     onTextChange = { viewModel.updatePrivateDraft(conversationName, it) },
                     pendingImage = pendingImage,
-                    onImageSelected = { pendingImage = it },
+                    onImageSelected = { image, quality -> pendingImage = image; pendingImageQuality = quality },
                     onClearImage = { pendingImage = null },
                     pendingAudio = pendingAudio,
                     onClearAudio = { pendingAudio = null },
@@ -193,7 +195,8 @@ fun ActiveChatScreen(
                             targetName = conversationName,
                             text = finalMessage,
                             imageBase64 = pendingImage,
-                            audioBase64 = pendingAudio
+                            audioBase64 = pendingAudio,
+                            imageQuality = pendingImageQuality
                         )
                         if (sent) {
                             viewModel.clearPrivateDraft(conversationName)
@@ -216,7 +219,8 @@ fun ActiveChatScreen(
                     },
                     mediaHelper = mediaHelper,
                     isAcquiringLocation = isAcquiringLocation,
-                    sendBudget = sendBudget
+                    sendBudget = sendBudget,
+                    imageBudget = imageBudget
                 )
             }
         ) { innerPadding ->

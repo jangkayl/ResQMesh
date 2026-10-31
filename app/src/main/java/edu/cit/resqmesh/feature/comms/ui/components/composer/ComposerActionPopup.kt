@@ -10,6 +10,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Image
 import androidx.compose.material.icons.outlined.LocationOn
 import androidx.compose.material.icons.outlined.Mic
+import androidx.compose.material.icons.outlined.PhotoCamera
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -22,6 +23,7 @@ import edu.cit.resqmesh.core.ui.theme.ResQTheme
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.material3.ExperimentalMaterial3Api
 
+@Suppress("FunctionNaming", "LongParameterList", "LongMethod")
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 internal fun ComposerActionPopup(
@@ -29,6 +31,7 @@ internal fun ComposerActionPopup(
     isPopupExpanded: Boolean,
     isAcquiringLocation: Boolean,
     onPickImage: () -> Unit,
+    onTakePhoto: () -> Unit,
     onPickLocation: () -> Unit,
     onRecord: () -> Unit
 ) {
@@ -67,6 +70,24 @@ internal fun ComposerActionPopup(
                             Icon(
                                 imageVector = Icons.Outlined.Image,
                                 contentDescription = stringResource(R.string.private_chat_add_image_action),
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(19.dp)
+                            )
+                        }
+                    }
+
+                    // Camera Button
+                    Surface(
+                        shape = CircleShape,
+                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.35f)),
+                        onClick = onTakePhoto,
+                        modifier = Modifier.size(38.dp)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                imageVector = Icons.Outlined.PhotoCamera,
+                                contentDescription = stringResource(R.string.composer_take_photo),
                                 tint = MaterialTheme.colorScheme.primary,
                                 modifier = Modifier.size(19.dp)
                             )

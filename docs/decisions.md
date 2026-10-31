@@ -32,7 +32,7 @@ Origin outboxes and transfer journals exist; disconnected-cluster delivery is no
 
 ## D8: Lightweight context engineering
 
-One shared router, `AGENTS.md`, plus six owner documents hold current context; each fact lives in one owner. Tool entry files (`CLAUDE.md`, `GEMINI.md`) only import `AGENTS.md` and add tool-specific notes. Avoid extra routers/indexes, ICM stage trees and knowledge graphs. Archived prompts are historical and never authorize implementation.
+One shared router, `AGENTS.md`, plus six owner documents hold current context; each fact lives in one owner. Tool entry files (`CLAUDE.md`, `GEMINI.md`) only import `AGENTS.md` and add tool-specific notes. Avoid extra routers/indexes, ICM stage trees and knowledge graphs.
 
 ## D9: Planning lifecycle
 
@@ -40,7 +40,7 @@ Small work stays in its task; medium work updates status. Only large multi-sessi
 
 ## D10: Deterministic PR gate
 
-CI repeats debug build, unit tests, Lint, Android-test compilation, detekt (baselined), architecture-boundary and docs checks, and diff hygiene. Failed checks block readiness and cannot be waived by AI explanation. PR creation and merge require explicit instruction. Local/CI checks never substitute for physical evidence.
+CI repeats debug build, unit tests, Lint, Android-test compilation, detekt (baselined), architecture-boundary and docs checks, and diff hygiene. Failed checks block readiness and cannot be waived by AI explanation.
 
 ## D11: Mutual direct-link denial, independent local release
 
@@ -127,3 +127,7 @@ Hidden; requires build-set PIN. [Plan](plans/developer-mode.md).
 ## D31: Voice notes only
 
 No live PTT; older `LIVE_AUDIO` drops. `liveAudioChunk` carries transfers. 30s note cap.
+
+## D32: Byte-capped WebP images
+
+320/480/720 px at 8/16/32 KiB; 6 image credits/min costing 1/2/4.

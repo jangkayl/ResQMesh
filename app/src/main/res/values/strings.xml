@@ -154,6 +154,14 @@
     <string name="chat_budget_left">%1$d of %2$d left</string>
     <string name="chat_budget_refill">" · +1 in %1$d s"</string>
     <string name="chat_budget_wait">Wait %1$d s</string>
+    <string name="composer_take_photo">Take photo</string>
+    <string name="composer_camera_unavailable">No camera app available</string>
+    <string name="composer_gallery_unavailable">No photo picker available</string>
+    <string name="composer_image_standard">Standard</string>
+    <string name="composer_image_high">High</string>
+    <string name="composer_image_very_high">Very High</string>
+    <string name="composer_image_larger_hint">Larger images take longer to send</string>
+    <string name="composer_image_wait">Image limit: wait %1$d s</string>
     <plurals name="chat_budget_send_in">
         <item quantity="one">Send available in %1$d second</item>
         <item quantity="other">Send available in %1$d seconds</item>

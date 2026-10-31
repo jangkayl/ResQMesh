@@ -105,6 +105,7 @@ val networkModule = module {
     single { RateLimitPolicy() }
     single { InboundGuards(get(), System::currentTimeMillis) }
     single { OutgoingChatBudget(get(), System::currentTimeMillis) }
+    single { edu.cit.resqmesh.core.network.ratelimit.OutgoingImageBudget(get(), System::currentTimeMillis) }
     single { OutgoingSosBudget(get(), System::currentTimeMillis) }
     single { edu.cit.resqmesh.core.network.ratelimit.OutgoingIncidentBudget(get(), System::currentTimeMillis) }
     single { NativeBleManager(androidContext(), get()) }
@@ -253,6 +254,7 @@ val viewModelModule = module {
             raiseSos = get(),
             sendPrivate = get(),
             chatBudget = get(),
+            imageBudget = get(),
             sosBudget = get(),
             voiceHold = get(),
             locationPreferences = get()
