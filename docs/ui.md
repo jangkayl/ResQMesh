@@ -5,7 +5,7 @@ Last reviewed: 2026-10-06. Baseline: see [status](status.md). Use Compose/Materi
 ## Components and ownership
 
 - Reuse shared components/theme tokens. Night uses black/grey panels and 1dp borders; Daylight uses white/grey with black text.
-- Safety Orange (#FF5A00) marks actions; green positive, amber attention and red SOS. Use text/semantic shapes and at least 48dp targets.
+- Safety Orange (#FF5A00) marks actions; green positive, amber attention, grey offline and red SOS. Use text/semantic shapes and at least 48dp targets.
 - Home retains its larger name, plain location labels and network view within nearby sharing.
 - Mission, Messages, Voice and Mesh use the shared shell. Mission/Messages/Voice have solid theme backgrounds and a prominent navigation SOS action without continuous pulse.
 - Chat composers hide inline media tools while typing; the floating action bubble retains access. They show the shared send budget ("13 of 15 left", plus "+1 in 4 s" while refilling); at 0 Send is disabled, reads "Wait N s" with a matching content description, and typed text is kept. Network/topology uses cards and a 2D route map. The SOS hub raise button shows "N of 3 left" (+1 per 20 s); at 0 it is disabled and reads "Wait N s".
@@ -47,9 +47,9 @@ Never display debug plaintext, keys, ciphertext previews or sensitive location.
 
 ## Sessions, navigation and diagnostics
 
-Background mesh is opt-in. Home/notification distinguish Bluetooth off, permission required, starting, searching and connected. OFF clears readiness; Go offline cancels recovery.
+Background mesh is opt-in. Home/notification distinguish Bluetooth off, permission required, starting, searching and connected. OFF clears readiness; Go offline cancels recovery. Home pill greys only for offline mesh.
 
-Home peer chips open matching stable-ID Network details. Blocked peers stay in Blocked Devices (Direct Link Denied), with relay messaging when a route exists. Settings owns offline maps.
+Home peer chips open matching stable-ID Network details. Recently offline peers: grey, labelled, uncounted. Blocked peers stay in Blocked Devices (Direct Link Denied), with relay messaging when a route exists. Settings owns offline maps.
 
 The developer console is a memory-only tabbed screen ([plan](plans/developer-mode.md)); release hides it until seven taps on the app version, and only with a configured PIN.
 

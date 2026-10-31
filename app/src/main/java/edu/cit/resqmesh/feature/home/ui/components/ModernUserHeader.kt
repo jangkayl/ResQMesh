@@ -62,7 +62,9 @@ internal fun ModernUserHeader(
     val initial = displayName.firstOrNull()?.uppercase() ?: "U"
 
     val defaultTitle = stringResource(if (isNodeActive) R.string.home_ready_title else R.string.home_setup_title)
+    val isMeshOffline = connectionStatus == edu.cit.resqmesh.core.network.bluetooth.MeshTransportState.OFFLINE.status
     val readinessTitle = when (connectionStatus) {
+        edu.cit.resqmesh.core.network.bluetooth.MeshTransportState.OFFLINE.status -> "Offline"
         edu.cit.resqmesh.core.network.bluetooth.MeshTransportState.BLUETOOTH_OFF.status -> "Bluetooth off"
         edu.cit.resqmesh.core.network.bluetooth.MeshTransportState.PERMISSION_REQUIRED.status -> "Permission needed"
         edu.cit.resqmesh.core.network.bluetooth.MeshTransportState.STARTING.status -> "Starting mesh"
@@ -70,10 +72,11 @@ internal fun ModernUserHeader(
         edu.cit.resqmesh.core.network.bluetooth.MeshTransportState.ERROR.status -> "Recovery pending"
         else -> defaultTitle
     }
-    val meshStatusColor = if (isNodeActive) {
-        if (summary.directPeers > 0) ResQTheme.colors.success else ModernSky
-    } else {
-        ResQTheme.colors.warning
+    val meshStatusColor = when {
+        isMeshOffline -> MaterialTheme.colorScheme.onSurfaceVariant
+        !isNodeActive -> ResQTheme.colors.warning
+        summary.directPeers > 0 -> ResQTheme.colors.success
+        else -> ModernSky
     }
 
     val infiniteTransition = rememberInfiniteTransition(label = "BeaconPulse")

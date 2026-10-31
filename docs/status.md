@@ -12,7 +12,7 @@ The current candidate is the October 6 APK `1AE82B6C...`; the user reports F1–
 
 ## Implemented
 
-Behavior and source ownership are in [architecture](architecture.md); accepted policies are in [decisions](decisions.md). The whole-app maintainability decomposition is merged (NativeBleManager keeps a reviewed 743-line facade exception); its evidence is archived in the [October 16 snapshot](../archive/README.md).
+Behavior and source ownership are in [architecture](architecture.md); accepted policies are in [decisions](decisions.md). The whole-app maintainability decomposition is merged (NativeBleManager keeps a reviewed 743-line facade exception); its evidence is archived in the [October 16 snapshot](../archive/README.md). Home offline grey awaits phone validation.
 
 ## Open issues
 

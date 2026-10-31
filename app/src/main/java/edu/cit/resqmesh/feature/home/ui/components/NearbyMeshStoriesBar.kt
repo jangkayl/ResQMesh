@@ -40,6 +40,12 @@ import edu.cit.resqmesh.core.ui.theme.ModernSky
 import edu.cit.resqmesh.core.ui.model.NodeItemData
 import edu.cit.resqmesh.core.ui.model.NodeKind
 
+/** Peers shown on Home: blocked peers stay out; recently offline peers stay visible, last. */
+internal fun homeStoryPeers(nodes: List<NodeItemData>): List<NodeItemData> =
+    nodes
+        .filter { !it.isBlocked && it.kind != NodeKind.BLOCKED_OFFLINE }
+        .sortedBy { it.kind == NodeKind.OFFLINE }
+
 @Composable
 internal fun NearbyMeshStoriesBar(
     nodes: List<NodeItemData>,
@@ -49,8 +55,8 @@ internal fun NearbyMeshStoriesBar(
     onPeerClick: (String) -> Unit,
     onNetworkClick: () -> Unit
 ) {
-    val activePeers = remember(nodes, directNodeNames) {
-        val classified = nodes.filter { !it.isBlocked && it.kind != NodeKind.OFFLINE && it.kind != NodeKind.BLOCKED_OFFLINE }
+    val storyPeers = remember(nodes, directNodeNames) {
+        val classified = homeStoryPeers(nodes)
         if (classified.isNotEmpty()) {
             classified
         } else {
@@ -66,6 +72,7 @@ internal fun NearbyMeshStoriesBar(
             }
         }
     }
+    val activePeerCount = storyPeers.count { it.kind != NodeKind.OFFLINE }
 
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Row(
@@ -80,13 +87,13 @@ internal fun NearbyMeshStoriesBar(
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface
                 )
-                if (activePeers.isNotEmpty()) {
+                if (activePeerCount > 0) {
                     Surface(
                         shape = CircleShape,
                         color = MaterialTheme.colorScheme.primaryContainer
                     ) {
                         Text(
-                            text = activePeers.size.toString(),
+                            text = activePeerCount.toString(),
                             style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp),
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.primary,
@@ -105,7 +112,7 @@ internal fun NearbyMeshStoriesBar(
             )
         }
 
-        if (activePeers.isEmpty()) {
+        if (storyPeers.isEmpty()) {
             Surface(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -157,9 +164,13 @@ internal fun NearbyMeshStoriesBar(
                 horizontalArrangement = Arrangement.spacedBy(14.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                activePeers.forEach { peer ->
-                    val isDirect = peer.kind == NodeKind.DIRECT
-                    val ringColor = if (isDirect) ModernMint else ModernSky
+                storyPeers.forEach { peer ->
+                    val isOffline = peer.kind == NodeKind.OFFLINE
+                    val ringColor = when {
+                        isOffline -> MaterialTheme.colorScheme.onSurfaceVariant
+                        peer.kind == NodeKind.DIRECT -> ModernMint
+                        else -> ModernSky
+                    }
                     val initial = peer.name.firstOrNull()?.uppercase() ?: "P"
 
                     Column(
@@ -181,7 +192,7 @@ internal fun NearbyMeshStoriesBar(
                                         text = initial,
                                         style = MaterialTheme.typography.titleMedium,
                                         fontWeight = FontWeight.Bold,
-                                        color = MaterialTheme.colorScheme.onSurface
+                                        color = if (isOffline) ringColor else MaterialTheme.colorScheme.onSurface
                                     )
                                 }
                             }
@@ -208,6 +219,14 @@ internal fun NearbyMeshStoriesBar(
                             modifier = Modifier.width(68.dp),
                             textAlign = androidx.compose.ui.text.style.TextAlign.Center
                         )
+
+                        if (isOffline) {
+                            Text(
+                                text = "Offline",
+                                style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
+                                color = ringColor
+                            )
+                        }
                     }
                 }
             }
