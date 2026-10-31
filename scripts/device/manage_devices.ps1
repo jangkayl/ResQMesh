@@ -113,35 +113,85 @@ function Show-ConnectedDevices {
     return $devs
 }
 
-function Sync-WirelessDevices {
-    Write-Host "Scanning local Wi-Fi for Wireless Debugging devices (mDNS)..." -ForegroundColor Cyan
-    $mdnsOutput = & $adb mdns services 2>&1
-    $endpoints = @()
-
-    foreach ($line in $mdnsOutput) {
-        if ($line -match "(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}:\d+)") {
-            $endpoints += $matches[1]
+# Lists phones advertising Wireless Debugging. Pairing services are skipped because adb connect cannot use them.
+function Get-MdnsEndpoints {
+    $list = @()
+    foreach ($line in (& $adb mdns services 2>&1)) {
+        if ("$line" -match "^(\S+)\s+_adb(-tls-connect)?\._tcp\S*\s+(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}:\d+)") {
+            $list += [PSCustomObject]@{ Name = $matches[1]; Endpoint = $matches[3] }
         }
     }
+    return @($list | Sort-Object Endpoint -Unique)
+}
 
-    $endpoints = @($endpoints | Select-Object -Unique)
-    if ($endpoints.Count -gt 0) {
-        foreach ($ep in $endpoints) {
-            & $adb connect $ep | Out-Null
+# Android picks a new port whenever Wireless Debugging restarts, so old addresses stay behind as offline.
+function Remove-StaleWirelessDevices {
+    foreach ($d in @(Get-ConnectedDevices)) {
+        if ($d.Status -eq "offline" -and $d.Id -match ":") {
+            & $adb disconnect $d.Id 2>&1 | Out-Null
         }
     }
 }
 
+# Connects every advertised phone. SettleSeconds keeps scanning for phones that appear late, such as after adb starts.
+function Sync-WirelessDevices {
+    param ([int]$SettleSeconds = 0)
+    Write-Host "Scanning local Wi-Fi for Wireless Debugging devices (mDNS)..." -ForegroundColor Cyan
+    Remove-StaleWirelessDevices
+    $settleUntil = (Get-Date).AddSeconds($SettleSeconds)
+    $deadline = (Get-Date).AddSeconds([Math]::Max($SettleSeconds, 4))
+    $tried = @{}
+    $failed = @{}
+
+    do {
+        $online = @(Get-ConnectedDevices | Where-Object { $_.Status -eq "device" } | ForEach-Object { $_.Id })
+        $services = @(Get-MdnsEndpoints)
+        $missing = @($services | Where-Object {
+            $online -notcontains $_.Endpoint -and
+            $online -notcontains "$($_.Name)._adb-tls-connect._tcp" -and
+            -not $tried.ContainsKey($_.Endpoint)
+        })
+        foreach ($svc in $missing) {
+            $tried[$svc.Endpoint] = $true
+            $out = "$(& $adb connect $svc.Endpoint 2>&1)"
+            if ($out -match "connected to") {
+                Write-Host "  Connected $($svc.Endpoint)" -ForegroundColor Green
+            } else {
+                $failed[$svc.Endpoint] = $out
+            }
+        }
+        $settled = ((Get-Date) -ge $settleUntil) -and ($services.Count -gt 0) -and ($missing.Count -eq 0)
+        if (-not $settled) { Start-Sleep -Milliseconds 500 }
+    } while (-not $settled -and (Get-Date) -lt $deadline)
+
+    foreach ($ep in $failed.Keys) {
+        Write-Host "  Could not connect $ep : $($failed[$ep])" -ForegroundColor Yellow
+        Write-Host "  If this phone was never paired with this PC, use Option 11 once." -ForegroundColor DarkGray
+    }
+}
+
 function Connect-AllMdnsDevices {
-    Sync-WirelessDevices
+    Sync-WirelessDevices -SettleSeconds 3
     $devs = Show-ConnectedDevices
     if ($devs.Count -eq 0) {
         Write-Host "No mDNS wireless devices found automatically." -ForegroundColor Yellow
         Write-Host "Tips:" -ForegroundColor DarkGray
         Write-Host "  1. Turn Wireless Debugging ON in phone Developer Options." -ForegroundColor DarkGray
         Write-Host "  2. Ensure your PC and phone are on the exact same Wi-Fi network." -ForegroundColor DarkGray
-        Write-Host "  3. You can also connect manually using Option 2." -ForegroundColor DarkGray
+        Write-Host "  3. Pair a new phone once using Option 11." -ForegroundColor DarkGray
+        Write-Host "  4. You can also connect manually using Option 2." -ForegroundColor DarkGray
     }
+}
+
+# Pairing is needed once per phone and PC; after that, scans reconnect it on any port.
+function Pair-NewDevice {
+    Write-Host "On the phone: Wireless debugging > Pair device with pairing code." -ForegroundColor Cyan
+    $ipPort = Read-Host "Enter the IP and pairing port shown there (e.g. 192.168.1.3:37099)"
+    if (-not $ipPort) { return }
+    $code = Read-Host "Enter the 6-digit pairing code"
+    & $adb pair $ipPort.Trim() $code.Trim()
+    Sync-WirelessDevices -SettleSeconds 3
+    Show-ConnectedDevices | Out-Null
 }
 
 function Connect-ManualDevice {
@@ -416,6 +466,7 @@ function Install-AllDevices {
 }
 
 function Install-SpecificDevice {
+    Sync-WirelessDevices
     $devs = @(Show-ConnectedDevices)
     $active = @($devs | Where-Object { $_.Status -eq "device" })
     if ($active.Count -eq 0) {
@@ -517,6 +568,9 @@ function Uninstall-AllDevices {
 }
 
 # --- Interactive Main Loop ---
+Sync-WirelessDevices -SettleSeconds 3
+Show-ConnectedDevices | Out-Null
+
 do {
     Write-Host "`n============================================" -ForegroundColor Green
     Write-Host "         ResQMesh Device Manager" -ForegroundColor Green
@@ -531,10 +585,11 @@ do {
     Write-Host " [8] Show connected devices status"
     Write-Host " [9] Clear app data on ALL devices"
     Write-Host " [10] Uninstall app (and data) from ALL devices"
+    Write-Host " [11] Pair a new phone (once per phone)"
     Write-Host " [0] Exit"
     Write-Host "============================================" -ForegroundColor Green
 
-    $choice = Read-Host "Select an option (0-10)"
+    $choice = Read-Host "Select an option (0-11)"
 
     switch ($choice) {
         "1" { Connect-AllMdnsDevices }
@@ -544,10 +599,11 @@ do {
         "5" { Install-AllDevices }
         "6" { Install-SpecificDevice }
         "7" { Launch-AllDevices }
-        "8" { Show-ConnectedDevices | Out-Null }
+        "8" { Sync-WirelessDevices; Show-ConnectedDevices | Out-Null }
         "9" { Clear-AllDevicesData }
         "10" { Uninstall-AllDevices }
+        "11" { Pair-NewDevice }
         "0" { Write-Host "`nGoodbye!" -ForegroundColor Cyan; break }
-        default { Write-Host "Invalid option. Please choose between 0 and 10." -ForegroundColor Yellow }
+        default { Write-Host "Invalid option. Please choose between 0 and 11." -ForegroundColor Yellow }
     }
 } while ($choice -ne "0")

@@ -20,8 +20,12 @@ Use two or more phones with Wireless Debugging or USB connected, and note which 
 4. **Signature conflict:** run option 5 with one phone holding the other variant. Expected: the other phones finish first. The script then asks for `YES` for that phone only, and any other answer skips it.
 5. **Failed phone:** turn off Wireless Debugging on one phone just after the install starts. Expected: that phone reports a failure and the others still finish.
 
+6. **Auto-reconnect:** on a paired phone, turn Wireless Debugging off and on so its port changes, then start the script. Expected: the phone connects without option 2, and its old address is gone from the device list.
+7. **New phone:** on a phone that was never paired, start the script. Expected: a yellow "Could not connect" line. Use option 11 once, then repeat step 6 on that phone.
+
 ## Failure indicators
 
+- A phone with Wireless Debugging on is missing at startup, with no "Could not connect" line. Windows may be blocking mDNS, so try setting the Wi-Fi network to Private.
 - A phone is reported as updated but runs the old build.
 - `INSTALL_FAILED_NO_MATCHING_ABIS` appears after a fresh rebuild.
 - The script hangs after one phone drops.
