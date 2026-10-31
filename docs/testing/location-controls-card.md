@@ -9,7 +9,7 @@ The change adds user control over GPS:
   - When included and auto-detect is off, a one-shot fix is taken on send.
   - A denied permission or phone location being off shows **Allow** or **Turn on**, and the slider still sends.
 
-Not changed: the wire format, Room, BLE, receiver wording ("No Location Attached"), background location (there is none) and the chat share-location action.
+Not changed: the wire format, Room, BLE, receiver wording ("No Location Attached"), background location (there is none) and the chat share-location action. Live tracking added later: see the [adaptive location card](adaptive-location-card.md).
 
 ## Setup
 

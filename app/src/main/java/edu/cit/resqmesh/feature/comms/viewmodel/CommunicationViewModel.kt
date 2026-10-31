@@ -3,6 +3,10 @@ package edu.cit.resqmesh.feature.comms.viewmodel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import edu.cit.resqmesh.feature.comms.model.ChatUiState
+import edu.cit.resqmesh.core.domain.usecase.sos.SOS_CACHED_LOCATION_MAX_AGE_MS
+import edu.cit.resqmesh.core.domain.usecase.sos.TrackOwnSosLocationUseCase
+import edu.cit.resqmesh.core.location.GOOD_FIX_MAX_ACCURACY_M
+import edu.cit.resqmesh.core.location.isFixUsable
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -74,7 +78,8 @@ class CommunicationViewModel(
     }.stateIn(viewModelScope, SharingStarted.Eagerly,
         edu.cit.resqmesh.feature.comms.model.SosMeshStatus(edu.cit.resqmesh.feature.comms.model.SosMeshState.OFF))
     private var sosLocationGeneration = 0L
-    private var creatingSos = false
+    private val creatingSos = MutableStateFlow(false)
+    private val trackOwnSos = TrackOwnSosLocationUseCase(locationClient, sosRepository)
     private val sendDebouncer = SendDebouncer(SEND_DEBOUNCE_MS) { android.os.SystemClock.elapsedRealtime() }
     private val sendGate = ChatSendGate(chatBudget, sendDebouncer)
 
@@ -196,7 +201,6 @@ class CommunicationViewModel(
     fun silenceSos(id: String) { viewModelScope.launch { sosRepository.silence(id) } }
     fun endSos(id: String) {
         sosLocationGeneration++
-        locationClient.cancelPinpointLocation()
         viewModelScope.launch {
             runCatching { sosRepository.end(id) }.onFailure {
                 if (it is kotlinx.coroutines.CancellationException) throw it
@@ -210,6 +214,15 @@ class CommunicationViewModel(
     }
 
     init {
+        viewModelScope.launch {
+            // Waits for the raise to finish: only then is an excluded SOS marked as withheld.
+            // Auto-detect off keeps the promised single fix on send.
+            combine(activeSosMessageId, creatingSos, autoDetectLocation) { id, creating, autoDetect ->
+                id.takeIf { !creating && autoDetect }
+            }
+                .distinctUntilChanged()
+                .collectLatest { id -> if (id != null && !isSosLocationWithheld(id)) trackOwnSos(id) }
+        }
         viewModelScope.launch {
             autoDetectLocation.drop(1).collect(::applyAutoDetect)
         }
@@ -310,8 +323,8 @@ class CommunicationViewModel(
     fun isSosLocationWithheld(sosId: String): Boolean = locationPreferences.isLocationWithheld(sosId)
 
     fun sendEmergencySOS(sosType: String, includeLocation: Boolean = true, onCreated: (String) -> Unit = {}) {
-        if (creatingSos) return
-        creatingSos = true
+        if (creatingSos.value) return
+        creatingSos.value = true
         val generation = ++sosLocationGeneration
         viewModelScope.launch {
             try {
@@ -325,12 +338,8 @@ class CommunicationViewModel(
                         return@launch
                     }
                 }
-                // A reopen keeps whatever location the SOS already carried, so only a new SOS is marked withheld.
-                if (includeLocation) {
-                    locationPreferences.setLocationWithheld(id, false)
-                } else if (result is SosRaiseResult.Created) {
-                    locationPreferences.setLocationWithheld(id, true)
-                }
+                // A reopen keeps the location the SOS already carried; withheld stops any further updates.
+                locationPreferences.setLocationWithheld(id, !includeLocation)
                 onCreated(id)
                 if (!includeLocation) return@launch
                 raiseSos.refineLocation(id, isCurrent = { generation == sosLocationGeneration }) { update ->
@@ -339,7 +348,7 @@ class CommunicationViewModel(
             } catch (e: Exception) {
                 if (e is kotlinx.coroutines.CancellationException) throw e
                 sosErrors.emit("Could not complete SOS sending. Check SOS alerts before trying again.")
-            } finally { creatingSos = false }
+            } finally { creatingSos.value = false }
         }
     }
 
@@ -418,41 +427,27 @@ class CommunicationViewModel(
         useCases.broadcastSeenReceipt(messageId, isPrivate, targetId)
     }
 
-    @androidx.annotation.RequiresPermission(anyOf = ["android.permission.ACCESS_FINE_LOCATION", "android.permission.ACCESS_COARSE_LOCATION"])
-    fun broadcastLocation(context: android.content.Context, isPrivate: Boolean, targetName: String? = null) {
+    /** Sends a recent fix at once, otherwise waits for a new one. Failure stays on this phone. */
+    fun broadcastLocation(isPrivate: Boolean, targetName: String? = null) {
+        val cached = locationClient.getLastKnownLocation()
+        val now = System.currentTimeMillis()
+        if (cached != null &&
+            isFixUsable(cached.time, cached.accuracy, now, SHARE_FRESH_FIX_MAX_AGE_MS, GOOD_FIX_MAX_ACCURACY_M)
+        ) {
+            sendLocationMessage(cached, isPrivate, targetName)
+            return
+        }
         _isAcquiringLocation.value = true
-        // The BEST way to get location on Android (Handles indoors via Wi-Fi/Cell + outdoors via GPS seamlessly)
-        val fusedLocationClient = com.google.android.gms.location.LocationServices.getFusedLocationProviderClient(context.applicationContext)
-        
-        try {
-            fusedLocationClient.getCurrentLocation(
-                com.google.android.gms.location.Priority.PRIORITY_HIGH_ACCURACY, 
-                null
-            ).addOnSuccessListener { location ->
-                _isAcquiringLocation.value = false
-                if (location != null) {
-                    sendLocationMessage(location, isPrivate, targetName)
-                } else {
-                    // Fallback to cache if fresh fetch miraculously fails
-                    fusedLocationClient.lastLocation.addOnSuccessListener { lastLoc ->
-                        _isAcquiringLocation.value = false
-                        if (lastLoc != null) {
-                            sendLocationMessage(lastLoc, isPrivate, targetName)
-                        } else {
-                            sendLocationError(isPrivate, targetName)
-                        }
-                    }.addOnFailureListener {
-                        _isAcquiringLocation.value = false
-                        sendLocationError(isPrivate, targetName)
-                    }
-                }
-            }.addOnFailureListener {
-                _isAcquiringLocation.value = false
-                sendLocationError(isPrivate, targetName)
-            }
-        } catch (e: SecurityException) {
+        locationClient.requestPinpointLocation { fresh ->
             _isAcquiringLocation.value = false
-            sendLocationError(isPrivate, targetName)
+            val fix = fresh ?: locationClient.getLastKnownLocation()?.takeIf {
+                isFixUsable(it.time, it.accuracy, System.currentTimeMillis(), SOS_CACHED_LOCATION_MAX_AGE_MS)
+            }
+            if (fix != null) {
+                sendLocationMessage(fix, isPrivate, targetName)
+            } else {
+                sosErrors.tryEmit("Could not get your location. Check that Location is on, then try outside.")
+            }
         }
     }
 
@@ -471,18 +466,6 @@ class CommunicationViewModel(
         }
     }
 
-    private fun sendLocationError(isPrivate: Boolean, targetName: String?) {
-        val errorMsg = "⚠️ Failed to get fresh GPS lock. Make sure Location is on, and you have sky visibility."
-        if (!chatBudget.tryConsume()) return
-        if (isPrivate && targetName != null) {
-            if (!useCases.sendPrivateMessage(targetName, errorMsg, null, null, null, null)) {
-                chatBudget.refund()
-                reportPrivateSendFailure()
-            }
-        } else {
-            sendGate.settle(useCases.sendPublicMessage(errorMsg, null, null, null, null).isNotEmpty())
-        }
-    }
 }
 
 private const val SEND_DEBOUNCE_MS = 400L
@@ -490,3 +473,4 @@ private const val BUDGET_TICK_MS = 1_000L
 private const val BUDGET_STOP_TIMEOUT_MS = 5_000L
 
 private const val LOCATION_INTERVAL_MS = 30_000L
+private const val SHARE_FRESH_FIX_MAX_AGE_MS = 60_000L

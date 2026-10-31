@@ -4,7 +4,7 @@ Last reviewed: 2026-10-17. Baseline: `a9a27ed` on `main` (also `origin/fix/incid
 
 ## Current objective
 
-Prepare for the capstone demo (within two weeks of 2026-10-16) and deployment readiness. The code/architecture review produced the [revision plan](plans/code-architecture-revision.md): behavior-neutral Phase 0 before the demo, behavior-touching phases after the freeze. UI/UX and mesh concerns are user-reported but not yet described.
+Prepare for the capstone demo (within two weeks of 2026-10-16) and deployment readiness. The code/architecture review produced the [revision plan](plans/code-architecture-revision.md): behavior-neutral Phase 0 before the demo, behavior-touching phases after the freeze.
 
 ## Working by user report
 
@@ -58,6 +58,8 @@ Basic block, incident, SOS and recovery checks have user-reported successes; the
 **Map download** (`fix/map-download-reliability`): user-reported slowness; speed unmeasured; [card](testing/map-download-reliability-card.md) pending.
 
 **Map page UX** (`fix/map-page-ux`): [card](testing/map-page-ux-card.md) pending.
+
+**Adaptive location** (`feat/adaptive-location`): [card](testing/adaptive-location-card.md) pending.
 
 ## Next actions
 

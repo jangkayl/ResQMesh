@@ -34,6 +34,8 @@ interface SosAlertRepository {
         captured: Long? = null
     ): SosRaiseResult
     suspend fun updateLocation(id: String, lat: Double, lng: Double, accuracy: Float, captured: Long)
+    /** Like [updateLocation], but a less accurate fix applies: the person has moved away from the old one. */
+    suspend fun updateMovedLocation(id: String, fix: edu.cit.resqmesh.core.model.SosLocationSample)
     suspend fun end(id: String)
     suspend fun silence(id: String)
 }

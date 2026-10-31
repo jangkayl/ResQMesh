@@ -347,6 +347,19 @@ class SosLifecycleAndSyncTest {
         assertEquals(3, b.sink.alarms.size)
     }
 
+    @Test fun lessAccurateFixNeedsMovementAndAnOlderFixNeverApplies() = runTest {
+        val net = Network(backgroundScope)
+        val a = Node("A", net)
+        val id = a.repo.create("Medical")
+        a.repo.updateLocation(id, 10.0, 20.0, 5f, 2000)
+        a.repo.updateLocation(id, 10.1, 20.0, 30f, 3000)
+        assertEquals(10.0, a.store.alert(id)!!.latitude!!, 0.0)
+        a.repo.updateMovedLocation(id, edu.cit.resqmesh.core.model.SosLocationSample(10.1, 20.0, 30f, 1500))
+        assertEquals(10.0, a.store.alert(id)!!.latitude!!, 0.0)
+        a.repo.updateMovedLocation(id, edu.cit.resqmesh.core.model.SosLocationSample(10.1, 20.0, 30f, 3000))
+        assertEquals(10.1, a.store.alert(id)!!.latitude!!, 0.0)
+    }
+
     @Test fun threeReorderedRaisesWithRefinesFirstAreNeverLimited() = runTest {
         val net = Network(backgroundScope)
         val gate = edu.cit.resqmesh.core.network.ratelimit.InboundOriginGate(

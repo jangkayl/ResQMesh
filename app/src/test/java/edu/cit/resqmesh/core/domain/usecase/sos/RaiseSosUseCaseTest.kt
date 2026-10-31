@@ -155,6 +155,7 @@ class RaiseSosUseCaseTest {
         override suspend fun updateLocation(id: String, lat: Double, lng: Double, accuracy: Float, captured: Long) {
             updates += id to captured
         }
+        override suspend fun updateMovedLocation(id: String, fix: edu.cit.resqmesh.core.model.SosLocationSample) = Unit
         override suspend fun end(id: String) = Unit
         override suspend fun silence(id: String) = Unit
     }

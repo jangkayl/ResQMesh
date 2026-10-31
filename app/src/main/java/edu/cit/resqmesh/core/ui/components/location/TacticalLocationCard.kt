@@ -54,10 +54,7 @@ fun TacticalLocationCard(
             ?: KoinJavaComponent.getKoin().get<LocationClientFactory>().create()
     }
 
-    var myLocation by remember { mutableStateOf<Location?>(null) }
-    LaunchedEffect(Unit) {
-        myLocation = locationClient.getLastKnownLocation()
-    }
+    val myLocation by locationClient.location.collectAsState()
 
     // Dynamic distance & bearing calculation
     val telemetry = remember(myLocation, latitude, longitude, isMine) {

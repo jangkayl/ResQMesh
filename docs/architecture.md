@@ -65,7 +65,7 @@ Presentation screens retain state/effects/launchers and scopes; visual sections 
 
 MapLibre renders versioned local PMTiles. Signed manifests use P-256 (Ed25519 fallback), resumable retries, hash/completion checks and atomic activation. Private notifications use MessagingStyle; SOS uses CATEGORY_ALARM. Incident alerts follow D28. Cold launches retain setup gates.
 
-`LocationPreferences` gates foreground-only tracking (default on); excluded SOS location sends no coordinates or refine. MeshSessionController owns start/stop. Opt-in MeshForegroundService is a non-sticky connectedDevice anchor with a silent, debounced notification; no boot receiver or wake lock. Go offline stops radio/service. Unexpected service destruction stops transport; disabled background mode stops on activity destruction except configuration changes.
+`LocationPreferences` gates foreground-only tracking; excluded SOS location sends no coordinates or refine. `SosLocationPublisher` paces own-SOS revisions. MeshSessionController owns start/stop. Opt-in MeshForegroundService is a non-sticky connectedDevice anchor with a silent notification; no boot receiver or wake lock. Go offline stops radio/service. Unexpected service destruction stops transport; disabled background mode stops on activity destruction except rotation.
 
 ## Evidence and source navigation
 

@@ -4,6 +4,7 @@ import edu.cit.resqmesh.core.network.*
 import edu.cit.resqmesh.core.network.dispatch.InboundPayloadValidator.Companion.MAX_TTL
 import edu.cit.resqmesh.core.network.ratelimit.InboundOriginGate
 import edu.cit.resqmesh.core.logging.AppLogger
+import edu.cit.resqmesh.core.model.SosLocationSample
 import edu.cit.resqmesh.core.model.SosRaiseCharge
 import edu.cit.resqmesh.core.model.SosRaiseResult
 import edu.cit.resqmesh.data.local.entity.*
@@ -114,14 +115,30 @@ class SosRepository(
     }
 
     suspend fun updateLocation(id: String, lat: Double, lng: Double, accuracy: Float, captured: Long) = mutex.withLock {
-        val old = store.alert(id) ?: return@withLock
-        if (old.ended || old.originNodeId != identity.getDeviceId() || old.signingKey != signing.publicKey) return@withLock
-        if (old.locationCapturedAt != null && (captured < old.locationCapturedAt ||
-                (old.accuracyMeters != null && accuracy > old.accuracyMeters))) return@withLock
-        if (!lat.isFinite() || !lng.isFinite() || lat !in LATITUDE_RANGE || lng !in LONGITUDE_RANGE ||
-            !accuracy.isFinite() || accuracy < 0 || captured <= 0) return@withLock
-        localRevision(old, false, SosLocationFix(lat, lng, accuracy, captured))
+        applyFix(id, SosLocationSample(lat, lng, accuracy, captured), moved = false)
     }
+
+    /** A newer fix replaces a sharper old one: the person has moved away from it. */
+    suspend fun updateMovedLocation(id: String, fix: SosLocationSample) = mutex.withLock {
+        applyFix(id, fix, moved = true)
+    }
+
+    private suspend fun applyFix(id: String, fix: SosLocationSample, moved: Boolean) {
+        val old = store.alert(id)?.takeIf { !it.ended && owns(it) }
+        if (old != null && replacesFix(old, fix, moved) && validFix(fix)) {
+            localRevision(old, false, SosLocationFix(fix.latitude, fix.longitude, fix.accuracy, fix.capturedAt))
+        }
+    }
+
+    private fun replacesFix(old: SosAlertEntity, fix: SosLocationSample, moved: Boolean): Boolean {
+        val capturedAt = old.locationCapturedAt ?: return true
+        val sharper = old.accuracyMeters?.let { fix.accuracy <= it } ?: true
+        return fix.capturedAt >= capturedAt && (moved || sharper)
+    }
+
+    private fun validFix(fix: SosLocationSample) = fix.latitude.isFinite() && fix.latitude in LATITUDE_RANGE &&
+        fix.longitude.isFinite() && fix.longitude in LONGITUDE_RANGE &&
+        fix.accuracy.isFinite() && fix.accuracy >= 0 && fix.capturedAt > 0
 
     suspend fun end(id: String) = mutex.withLock {
         val old = store.alert(id) ?: return@withLock

@@ -35,6 +35,9 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import edu.cit.resqmesh.core.location.LocationClient
+import edu.cit.resqmesh.core.location.MAP_LIVE_INTERVAL_MS
+import edu.cit.resqmesh.core.location.MAP_LIVE_MIN_DISTANCE_M
+import kotlinx.coroutines.flow.filterNotNull
 import edu.cit.resqmesh.core.map.storage.MapStyleValidator
 import edu.cit.resqmesh.core.model.ChatMessage
 import edu.cit.resqmesh.core.ui.theme.ResQSize
@@ -111,6 +114,29 @@ internal fun MapLibreLocalMapContainer(
             }
         }
     }
+    LaunchedEffect(locationClient) {
+        locationClient.location.filterNotNull().collect {
+            myLocation = it
+            isMyLocationUnavailable = false
+        }
+    }
+    // High-accuracy updates only while the map is on screen
+    DisposableEffect(lifecycleOwner, locationClient) {
+        var live: AutoCloseable? = null
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_START && live == null) {
+                live = locationClient.acquireLive(MAP_LIVE_INTERVAL_MS, MAP_LIVE_MIN_DISTANCE_M)
+            } else if (event == Lifecycle.Event.ON_STOP) {
+                live?.close()
+                live = null
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+            live?.close()
+        }
+    }
 
     // Dynamic distance & direction between the user and the location
     val distanceSummary = remember(myLocation, isMyLocationUnavailable, state.lat, state.lng) {
@@ -171,29 +197,36 @@ internal fun MapLibreLocalMapContainer(
         val map = mapLibreInstance ?: return@LaunchedEffect
         val userLoc = myLocation ?: return@LaunchedEffect
 
-        // Update or add user marker
-        userMarker?.let { map.removeMarker(it) }
-        rangePolyline?.let { map.removePolyline(it) }
+        val userPoint = LatLng(userLoc.latitude, userLoc.longitude)
+        val targetPoint = LatLng(state.lat, state.lng)
 
-        val iconFactory = IconFactory.getInstance(context)
-        val myLocationIcon = iconFactory.fromBitmap(createMyLocationMarkerBitmap(context))
+        // Move the existing marker and line; rebuilding them on every live fix would waste frames
+        val marker = userMarker
+        val line = rangePolyline
+        if (marker != null && line != null) {
+            marker.position = userPoint
+            line.setPoints(listOf(userPoint, targetPoint))
+        } else {
+            val iconFactory = IconFactory.getInstance(context)
+            val myLocationIcon = iconFactory.fromBitmap(createMyLocationMarkerBitmap(context))
 
-        userMarker = map.addMarker(
-            MarkerOptions()
-                .position(LatLng(userLoc.latitude, userLoc.longitude))
-                .title("You")
-                .snippet("Your location")
-                .icon(myLocationIcon)
-        )
+            userMarker = map.addMarker(
+                MarkerOptions()
+                    .position(userPoint)
+                    .title("You")
+                    .snippet("Your location")
+                    .icon(myLocationIcon)
+            )
 
-        // Straight line to the target in high-vis Safety Orange
-        rangePolyline = map.addPolyline(
-            PolylineOptions()
-                .add(LatLng(userLoc.latitude, userLoc.longitude))
-                .add(LatLng(state.lat, state.lng))
-                .color(android.graphics.Color.parseColor("#FF9100"))
-                .width(3.5f)
-        )
+            // Straight line to the target in high-vis Safety Orange
+            rangePolyline = map.addPolyline(
+                PolylineOptions()
+                    .add(userPoint)
+                    .add(targetPoint)
+                    .color(android.graphics.Color.parseColor("#FF9100"))
+                    .width(3.5f)
+            )
+        }
 
         // The style usually loads before the first fix, so frame both once the fix arrives.
         if (!hasFramedBothLocations && map.style?.isFullyLoaded == true) {

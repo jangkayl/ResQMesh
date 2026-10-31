@@ -211,7 +211,6 @@ fun ActiveChatScreen(
                             ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
                         ) {
                             viewModel.broadcastLocation(
-                                context = context,
                                 isPrivate = true,
                                 targetName = conversationName
                             )
