@@ -140,7 +140,7 @@ internal fun MapExpandedDetails(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                text = "LINK: ${alertMessage.receiveMedium.ifBlank { "LORA MESH • 2 HOPS" }}",
+                text = "LINK: ${alertMessage.receiveMedium.ifBlank { "NEARBY PHONES" }}",
                 style = MaterialTheme.typography.labelSmall,
                 fontFamily = FontFamily.Monospace,
                 color = MaterialTheme.colorScheme.onSurfaceVariant

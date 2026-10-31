@@ -438,7 +438,7 @@ fun ProfileScreen(
                 )
                 Spacer(Modifier.width(Spacing.Small))
                 Text(
-                    text = if (state.isOnline) "Stop mesh session" else "Start mesh session",
+                    text = if (state.isOnline) "Turn off nearby sharing" else "Turn on nearby sharing",
                     fontWeight = FontWeight.Bold,
                     color = if (state.isOnline) ResQTheme.colors.sos else ResQTheme.colors.success
                 )

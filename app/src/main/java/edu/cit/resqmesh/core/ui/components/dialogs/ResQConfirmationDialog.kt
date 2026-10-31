@@ -3,7 +3,6 @@ package edu.cit.resqmesh.core.ui.components.dialogs
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material3.*
@@ -19,6 +18,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import edu.cit.resqmesh.core.ui.components.layout.ResQGlassSurface
+import edu.cit.resqmesh.core.ui.theme.ResQTheme
 import edu.cit.resqmesh.core.ui.theme.Spacing
 
 @Composable
@@ -40,9 +40,9 @@ fun ResQConfirmationDialog(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = Spacing.Medium),
-            shape = RoundedCornerShape(28.dp),
+            shape = MaterialTheme.shapes.extraLarge,
             contentPadding = PaddingValues(Spacing.Large),
-            shadowElevation = 24.dp
+            shadowElevation = 12.dp
         ) {
             Column(
                 modifier = Modifier.fillMaxWidth(),
@@ -71,7 +71,7 @@ fun ResQConfirmationDialog(
                 Text(
                     text = title,
                     style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Black,
+                    fontWeight = FontWeight.Bold,
                     textAlign = TextAlign.Center
                 )
 
@@ -98,8 +98,8 @@ fun ResQConfirmationDialog(
                         modifier = Modifier
                             .weight(1f)
                             .height(48.dp),
-                        shape = RoundedCornerShape(16.dp),
-                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                        shape = MaterialTheme.shapes.medium,
+                        border = BorderStroke(1.dp, ResQTheme.colors.glassBorder)
                     ) {
                         Text(
                             text = cancelText,
@@ -117,7 +117,7 @@ fun ResQConfirmationDialog(
                         modifier = Modifier
                             .weight(1f)
                             .height(48.dp),
-                        shape = RoundedCornerShape(16.dp),
+                        shape = MaterialTheme.shapes.medium,
                         colors = ButtonDefaults.buttonColors(
                             containerColor = accentColor,
                             contentColor = if (isDestructive) Color.White else MaterialTheme.colorScheme.onPrimary

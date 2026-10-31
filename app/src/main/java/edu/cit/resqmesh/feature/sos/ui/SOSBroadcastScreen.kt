@@ -183,7 +183,7 @@ fun SOSBroadcastScreen(
                             )
                             Spacer(Modifier.width(8.dp))
                             Text(
-                                text = "EMERGENCY DISPATCH",
+                                text = "ASK FOR HELP",
                                 fontFamily = FontFamily.Monospace,
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 10.sp,
@@ -235,7 +235,7 @@ fun SOSBroadcastScreen(
                 )
                 Spacer(Modifier.height(8.dp))
                 Text(
-                    text = "Select emergency type, then slide below to broadcast high-priority distress alerts to all mesh nodes within range.",
+                    text = "Pick what is wrong. Then slide below to tell people nearby.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.Center,
@@ -336,7 +336,7 @@ fun SOSBroadcastScreen(
                 Spacer(Modifier.height(14.dp))
 
                 Text(
-                    text = "Broadcasts will relay offline across all nearby civilian & rescuer devices.",
+                    text = "Your SOS passes from phone to phone. It works without internet.",
                     fontSize = 11.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.Center,

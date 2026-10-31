@@ -16,7 +16,7 @@ enum class IncidentAction(val label: String) {
     REVIEW_SELECTED("Review selected helper"), CONFIRM("Confirm I can help"),
     DECLINE("Decline"), WITHDRAW("Withdraw offer"), REVOKE("Remove selection"),
     RESOLVE("Mark resolved"), CANCEL("Cancel request"),
-    ACKNOWLEDGE("Acknowledge request"), ASSIGN("Volunteer to respond"),
+    ACKNOWLEDGE("I saw this request"), ASSIGN("Volunteer to respond"),
     START("Start responding"), RELEASE("Release assignment")
 }
 

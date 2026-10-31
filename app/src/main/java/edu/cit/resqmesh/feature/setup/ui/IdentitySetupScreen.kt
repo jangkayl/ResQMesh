@@ -206,7 +206,7 @@ fun IdentitySetupContent(
                             )
                             Spacer(Modifier.width(6.dp))
                             Text(
-                                text = "OFFLINE ID PASS",
+                                text = "YOUR NAME CARD",
                                 style = MaterialTheme.typography.labelSmall.copy(
                                     fontSize = 10.sp,
                                     fontFamily = FontFamily.Monospace,
@@ -256,7 +256,7 @@ fun IdentitySetupContent(
                             )
                             Spacer(Modifier.height(2.dp))
                             Text(
-                                text = "Mesh Participant",
+                                text = "ResQMesh User",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -306,7 +306,7 @@ fun IdentitySetupContent(
                                 )
                                 Spacer(Modifier.width(4.dp))
                                 Text(
-                                    text = "READY TO MESH",
+                                    text = "READY",
                                     style = MaterialTheme.typography.labelSmall.copy(
                                         fontSize = 10.sp,
                                         fontFamily = FontFamily.Monospace

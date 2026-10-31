@@ -59,7 +59,7 @@ internal fun ModernMessagesHeader() {
             )
             Spacer(Modifier.height(2.dp))
             Text(
-                text = "Offline Bluetooth mesh messaging",
+                text = "Chat without internet",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -187,7 +187,7 @@ internal fun GlobalBroadcastCommandCard(
                 ) {
                     Text(
                         text = preview?.text?.ifBlank { stringResource(R.string.messages_attachment_preview) }
-                            ?: "Ordinary public messages across the reachable mesh",
+                            ?: "Messages for everyone nearby",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,

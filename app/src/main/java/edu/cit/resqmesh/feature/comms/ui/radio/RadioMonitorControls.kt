@@ -52,7 +52,7 @@ internal fun RadioMonitorControls(
                 Spacer(Modifier.width(12.dp))
                 Column(Modifier.weight(1f)) {
                     Text(
-                        text = "Channel Monitor",
+                        text = "Listen to Channel",
                         fontWeight = FontWeight.Bold,
                         style = MaterialTheme.typography.titleMedium
                     )

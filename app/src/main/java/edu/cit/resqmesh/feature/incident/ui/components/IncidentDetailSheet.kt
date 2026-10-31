@@ -319,7 +319,7 @@ fun IncidentDetailSheet(
                                 .height(36.dp)
                         ) {
                             Text(
-                                text = "Acknowledge request",
+                                text = "I saw this request",
                                 style = MaterialTheme.typography.labelMedium.copy(
                                     fontSize = 12.5.sp,
                                     fontWeight = FontWeight.SemiBold

@@ -31,7 +31,7 @@ class PrivateChatHeaderTest {
         }
 
         composeRule.onNodeWithText("Ari").assertIsDisplayed()
-        composeRule.onNodeWithText("Relayed").assertIsDisplayed()
+        composeRule.onNodeWithText("Through another phone").assertIsDisplayed()
         composeRule.onNodeWithContentDescription("Back").performClick()
         composeRule.onNodeWithContentDescription("Delete conversation").performClick()
 
