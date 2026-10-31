@@ -6,6 +6,7 @@ import edu.cit.resqmesh.core.model.NodeIdentity
 import edu.cit.resqmesh.core.logging.trace.TraceDir
 import edu.cit.resqmesh.core.logging.trace.TraceDropReason
 import edu.cit.resqmesh.core.logging.trace.TraceStage
+import edu.cit.resqmesh.core.network.DetachedSender
 import edu.cit.resqmesh.core.network.PacketTraceEmitter
 import edu.cit.resqmesh.core.network.ReliableMeshTransfers
 import edu.cit.resqmesh.core.network.bluetooth.state.BleLinkRole
@@ -16,6 +17,7 @@ import kotlinx.serialization.ExperimentalSerializationApi
 
 /** Inbound gates run at the same call site; only the existing rename/retirement posts are used. */
 @OptIn(ExperimentalSerializationApi::class)
+@Suppress("LongParameterList")
 internal class NativeInboundPipeline(
     private val store: BleStateStore,
     private val handler: Handler,
@@ -25,6 +27,7 @@ internal class NativeInboundPipeline(
     private val isTransportGenerationCurrent: (Long) -> Boolean,
     private val hasLiveSocket: (String) -> Boolean,
     private val nodeIdForEndpoint: (String) -> String?,
+    private val endpointForPeer: (String) -> String?,
     private val hasReadyEndpoint: (String) -> Boolean,
     private val isDeviceBlocked: (String) -> Boolean,
     private val transfers: () -> ReliableMeshTransfers,
@@ -41,6 +44,19 @@ internal class NativeInboundPipeline(
     private val reliableTransfers get() = transfers()
     private val onDeviceConnected get() = connectedListener()
     private val onDeviceLivenessChanged get() = livenessListener()
+
+    /**
+     * A digest-verified transfer finished, so it no longer needs its sender's link. Link gates ran on
+     * every piece; the block, frame and origin gates still run here. Only MESSAGE and CONVERSATION
+     * complete, so identity pulses cannot reach the detached path.
+     */
+    fun processCompletedTransfer(peer: String, payloadBytes: ByteArray) {
+        if (!store.isNodeActive.get() || store.blockedDevices[peer.uppercase()] == true) return
+        val live = endpointForPeer(peer)
+        if (live != null) { processBinaryPayload(live, payloadBytes); return }
+        val endpoint = DetachedSender.endpointOf(peer)
+        if (store.guards.admitFrame("$endpoint/frames")) dispatch(endpoint, payloadBytes)
+    }
 
     fun processBinaryPayload(endpointId: String, payloadBytes: ByteArray, transport: String? = null) {
         val capturedGeneration = transportGeneration

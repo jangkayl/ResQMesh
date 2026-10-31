@@ -19,7 +19,10 @@ internal data class TransferRecord(
     val relayTargetsSet: Boolean = false, val relayTargets: List<String> = emptyList(),
     val forwardedPeers: List<String> = emptyList(),
     val applicationStored: Boolean = false,
-    val requiresRelayRoster: Boolean = false
+    val requiresRelayRoster: Boolean = false,
+    /** Late-forward window. [relayHoldBytes] above zero means the onward copy is still on disk. */
+    val relayHoldUntil: Long = 0L, val relayHoldBytes: Int = 0,
+    val relayVisited: List<String> = emptyList()
 )
 
 /** App-private, backup-excluded custody. Caller serializes IO on one worker, never the UI thread. */
@@ -107,13 +110,31 @@ internal class TransferJournal(private val root: File, private val now: () -> Lo
         relayTargetsSet = true, relayTargets = peers.toList()).also(::write)
     fun forwarded(record: TransferRecord, peer: String) = record.copy(
         forwardedPeers = (record.forwardedPeers + peer).distinct()).also(::write)
+    fun relayHolds() = records.values.filter { it.relayHoldBytes > 0 }
+    fun relayBytes(record: TransferRecord): ByteArray = File(directory(record), RELAY_FILE).readBytes()
+
+    /** Holds sit outside the pending pool so they cannot starve live custody; returns evicted holds. */
+    fun holdRelay(record: TransferRecord, onward: ByteArray, until: Long, visited: List<String>): List<TransferRecord> {
+        atomic(File(directory(record), RELAY_FILE), onward)
+        write(record.copy(relayHoldUntil = until, relayHoldBytes = onward.size, relayVisited = visited))
+        var held = relayHolds().sortedBy { it.relayHoldUntil }
+        val evicted = mutableListOf<TransferRecord>()
+        while (held.size > MAX_PENDING || held.sumOf { it.relayHoldBytes.toLong() } > MAX_BYTES) {
+            evicted += releaseRelay(held.first()); held = held.drop(1)
+        }
+        return evicted
+    }
+    fun releaseRelay(record: TransferRecord) = record.copy(relayHoldBytes = 0).also {
+        File(directory(record), RELAY_FILE).delete(); write(it)
+    }
     fun applicationStored(record: TransferRecord, response: ByteArray?) = record.copy(
         applicationStored = true, response = response ?: record.response).also(::write)
     fun stored(record: TransferRecord, response: ByteArray? = null) {
         write(record.copy(stored = true, response = response?.takeIf { it.size <= MAX_RESPONSE_BYTES }))
         directory(record).listFiles().orEmpty().filter { it.name.startsWith("p") }.forEach { it.delete() }
         // Completed markers can be evicted; the application still deduplicates logical messages.
-        records.values.filter { it.stored }.sortedBy { it.expiresAt }.dropLast(MAX_STORED_MARKERS).toList().forEach(::delete)
+        records.values.filter { it.stored && it.relayHoldBytes == 0 }.sortedBy { it.expiresAt }
+            .dropLast(MAX_STORED_MARKERS).toList().forEach(::delete)
     }
     fun delete(record: TransferRecord) { records.remove(key(record)); removeDirectory(directory(record)) }
     fun prune() = records.values.filter { it.expiresAt <= now() }.toList().forEach(::delete)
@@ -152,6 +173,7 @@ internal class TransferJournal(private val root: File, private val now: () -> Lo
         private const val MAX_KEY_FIELD_LENGTH = 128
         private const val MAX_RESPONSE_BYTES = 4096
         private const val MAX_STORED_MARKERS = 256
+        private const val RELAY_FILE = "relay"
         const val CONTROL_BYTES = 64 * 1024
         const val PEER_SHARE_PERCENT = 25
         private const val PERCENT = 100

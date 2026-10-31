@@ -180,7 +180,8 @@ class NativeBleManager(
         privateNotification = notificationHelper::showPrivateMessageNotification,
         sosNotification = notificationHelper::showSosEmergencyNotification,
         admittedNodeId = { endpoint ->
-            nodeIdForEndpoint(endpoint)?.takeIf { store.links.isIdentityAdmitted(endpoint) }
+            DetachedSender.peerOf(endpoint)
+                ?: nodeIdForEndpoint(endpoint)?.takeIf { store.links.isIdentityAdmitted(endpoint) }
         }
     )
 
@@ -206,13 +207,15 @@ class NativeBleManager(
                 val endpoint = endpointForPeer(peer)
                 done(if (endpoint == null) TransportDispatchResult.REJECTED_NOT_READY else sendRawPayload(endpoint, bytes, priority))
             } },
-            received = { peer, bytes -> handler.post { endpointForPeer(peer)?.let { processBinaryPayload(it, bytes) } } },
+            received = { peer, bytes -> handler.post { inboundPipeline.processCompletedTransfer(peer, bytes) } },
             response = { peer, bytes -> handler.post { endpointForPeer(peer)?.let { sendRawPayload(it, bytes, true) } } },
             event = { bytes, stage, queuedAt, startedAt -> handler.post {
                 reportFrame("", bytes, stage, "TRANSFER", queuedAt, startedAt)
             } },
             log = { AppLogger.d("BLE_TRANSFER", it) },
-            trace = TransferTraceEmitter::transfer
+            trace = TransferTraceEmitter::transfer,
+            blocked = { peer -> store.blockedDevices[peer] == true },
+            relayPeers = { outboundDispatcher.readyRelayPeers() }
         )
     }
     private val outboundDispatcher: NativeOutboundDispatcher = NativeOutboundDispatcher(
@@ -573,6 +576,7 @@ class NativeBleManager(
         isTransportGenerationCurrent = ::isTransportGenerationCurrent,
         hasLiveSocket = ::hasLiveSocket,
         nodeIdForEndpoint = ::nodeIdForEndpoint,
+        endpointForPeer = ::endpointForPeer,
         hasReadyEndpoint = ::hasReadyEndpoint,
         isDeviceBlocked = ::isDeviceBlocked,
         transfers = { reliableTransfers },

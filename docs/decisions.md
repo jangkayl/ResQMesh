@@ -36,7 +36,7 @@ One shared router, `AGENTS.md`, plus six owner documents hold current context; e
 
 ## D9: Planning lifecycle
 
-Small work stays in its task; medium work updates status. Only large multi-session initiatives get one active plan, capped at 1,200 words. Extract lasting decisions/results before archival. Label implemented, superseded, partially superseded and deferred material explicitly; preserve unique tests and historical build identities.
+Extract lasting decisions/results before archival. Label implemented, superseded, partially superseded and deferred material explicitly; preserve unique tests and historical build identities.
 
 ## D10: Deterministic PR gate
 
@@ -131,3 +131,7 @@ No live PTT; older `LIVE_AUDIO` drops. `liveAudioChunk` carries transfers. 30s n
 ## D32: Byte-capped WebP images
 
 320/480/720 px at 8/16/32 KiB; 6 image credits/min costing 1/2/4.
+
+## D33: Late public media relay
+
+Relays keep public media 10 minutes for later READY neighbors, each once. Finished transfers need no sender link. Text keeps its roster.
