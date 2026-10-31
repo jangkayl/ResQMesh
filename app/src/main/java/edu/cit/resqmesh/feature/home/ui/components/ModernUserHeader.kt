@@ -47,6 +47,16 @@ import edu.cit.resqmesh.core.ui.theme.ModernSky
 import edu.cit.resqmesh.core.ui.theme.ResQTheme
 import edu.cit.resqmesh.feature.home.model.HomeNetworkSummary
 
+private fun readinessTitleFor(connectionStatus: String, defaultTitle: String): String = when (connectionStatus) {
+    edu.cit.resqmesh.core.network.bluetooth.MeshTransportState.OFFLINE.status -> "Offline"
+    edu.cit.resqmesh.core.network.bluetooth.MeshTransportState.BLUETOOTH_OFF.status -> "Bluetooth off"
+    edu.cit.resqmesh.core.network.bluetooth.MeshTransportState.PERMISSION_REQUIRED.status -> "Permission needed"
+    edu.cit.resqmesh.core.network.bluetooth.MeshTransportState.STARTING.status -> "Starting mesh"
+    edu.cit.resqmesh.core.network.bluetooth.MeshTransportState.SEARCHING.status -> "Searching"
+    edu.cit.resqmesh.core.network.bluetooth.MeshTransportState.ERROR.status -> "Recovery pending"
+    else -> defaultTitle
+}
+
 @Composable
 internal fun ModernUserHeader(
     myDeviceName: String,
@@ -63,15 +73,7 @@ internal fun ModernUserHeader(
 
     val defaultTitle = stringResource(if (isNodeActive) R.string.home_ready_title else R.string.home_setup_title)
     val isMeshOffline = connectionStatus == edu.cit.resqmesh.core.network.bluetooth.MeshTransportState.OFFLINE.status
-    val readinessTitle = when (connectionStatus) {
-        edu.cit.resqmesh.core.network.bluetooth.MeshTransportState.OFFLINE.status -> "Offline"
-        edu.cit.resqmesh.core.network.bluetooth.MeshTransportState.BLUETOOTH_OFF.status -> "Bluetooth off"
-        edu.cit.resqmesh.core.network.bluetooth.MeshTransportState.PERMISSION_REQUIRED.status -> "Permission needed"
-        edu.cit.resqmesh.core.network.bluetooth.MeshTransportState.STARTING.status -> "Starting mesh"
-        edu.cit.resqmesh.core.network.bluetooth.MeshTransportState.SEARCHING.status -> "Searching"
-        edu.cit.resqmesh.core.network.bluetooth.MeshTransportState.ERROR.status -> "Recovery pending"
-        else -> defaultTitle
-    }
+    val readinessTitle = readinessTitleFor(connectionStatus, defaultTitle)
     val meshStatusColor = when {
         isMeshOffline -> MaterialTheme.colorScheme.onSurfaceVariant
         !isNodeActive -> ResQTheme.colors.warning
