@@ -20,6 +20,9 @@ data class SosAlert(
     val transmission: String
 )
 
+/** A position fix for an SOS. */
+data class SosLocationSample(val latitude: Double, val longitude: Double, val accuracy: Float, val capturedAt: Long)
+
 /** One retained SOS revision decoded for the audit history; the UI shows only these fields. */
 data class SosActivity(
     val eventId: String,

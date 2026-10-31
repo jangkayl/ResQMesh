@@ -4,11 +4,11 @@ Last reviewed: 2026-10-17. Baseline: `a9a27ed` on `main` (also `origin/fix/incid
 
 ## Current objective
 
-Prepare for the capstone demo (within two weeks of 2026-10-16) and deployment readiness. The code/architecture review produced the [revision plan](plans/code-architecture-revision.md): behavior-neutral Phase 0 before the demo, behavior-touching phases after the freeze. UI/UX and mesh concerns are user-reported but not yet described.
+Prepare for the capstone demo (within two weeks of 2026-10-16) and deployment readiness. The code/architecture review produced the [revision plan](plans/code-architecture-revision.md): behavior-neutral Phase 0 before the demo, behavior-touching phases after the freeze.
 
 ## Working by user report
 
-The current candidate is the October 6 APK `1AE82B6C...`; the user reports F1–F14 PASS on it, including the incident UI repair cases. Earlier October 4 reports cover four-phone text/receipts/notes/SOS, recovery, background, blocking, incidents and offline maps. Models, counts, timings and transport coverage were not supplied, so these are qualitative results, not measured rates. Details are in [validation](validation.md).
+The current candidate is the October 6 APK `1AE82B6C...`; the user reports F1–F14 PASS on it, including the incident UI repair cases. Earlier October 4 reports cover four-phone text/receipts/notes/SOS, recovery, background, blocking, incidents and offline maps. Models, counts, timings and transport coverage were not supplied, so these are qualitative results, not measured rates.
 
 ## Implemented
 
@@ -43,7 +43,7 @@ Basic block, incident, SOS and recovery checks have user-reported successes; the
 
 **Code smells refactor:** [card](testing/code-smells-refactor-card.md) pending.
 
-**Batch A cleanup** (`refactor/batch-a-cleanup`): the user reported all [smoke card](testing/batch-a-cleanup-smoke-card.md) steps working on 2026-10-16. Remaining review work: revision-plan phases P1–P6.
+**Batch A cleanup**: the user reported all [smoke card](testing/batch-a-cleanup-smoke-card.md) steps working on 2026-10-16.
 
 **Developer console** (branch `feat/developer-console`, [plan](plans/developer-mode.md)): Stage 1 and live follow are pushed; Stage 2 (traces, timeline) has local checks only and awaits the [phone card](testing/developer-mode-card.md). Stage 3 (signal and queue stats) is pending.
 
@@ -55,9 +55,15 @@ Basic block, incident, SOS and recovery checks have user-reported successes; the
 
 **Image quality** (`feat/image-quality`): user-rated quality good; [card](testing/image-quality-card.md) pending.
 
+**Map download** (`fix/map-download-reliability`): user-reported slowness; speed unmeasured; [card](testing/map-download-reliability-card.md) pending.
+
+**Map page UX** (`fix/map-page-ux`): [card](testing/map-page-ux-card.md) pending.
+
+**Adaptive location** (`feat/adaptive-location`): [card](testing/adaptive-location-card.md) pending.
+
 ## Next actions
 
-Deployment target (user-confirmed 2026-10-17): capstone demo first, then a signed sideloaded pilot beta. Play Store is out of scope for now.
+Deployment target (user-confirmed 2026-10-17): capstone demo first, then a signed sideloaded pilot beta. Play Store is out of scope.
 
 1. **Developer console:** run the Stage 1–2 phone card, then start Stage 3. Then run [PTT removal](testing/live-ptt-removal-card.md) and [voice limit](testing/voice-note-limit-card.md) cards.
 2. **Demo freeze (P0, by about 2026-10-28):** parts 3–4 user-reported done (capture folder and miss times not supplied, so DELIVERY-01 stays unanalysed). The [limitations](demo/known-limitations.md) and [user guide](demo/user-guide.md) are drafted. After the freeze, only separately approved blocker fixes go in.

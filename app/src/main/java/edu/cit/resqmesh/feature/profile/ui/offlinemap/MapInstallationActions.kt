@@ -13,7 +13,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import edu.cit.resqmesh.core.ui.theme.SafetyOrange
 import edu.cit.resqmesh.core.ui.theme.SignalAmber
-import edu.cit.resqmesh.core.ui.theme.SignalRed
 import edu.cit.resqmesh.core.ui.theme.Spacing
 
 import edu.cit.resqmesh.feature.profile.ui.offlinemap.formatBytes
@@ -25,7 +24,8 @@ internal fun NotInstalledSection(
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(Spacing.Medium)) {
         Text(
-            text = "No offline map installed. SOS screens will operate in mapless coordinate fallback mode until installed.",
+            text = "Download this map so you can see SOS locations without internet. " +
+                "Without it, you'll see the location as numbers only.",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
@@ -41,7 +41,7 @@ internal fun NotInstalledSection(
             Icon(Icons.Default.CloudDownload, contentDescription = null)
             Spacer(Modifier.width(Spacing.Small))
             Text(
-                text = "Download Cebu Map (${formatBytes(estimatedBytes)})",
+                text = "Download map (${formatBytes(estimatedBytes)})",
                 fontWeight = FontWeight.Bold,
                 style = MaterialTheme.typography.titleSmall
             )
@@ -68,14 +68,14 @@ internal fun WifiRequiredSection(
                 Icon(Icons.Default.WifiOff, contentDescription = null, tint = SignalAmber)
                 Spacer(Modifier.width(Spacing.Small))
                 Text(
-                    text = "Wi-Fi Connection Required",
+                    text = "You're not on Wi-Fi",
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface
                 )
             }
             Text(
-                text = "Connecting to Wi-Fi prevents large data usage on cellular links. Connect to Wi-Fi to proceed, or download anyway.",
+                text = "Connect to Wi-Fi, or use mobile data to download now. Your mobile plan may charge for this.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -87,14 +87,14 @@ internal fun WifiRequiredSection(
                     onClick = onBypass,
                     modifier = Modifier.weight(1f)
                 ) {
-                    Text("Cellular")
+                    Text("Use mobile data")
                 }
                 Button(
                     onClick = onRetry,
                     modifier = Modifier.weight(1f),
                     colors = ButtonDefaults.buttonColors(containerColor = SafetyOrange)
                 ) {
-                    Text("Retry Wi-Fi")
+                    Text("Try Wi-Fi again")
                 }
             }
         }
@@ -110,8 +110,8 @@ internal fun InsufficientStorageSection(
     val requiredMb = (requiredBytes / (1024 * 1024)).coerceAtLeast(1)
     Surface(
         shape = RoundedCornerShape(14.dp),
-        color = SignalRed.copy(alpha = 0.12f),
-        border = BorderStroke(1.dp, SignalRed.copy(alpha = 0.4f)),
+        color = SignalAmber.copy(alpha = 0.12f),
+        border = BorderStroke(1.dp, SignalAmber.copy(alpha = 0.4f)),
         modifier = Modifier.fillMaxWidth()
     ) {
         Column(
@@ -119,17 +119,17 @@ internal fun InsufficientStorageSection(
             verticalArrangement = Arrangement.spacedBy(Spacing.Small)
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Default.Storage, contentDescription = null, tint = SignalRed)
+                Icon(Icons.Default.Storage, contentDescription = null, tint = SignalAmber)
                 Spacer(Modifier.width(Spacing.Small))
                 Text(
-                    text = "Insufficient Storage Space",
+                    text = "Not enough space",
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.Bold,
-                    color = SignalRed
+                    color = MaterialTheme.colorScheme.onSurface
                 )
             }
             Text(
-                text = "Available: ${formatBytes(availableBytes)}. Approximately $requiredMb MB required for download and vector extraction safety margins.",
+                text = "Free up about $requiredMb MB and try again. You have ${formatBytes(availableBytes)} free.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -138,7 +138,7 @@ internal fun InsufficientStorageSection(
                 modifier = Modifier.fillMaxWidth(),
                 colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
             ) {
-                Text("Recheck Storage", color = MaterialTheme.colorScheme.onSurface)
+                Text("Check again", color = MaterialTheme.colorScheme.onSurface)
             }
         }
     }
@@ -148,8 +148,8 @@ internal fun InsufficientStorageSection(
 internal fun CorruptPackageSection(onRetry: () -> Unit) {
     Surface(
         shape = RoundedCornerShape(14.dp),
-        color = SignalRed.copy(alpha = 0.12f),
-        border = BorderStroke(1.dp, SignalRed.copy(alpha = 0.4f)),
+        color = SignalAmber.copy(alpha = 0.12f),
+        border = BorderStroke(1.dp, SignalAmber.copy(alpha = 0.4f)),
         modifier = Modifier.fillMaxWidth()
     ) {
         Column(
@@ -157,17 +157,17 @@ internal fun CorruptPackageSection(onRetry: () -> Unit) {
             verticalArrangement = Arrangement.spacedBy(Spacing.Small)
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Default.SecurityUpdateWarning, contentDescription = null, tint = SignalRed)
+                Icon(Icons.Default.Warning, contentDescription = null, tint = SignalAmber)
                 Spacer(Modifier.width(Spacing.Small))
                 Text(
-                    text = "Integrity Verification Failed",
+                    text = "The download was damaged",
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.Bold,
-                    color = SignalRed
+                    color = MaterialTheme.colorScheme.onSurface
                 )
             }
             Text(
-                text = "Digital signature or SHA-256 hash check failed. Damaged staging files have been discarded.",
+                text = "We removed it. Please try again.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -176,7 +176,7 @@ internal fun CorruptPackageSection(onRetry: () -> Unit) {
                 modifier = Modifier.fillMaxWidth(),
                 colors = ButtonDefaults.buttonColors(containerColor = SafetyOrange)
             ) {
-                Text("Retry Clean Download")
+                Text("Try again")
             }
         }
     }
@@ -189,8 +189,8 @@ internal fun GenericErrorSection(
 ) {
     Surface(
         shape = RoundedCornerShape(14.dp),
-        color = SignalRed.copy(alpha = 0.12f),
-        border = BorderStroke(1.dp, SignalRed.copy(alpha = 0.4f)),
+        color = SignalAmber.copy(alpha = 0.12f),
+        border = BorderStroke(1.dp, SignalAmber.copy(alpha = 0.4f)),
         modifier = Modifier.fillMaxWidth()
     ) {
         Column(
@@ -198,10 +198,10 @@ internal fun GenericErrorSection(
             verticalArrangement = Arrangement.spacedBy(Spacing.Small)
         ) {
             Text(
-                text = "Download Error",
+                text = "Download didn't finish",
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.Bold,
-                color = SignalRed
+                color = MaterialTheme.colorScheme.onSurface
             )
             Text(
                 text = message,
@@ -213,7 +213,7 @@ internal fun GenericErrorSection(
                 modifier = Modifier.fillMaxWidth(),
                 colors = ButtonDefaults.buttonColors(containerColor = SafetyOrange)
             ) {
-                Text("Retry")
+                Text("Try again")
             }
         }
     }

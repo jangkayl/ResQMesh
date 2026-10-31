@@ -33,7 +33,7 @@ internal fun DownloadingProgressSection(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                text = "Downloading vector archive...",
+                text = "Downloading map…",
                 style = MaterialTheme.typography.bodySmall,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onSurface
@@ -73,7 +73,7 @@ internal fun DownloadingProgressSection(
 }
 
 @Composable
-internal fun VerifyingProgressSection(verifying: MapPackageStatus.Verifying) {
+internal fun VerifyingProgressSection() {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -88,12 +88,12 @@ internal fun VerifyingProgressSection(verifying: MapPackageStatus.Verifying) {
         )
         Column {
             Text(
-                text = "Verifying Package Integrity",
+                text = "Checking the map…",
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.Bold
             )
             Text(
-                text = verifying.stage,
+                text = "This makes sure the download is complete and safe.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -117,12 +117,12 @@ internal fun ExtractingProgressSection(extracting: MapPackageStatus.Extracting) 
         )
         Column {
             Text(
-                text = "Extracting Assets",
+                text = "Installing the map…",
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.Bold
             )
             Text(
-                text = "Getting your map ready...",
+                text = "Almost done.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -131,10 +131,44 @@ internal fun ExtractingProgressSection(extracting: MapPackageStatus.Extracting) 
 }
 
 @Composable
+private fun MapUpdateNotice(onUpdate: () -> Unit) {
+    Surface(
+        shape = RoundedCornerShape(12.dp),
+        color = SignalAmber.copy(alpha = 0.12f),
+        border = BorderStroke(1.dp, SignalAmber.copy(alpha = 0.4f)),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Row(
+            modifier = Modifier.padding(Spacing.Medium),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "A newer map is available",
+                    fontWeight = FontWeight.Bold,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    text = "Update to get the latest version.",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Button(
+                onClick = onUpdate,
+                colors = ButtonDefaults.buttonColors(containerColor = SafetyOrange)
+            ) {
+                Text("Update")
+            }
+        }
+    }
+}
+
+@Composable
 internal fun InstalledActiveSection(
-    installed: MapPackageStatus.Installed,
     isUpdateAvailable: Boolean,
-    targetVersion: Int,
     onUpdate: () -> Unit,
     onDelete: () -> Unit
 ) {
@@ -144,13 +178,13 @@ internal fun InstalledActiveSection(
             Spacer(Modifier.width(Spacing.Small))
             Column {
                 Text(
-                    text = "Package Active (Version ${installed.manifest.version})",
+                    text = "Map is ready",
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface
                 )
                 Text(
-                    text = "Local PMTiles & styles ready for MapLibre Native SOS display.",
+                    text = "You can use it without internet.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -158,38 +192,7 @@ internal fun InstalledActiveSection(
         }
 
         if (isUpdateAvailable) {
-            Surface(
-                shape = RoundedCornerShape(12.dp),
-                color = SignalAmber.copy(alpha = 0.12f),
-                border = BorderStroke(1.dp, SignalAmber.copy(alpha = 0.4f)),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Row(
-                    modifier = Modifier.padding(Spacing.Medium),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = "New Update Available: v$targetVersion",
-                            fontWeight = FontWeight.Bold,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                        Text(
-                            text = "Latest road network and obstacle updates.",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                    Button(
-                        onClick = onUpdate,
-                        colors = ButtonDefaults.buttonColors(containerColor = SafetyOrange)
-                    ) {
-                        Text("Update")
-                    }
-                }
-            }
+            MapUpdateNotice(onUpdate = onUpdate)
         }
 
         OutlinedButton(
@@ -200,7 +203,7 @@ internal fun InstalledActiveSection(
         ) {
             Icon(Icons.Default.DeleteOutline, contentDescription = null)
             Spacer(Modifier.width(Spacing.Small))
-            Text("Delete Offline Map Package")
+            Text("Delete map")
         }
     }
 }

@@ -49,14 +49,14 @@ internal fun NoLocationFallback(
                 )
                 Spacer(Modifier.height(Spacing.Medium))
                 Text(
-                    text = "No Location Attached",
+                    text = "No location was sent",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface
                 )
                 Spacer(Modifier.height(Spacing.Small))
                 Text(
-                    text = "This SOS alert from ${alertMessage.senderName} did not include GPS coordinates.",
+                    text = "This SOS from ${alertMessage.senderName} didn't include a location.",
                     style = MaterialTheme.typography.bodyMedium,
                     textAlign = TextAlign.Center,
                     color = MaterialTheme.colorScheme.onSurfaceVariant

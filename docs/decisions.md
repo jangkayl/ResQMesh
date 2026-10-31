@@ -106,11 +106,12 @@ The threat model is a malicious nearby phone. Rate limits charge the originating
 
 ## D25: Packages before Gradle modules
 
-Enforce layer boundaries with packages and `scripts/ci/check_boundaries.ps1`; its allowlist reached zero on 2026-10-17 ([plan](plans/layer-boundaries.md)). It uses adapters rather than renamed repositories, String-typed models and `feature-no-data`, and adds use cases only for multi-step flows. Cross-feature rules wait for P3. The project stays one module; other behavior-touching refactors wait until after the demo freeze.
+Enforce layer boundaries with packages and `scripts/ci/check_boundaries.ps1` ([plan](plans/layer-boundaries.md)). It uses adapters rather than renamed repositories, String-typed models and `feature-no-data`, and adds use cases only for multi-step flows. Cross-feature rules wait for P3. The project stays one module; other behavior-touching refactors wait until after the demo freeze.
 
 ## D27: User-controlled location
 
 Auto-detect defaults on; each SOS may exclude location; location never blocks SOS. No background location or withheld wire flag.
+ Continuous peer positions are rejected.
 
 ## D28: Incident notifications
 

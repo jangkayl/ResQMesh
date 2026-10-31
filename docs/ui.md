@@ -1,6 +1,6 @@
 # UI guidance
 
-Last reviewed: 2026-10-06. Baseline: see [status](status.md). Use Compose/Material 3; inspect current source.
+Last reviewed: 2026-10-06. Baseline: see [status](status.md). Use Compose/Material 3.
 
 ## Components and ownership
 
@@ -49,7 +49,7 @@ Never display debug plaintext, keys, ciphertext previews or sensitive location.
 
 Background mesh is opt-in. Home/notification distinguish Bluetooth off, permission required, starting, searching and connected. OFF clears readiness; Go offline cancels recovery. Home pill greys only for offline mesh.
 
-Home peer chips open matching stable-ID Network details. Direct/routed peers going offline: grey, uncounted. Blocked peers stay in Blocked Devices (Direct Link Denied), with relay messaging when a route exists. Settings owns offline maps.
+Home peer chips open matching stable-ID Network details. Direct/routed peers going offline: grey, uncounted. Blocked peers stay in Blocked Devices (Direct Link Denied), with relay messaging when a route exists. Settings owns offline maps. Map pages use plain words; SOS labels mark real alerts only; distances say straight-line.
 
 The developer console is a memory-only tabbed screen ([plan](plans/developer-mode.md)); release hides it until seven taps on the app version, and only with a configured PIN.
 
@@ -59,4 +59,4 @@ Screen sections live within their features; saveable state, launchers, effects a
 
 Support both appearances, contrast, targets/labels, empty/error/denied states, small screens, landscape, large text, TalkBack and restoration. Startup errors offer recovery; map setup returns to its SOS. Prevent reminder/header/keyboard overlap and scan-driven flicker.
 
-Functional phone results live in [validation](validation.md); open issues in [status](status.md). They do not establish completed accessibility/novice usability, every channel/gesture regression or pressure/fallback scenario. Use the [SOS/conversation](testing/sos-conversations-test-card.md) procedure. Keep measured outcomes in validation rather than adding transcripts here.
+Functional phone results live in [validation](validation.md); open issues in [status](status.md). They do not establish completed accessibility/novice usability, every channel/gesture regression or pressure/fallback scenario. Use the [SOS/conversation](testing/sos-conversations-test-card.md) procedure.

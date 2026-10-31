@@ -1,6 +1,8 @@
 package edu.cit.resqmesh.core.map
 
+import com.sun.net.httpserver.HttpServer
 import edu.cit.resqmesh.core.map.download.ConnectivityProvider
+import edu.cit.resqmesh.core.map.download.DefaultHttpTransport
 import edu.cit.resqmesh.core.map.download.HttpTransport
 import edu.cit.resqmesh.core.map.download.MapPackageDownloader
 import edu.cit.resqmesh.core.map.model.MapPackageManifest
@@ -9,8 +11,13 @@ import edu.cit.resqmesh.core.map.storage.MapStorageGuard
 import edu.cit.resqmesh.core.map.storage.MapStyleValidator
 import edu.cit.resqmesh.core.map.verifier.ManifestVerifier
 import edu.cit.resqmesh.core.map.verifier.SignatureVerifier
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.flow.toList
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import org.junit.After
 import org.junit.Assert.*
 import org.junit.Before
@@ -18,8 +25,13 @@ import org.junit.Test
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileOutputStream
+import java.io.IOException
+import java.net.InetAddress
+import java.net.InetSocketAddress
 import java.nio.file.Files
 import java.security.MessageDigest
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.Executors
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 
@@ -212,7 +224,8 @@ class MapPackageTest {
             storageGuard = storageGuard,
             verifier = verifier,
             connectivityProvider = object : ConnectivityProvider { override fun isWifiConnected() = true },
-            httpTransport = transport
+            httpTransport = transport,
+            retryDelayMs = 0L
         )
 
         val statuses = downloader.downloadAndInstallPackage(
@@ -233,6 +246,182 @@ class MapPackageTest {
         val stagingPart = storageGuard.getStagingFile("cebu-v1.zip")
         assertTrue(stagingPart.exists())
         assertEquals("partial-data", stagingPart.readText())
+    }
+
+    private fun validPackageZip() = createZipArchive(
+        mapOf(
+            MapStorageGuard.PMTILES_FILENAME to "pmtiles-payload".toByteArray(),
+            MapStorageGuard.STYLE_FILENAME to "{\"version\": 8}".toByteArray()
+        )
+    )
+
+    private fun manifestFor(zipBytes: ByteArray) = MapPackageManifest(
+        packageId = "cebu-city",
+        version = 1,
+        minLat = 10.2, minLng = 123.8, maxLat = 10.4, maxLng = 124.0,
+        minZoom = 10, maxZoom = 16,
+        byteLength = zipBytes.size.toLong(),
+        sha256 = sha256Hex(zipBytes),
+        releaseDate = "2026-09-19",
+        attribution = "© OpenStreetMap contributors",
+        assetUrl = "https://example.com/cebu-v1.zip"
+    )
+
+    /** Records resume offsets and delegates each attempt to [attemptDownload]. */
+    private class RecordingTransport(
+        private val manifest: MapPackageManifest,
+        private val attemptDownload: (attempt: Int, destination: File, onProgress: (Long, Long) -> Unit) -> Boolean
+    ) : HttpTransport {
+        val resumeOffsets = mutableListOf<Long>()
+
+        override suspend fun fetchBytes(urlString: String): ByteArray = manifest.toJson().toByteArray()
+
+        override suspend fun downloadToFile(
+            urlString: String,
+            destinationFile: File,
+            resumeOffset: Long,
+            onProgress: (Long, Long) -> Unit
+        ): Boolean {
+            resumeOffsets += resumeOffset
+            return attemptDownload(resumeOffsets.size, destinationFile, onProgress)
+        }
+    }
+
+    private fun downloaderFor(transport: HttpTransport) = MapPackageDownloader(
+        storageGuard = storageGuard,
+        verifier = ManifestVerifier(
+            signatureVerifier = object : SignatureVerifier {
+                override fun verify(data: ByteArray, signature: ByteArray, publicKey: ByteArray) = true
+            }
+        ),
+        connectivityProvider = object : ConnectivityProvider { override fun isWifiConnected() = true },
+        httpTransport = transport,
+        retryDelayMs = 0L
+    )
+
+    private suspend fun runDownload(transport: HttpTransport) = downloaderFor(transport).downloadAndInstallPackage(
+        manifestUrl = "https://example.com/manifest.json",
+        signatureUrl = "https://example.com/manifest.sig",
+        maintainerPublicKey = byteArrayOf(1, 2, 3),
+        requireWifi = false
+    ).toList()
+
+    @Test
+    fun transientDownloadFailure_retriesFromStagedBytesAndInstalls() = runBlocking {
+        val zipBytes = validPackageZip()
+        val transport = RecordingTransport(manifestFor(zipBytes)) { attempt, destination, _ ->
+            if (attempt == 1) {
+                destination.writeBytes(zipBytes.copyOf(10))
+                false
+            } else {
+                destination.appendBytes(zipBytes.copyOfRange(10, zipBytes.size))
+                true
+            }
+        }
+
+        val statuses = runDownload(transport)
+
+        assertTrue(statuses.last() is MapPackageStatus.Installed)
+        assertEquals(listOf(0L, 10L), transport.resumeOffsets)
+    }
+
+    @Test
+    fun repeatedDownloadFailure_stopsAfterThreeAttemptsAndKeepsStagedBytes() = runBlocking {
+        val zipBytes = validPackageZip()
+        val transport = RecordingTransport(manifestFor(zipBytes)) { _, destination, _ ->
+            destination.writeBytes(zipBytes.copyOf(10))
+            false
+        }
+
+        val statuses = runDownload(transport)
+
+        assertTrue(statuses.last() is MapPackageStatus.Error)
+        assertEquals(3, transport.resumeOffsets.size)
+        assertEquals(10L, storageGuard.getStagingFile("cebu-v1.zip").length())
+    }
+
+    @Test
+    fun completeStagingFile_installsWithoutDownloading() = runBlocking {
+        val zipBytes = validPackageZip()
+        storageGuard.getStagingFile("cebu-v1.zip").writeBytes(zipBytes)
+        val transport = RecordingTransport(manifestFor(zipBytes)) { _, _, _ -> false }
+
+        val statuses = runDownload(transport)
+
+        assertTrue(statuses.last() is MapPackageStatus.Installed)
+        assertTrue(transport.resumeOffsets.isEmpty())
+    }
+
+    @Test
+    fun oversizedStagingFile_restartsFromZero() = runBlocking {
+        val zipBytes = validPackageZip()
+        storageGuard.getStagingFile("cebu-v1.zip").writeBytes(zipBytes + byteArrayOf(1, 2, 3))
+        val transport = RecordingTransport(manifestFor(zipBytes)) { _, destination, _ ->
+            destination.writeBytes(zipBytes)
+            true
+        }
+
+        val statuses = runDownload(transport)
+
+        assertTrue(statuses.last() is MapPackageStatus.Installed)
+        assertEquals(listOf(0L), transport.resumeOffsets)
+    }
+
+    @Test
+    fun downloadProgress_emitsOncePerPercent() = runBlocking {
+        val zipBytes = validPackageZip()
+        val total = zipBytes.size.toLong()
+        val transport = RecordingTransport(manifestFor(zipBytes)) { _, destination, onProgress ->
+            destination.writeBytes(zipBytes)
+            repeat(50) { onProgress(total, total) }
+            true
+        }
+
+        val statuses = runDownload(transport)
+
+        assertEquals(2, statuses.count { it is MapPackageStatus.Downloading })
+    }
+
+    @Test
+    fun cancelledDownload_stopsCopyLoop() = runBlocking {
+        val server = HttpServer.create(InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0)
+        server.createContext("/package.zip") { exchange ->
+            exchange.sendResponseHeaders(200, 0)
+            val chunk = ByteArray(64 * 1024)
+            try {
+                // Streams far past the test timeout unless the client stops reading.
+                repeat(100_000) { exchange.responseBody.write(chunk) }
+            } catch (_: IOException) {
+                // Client disconnected, which is the expected outcome.
+            } finally {
+                exchange.close()
+            }
+        }
+        server.executor = Executors.newSingleThreadExecutor()
+        server.start()
+
+        try {
+            val firstProgress = CompletableDeferred<Unit>()
+            val destination = File(tempDir, "cancelled.part")
+            val job = launch(Dispatchers.IO) {
+                DefaultHttpTransport().downloadToFile(
+                    urlString = "http://127.0.0.1:${server.address.port}/package.zip",
+                    destinationFile = destination,
+                    resumeOffset = 0L,
+                    onProgress = { _, _ -> firstProgress.complete(Unit) }
+                )
+            }
+
+            withTimeout(10_000L) {
+                firstProgress.await()
+                job.cancelAndJoin()
+            }
+
+            assertTrue(job.isCancelled)
+        } finally {
+            server.stop(0)
+            (server.executor as ExecutorService).shutdownNow()
+        }
     }
 
     @Test

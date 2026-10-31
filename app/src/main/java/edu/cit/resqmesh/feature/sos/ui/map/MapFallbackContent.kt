@@ -1,7 +1,6 @@
 package edu.cit.resqmesh.feature.sos.ui.map
 
-import androidx.compose.animation.core.*
-import androidx.compose.foundation.border
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -19,12 +18,9 @@ import androidx.compose.ui.unit.sp
 import edu.cit.resqmesh.core.model.ChatMessage
 import edu.cit.resqmesh.core.ui.theme.SafetyOrange
 import edu.cit.resqmesh.core.ui.theme.Spacing
-import java.util.Locale
 import edu.cit.resqmesh.feature.sos.ui.SosMapViewState
-import edu.cit.resqmesh.feature.sos.ui.formatMgrsCoordinate
-import edu.cit.resqmesh.feature.sos.ui.formatTimestamp
-
-import edu.cit.resqmesh.feature.sos.ui.map.DetailRow
+import edu.cit.resqmesh.feature.sos.ui.mapLocationTitle
+import edu.cit.resqmesh.feature.sos.ui.mapSentTime
 
 @Composable
 internal fun MaplessSosFallback(
@@ -43,54 +39,65 @@ internal fun MaplessSosFallback(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(Spacing.Medium)
     ) {
-        // Status Warning Card
+        // Map Status Card. A missing map is not an emergency, so it stays in the normal theme colors.
         Surface(
             shape = RoundedCornerShape(16.dp),
-            color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.4f),
-            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.6f)),
+            color = MaterialTheme.colorScheme.surface,
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)),
             modifier = Modifier.fillMaxWidth()
         ) {
-            Row(
+            Column(
                 modifier = Modifier.padding(Spacing.Medium),
-                verticalAlignment = Alignment.CenterVertically
+                verticalArrangement = Arrangement.spacedBy(Spacing.Medium)
             ) {
-                Icon(
-                    imageVector = Icons.Default.Warning,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onErrorContainer,
-                    modifier = Modifier.size(36.dp)
-                )
-                Spacer(Modifier.width(Spacing.Medium))
-                Column {
-                    Text(
-                        text = state.statusMessage,
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onErrorContainer
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Default.Map,
+                        contentDescription = null,
+                        tint = SafetyOrange,
+                        modifier = Modifier.size(32.dp)
                     )
-                    Text(
-                        text = "Coordinates remain available. Set up an offline map, then return to this alert.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onErrorContainer
-                    )
+                    Spacer(Modifier.width(Spacing.Medium))
+                    Column {
+                        Text(
+                            text = state.statusMessage,
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            text = if (state.showInstallAction) {
+                                "You can still see the location below. " +
+                                    "Download the map once and it works without internet."
+                            } else {
+                                "You can still see the location below."
+                            },
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+
+                if (state.showInstallAction) {
+                    Button(
+                        onClick = onInstallMap,
+                        modifier = Modifier.fillMaxWidth().height(52.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = SafetyOrange)
+                    ) {
+                        Icon(Icons.Default.CloudDownload, contentDescription = null)
+                        Spacer(Modifier.width(Spacing.Small))
+                        Text("Download map", fontWeight = FontWeight.Bold)
+                    }
                 }
             }
         }
 
-        if (state.showInstallAction) {
-            Button(onClick = onInstallMap, modifier = Modifier.fillMaxWidth().height(52.dp)) {
-                Icon(Icons.Default.CloudDownload, contentDescription = null)
-                Spacer(Modifier.width(Spacing.Small))
-                Text("Set up offline map")
-            }
-        }
-
-        // Tactical Coordinates Display Box
+        // Location Card
         Surface(
             shape = RoundedCornerShape(20.dp),
             color = MaterialTheme.colorScheme.surfaceVariant,
             shadowElevation = 4.dp,
-            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)),
             modifier = Modifier.fillMaxWidth()
         ) {
             Column(
@@ -98,11 +105,10 @@ internal fun MaplessSosFallback(
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Text(
-                    text = "EMERGENCY BEACON COORDINATES",
-                    style = MaterialTheme.typography.labelMedium,
+                    text = "${alertMessage.senderName}'s location",
+                    style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
-                    color = SafetyOrange,
-                    letterSpacing = 1.sp
+                    color = MaterialTheme.colorScheme.onSurface
                 )
                 Spacer(Modifier.height(Spacing.Medium))
 
@@ -110,7 +116,7 @@ internal fun MaplessSosFallback(
                 Surface(
                     shape = RoundedCornerShape(12.dp),
                     color = MaterialTheme.colorScheme.surface,
-                    border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Column(
@@ -132,58 +138,24 @@ internal fun MaplessSosFallback(
                             fontSize = 22.sp,
                             color = MaterialTheme.colorScheme.onSurface
                         )
-                        Spacer(Modifier.height(8.dp))
-                        Text(
-                            text = "Decimal: %.6f, %.6f".format(Locale.US, state.lat, state.lng),
-                            fontFamily = FontFamily.Monospace,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Spacer(Modifier.height(4.dp))
-                        Text(
-                            text = "MGRS: ${formatMgrsCoordinate(state.lat, state.lng)}",
-                            fontFamily = FontFamily.Monospace,
-                            fontSize = 11.sp,
-                            color = MaterialTheme.colorScheme.primary
-                        )
                     }
                 }
 
                 Spacer(Modifier.height(Spacing.Medium))
 
-                // Operator & Timestamp details
-                DetailRow(label = "Sender", value = alertMessage.senderName)
-                DetailRow(label = "Broadcast Time", value = formatTimestamp(alertMessage.timestamp))
-                if (alertMessage.text.isNotBlank()) {
-                    DetailRow(label = "Emergency Note", value = alertMessage.text)
-                }
-                DetailRow(label = "Transport Link", value = alertMessage.receiveMedium)
-            }
-        }
+                MapLocationActions(
+                    lat = state.lat,
+                    lng = state.lng,
+                    label = "${mapLocationTitle(alertMessage)}: ${alertMessage.senderName}"
+                )
 
-        // Guidance / Policy Note Card
-        Surface(
-            shape = RoundedCornerShape(14.dp),
-            color = MaterialTheme.colorScheme.surface,
-            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.15f)),
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Row(
-                modifier = Modifier.padding(Spacing.Medium),
-                verticalAlignment = Alignment.Top
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Info,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(24.dp)
-                )
-                Spacer(Modifier.width(Spacing.Small))
-                Text(
-                    text = "Download a map before an emergency. This location still works in any map or GPS app.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                Spacer(Modifier.height(Spacing.Medium))
+
+                DetailRow(label = "From", value = alertMessage.senderName)
+                mapSentTime(alertMessage)?.let { DetailRow(label = "Sent at", value = it) }
+                if (alertMessage.text.isNotBlank()) {
+                    DetailRow(label = "Message", value = alertMessage.text)
+                }
             }
         }
     }

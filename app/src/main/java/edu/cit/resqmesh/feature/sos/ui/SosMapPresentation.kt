@@ -13,17 +13,13 @@ import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
-import edu.cit.resqmesh.feature.sos.ui.CoordinateFormatTab
+import kotlin.math.roundToInt
 import edu.cit.resqmesh.feature.sos.ui.SosMapViewState
 
-/**
- * Tactical Coordinate display formats.
- */
-enum class CoordinateFormatTab {
-    DECIMAL,
-    MGRS,
-    W3W
-}
+/** Id prefix of the preview message built when an incident opens this map. */
+internal const val INCIDENT_MAP_ID_PREFIX = "incident_map_"
+
+private const val METERS_PER_KILOMETER = 1000f
 
 /**
  * Presentation state for [SosMapScreen].
@@ -86,12 +82,12 @@ fun resolveSosMapViewState(
         )
     } else {
         val statusMsg = when (packageStatus) {
-            is MapPackageStatus.Downloading -> "Map download in progress"
-            is MapPackageStatus.Verifying -> "Map verification in progress"
-            is MapPackageStatus.Extracting -> "Map extraction in progress"
-            is MapPackageStatus.Error -> "Cebu offline map not installed"
-            is MapPackageStatus.NotInstalled -> "Cebu offline map not installed"
-            is MapPackageStatus.Installed -> "Offline map installed"
+            is MapPackageStatus.Downloading -> "Your map is downloading"
+            is MapPackageStatus.Verifying -> "Getting your map ready"
+            is MapPackageStatus.Extracting -> "Getting your map ready"
+            is MapPackageStatus.Error -> "No map on this phone yet"
+            is MapPackageStatus.NotInstalled -> "No map on this phone yet"
+            is MapPackageStatus.Installed -> "Your map is ready"
         }
         SosMapViewState.MaplessFallback(
             lat = lat,
@@ -113,26 +109,40 @@ internal fun formatCoordinate(coord: Double, isLat: Boolean): String {
     return String.format(Locale.US, "%.5f° %s", kotlin.math.abs(coord), dir)
 }
 
-internal fun formatMgrsCoordinate(lat: Double, lng: Double): String {
-    // Cebu Province sits in UTM Zone 51P
-    val easting = ((lng - 123.0) * 100000.0).toInt().coerceIn(10000, 99999)
-    val northing = ((lat - 9.0) * 100000.0).toInt().coerceIn(10000, 99999)
-    return "51P XJ $easting $northing"
-}
-
-internal fun formatW3wCoordinate(lat: Double, lng: Double): String {
-    val latInt = (lat * 100).toInt()
-    val lngInt = (lng * 100).toInt()
-    return "///cebu.beacon.loc%d%d".format(latInt, lngInt)
-}
-
 internal fun formatTimestamp(timestampMillis: Long): String {
-    val sdf = SimpleDateFormat("MMM dd, HH:mm:ss", Locale.getDefault())
+    val sdf = SimpleDateFormat("MMM d, h:mm a", Locale.getDefault())
     return sdf.format(Date(timestampMillis))
 }
 
-internal fun bearingToCardinal(bearing: Double): String {
-    val directions = arrayOf("N", "NE", "E", "SE", "S", "SW", "W", "NW")
+internal fun bearingToDirectionName(bearing: Double): String {
+    val directions = arrayOf("North", "Northeast", "East", "Southeast", "South", "Southwest", "West", "Northwest")
     val index = (((bearing + 22.5) % 360) / 45).toInt()
     return directions[index.coerceIn(0, 7)]
 }
+
+/** Headline and supporting line for how far away the location is. */
+internal fun describeDistance(distanceMeters: Float, bearingDegrees: Float): Pair<String, String> {
+    val distance = if (distanceMeters < METERS_PER_KILOMETER) {
+        "${distanceMeters.roundToInt()} m"
+    } else {
+        String.format(Locale.US, "%.1f km", distanceMeters / METERS_PER_KILOMETER)
+    }
+    val direction = bearingToDirectionName(bearingDegrees.toDouble())
+    return "About $distance away" to "$direction of you. In a straight line, not by road."
+}
+
+/** Previews opened from chat, radio and incidents are not SOS alerts and must not read as one. */
+internal fun mapLocationTitle(message: ChatMessage): String = when {
+    message.isSOS -> "SOS location"
+    message.id.startsWith(INCIDENT_MAP_ID_PREFIX) -> "Incident location"
+    else -> "Shared location"
+}
+
+internal fun mapPinLabel(message: ChatMessage): String = if (message.isSOS) "SOS" else "PIN"
+
+/** Only real alerts carry a sent time; previews are stamped when they are opened. */
+internal fun mapSentTime(message: ChatMessage): String? =
+    if (message.isSOS) formatTimestamp(message.timestamp) else null
+
+internal fun copyableCoordinates(lat: Double, lng: Double): String =
+    String.format(Locale.US, "%.6f, %.6f", lat, lng)

@@ -1,6 +1,5 @@
 package edu.cit.resqmesh.feature.sos.ui.map
 
-import androidx.compose.animation.core.*
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
@@ -9,81 +8,58 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import edu.cit.resqmesh.core.model.ChatMessage
+import edu.cit.resqmesh.core.ui.theme.ResQSize
 import edu.cit.resqmesh.core.ui.theme.SignalRed
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.material3.ExperimentalMaterial3Api
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 internal fun MapCollapsedPreview(
     alertMessage: ChatMessage,
-    telemetry: Pair<String, String>,
+    distance: Pair<String, String>,
     isSheetExpanded: Boolean,
     onToggle: () -> Unit
 ) {
-    // Collapsed Compact 56dp Bar Preview (Always visible)
+    // Always visible: how far away the location is.
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .clickable { onToggle() }
             .padding(vertical = 2.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.weight(1f)
-        ) {
-            Icon(
-                imageVector = Icons.Default.LocationOn,
-                contentDescription = null,
-                tint = SignalRed,
-                modifier = Modifier.size(20.dp)
+        Icon(
+            imageVector = Icons.Default.LocationOn,
+            contentDescription = null,
+            tint = if (alertMessage.isSOS) SignalRed else MaterialTheme.colorScheme.primary,
+            modifier = Modifier.size(24.dp)
+        )
+        Spacer(Modifier.width(8.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = distance.first,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface
             )
-            Spacer(Modifier.width(6.dp))
-            Column {
+            if (distance.second.isNotEmpty()) {
                 Text(
-                    text = alertMessage.senderName,
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Text(
-                    text = telemetry.second,
-                    style = MaterialTheme.typography.labelSmall,
-                    fontFamily = FontFamily.Monospace,
+                    text = distance.second,
+                    style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
         }
-
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                text = telemetry.first,
-                fontFamily = FontFamily.Monospace,
-                fontWeight = FontWeight.Black,
-                fontSize = 18.sp,
-                color = SignalRed
+        IconButton(
+            onClick = { onToggle() },
+            modifier = Modifier.size(ResQSize.MinimumTouchTarget)
+        ) {
+            Icon(
+                imageVector = if (isSheetExpanded) Icons.Default.KeyboardArrowDown else Icons.Default.KeyboardArrowUp,
+                contentDescription = if (isSheetExpanded) "Show less" else "Show more",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
             )
-            IconButton(
-                onClick = { onToggle() },
-                modifier = Modifier.size(32.dp)
-            ) {
-                Icon(
-                    imageVector = if (isSheetExpanded) Icons.Default.KeyboardArrowDown else Icons.Default.KeyboardArrowUp,
-                    contentDescription = if (isSheetExpanded) "Collapse" else "Expand",
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
         }
     }
-
 }

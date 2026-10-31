@@ -14,6 +14,7 @@ import edu.cit.resqmesh.feature.sos.ui.SosMapViewState
 import edu.cit.resqmesh.feature.sos.ui.resolveSosMapViewState
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
@@ -276,6 +277,57 @@ class OfflineMapViewModelTest {
     }
 
     @Test
+    fun cancelDownload_cleansStagingOnlyAfterDownloadStops() = runTest {
+        val fakeVerifier = ManifestVerifier(
+            signatureVerifier = object : SignatureVerifier {
+                override fun verify(data: ByteArray, signature: ByteArray, publicKey: ByteArray) = true
+            }
+        )
+        val manifest = createSampleManifest(version = 1)
+        var transportStopped = false
+        var stagingExistedWhenStopped = false
+
+        val fakeTransport = object : HttpTransport {
+            override suspend fun fetchBytes(urlString: String): ByteArray = manifest.toJson().toByteArray()
+            override suspend fun downloadToFile(
+                urlString: String,
+                destinationFile: File,
+                resumeOffset: Long,
+                onProgress: (Long, Long) -> Unit
+            ): Boolean {
+                destinationFile.writeBytes(byteArrayOf(1, 2, 3))
+                try {
+                    awaitCancellation()
+                } finally {
+                    stagingExistedWhenStopped = destinationFile.exists()
+                    transportStopped = true
+                }
+            }
+        }
+
+        val downloader = MapPackageDownloader(
+            storageGuard = storageGuard,
+            verifier = fakeVerifier,
+            connectivityProvider = connectivityProvider,
+            httpTransport = fakeTransport,
+            ioDispatcher = testDispatcher
+        )
+        val viewModel = OfflineMapViewModel(storageGuard, downloader, connectivityProvider)
+
+        viewModel.startDownload()
+        advanceUntilIdle()
+        assertTrue(viewModel.uiState.value.isDownloadingOrInstalling)
+
+        viewModel.cancelDownload()
+        advanceUntilIdle()
+
+        assertTrue(transportStopped)
+        assertTrue(stagingExistedWhenStopped)
+        assertFalse(storageGuard.getStagingFile("cebu-v1.zip").exists())
+        assertFalse(viewModel.uiState.value.isDownloadingOrInstalling)
+    }
+
+    @Test
     fun updateAvailable_detectedWhenTargetVersionExceedsInstalledVersion() {
         // Active package is version 1
         val zipBytes = createZipArchive(
@@ -324,7 +376,7 @@ class OfflineMapViewModelTest {
         val initialMapState = resolveSosMapViewState(sosAlert, storageGuard.getActivePackageStatus())
         assertTrue(initialMapState is SosMapViewState.MaplessFallback)
         val initialFallback = initialMapState as SosMapViewState.MaplessFallback
-        assertEquals("Cebu offline map not installed", initialFallback.statusMessage)
+        assertEquals("No map on this phone yet", initialFallback.statusMessage)
 
         // 2. Download and verify package via Downloader
         val fakeVerifier = ManifestVerifier(

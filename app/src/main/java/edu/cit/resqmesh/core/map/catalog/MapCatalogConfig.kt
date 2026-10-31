@@ -13,9 +13,9 @@ package edu.cit.resqmesh.core.map.catalog
  */
 data class MapPackageCatalogEntry(
     val packageId: String = DEFAULT_PACKAGE_ID,
-    val title: String = "Cebu Tactical Vector Map",
+    val title: String = "Cebu map",
     val description: String = "High-contrast vector road network, waterways, POIs, and emergency infrastructure for Cebu Metropolitan Area and Cebu Province.",
-    val coverageArea: String = "Cebu Province & Metropolitan Area (9.40°N - 11.40°N, 123.30°E - 124.20°E)",
+    val coverageArea: String = "Cebu City and Cebu Province",
     val targetVersion: Int = 1,
     val minZoom: Int = 6,
     val maxZoom: Int = 15,

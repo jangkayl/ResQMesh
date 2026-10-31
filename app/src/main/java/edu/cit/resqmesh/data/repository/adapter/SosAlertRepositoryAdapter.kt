@@ -40,6 +40,8 @@ class SosAlertRepositoryAdapter(
     ): SosRaiseResult = repository.raise(type, charge, lat, lng, accuracy, captured)
     override suspend fun updateLocation(id: String, lat: Double, lng: Double, accuracy: Float, captured: Long) =
         repository.updateLocation(id, lat, lng, accuracy, captured)
+    override suspend fun updateMovedLocation(id: String, fix: edu.cit.resqmesh.core.model.SosLocationSample) =
+        repository.updateMovedLocation(id, fix)
     override suspend fun end(id: String) = repository.end(id)
     override suspend fun silence(id: String) = repository.silence(id)
 }

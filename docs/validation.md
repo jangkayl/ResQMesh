@@ -61,7 +61,7 @@ Full October 4–5 audit narratives and APK hashes are in the [October 5 validat
 | Bluetooth recovery, October 2 | 266 unit tests, build, Android-test compilation and Lint; see [recovery card](testing/bluetooth-recovery-test-card.md). |
 | Presentation organization, October 4 | Builds, Lint and 24 presentation tests; full suite blocked. See [organization card](../archive/docs-superseded-2026-10-16/testing/structure-organization-test-card.md). |
 
-Original September capture results, paths, Samsung reports, and historical procedures remain in [validation before synchronization](../archive/docs-superseded-2026-10-04/evidence/validation-before-sync.md). Older cards and hashes are indexed in the [dated archive](../archive/docs-superseded-2026-10-04/README.md). They identify historical snapshots, not the current candidate.
+Original September capture results, paths, Samsung reports, and historical procedures remain in [validation before synchronization](../archive/docs-superseded-2026-10-04/evidence/validation-before-sync.md). Older cards and hashes are indexed in the [dated archive](../archive/docs-superseded-2026-10-04/README.md).
 
 ## Active physical procedures
 
@@ -71,8 +71,9 @@ Original September capture results, paths, Samsung reports, and historical proce
 | [Voice/relay](testing/ble-voice-transfer-test-card.md) | Direct/relay notes, bursts, joining, fallback, recovery and arrival versus confirmation |
 | [Recovery](testing/bluetooth-recovery-test-card.md) | OFF/ON, isolation, cluster merge, permissions, background and Go offline |
 | [Samsung](testing/samsung-send-test-card.md) | Samsung roles/transports, private receipts and reconnect |
-| [Batch A smoke](testing/batch-a-cleanup-smoke-card.md) | No-behavior-change regression check after the Batch A cleanup |
+| [Batch A smoke](testing/batch-a-cleanup-smoke-card.md) | Regression check after Batch A |
 | [Batch C smoke](testing/batch-c-hygiene-smoke-card.md) | Startup DI, audio, SOS alert, notification and upgrade-install regression check after Batch C |
+| [Adaptive location](testing/adaptive-location-card.md) | Fix time, live map, SOS revisions |
 | [SOS/conversations](testing/sos-conversations-test-card.md) | Channel isolation, independent alerts, reconnect terminal state, gestures and UI |
 | [Capstone](plans/capstone-demo-readiness.md) | Reporter/helper roles, ownership, withdrawal/offline revision and demo/release evidence |
 
