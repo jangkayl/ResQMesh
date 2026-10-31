@@ -219,14 +219,6 @@ internal fun NearbyMeshStoriesBar(
                             modifier = Modifier.width(68.dp),
                             textAlign = androidx.compose.ui.text.style.TextAlign.Center
                         )
-
-                        if (isOffline) {
-                            Text(
-                                text = "Offline",
-                                style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
-                                color = ringColor
-                            )
-                        }
                     }
                 }
             }

@@ -49,7 +49,7 @@ Never display debug plaintext, keys, ciphertext previews or sensitive location.
 
 Background mesh is opt-in. Home/notification distinguish Bluetooth off, permission required, starting, searching and connected. OFF clears readiness; Go offline cancels recovery. Home pill greys only for offline mesh.
 
-Home peer chips open matching stable-ID Network details. Recently offline peers: grey, labelled, uncounted. Blocked peers stay in Blocked Devices (Direct Link Denied), with relay messaging when a route exists. Settings owns offline maps.
+Home peer chips open matching stable-ID Network details. Direct/routed peers going offline: grey, uncounted. Blocked peers stay in Blocked Devices (Direct Link Denied), with relay messaging when a route exists. Settings owns offline maps.
 
 The developer console is a memory-only tabbed screen ([plan](plans/developer-mode.md)); release hides it until seven taps on the app version, and only with a configured PIN.
 
