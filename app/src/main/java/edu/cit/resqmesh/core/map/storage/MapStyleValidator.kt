@@ -51,78 +51,56 @@ object MapStyleValidator {
             return ValidationResult.Invalid("style.json is not valid JSON: ${e.message}")
         }
 
-        // 3. Validate sources
-        if (root.has("sources")) {
-            val sources = root.optJSONObject("sources")
-            if (sources != null) {
-                val keys = sources.keys()
-                while (keys.hasNext()) {
-                    val key = keys.next()
-                    val sourceObj = sources.optJSONObject(key) ?: continue
-                    val url = sourceObj.optString("url", "")
-                    if (url.isNotBlank()) {
-                        // Check pmtiles reference
-                        val cleanPath = url
-                            .removePrefix("pmtiles://")
-                            .removePrefix("file://")
-                            .removePrefix("./")
-                            .removePrefix("{PACKAGE_DIR}/")
-                        if (cleanPath.endsWith(".pmtiles")) {
-                            val pmtilesFile = File(packageDir, cleanPath)
-                            if (!pmtilesFile.exists()) {
-                                return ValidationResult.Invalid(
-                                    "Source '$key' references missing PMTiles file: $cleanPath"
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        // 4. Validate sprite
-        if (root.has("sprite")) {
-            val spriteBase = root.optString("sprite", "")
-                .removePrefix("file://")
-                .removePrefix("./")
-                .removePrefix("{PACKAGE_DIR}/")
-
-            if (spriteBase.isNotBlank()) {
-                val jsonFile = File(packageDir, "$spriteBase.json")
-                val pngFile = File(packageDir, "$spriteBase.png")
-                if (!jsonFile.exists()) {
-                    return ValidationResult.Invalid("Missing referenced sprite JSON: $spriteBase.json")
-                }
-                if (!pngFile.exists()) {
-                    return ValidationResult.Invalid("Missing referenced sprite PNG: $spriteBase.png")
-                }
-            }
-        }
-
-        // 5. Validate glyphs
-        if (root.has("glyphs")) {
-            val glyphsTemplate = root.optString("glyphs", "")
-            if (glyphsTemplate.isNotBlank()) {
-                // Extract directory prefix before {fontstack} or {range}
-                val dirPrefix = glyphsTemplate.substringBefore("{")
-                    .trimEnd('/')
-                    .removePrefix("file://")
-                    .removePrefix("./")
-                    .removePrefix("{PACKAGE_DIR}/")
-
-                val glyphsDir = if (dirPrefix.isNotBlank()) File(packageDir, dirPrefix) else File(packageDir, "glyphs")
-                if (!glyphsDir.exists() || !glyphsDir.isDirectory) {
-                    return ValidationResult.Invalid("Missing referenced glyphs directory: ${glyphsDir.name}")
-                }
-                val hasPbf = hasPbfFiles(glyphsDir)
-                if (!hasPbf) {
-                    return ValidationResult.Invalid("Referenced glyphs directory contains no .pbf font files: ${glyphsDir.name}")
-                }
-            }
-        }
-
-        return ValidationResult.Valid
+        return validateSources(packageDir, root) ?: validateSprite(packageDir, root) ?: validateGlyphs(packageDir, root)
+            ?: ValidationResult.Valid
     }
+
+    private fun validateSources(packageDir: File, root: JSONObject): ValidationResult.Invalid? {
+        val sources = root.optJSONObject("sources") ?: return null
+        val keys = sources.keys()
+        while (keys.hasNext()) {
+            val key = keys.next()
+            val sourceObj = sources.optJSONObject(key) ?: continue
+            val url = sourceObj.optString("url", "")
+            if (url.isBlank()) continue
+            val cleanPath = url.removePrefix("pmtiles://").stripLocalPrefixes()
+            if (cleanPath.endsWith(".pmtiles") && !File(packageDir, cleanPath).exists()) {
+                return ValidationResult.Invalid("Source '$key' references missing PMTiles file: $cleanPath")
+            }
+        }
+        return null
+    }
+
+    private fun validateSprite(packageDir: File, root: JSONObject): ValidationResult.Invalid? {
+        if (!root.has("sprite")) return null
+        val spriteBase = root.optString("sprite", "").stripLocalPrefixes()
+        if (spriteBase.isBlank()) return null
+        if (!File(packageDir, "$spriteBase.json").exists()) {
+            return ValidationResult.Invalid("Missing referenced sprite JSON: $spriteBase.json")
+        }
+        if (!File(packageDir, "$spriteBase.png").exists()) {
+            return ValidationResult.Invalid("Missing referenced sprite PNG: $spriteBase.png")
+        }
+        return null
+    }
+
+    private fun validateGlyphs(packageDir: File, root: JSONObject): ValidationResult.Invalid? {
+        if (!root.has("glyphs")) return null
+        val glyphsTemplate = root.optString("glyphs", "")
+        if (glyphsTemplate.isBlank()) return null
+        // Extract directory prefix before {fontstack} or {range}
+        val dirPrefix = glyphsTemplate.substringBefore("{").trimEnd('/').stripLocalPrefixes()
+        val glyphsDir = if (dirPrefix.isNotBlank()) File(packageDir, dirPrefix) else File(packageDir, "glyphs")
+        if (!glyphsDir.exists() || !glyphsDir.isDirectory) {
+            return ValidationResult.Invalid("Missing referenced glyphs directory: ${glyphsDir.name}")
+        }
+        if (!hasPbfFiles(glyphsDir)) {
+            return ValidationResult.Invalid("Referenced glyphs directory contains no .pbf font files: ${glyphsDir.name}")
+        }
+        return null
+    }
+
+    private fun String.stripLocalPrefixes() = removePrefix("file://").removePrefix("./").removePrefix("{PACKAGE_DIR}/")
 
     private fun hasPbfFiles(dir: File): Boolean {
         val files = dir.listFiles() ?: return false
@@ -131,6 +109,28 @@ object MapStyleValidator {
             if (f.isFile && f.name.endsWith(".pbf", ignoreCase = true)) return true
         }
         return false
+    }
+
+    private fun resolveLocalAsset(root: JSONObject, field: String, packageUri: String) {
+        if (!root.has(field)) return
+        val value = root.getString(field)
+        if (value.startsWith("file://") || value.startsWith("asset://")) return
+        val clean = value.removePrefix("./").removePrefix("{PACKAGE_DIR}/")
+        root.put(field, "$packageUri/$clean")
+    }
+
+    private fun resolveVectorSources(root: JSONObject, packageDir: File) {
+        val sources = root.optJSONObject("sources") ?: return
+        val packagePath = packageDir.canonicalPath.replace('\\', '/')
+        val keys = sources.keys()
+        while (keys.hasNext()) {
+            val src = sources.getJSONObject(keys.next())
+            if (!src.has("url")) continue
+            val url = src.getString("url")
+            if (!url.startsWith("pmtiles://") || url.contains(packagePath)) continue
+            val path = url.removePrefix("pmtiles://").removePrefix("./").removePrefix("{PACKAGE_DIR}/")
+            src.put("url", "pmtiles://file://$packagePath/$path")
+        }
     }
 
     /**
@@ -149,43 +149,9 @@ object MapStyleValidator {
             val packageUri = "file://${packageDir.canonicalPath.replace('\\', '/')}"
             val root = JSONObject(content)
 
-            // 1. Resolve sprite
-            if (root.has("sprite")) {
-                val sprite = root.getString("sprite")
-                if (!sprite.startsWith("file://") && !sprite.startsWith("asset://")) {
-                    val clean = sprite.removePrefix("./").removePrefix("{PACKAGE_DIR}/")
-                    root.put("sprite", "$packageUri/$clean")
-                }
-            }
-
-            // 2. Resolve glyphs
-            if (root.has("glyphs")) {
-                val glyphs = root.getString("glyphs")
-                if (!glyphs.startsWith("file://") && !glyphs.startsWith("asset://")) {
-                    val clean = glyphs.removePrefix("./").removePrefix("{PACKAGE_DIR}/")
-                    root.put("glyphs", "$packageUri/$clean")
-                }
-            }
-
-            // 3. Resolve vector sources
-            if (root.has("sources")) {
-                val sources = root.optJSONObject("sources")
-                if (sources != null) {
-                    val keys = sources.keys()
-                    while (keys.hasNext()) {
-                        val key = keys.next()
-                        val src = sources.getJSONObject(key)
-                        if (src.has("url")) {
-                            val url = src.getString("url")
-                            if (url.startsWith("pmtiles://") && !url.contains(packageDir.canonicalPath.replace('\\', '/'))) {
-                                val path = url.removePrefix("pmtiles://").removePrefix("./").removePrefix("{PACKAGE_DIR}/")
-                                val targetUri = "file://${packageDir.canonicalPath.replace('\\', '/')}/$path"
-                                src.put("url", "pmtiles://$targetUri")
-                            }
-                        }
-                    }
-                }
-            }
+            resolveLocalAsset(root, "sprite", packageUri)
+            resolveLocalAsset(root, "glyphs", packageUri)
+            resolveVectorSources(root, packageDir)
 
             root.toString()
         } catch (e: Exception) {

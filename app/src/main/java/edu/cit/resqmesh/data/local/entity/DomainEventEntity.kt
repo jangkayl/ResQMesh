@@ -19,5 +19,12 @@ data class DomainEventEntity(
     val applied: Boolean = true,
     /** Validation and projection application are separate: verified prerequisites may wait. */
     @ColumnInfo(defaultValue = "'UNVERIFIED'")
-    val validationStatus: String = if (applied) "ACCEPTED" else "UNVERIFIED"
+    val validationStatus: String = if (applied) EventValidationStatus.ACCEPTED else EventValidationStatus.UNVERIFIED
 )
+
+/** Persisted [DomainEventEntity.validationStatus] values. */
+object EventValidationStatus {
+    const val ACCEPTED = "ACCEPTED"
+    const val REJECTED = "REJECTED"
+    const val UNVERIFIED = "UNVERIFIED"
+}

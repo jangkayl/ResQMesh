@@ -1,5 +1,6 @@
 package edu.cit.resqmesh.core.domain.incident
 
+import edu.cit.resqmesh.core.model.HELP_WORKFLOW_VERSION
 import edu.cit.resqmesh.core.model.EventType
 import edu.cit.resqmesh.core.model.IncidentState
 
@@ -59,5 +60,5 @@ object IncidentRules {
         signingKey: String?
     ): Boolean =
         userId != null && userId == creatorId &&
-            (workflowVersion != 2 || !signingKey.isNullOrBlank() && signingKey == reporterSigningKey)
+            (workflowVersion != HELP_WORKFLOW_VERSION || !signingKey.isNullOrBlank() && signingKey == reporterSigningKey)
 }

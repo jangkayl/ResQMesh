@@ -32,7 +32,7 @@ SYSTEM advertises transfer protocol 1. ReliableMeshTransfers journals MESSAGE/CO
 
 Maximum direct neighbors: three; unidentified endpoints occupy capacity separately. Admission retains 32 candidates, expires unobserved advertisements after eight seconds and reconsiders fresh candidates after isolation. A free third link can bridge unreachable clusters. Full-capacity reclamation requires idle transport, recent directed alternate paths preserving reachability, a responsive first hop, owned retirement and 60-second cooldown; otherwise defer. Connect Directly keeps block/duplicate/capacity guards.
 
-MeshRepository keeps public flows/router and initialization-time callback binding. MeshPeerCoordinator handles peer/name/topology updates, one row per peer (ConnectedPeerRows); MeshOutboundDelivery owns the one mutex, conflated wake channel, worker and receipt progress. MeshInboundMessages shares that exact mutex for conversation storage. MeshBlockCoordinator owns retry jobs; MeshConversationMedia keeps channel/SOS-facing and audio coordination. Identity/channel providers and SOS reply capability keep policy.
+MeshRepository keeps public flows/router and initialization-time callback binding. MeshPeerCoordinator handles peer/name/topology updates, one row per peer (ConnectedPeerRows); MeshOutboundDelivery owns the mutex, conflated wake channel, worker; PrivateReceiptWatch owns receipts. MeshInboundMessages shares that mutex for conversation storage. MeshBlockCoordinator owns retry jobs; MeshConversationMedia keeps channel/SOS-facing and audio coordination. Identity/channel providers and SOS reply capability keep policy.
 
 ## Identity, routing and private delivery
 
@@ -77,10 +77,10 @@ Paths below are under `app/src/main/java/edu/cit/resqmesh/`:
 
 | Area | Source |
 | --- | --- |
-| BLE and transfer ownership | `core/network/NativeBleManager.kt`, `core/network/bluetooth/`, `core/network/ReliableMeshTransfers.kt`, `core/network/TransferJournal.kt`, `core/network/dispatch/` |
+| BLE and transfer ownership | `core/network/NativeBleManager.kt`, `core/network/bluetooth/`, `core/network/ReliableMeshTransfers.kt`, `core/network/TransferFlight.kt`, `core/network/TransferJournal.kt`, `core/network/dispatch/` |
 | Identity/crypto | `core/network/CryptoManager.kt`, `data/repository/PeerPublicKeyCache.kt` |
 | Routing/persistence | `data/repository/MeshRepository.kt`, `data/repository/MeshRouter.kt`, `data/repository/MessageStore.kt`, `data/local/` |
-| Incident/SOS state | `data/repository/IncidentSyncCoordinator.kt`, `data/repository/SosRepository.kt`, `data/repository/SosSyncCoordinator.kt` |
+| Incident/SOS state | `data/repository/IncidentHelp*.kt`, `data/repository/IncidentSyncCoordinator.kt`, `data/repository/SosRepository.kt`, `data/repository/SosSyncCoordinator.kt` |
 | Domain boundary | `core/model/`, `core/domain/{repository,incident,usecase}/`, `data/mapper/`, `data/repository/adapter/` |
 | Presentation | `app/navigation/`, `feature/*/{ui,viewmodel,model}/`, `core/ui/` |
 | Maps/session | `core/map/`, `core/service/` |

@@ -1,5 +1,6 @@
 package edu.cit.resqmesh.feature.incident.ui
 
+import edu.cit.resqmesh.core.model.HELP_WORKFLOW_VERSION
 import edu.cit.resqmesh.feature.incident.ui.list.IncidentSearchField
 import edu.cit.resqmesh.feature.incident.ui.list.IncidentDestinations
 import edu.cit.resqmesh.feature.incident.ui.list.IncidentQuickFilters
@@ -428,7 +429,7 @@ fun IncidentListScreen(
                     offers = offers,
                     localSigningKey = viewModel.localSigningKey,
                     identityLoading = identity.loading,
-                    identityError = identity.error.takeIf { inc.workflowVersion == 2 || identity.user == null },
+                    identityError = identity.error.takeIf { inc.workflowVersion == HELP_WORKFLOW_VERSION || identity.user == null },
                     leadReachability = leadReachability,
                     actionBusy = actionBusy,
                     actionMessage = actionMessage,
@@ -444,11 +445,11 @@ fun IncidentListScreen(
                     onAssign = { viewModel.assignToMe(inc.incidentId) },
                     onStartResponse = { viewModel.startResponse(inc.incidentId) },
                     onResolve = {
-                        if (inc.workflowVersion == 2) viewModel.resolveHelp(inc.incidentId)
+                        if (inc.workflowVersion == HELP_WORKFLOW_VERSION) viewModel.resolveHelp(inc.incidentId)
                         else viewModel.resolve(inc.incidentId)
                     },
                     onCancel = {
-                        if (inc.workflowVersion == 2) viewModel.cancelHelp(inc.incidentId)
+                        if (inc.workflowVersion == HELP_WORKFLOW_VERSION) viewModel.cancelHelp(inc.incidentId)
                         else viewModel.cancel(inc.incidentId)
                     },
                     onReleaseAssignment = { viewModel.releaseAssignment(inc.incidentId) },

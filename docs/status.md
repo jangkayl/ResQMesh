@@ -4,7 +4,7 @@ Last reviewed: 2026-10-17. Baseline: `a9a27ed` on `main` (also `origin/fix/incid
 
 ## Current objective
 
-Prepare for the capstone demo (within two weeks of 2026-10-16) and deployment readiness. Documentation consistency is done; the code/architecture review produced the [revision plan](plans/code-architecture-revision.md): behavior-neutral Phase 0 before the demo, behavior-touching phases after the freeze. UI/UX and mesh concerns are user-reported but not yet described.
+Prepare for the capstone demo (within two weeks of 2026-10-16) and deployment readiness. The code/architecture review produced the [revision plan](plans/code-architecture-revision.md): behavior-neutral Phase 0 before the demo, behavior-touching phases after the freeze. UI/UX and mesh concerns are user-reported but not yet described.
 
 ## Working by user report
 
@@ -31,9 +31,9 @@ Behavior and source ownership are in [architecture](architecture.md); accepted p
 
 Basic block, incident, SOS and recovery checks have user-reported successes; their adversarial, load and repeated cases remain pending, not known defects. See the [physical checklist](testing/physical-reliability-tests.md).
 
-**Layer boundaries / P2 subset** (`refactor/layer-boundaries`): behavior-neutral mappers, interfaces, use cases and a zero allowlist ([plan](plans/layer-boundaries.md)). The user reported the [smoke card](testing/layer-boundaries-smoke-card.md) passing on three phones (2026-10-17); merged.
+**Layer boundaries / P2 subset** (`refactor/layer-boundaries`, [plan](plans/layer-boundaries.md)): The user reported the [smoke card](testing/layer-boundaries-smoke-card.md) passing on three phones (2026-10-17); merged.
 
-**Batch C hygiene / Phase 0** (branch `refactor/batch-c-hygiene`): tests, cleanup and CI gates. Local checks pass; the user reported all [smoke card](testing/batch-c-hygiene-smoke-card.md) steps working on 2026-10-17 (models and counts not supplied).
+**Batch C hygiene / Phase 0** (`refactor/batch-c-hygiene`): the user reported all [smoke card](testing/batch-c-hygiene-smoke-card.md) steps working on 2026-10-17 (models and counts not supplied).
 
 **Dead screens**: merged; device pending.
 
@@ -41,7 +41,11 @@ Basic block, incident, SOS and recovery checks have user-reported successes; the
 
 **Reconnect sync fix** (`fix/incident-reconnect-sync`): bounded sync, paced creation (D29); [card](testing/incident-reconnect-sync-card.md) pending.
 
-**Developer console** (branch `feat/developer-console`, [plan](plans/developer-mode.md)): Stage 1 (tabs, fast logger, export, release PIN unlock) and live follow are pushed; Stage 2 (hop, drop, failure, transfer and voice data, timeline) is built with local checks only and awaits the [phone card](testing/developer-mode-card.md). Stage 3 (signal and queue stats) is pending.
+**Code smells refactor:** [card](testing/code-smells-refactor-card.md) pending.
+
+**Batch A cleanup** (`refactor/batch-a-cleanup`): the user reported all [smoke card](testing/batch-a-cleanup-smoke-card.md) steps working on 2026-10-16 (build, models, counts not supplied). Remaining review work: revision-plan phases P1–P6.
+
+**Developer console** (branch `feat/developer-console`, [plan](plans/developer-mode.md)): Stage 1 and live follow are pushed; Stage 2 (traces, timeline) has local checks only and awaits the [phone card](testing/developer-mode-card.md). Stage 3 (signal and queue stats) is pending.
 
 **Unknown duplicate row** (`fix/unknown-duplicate-row`): the peer list keeps one row per peer and follows the surviving socket. JVM tests pass; [phone card](testing/unknown-duplicate-row-card.md) pending. Second-socket cause unmeasured.
 

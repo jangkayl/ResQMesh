@@ -1,5 +1,6 @@
 package edu.cit.resqmesh.feature.incident.ui.components
 
+import edu.cit.resqmesh.core.model.HELP_WORKFLOW_VERSION
 import android.text.format.DateUtils
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -78,7 +79,7 @@ fun TacticalIncidentCard(
     val statusText = when (incident.status) {
         "OPEN" -> "Looking for help"
         "AWAITING_HELPER" -> "Awaiting confirmation"
-        "RESPONDING" -> if (incident.workflowVersion == 2) "Helper confirmed" else "Responding"
+        "RESPONDING" -> if (incident.workflowVersion == HELP_WORKFLOW_VERSION) "Helper confirmed" else "Responding"
         "ACKNOWLEDGED" -> "Acknowledged"
         "ASSIGNED" -> "Assigned"
         "RESOLVED" -> "Resolved"

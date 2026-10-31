@@ -1,6 +1,9 @@
 package edu.cit.resqmesh.data.repository
 
+import edu.cit.resqmesh.data.local.entity.EventValidationStatus
+import edu.cit.resqmesh.core.model.HELP_WORKFLOW_VERSION
 import edu.cit.resqmesh.data.repository.incident.IncidentCommands
+import edu.cit.resqmesh.data.repository.incident.IncidentDraft
 import edu.cit.resqmesh.data.repository.incident.IncidentEventIngestor
 import edu.cit.resqmesh.data.repository.incident.LegacyIncidentProjection
 import edu.cit.resqmesh.data.repository.incident.LegacyIncidentSync
@@ -90,7 +93,7 @@ class IncidentRepository(
         helpWorkflow?.let { workflow ->
             repositoryScope.launch {
                 incidentDao.getAllIncidents().collect { incidents ->
-                    incidents.filter { it.workflowVersion == 2 && it.selectionId != null }.forEach {
+                    incidents.filter { it.workflowVersion == HELP_WORKFLOW_VERSION && it.selectionId != null }.forEach {
                         workflow.reconcileWithdrawnSelection(it.incidentId)
                     }
                 }
@@ -124,7 +127,7 @@ class IncidentRepository(
             }
         }
         repositoryScope.launch {
-            domainEventDao.getIncidentHistory().filter { !it.applied && it.validationStatus != "REJECTED" }
+            domainEventDao.getIncidentHistory().filter { !it.applied && it.validationStatus != EventValidationStatus.REJECTED }
                 .map { it.entityId }.distinct().forEach { replayPendingForIncident(it) }
         }
         if (syncCoordinator != null) {
@@ -164,7 +167,8 @@ class IncidentRepository(
         locationCapturedAt: Long? = null,
         locationAccuracyMeters: Float? = null,
         title: String = ""
-    ): IncidentEntity = commands.createIncident(incidentType, severity, description, areaDescription, latitude, longitude, locationCapturedAt, locationAccuracyMeters, title)
+    ): IncidentEntity = commands.createIncident(IncidentDraft(incidentType, severity, description, areaDescription,
+        latitude, longitude, locationCapturedAt, locationAccuracyMeters, title))
 
     suspend fun acknowledgeIncident(incidentId: String): Boolean = commands.acknowledgeIncident(incidentId)
 

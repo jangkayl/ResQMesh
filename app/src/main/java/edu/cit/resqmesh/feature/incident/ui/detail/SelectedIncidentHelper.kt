@@ -1,5 +1,6 @@
 package edu.cit.resqmesh.feature.incident.ui.detail
 
+import edu.cit.resqmesh.core.model.HELP_WORKFLOW_VERSION
 import androidx.compose.animation.*
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
@@ -43,7 +44,7 @@ internal fun SelectedIncidentHelper(
     val selectedHelperChatTarget = selectedHelper
         ?.takeUnless { it.helperKey == localSigningKey }
         ?.let(::helperChatTarget)
-    if (selectedHelper != null || (incident.workflowVersion != 2 && incident.primaryResponderName != null)) {
+    if (selectedHelper != null || (incident.workflowVersion != HELP_WORKFLOW_VERSION && incident.primaryResponderName != null)) {
         val helperName = selectedHelper?.helperName ?: incident.primaryResponderName ?: "Helper"
         val isConfirmed = incident.status == "RESPONDING" || incident.selectionConfirmedAt != null
         val statusLabel = if (isConfirmed) "Confirmed" else "Awaiting confirmation"
