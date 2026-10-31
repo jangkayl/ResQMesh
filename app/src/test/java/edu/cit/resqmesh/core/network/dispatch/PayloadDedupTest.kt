@@ -42,6 +42,12 @@ class PayloadDedupTest {
         assertEquals(2, cb.sosPackets.size); assertEquals(2, cb.conversations.size)
     }
 
+    @Test fun liveAudioFromOlderBuildIsDroppedNotStoredOrRelayed() {
+        send(MeshPayload(id = "l1", type = "LIVE_AUDIO", senderName = "Alice#A001", liveAudioChunk = byteArrayOf(1)))
+        assertTrue(cb.received.isEmpty())
+        assertTrue(cb.broadcasts.isEmpty())
+    }
+
     @Test fun capEvictsOldestIdsOnly() {
         cb.seen = ExpiringIdCache(maxEntries = 2, ttlMs = 1000, clock = { 0L })
         listOf("a", "b", "c").forEach { send(chat(it)) }

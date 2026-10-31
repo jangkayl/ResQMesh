@@ -21,9 +21,7 @@ Replace the flat debug terminal with a tabbed console that shows who is connecte
 | Release | Hidden until seven taps on the app version, then a build-configured PIN; unavailable when no PIN is configured |
 | Peers | On screen `Name (short id)`; exports carry short IDs only |
 | Storage | Memory only; sanitized text and CSV export through the system file picker |
-| Voice | Voice-note transfers and record/playback errors only; no live push-to-talk instrumentation |
-
-The user plans to remove live push-to-talk later. Raise it when this work finishes.
+| Voice | Voice-note transfers and record/playback errors only |
 
 ## Release access policy (D30 detail)
 

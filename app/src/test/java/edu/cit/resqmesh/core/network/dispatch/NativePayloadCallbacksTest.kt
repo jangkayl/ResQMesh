@@ -19,14 +19,12 @@ class NativePayloadCallbacksTest {
         override var onPublicKeyReceived: ((String, String, String) -> Unit)? = null
         override var onRoutingTableReceived: ((String, String, List<String>, List<String>, Long) -> Unit)? = null
         override var onMessageReceived: MessageReceivedCallback? = null
-        override var onLiveAudioChunk: ((String, String, ByteArray) -> Unit)? = null
         override var onSosCancelled: (() -> Unit)? = null
         override var onBlockRequest: ((String, MeshPayload, BlockControlEnvelope) -> Unit)? = null
         override var onBlockAck: ((String, MeshPayload, BlockControlEnvelope) -> Unit)? = null
         override var onDomainEvent: ((String, MeshPayload) -> Unit)? = null
         override var onEventSyncRequest: ((String, MeshPayload) -> Unit)? = null
         override var onEventSyncResponse: ((String, MeshPayload) -> Unit)? = null
-        override var stpNeighborsProvider: (() -> Set<String>)? = null
     }
 
     private fun callbacks(events: Events, direct: (String, ByteArray) -> TransportDispatchResult = { _, _ -> TransportDispatchResult.ACCEPTED }) =
@@ -58,13 +56,11 @@ class NativePayloadCallbacksTest {
         events.onConversationMessage = { _, received -> currentPayload = received }
         events.myDeviceName = "Renamed#F006"
         events.myNodeId = "F006"
-        events.stpNeighborsProvider = { setOf("B002") }
         callback.onConversationMessage("endpoint", payload)
         assertEquals(1, oldCalls)
         assertSame(payload, currentPayload)
         assertEquals("Renamed#F006", callback.getMyDeviceName())
         assertEquals("F006", callback.getMyNodeId())
-        assertEquals(setOf("B002"), callback.getStpNeighbors())
     }
 
     @Test fun dispatchPreservesImmediateResultAndAllMessageArguments() {

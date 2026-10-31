@@ -226,7 +226,7 @@ Report APK hash, models/API, topology, actual transport, background setting, cou
 
 Working prototype with qualitative user-reported phone successes. Current objective, open issues (including intermittent relay loss, DELIVERY-01) and next actions: [status](docs/status.md). Build identity and evidence: [validation](docs/validation.md).
 
-Measured scale, latency, range, battery/OEM behavior, accessibility, novice usability and release/upgrade readiness remain pending. Authenticated E2EE, forward secrecy, verified personal identity and guaranteed self-healing/delivery are not claimed. Recorded-note success does not establish live-PTT reliability.
+Measured scale, latency, range, battery/OEM behavior, accessibility, novice usability and release/upgrade readiness remain pending. Authenticated E2EE, forward secrecy, verified personal identity and guaranteed self-healing/delivery are not claimed.
 
 ## Documentation
 

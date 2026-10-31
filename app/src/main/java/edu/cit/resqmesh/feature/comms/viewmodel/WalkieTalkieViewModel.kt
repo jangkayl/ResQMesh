@@ -12,12 +12,9 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.launch
 
-import edu.cit.resqmesh.core.audio.LiveAudioEngine
-
 class WalkieTalkieViewModel(
     private val useCases: edu.cit.resqmesh.core.domain.usecase.MeshUseCases,
-    private val mediaHelper: MediaHelper,
-    private val liveAudioEngine: LiveAudioEngine
+    private val mediaHelper: MediaHelper
 ) : ViewModel() {
 
     private val _isWalkieTalkieMode = MutableStateFlow(false)
@@ -27,10 +24,8 @@ class WalkieTalkieViewModel(
     
     val currentSpeaker: StateFlow<String?> = combine(
         mediaHelper.currentRadioSpeaker,
-        liveAudioEngine.currentSpeaker,
         useCases.observePeerNames()
-    ) { radioSender, liveSender, names ->
-        val sender = radioSender ?: liveSender
+    ) { sender, names ->
         sender?.let {
             NodeIdentity.displayNameOf(NodeIdentity.currentName(it, names)).ifBlank { NodeIdentity.displayNameOf(it) }
         }
@@ -41,14 +36,6 @@ class WalkieTalkieViewModel(
         mediaHelper.setRadioMonitoring(false)
         useCases.setChannel(channelId)
         mediaHelper.setRadioMonitoring(_isWalkieTalkieMode.value)
-    }
-
-    private val _volumeGain = MutableStateFlow(1.0f)
-    val volumeGain = _volumeGain.asStateFlow()
-
-    fun setVolumeGain(gain: Float) {
-        _volumeGain.value = gain
-        liveAudioEngine.volumeGain = gain
     }
 
     init {
@@ -64,25 +51,9 @@ class WalkieTalkieViewModel(
         }
     }
 
-    fun startLiveAudio() {
-        liveAudioEngine.startRecording()
-    }
-
-    fun stopLiveAudio(): String? {
-        val wavBytes = liveAudioEngine.stopRecording()
-        return if (wavBytes != null) {
-            android.util.Base64.encodeToString(wavBytes, android.util.Base64.NO_WRAP)
-        } else null
-    }
-
     fun toggleWalkieTalkieMode() {
         _isWalkieTalkieMode.value = !_isWalkieTalkieMode.value
         mediaHelper.setRadioMonitoring(_isWalkieTalkieMode.value)
-        if (_isWalkieTalkieMode.value) {
-            liveAudioEngine.startPlayback(useCases.observeIncomingLiveAudioChunk())
-        } else {
-            liveAudioEngine.stopPlayback()
-        }
     }
 
     override fun onCleared() {

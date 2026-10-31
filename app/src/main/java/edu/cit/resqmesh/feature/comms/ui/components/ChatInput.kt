@@ -360,6 +360,7 @@ fun ChatInput(
                 // Auto-Expanding Multi-Line Text Input Area (or Active Recording Mode)
                 if (isRecording) {
                     // Active Voice Recording Indicator Bar
+                    val elapsedMs by rememberVoiceNoteElapsedMs(true)
                     val infiniteTransition = rememberInfiniteTransition(label = "recordingPulse")
                     val pulseAlpha by infiniteTransition.animateFloat(
                         initialValue = 0.4f,
@@ -396,7 +397,7 @@ fun ChatInput(
                                 )
                                 Spacer(Modifier.width(8.dp))
                                 Text(
-                                    text = "Recording voice note...",
+                                    text = "Recording ${edu.cit.resqmesh.core.audio.voiceNoteElapsedLabel(elapsedMs)}",
                                     style = MaterialTheme.typography.bodyMedium,
                                     fontWeight = FontWeight.Bold,
                                     color = ResQTheme.colors.sos

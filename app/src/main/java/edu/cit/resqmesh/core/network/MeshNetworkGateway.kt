@@ -33,7 +33,6 @@ interface MeshNetworkGateway {
     var onDeviceScanRemoved: ((String) -> Unit)?
     var onMessageReceived: MessageReceivedCallback?
     var onMessageSeen: ((String, String) -> Unit)?
-    var onLiveAudioChunk: ((String, String, ByteArray) -> Unit)?
     var onMessageDelivered: ((String, String, List<String>) -> Unit)?
     var onPublicKeyReceived: ((String, String, String) -> Unit)?
     var onRoutingTableReceived: ((String, String, List<String>, List<String>, Long) -> Unit)?
@@ -53,7 +52,6 @@ interface MeshNetworkGateway {
     var onEventSyncRequest: ((String, MeshPayload) -> Unit)?
     var onEventSyncResponse: ((String, MeshPayload) -> Unit)?
     var checkRouteExists: ((String) -> Boolean)?
-    var stpNeighborsProvider: (() -> Set<String>)?
 
     fun startMeshNode(teamKey: String)
     fun stopMeshNode()

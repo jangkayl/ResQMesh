@@ -24,11 +24,15 @@ class MediaHelper(private val context: Context) {
     private var audioFile: File? = null
     private var mediaPlayer: MediaPlayer? = null
 
+    private val _recordingLimitReached = MutableStateFlow(false)
+    val recordingLimitReached: StateFlow<Boolean> = _recordingLimitReached
+
     private fun traceVoice(dir: TraceDir, reason: TraceDropReason) =
         TransferTraceEmitter.voice(dir, TraceStage.FAILED, TraceScope.UNKNOWN, "", reason, "media")
 
     // --- AUDIO LOGIC ---
     fun startRecording(): Boolean {
+        _recordingLimitReached.value = false
         return try {
             audioFile = File(context.cacheDir, "temp_audio_record.amr")
             mediaRecorder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) MediaRecorder(context) else MediaRecorder()
@@ -37,6 +41,10 @@ class MediaHelper(private val context: Context) {
                 setOutputFormat(MediaRecorder.OutputFormat.AMR_NB)
                 setAudioEncoder(MediaRecorder.AudioEncoder.AMR_NB)
                 setOutputFile(audioFile!!.absolutePath)
+                setMaxDuration(MAX_VOICE_NOTE_MS)
+                setOnInfoListener { recorder, what, _ ->
+                    if (what == MediaRecorder.MEDIA_RECORDER_INFO_MAX_DURATION_REACHED) finishAtLimit(recorder)
+                }
                 prepare()
                 start()
             }
@@ -48,7 +56,19 @@ class MediaHelper(private val context: Context) {
         }
     }
 
+    /** Releases the recorder now, so stopRecording only reads the file and cannot lose the note on a second stop. */
+    private fun finishAtLimit(recorder: MediaRecorder) {
+        if (recorder !== mediaRecorder) return
+        runCatching { recorder.stop() }.onFailure {
+            AppLogger.d("MediaHelper", "Recorder stop at limit failed: ${it.javaClass.simpleName}")
+        }
+        recorder.release()
+        mediaRecorder = null
+        _recordingLimitReached.value = true
+    }
+
     fun stopRecording(): String? {
+        _recordingLimitReached.value = false
         return try {
             mediaRecorder?.stop()
             mediaRecorder?.release()

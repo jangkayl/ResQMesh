@@ -7,7 +7,6 @@ import edu.cit.resqmesh.core.network.dispatch.GoodbyeHandler
 import edu.cit.resqmesh.core.network.dispatch.InboundPayloadValidator
 import edu.cit.resqmesh.core.network.ratelimit.InboundGuards
 import edu.cit.resqmesh.core.network.ratelimit.InboundOriginGate
-import edu.cit.resqmesh.core.network.dispatch.LiveAudioHandler
 import edu.cit.resqmesh.core.network.dispatch.PayloadHandler
 import edu.cit.resqmesh.core.network.dispatch.ReceiptHandler
 import edu.cit.resqmesh.core.network.dispatch.StandardMessageHandler
@@ -45,7 +44,6 @@ class PayloadDispatcher(
         DomainEventHandler(),
         EventSyncRequestHandler(),
         EventSyncResponseHandler(),
-        LiveAudioHandler(),
         StandardMessageHandler()
     )
 

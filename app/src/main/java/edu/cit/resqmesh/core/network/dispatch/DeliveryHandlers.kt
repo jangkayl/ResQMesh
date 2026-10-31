@@ -81,6 +81,7 @@ class StandardMessageHandler : PayloadHandler {
     private fun voiceNote(msgId: String, scope: TraceScope, endpointId: String) =
         TransferTraceEmitter.voice(TraceDir.IN, TraceStage.RECEIVED, scope, msgId, TraceDropReason.NONE, endpointId)
 
+    // LIVE_AUDIO stays excluded so packets from older builds drop instead of landing as messages.
     override fun canHandle(payloadType: String) = !listOf("SYSTEM", "SEEN", "DELIVERED", "GOODBYE", "BLOCK", "UNBLOCK", "LIVE_AUDIO").contains(payloadType)
 
     override fun handle(endpointId: String, payload: MeshPayload, payloadBytes: ByteArray, callback: PayloadDispatcherCallback) {

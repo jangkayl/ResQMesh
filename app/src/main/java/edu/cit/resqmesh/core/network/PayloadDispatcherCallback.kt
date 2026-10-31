@@ -11,7 +11,6 @@ interface PayloadDispatcherCallback {
     fun getEndpointMedium(endpointId: String): String
     fun getConnectedEndpointIdByName(name: String): String?
     fun getConnectedEndpointIdByNodeId(nodeId: String): String?
-    fun getStpNeighbors(): Set<String>
     /** Stable node id bound to [endpointId] once its direct identity exchange completed, else null. */
     fun getAdmittedNodeId(endpointId: String): String? = null
 
@@ -36,7 +35,6 @@ interface PayloadDispatcherCallback {
     fun onPublicKeyReceived(senderName: String, senderNodeId: String, key: String)
     fun onRoutingTableReceived(senderName: String, senderNodeId: String, connectedNodes: List<String>, connectedNodeIds: List<String>, topologySequence: Long)
     fun onMessageReceived(endpointId: String, msgId: String, senderName: String, text: String, isPrivate: Boolean, isSystem: Boolean, imageBase64: String?, audioBase64: String?, locationLat: Double?, locationLng: Double?, medium: String, routePath: List<String>, channelId: String)
-    fun onLiveAudioChunk(sender: String, channelId: String, chunk: ByteArray)
     
     fun onDeviceNameSync(endpointId: String, realName: String)
     fun onDeviceGoodbye(endpointId: String)

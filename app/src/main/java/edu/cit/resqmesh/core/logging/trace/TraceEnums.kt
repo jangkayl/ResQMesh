@@ -24,7 +24,7 @@ enum class TraceLevel { DEBUG, INFO, WARN, ERROR }
 
 /** Peer-supplied type strings map onto this closed set so they are never stored or formatted. */
 enum class TraceType {
-    MESSAGE, CONVERSATION, SYSTEM, PING, PONG, SEEN, DELIVERED, LIVE_AUDIO, PIECE, ACK,
+    MESSAGE, CONVERSATION, SYSTEM, PING, PONG, SEEN, DELIVERED, PIECE, ACK,
     SOS_EVENT, SOS_SYNC_REQ, SOS_SYNC_RES, BLOCK_REQUEST, BLOCK_ACK, OTHER,
     /** Voice-note events, tagged only where the audio is known (public, or this phone is sender or recipient). */
     VOICE_NOTE,
@@ -48,7 +48,6 @@ enum class TraceType {
             "PONG" -> PONG
             "SEEN" -> SEEN
             "DELIVERED" -> DELIVERED
-            "LIVE_AUDIO" -> LIVE_AUDIO
             "PIECE" -> PIECE
             "ACK" -> ACK
             "SOS_EVENT" -> SOS_EVENT

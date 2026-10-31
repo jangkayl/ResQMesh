@@ -45,9 +45,6 @@ internal class NativePayloadCallbacks(
 
     override fun getAdmittedNodeId(endpointId: String) = admittedNodeId(endpointId)
 
-    override fun getStpNeighbors(): Set<String> {
-        return events.stpNeighborsProvider?.invoke() ?: emptySet()
-    }
     override fun sendDirectPayload(endpointId: String, payload: ByteArray) = direct(endpointId, payload)
     override fun sendPriorityPayload(endpointId: String, payload: ByteArray) = priority(endpointId, payload)
     override fun sendPrivateReceipt(payload: MeshPayload) = receipt(payload)
@@ -64,9 +61,6 @@ internal class NativePayloadCallbacks(
     }
     override fun onMessageReceived(endpointId: String, msgId: String, senderName: String, text: String, isPrivate: Boolean, isSystem: Boolean, imageBase64: String?, audioBase64: String?, locationLat: Double?, locationLng: Double?, medium: String, routePath: List<String>, channelId: String) {
         events.onMessageReceived?.invoke(endpointId, msgId, senderName, text, isPrivate, isSystem, imageBase64, audioBase64, locationLat, locationLng, medium, routePath, channelId)
-    }
-    override fun onLiveAudioChunk(sender: String, channelId: String, chunk: ByteArray) {
-        events.onLiveAudioChunk?.invoke(sender, channelId, chunk)
     }
     override fun onDeviceNameSync(endpointId: String, realName: String) {
         // Deprecated: We now handle this safely in processBinaryPayload

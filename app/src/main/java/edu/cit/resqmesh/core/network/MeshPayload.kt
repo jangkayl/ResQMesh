@@ -7,7 +7,7 @@ import kotlinx.serialization.protobuf.ProtoNumber
 @OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
 data class MeshPayload(
     @ProtoNumber(1) val id: String = "",
-    @ProtoNumber(2) val type: String = "MESSAGE", // MESSAGE, SYSTEM, SEEN, DELIVERED, LIVE_AUDIO
+    @ProtoNumber(2) val type: String = "MESSAGE", // MESSAGE, SYSTEM, SEEN, DELIVERED
     @ProtoNumber(3) val senderName: String = "",
     @ProtoNumber(4) val targetName: String = "",
     @ProtoNumber(5) val text: String = "",
@@ -29,6 +29,7 @@ data class MeshPayload(
     @ProtoNumber(21) val connectedNodes: List<String> = emptyList(),
     @ProtoNumber(22) val targetMessageId: String = "",
     @ProtoNumber(23) val reader: String = "",
+    // Historical name: carries ReliableMeshTransfers pieces. Renaming is safe only with the wire tag unchanged.
     @ProtoNumber(24) val liveAudioChunk: ByteArray? = null,
     /** Stable identity fields are optional so older peers can still decode the envelope. */
     @ProtoNumber(25) val senderNodeId: String = "",

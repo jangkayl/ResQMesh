@@ -29,7 +29,6 @@ class HybridPrivateRoutingTest {
         override fun getEndpointMedium(endpointId: String) = "BLE"
         override fun getConnectedEndpointIdByName(name: String) = endpointMap[name]
         override fun getConnectedEndpointIdByNodeId(nodeId: String) = endpointMap[nodeId]
-        override fun getStpNeighbors(): Set<String> = emptySet()
         override fun sendDirectPayload(endpointId: String, payload: ByteArray): TransportDispatchResult {
             directPayloads.add(endpointId to payload)
             return TransportDispatchResult.ACCEPTED
@@ -48,7 +47,6 @@ class HybridPrivateRoutingTest {
         override fun onPublicKeyReceived(senderName: String, senderNodeId: String, key: String) {}
         override fun onRoutingTableReceived(senderName: String, senderNodeId: String, connectedNodes: List<String>, connectedNodeIds: List<String>, topologySequence: Long) {}
         override fun onMessageReceived(endpointId: String, msgId: String, senderName: String, text: String, isPrivate: Boolean, isSystem: Boolean, imageBase64: String?, audioBase64: String?, locationLat: Double?, locationLng: Double?, medium: String, routePath: List<String>, channelId: String) {}
-        override fun onLiveAudioChunk(sender: String, channelId: String, chunk: ByteArray) {}
         override fun onDeviceNameSync(endpointId: String, realName: String) {}
         override fun onDeviceGoodbye(endpointId: String) {}
         override fun onSosCancelled() {}

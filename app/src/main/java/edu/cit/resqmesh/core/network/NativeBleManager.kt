@@ -67,8 +67,6 @@ class NativeBleManager(
     var onDeviceScanRemoved: ((String) -> Unit)? = null
     override var onMessageReceived: MessageReceivedCallback? = null
     override var onMessageSeen: ((String, String) -> Unit)? = null
-    override var stpNeighborsProvider: (() -> Set<String>)? = null
-    override var onLiveAudioChunk: ((String, String, ByteArray) -> Unit)? = null
     override var onMessageDelivered: ((String, String, List<String>) -> Unit)? = null
     override var onPublicKeyReceived: ((String, String, String) -> Unit)? = null
     override var onRoutingTableReceived: ((String, String, List<String>, List<String>, Long) -> Unit)? = null

@@ -136,6 +136,11 @@ fun PublicChatTab(
         }
     }
 
+    edu.cit.resqmesh.feature.comms.ui.components.VoiceNoteLimitEffect(mediaHelper, isRecording) {
+        isRecording = false
+        mediaHelper.stopRecording()?.let { pendingAudio = it }
+    }
+
     ResQAuroraBackground(Modifier.fillMaxSize()) {
         Scaffold(
             containerColor = androidx.compose.ui.graphics.Color.Transparent,

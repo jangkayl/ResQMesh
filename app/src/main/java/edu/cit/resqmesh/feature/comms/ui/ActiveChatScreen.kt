@@ -104,6 +104,11 @@ fun ActiveChatScreen(
         if (latestMessageId != null) listState.scrollToItem(0)
     }
 
+    edu.cit.resqmesh.feature.comms.ui.components.VoiceNoteLimitEffect(mediaHelper, isRecording) {
+        isRecording = false
+        mediaHelper.stopRecording()?.let { pendingAudio = it }
+    }
+
     if (showDeleteDialog) {
         DeleteConversationDialog(
             name = displayName,

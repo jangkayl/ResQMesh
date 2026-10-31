@@ -357,7 +357,7 @@ fun ProfileScreen(
                 SettingRow(
                     icon = Icons.Outlined.Info,
                     title = "How to use ResQMesh",
-                    subtitle = "Purpose, local messaging, Radio PTT, and SOS guide",
+                    subtitle = "Purpose, local messaging, radio voice notes, and SOS guide",
                     onClick = onHelp
                 )
                 DividerLine()

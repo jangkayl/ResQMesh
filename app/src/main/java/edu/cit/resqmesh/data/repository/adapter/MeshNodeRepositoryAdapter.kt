@@ -13,7 +13,6 @@ class MeshNodeRepositoryAdapter(private val repository: MeshRepository) : MeshNo
     override val scannedDevices get() = repository.scannedDevices
     override val incomingSosAlert get() = repository.incomingSosAlert
     override val incomingVoiceMessage get() = repository.incomingVoiceMessage
-    override val incomingLiveAudioChunk get() = repository.incomingLiveAudioChunk
     override val publicSendFeedback get() = repository.publicSendFeedback
     override val knownNodes get() = repository.knownNodes
     override val topology get() = repository.topology
@@ -61,7 +60,6 @@ class MeshNodeRepositoryAdapter(private val repository: MeshRepository) : MeshNo
     override fun acceptPendingPublicKeyChange(peerName: String) = repository.acceptPendingPublicKeyChange(peerName)
     override fun rejectPendingPublicKeyChange(peerName: String) = repository.rejectPendingPublicKeyChange(peerName)
     override fun deleteConversationWith(peerName: String) = repository.deleteConversationWith(peerName)
-    override fun broadcastLiveAudioChunk(chunk: ByteArray) = repository.broadcastLiveAudioChunk(chunk)
     override fun broadcastSeenReceipt(messageId: String, isPrivate: Boolean, targetName: String?) =
         repository.broadcastSeenReceipt(messageId, isPrivate, targetName)
     override fun clearSosAlert() = repository.clearSosAlert()
