@@ -44,7 +44,7 @@ CI repeats debug build, unit tests, Lint, Android-test compilation, detekt (base
 
 ## D11: Mutual direct-link denial, independent local release
 
-Stable-ID block requests/ACKs establish denial before direct teardown. Both phones persist records and unblock locally. Relayed text/private/SOS/receipts/audio remain allowed. See validation. This is a routing-debug policy, not authenticated security.
+Stable-ID block requests/ACKs establish denial before direct teardown. Both phones persist records and unblock locally. Relayed text/private/SOS/receipts/audio remain allowed. See validation. This is routing-debug policy, not authenticated security.
 
 ## D12: Conservative recovery and cluster bridging
 
@@ -88,7 +88,7 @@ Broadcasts stay the fast path; periodic history/state digest comparison repairs 
 
 ## D22: Independent conversation and SOS ownership
 
-Community, Radio and SOS keep independent history, drafts and unread state. SOS ownership belongs to the origin key: sender Back preserves it, receiver silence is local, and only signed origin termination ends it, reconciled after reconnect. Matching builds are required. Details: [architecture](architecture.md).
+Community, Radio and SOS keep independent history, drafts and unread state. SOS ownership belongs to the origin key: sender Back preserves it, receiver silence is local, and only signed origin termination ends it, reconciled after reconnect. Matching builds are required.
 
 Deferred designs: [archive index](../archive/docs-superseded-2026-10-04/README.md).
 
@@ -124,6 +124,6 @@ Sync (protocol 3) carries open and 24 h closed incidents, at most 100, with full
 
 Hidden; requires build-set PIN. [Plan](plans/developer-mode.md).
 
-## D31: No live PTT
+## D31: Voice notes only
 
-Voice notes only; older `LIVE_AUDIO` drops. `liveAudioChunk` carries transfers.
+No live PTT; older `LIVE_AUDIO` drops. `liveAudioChunk` carries transfers. 30s note cap.
