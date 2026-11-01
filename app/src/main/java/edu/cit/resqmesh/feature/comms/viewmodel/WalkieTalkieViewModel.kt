@@ -28,7 +28,8 @@ class WalkieTalkieViewModel(
     ) { sender, names ->
         sender?.let {
             edu.cit.resqmesh.core.security.input.TextSanitizer.inboundPeerName(
-                NodeIdentity.displayNameOf(NodeIdentity.currentName(it, names)).ifBlank { NodeIdentity.displayNameOf(it) }
+                NodeIdentity.displayNameOf(NodeIdentity.currentName(it, names))
+                    .ifBlank { NodeIdentity.displayNameOf(it) }
             )
         }
     }.stateIn(viewModelScope, SharingStarted.Eagerly, null)

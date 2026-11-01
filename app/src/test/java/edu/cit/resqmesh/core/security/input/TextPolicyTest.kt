@@ -149,7 +149,8 @@ class TextPolicyTest {
 
     @Test
     fun displayNameKeepsRealNames() {
-        listOf("Juan dela Cruz", "Peña", "O'Brien", "Anne-Marie", "Jose Jr.", "Cruz, Juan", "SM-A536E", "ناصر", "हिन्दी", "สมชาย").forEach {
+        listOf("Juan dela Cruz", "Peña", "O'Brien", "Anne-Marie", "Jose Jr.", "Cruz, Juan",
+            "SM-A536E", "ناصر", "हिन्दी", "สมชาย").forEach {
             assertEquals(it, TextSanitizer.sanitize(it, TextField.DISPLAY_NAME))
         }
     }

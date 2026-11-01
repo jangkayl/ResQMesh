@@ -316,7 +316,8 @@ fun ChatBubble(
                                         ) {
                                             Box(contentAlignment = Alignment.Center) {
                                                 Text(
-                                                    text = edu.cit.resqmesh.core.security.input.TextPolicy.firstGrapheme(reader).uppercase(),
+                                                    text = edu.cit.resqmesh.core.security.input.TextPolicy
+                                                        .firstGrapheme(reader).uppercase(),
                                                     style = MaterialTheme.typography.labelSmall.copy(
                                                         fontSize = 8.sp,
                                                         lineHeight = 8.sp
@@ -363,7 +364,8 @@ fun ChatBubble(
                                         ) {
                                             Box(contentAlignment = Alignment.Center) {
                                                 Text(
-                                                    text = edu.cit.resqmesh.core.security.input.TextPolicy.firstGrapheme(reader).uppercase(),
+                                                    text = edu.cit.resqmesh.core.security.input.TextPolicy
+                                                        .firstGrapheme(reader).uppercase(),
                                                     style = MaterialTheme.typography.labelSmall.copy(
                                                         fontSize = 8.sp,
                                                         lineHeight = 8.sp

@@ -27,7 +27,8 @@ class IncidentDisplayModelTest {
     @Test
     fun eventDisplayModelCleansActorButKeepsSignedFieldsRaw() {
         val payload = "{\"helperName\":\"a‮b\"}"
-        val entity = DomainEventEntity("e", "i", "INCIDENT", "INCIDENT_CREATED", "a", "Ann‮#AB12", 1, 1, payload, "sig", true)
+        val entity = DomainEventEntity("e", "i", "INCIDENT", "INCIDENT_CREATED",
+            "a", "Ann‮#AB12", 1, 1, payload, "sig", true)
         val model = entity.toDisplayModel()
         assertEquals("Ann#AB12", model.actorName)
         assertEquals(payload, model.payloadJson)

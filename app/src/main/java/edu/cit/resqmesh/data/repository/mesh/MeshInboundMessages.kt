@@ -139,7 +139,10 @@ internal class MeshInboundMessages(
         }
     }
 
-    /** [rawSender] is the unmodified wire name; routing and replay limits keep using it, only the stored copy is cleaned. */
+    /**
+     * [rawSender] is the unmodified wire name; routing and replay limits keep using it,
+     * only the stored copy is cleaned.
+     */
     private suspend fun storePublicMessage(message: ChatMessage, rawSender: String) {
         val duplicate = messageStore.contains(message.id)
         if (!duplicate) messageStore.save(message, targetName = null)
@@ -149,7 +152,12 @@ internal class MeshInboundMessages(
         }
     }
 
-    private suspend fun receivePrivate(endpointId: String, message: ChatMessage, routePath: List<String>, sender: String) {
+    private suspend fun receivePrivate(
+        endpointId: String,
+        message: ChatMessage,
+        routePath: List<String>,
+        sender: String
+    ) {
         val msgId = message.id
         val inserted = messageStore.saveIncomingPrivateIfAbsent(message)
         if (inserted == PrivateMessageInsert.REJECTED) return
@@ -232,7 +240,8 @@ internal class MeshInboundMessages(
         outboxMutex.withLock {
             if (messageStore.contains(p.id)) return@withLock null
             val message = ChatMessage(p.id, TextSanitizer.inboundPeerName(p.senderName),
-                inboundDisplayText(p.text, imageBase64 != null || audioBase64 != null || p.locationLat != null), imageBase64, audioBase64, p.locationLat, p.locationLng,
+                inboundDisplayText(p.text, imageBase64 != null || audioBase64 != null || p.locationLat != null),
+                imageBase64, audioBase64, p.locationLat, p.locationLng,
                 false, timestamp = System.currentTimeMillis(), isHopped = p.relayHopCount > 0,
                 outboundRoute = p.routePath, conversationKind = p.conversationKind, channelId = p.channelId,
                 sosId = p.sosId, senderNodeId = p.senderNodeId)

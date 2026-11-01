@@ -1,5 +1,7 @@
 package edu.cit.resqmesh.data.local.entity
 
+private const val ESCAPE_LENGTH = 3
+
 /**
  * Codec for the comma-joined name columns (deliveredTo, seenBy, outboundRoute).
  * Items escape '%' and ',' so names containing commas survive; legacy rows decode unchanged.
@@ -20,9 +22,9 @@ internal object StoredNameList {
         while (i < item.length) {
             val c = item[i]
             if (c == '%' && item.startsWith("25", i + 1)) {
-                out.append('%'); i += 3
+                out.append('%'); i += ESCAPE_LENGTH
             } else if (c == '%' && item.startsWith("2C", i + 1)) {
-                out.append(','); i += 3
+                out.append(','); i += ESCAPE_LENGTH
             } else {
                 out.append(c); i++
             }
