@@ -8,6 +8,8 @@ import edu.cit.resqmesh.data.local.entity.MessageEntity
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -55,9 +57,31 @@ class ChatSyncQueryTest {
         assertEquals(4, store.chatSyncIndex(2, 1).size)
     }
 
-    @Test fun mediaIsFlaggedInTheIndexButNeverServedAsText() = runBlocking {
-        put(row("voice").copy(audioBase64 = "audio"))
-        assertTrue(store.chatSyncIndex(50, 8).single().hasMedia)
-        assertTrue(store.chatSyncRows(listOf("voice")).isEmpty())
+    @Test fun mediaKindIsOfferedWithoutTheAttachment() = runBlocking {
+        put(row("voice").copy(audioBase64 = "audio"), row("image").copy(imageBase64 = "image"))
+        assertEquals(setOf("VOICE", "IMAGE"), store.chatSyncIndex(50, 8).map { it.mediaKind }.toSet())
+        assertEquals(setOf("VOICE", "IMAGE"), store.chatSyncRows(listOf("voice", "image")).map { it.mediaKind }.toSet())
+        assertEquals("audio", store.chatSyncMessage("voice")?.audioBase64)
+    }
+
+    @Test fun privateMediaIsNeverServed() = runBlocking {
+        put(row("secret", kind = "PRIVATE").copy(targetName = "Bob#B1", audioBase64 = "audio"))
+        assertNull(store.chatSyncMessage("secret"))
+    }
+
+    @Test fun placeholdersPastTheNewestLimitGiveUpAndOthersFill() = runBlocking {
+        repeat(3) { put(row("m$it", time = it.toLong()).copy(syncState = 2, syncMediaKind = "IMAGE")) }
+        assertEquals(listOf("m2", "m1"), store.pendingSyncMedia(2))
+        assertEquals(3, database.messageDao().getMessageById("m0")?.syncState)
+        assertTrue(store.fillSyncedMedia("m2", "A1", "image", null))
+        val filled = database.messageDao().getMessageById("m2")!!
+        assertEquals(1, filled.syncState)
+        assertEquals("image", filled.imageBase64)
+    }
+
+    @Test fun aCopyFromAnotherSenderOrForALiveRowFillsNothing() = runBlocking {
+        put(row("pending").copy(syncState = 2, syncMediaKind = "IMAGE"), row("live"))
+        assertFalse(store.fillSyncedMedia("pending", "OTHER", "image", null))
+        assertFalse(store.fillSyncedMedia("live", "A1", "image", null))
     }
 }

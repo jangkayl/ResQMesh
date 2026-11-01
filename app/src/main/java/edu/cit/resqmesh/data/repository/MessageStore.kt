@@ -38,6 +38,11 @@ interface MessageStore {
     /** Newest offerable Community and SOS messages, [limit] per conversation. */
     suspend fun chatSyncIndex(limit: Int, maxSosThreads: Int): List<ChatSyncEntry> = emptyList()
     suspend fun chatSyncRows(ids: List<String>): List<ChatSyncRow> = emptyList()
+    suspend fun chatSyncMessage(id: String): ChatMessage? = null
+    /** Placeholders still worth fetching, newest first. Those past the newest [limit] per conversation give up. */
+    suspend fun pendingSyncMedia(limit: Int): List<String> = emptyList()
+    /** True when [id] was a placeholder from [senderNodeId] and now holds its attachment. */
+    suspend fun fillSyncedMedia(id: String, senderNodeId: String, image: String?, audio: String?): Boolean = false
 }
 
 enum class PrivateMessageInsert { INSERTED, DUPLICATE, REJECTED }
@@ -62,6 +67,18 @@ class RoomMessageStore(private val dao: MessageDao) : MessageStore {
         dao.chatSyncCommunity(limit) +
             dao.chatSyncSosThreads(maxSosThreads).flatMap { dao.chatSyncSosThread(it, limit) }
     override suspend fun chatSyncRows(ids: List<String>): List<ChatSyncRow> = dao.chatSyncRows(ids)
+    override suspend fun chatSyncMessage(id: String): ChatMessage? = dao.chatSyncMessage(id)?.toChatMessage()
+    override suspend fun pendingSyncMedia(limit: Int): List<String> {
+        val pending = dao.pendingSyncMedia()
+        val past = pending.groupBy { it.kind to it.sosId }.flatMap { (conversation, rows) ->
+            val newest = dao.newestMediaIds(conversation.first, conversation.second, limit).toSet()
+            rows.map { it.id }.filterNot { it in newest }
+        }.toSet()
+        if (past.isNotEmpty()) dao.markMediaNotSynced(past.toList())
+        return pending.map { it.id }.filterNot { it in past }
+    }
+    override suspend fun fillSyncedMedia(id: String, senderNodeId: String, image: String?, audio: String?): Boolean =
+        dao.fillSyncedMedia(id, senderNodeId, image, audio) > 0
     override val allPublicMessages = dao.getAllPublicMessages().map { rows -> rows.map { it.toChatMessage() } }
     override val publicMessages: Flow<List<ChatMessage>> = dao.getPublicMessages().map { messages ->
         messages.map { it.toChatMessage() }

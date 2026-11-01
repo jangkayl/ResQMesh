@@ -78,6 +78,13 @@ internal class NativeOutboundDispatcher(
         }
     }
 
+    fun sendSyncCopy(nodeId: String, payload: ByteArray): TransportDispatchResult {
+        val peer = nodeId.uppercase()
+        return if (peerTransferVersions[peer] == ReliableMeshTransfers.VERSION && endpointForPeer(peer) != null) {
+            reliableTransfers.offer(peer, payload, false, durableRelay = true, lateRelay = true)
+        } else TransportDispatchResult.REJECTED_NOT_READY
+    }
+
     fun endpointForPeer(nodeId: String): String? = DirectSendPolicy.select(
         (store.activeConnections.keys + store.activeServerConnections.keys).distinct().mapNotNull { endpoint ->
             val id = nodeIdForEndpoint(endpoint) ?: return@mapNotNull null

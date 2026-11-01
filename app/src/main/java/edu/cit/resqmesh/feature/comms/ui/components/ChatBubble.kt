@@ -207,6 +207,14 @@ fun ChatBubble(
                         )
                         Spacer(Modifier.height(2.dp))
                     }
+                    syncMediaPlaceholder(message)?.let { placeholder ->
+                        Text(
+                            text = placeholder,
+                            style = MaterialTheme.typography.labelMedium,
+                            color = contentColor.copy(alpha = 0.72f)
+                        )
+                        Spacer(Modifier.height(2.dp))
+                    }
 
                     val (replyQuote, actualText) = remember(message.text) { ReplyQuote.parse(message.text) }
 
@@ -277,6 +285,15 @@ fun ChatBubble(
                             text = actualText,
                             style = MaterialTheme.typography.bodyMedium,
                             fontWeight = if (isSos) FontWeight.Bold else FontWeight.Normal
+                        )
+                    }
+
+                    syncedTimeLabel(message, System.currentTimeMillis())?.let { label ->
+                        Text(
+                            text = label,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = contentColor.copy(alpha = 0.72f),
+                            modifier = Modifier.padding(top = 2.dp)
                         )
                     }
 

@@ -13,6 +13,7 @@ class NativeBleGateway(private val manager: NativeBleManager) : MeshNetworkGatew
     override var onConversationMessage by manager::onConversationMessage
     override var onSosPacket by manager::onSosPacket
     override var onChatSyncPacket by manager::onChatSyncPacket
+    override fun sendSyncCopy(nodeId: String, payloadBytes: ByteArray) = manager.sendSyncCopy(nodeId, payloadBytes)
     override var myDeviceName: String
         get() = manager.myDeviceName
         set(value) { manager.myDeviceName = value }

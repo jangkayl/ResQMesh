@@ -31,6 +31,8 @@ class ChatSyncCoordinatorTest {
         val rows = linkedMapOf<String, ChatSyncRow>()
         val extraRows = mutableListOf<ChatSyncRow>()
         val saved = linkedSetOf<String>()
+        val pending = linkedMapOf<String, Long>()
+        val filled = mutableListOf<String>()
         override val publicMessages = flowOf(emptyList<ChatMessage>())
         override val privateMessages = flowOf(emptyMap<String, List<ChatMessage>>())
         override suspend fun save(message: ChatMessage, targetName: String?) = Unit
@@ -46,22 +48,38 @@ class ChatSyncCoordinatorTest {
         override suspend fun chatSyncIndex(limit: Int, maxSosThreads: Int) =
             offered.sortedByDescending { it.sentAt }.take(limit)
         override suspend fun chatSyncRows(ids: List<String>) = rows.values.filter { it.id in ids } + extraRows
+        override suspend fun chatSyncMessage(id: String) = rows[id]?.takeIf { it.mediaKind.isNotEmpty() }?.let {
+            ChatMessage(it.id, it.senderName, it.text, null, "audio", isMine = false, timestamp = it.sentAt)
+        }
+        override suspend fun pendingSyncMedia(limit: Int) =
+            pending.entries.sortedByDescending { it.value }.take(limit).map { it.key }
 
-        fun offer(id: String, sentAt: Long, kind: String = "COMMUNITY", sosId: String = "", media: Boolean = false) =
+        fun offer(id: String, sentAt: Long, kind: String = "COMMUNITY", sosId: String = "", media: String = "") =
             offer(ChatSyncEntry(id, sentAt, kind, "Ann#A1", sosId, media))
 
         fun offer(entry: ChatSyncEntry, text: String = "hello") {
             offered += entry
-            rows[entry.id] = ChatSyncRow(entry.id, entry.sentAt, entry.kind, entry.senderName, "A1", text, entry.sosId)
+            rows[entry.id] = ChatSyncRow(entry.id, entry.sentAt, entry.kind, entry.senderName, "A1", text, entry.sosId,
+                mediaKind = entry.mediaKind)
         }
     }
 
     private class Network(val scope: CoroutineScope) {
         val nodes = mutableMapOf<String, Node>()
         val sent = mutableListOf<MeshPayload>()
+        val copies = mutableListOf<String>()
+        var dropCopies = false
+        var copyBytes = 100
         fun send(from: Node, to: String, bytes: ByteArray): TransportDispatchResult {
             val payload = ProtoBuf.decodeFromByteArray<MeshPayload>(bytes)
             sent += payload
+            scope.launch { nodes.getValue(to).deliver(from.id, payload) }
+            return TransportDispatchResult.ACCEPTED
+        }
+        fun sendCopy(from: Node, to: String, bytes: ByteArray): TransportDispatchResult {
+            val payload = ProtoBuf.decodeFromByteArray<MeshPayload>(bytes)
+            copies += payload.id
+            if (dropCopies) return TransportDispatchResult.ACCEPTED
             scope.launch { nodes.getValue(to).deliver(from.id, payload) }
             return TransportDispatchResult.ACCEPTED
         }
@@ -78,6 +96,7 @@ class ChatSyncCoordinatorTest {
         val blocked = mutableSetOf<String>()
         val changes = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
         var knownSos = true
+        val released = mutableListOf<String>()
         private var listener: ((String, MeshPayload) -> Unit)? = null
         private val gateway = Proxy.newProxyInstance(
             MeshNetworkGateway::class.java.classLoader, arrayOf(MeshNetworkGateway::class.java)
@@ -89,6 +108,8 @@ class ChatSyncCoordinatorTest {
                     null
                 }
                 "getMyNodeId" -> id
+                "markPayloadStored" -> { released += args!![0] as String; null }
+                "sendSyncCopy" -> network.sendCopy(this, args!![0] as String, args[1] as ByteArray)
                 "hasReadyEndpoint" -> true
                 "isDeviceBlocked" -> args!![0] in blocked
                 "linkEstablishedAt" -> 1L
@@ -98,8 +119,20 @@ class ChatSyncCoordinatorTest {
             }
         } as MeshNetworkGateway
 
+        private val sink = object : ChatSyncSink {
+            override suspend fun ingest(row: ChatSyncRow) = this@Node.ingest(row)
+            override suspend fun ingestMedia(payload: MeshPayload): Boolean {
+                val waiting = store.pending.remove(payload.id) != null
+                if (waiting) store.filled += payload.id
+                return waiting
+            }
+        }
+
         @Suppress("unused")
-        private val coordinator = ChatSyncCoordinator(gateway, peers, store, network.scope, { ingest(it) }, changes)
+        private val coordinator = ChatSyncCoordinator(gateway, peers, store, network.scope, sink, changes) { message ->
+            ProtoBuf.encodeToByteArray(MeshPayload.serializer(), MeshPayload(id = message.id, type = "CONVERSATION",
+                chatSync = true, audioBytes = ByteArray(network.copyBytes)))
+        }
 
         init { network.nodes[id] = this }
 
@@ -108,6 +141,7 @@ class ChatSyncCoordinatorTest {
         private fun ingest(row: ChatSyncRow): ChatSyncIngestion {
             if (row.kind == "SOS" && !knownSos) return ChatSyncIngestion.DEFERRED
             store.saved += row.id
+            if (row.mediaKind.isNotEmpty()) store.pending[row.id] = row.sentAt
             return ChatSyncIngestion.STORED
         }
     }
@@ -127,12 +161,62 @@ class ChatSyncCoordinatorTest {
         assertEquals((10 until 60).map { "m$it" }.toSet(), b.store.saved)
     }
 
-    @Test fun messagesWithMediaWaitForTheMediaStage() = runTest {
+    @Test fun placeholdersArriveWithTextAndMediaWaitsForTheSettle() = runTest {
         val (a, b) = scene(backgroundScope)
         a.store.offer("text", 1_000L)
-        a.store.offer("voice", 2_000L, media = true)
+        a.store.offer("voice", 2_000L, media = "VOICE")
         a.link(b); advanceTimeBy(5_000); runCurrent()
-        assertEquals(setOf("text"), b.store.saved)
+        assertEquals(setOf("text", "voice"), b.store.saved)
+        assertTrue(a.network.copies.isEmpty())
+        advanceTimeBy(ChatMediaPuller.SETTLE_MS); runCurrent()
+        assertEquals(listOf("voice"), b.store.filled)
+    }
+
+    @Test fun aNeighborSendsImagesItSentItselfNewestFirst() = runTest {
+        val (a, b) = scene(backgroundScope)
+        a.store.offer("older", 1_000L, media = "IMAGE")
+        a.store.offer("newer", 2_000L, media = "IMAGE")
+        a.link(b); advanceTimeBy(20_000); runCurrent()
+        assertEquals(listOf("newer", "older"), b.store.filled)
+    }
+
+    @Test fun onlyTheNewestTenPerConversationAreFetched() = runTest {
+        val (a, b) = scene(backgroundScope)
+        repeat(12) { a.store.offer("m$it", 1_000L + it, media = "IMAGE") }
+        a.link(b); advanceTimeBy(40_000); runCurrent()
+        // The fake keeps pending rows, so each pass reaches the next ten; the first pass proves the order and cap.
+        assertEquals((11 downTo 2).map { "m$it" }, b.store.filled.take(ChatMediaPuller.MAX_PER_CONVERSATION))
+    }
+
+    @Test fun aNeighborStopsAtItsByteBudget() = runTest {
+        val (a, b) = scene(backgroundScope)
+        a.network.copyBytes = 600 * 1024
+        a.store.offer("first", 2_000L, media = "IMAGE")
+        a.store.offer("second", 1_000L, media = "IMAGE")
+        a.link(b); advanceTimeBy(20_000); runCurrent()
+        assertEquals(listOf("first"), b.store.filled)
+        assertEquals(listOf("first"), a.network.copies)
+    }
+
+    @Test fun anUnrequestedCopyIsIgnoredButItsCustodyIsReleased() = runTest {
+        val (_, b) = scene(backgroundScope)
+        b.store.pending["target"] = 1_000L
+        b.deliver("A", MeshPayload(id = "target", type = "CONVERSATION", chatSync = true))
+        runCurrent()
+        assertTrue(b.store.filled.isEmpty())
+        assertEquals(listOf("target"), b.released)
+    }
+
+    @Test fun aLostCopyStaysPendingAndIsAskedForAgain() = runTest {
+        val (a, b) = scene(backgroundScope)
+        a.store.offer("voice", 1_000L, media = "VOICE")
+        a.network.dropCopies = true
+        a.link(b); advanceTimeBy(20_000); runCurrent()
+        assertTrue(b.store.filled.isEmpty())
+        assertEquals(listOf("voice"), b.store.pending.keys.toList())
+        a.network.dropCopies = false
+        advanceTimeBy(160_000); runCurrent()
+        assertEquals(listOf("voice"), b.store.filled)
     }
 
     @Test fun rowsNobodyAskedForAreIgnored() = runTest {

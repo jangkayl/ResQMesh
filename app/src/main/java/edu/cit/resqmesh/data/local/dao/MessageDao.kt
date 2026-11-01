@@ -8,13 +8,16 @@ import androidx.room.Transaction
 import edu.cit.resqmesh.data.local.entity.ChatSyncEntry
 import edu.cit.resqmesh.data.local.entity.ChatSyncRow
 import edu.cit.resqmesh.data.local.entity.MessageEntity
+import edu.cit.resqmesh.data.local.entity.PendingSyncMedia
 import kotlinx.coroutines.flow.Flow
 
 /** Public rows a neighbor may be offered: never private, never unsent, never without a stable sender. */
 private const val CHAT_SYNCABLE = "targetName IS NULL AND isSOS = 0 AND senderNodeId != '' " +
     "AND deliveredTo NOT IN ('PENDING', 'FAILED')"
+private const val CHAT_SYNC_MEDIA_KIND = "CASE WHEN audioBase64 IS NOT NULL THEN 'VOICE' " +
+    "WHEN imageBase64 IS NOT NULL THEN 'IMAGE' ELSE syncMediaKind END AS mediaKind"
 private const val CHAT_SYNC_ENTRY = "SELECT msgId AS id, timestamp AS sentAt, conversationKind AS kind, senderName, " +
-    "sosId, (imageBase64 IS NOT NULL OR audioBase64 IS NOT NULL) AS hasMedia FROM messages"
+    "sosId, $CHAT_SYNC_MEDIA_KIND FROM messages"
 
 @Dao
 interface MessageDao {
@@ -31,10 +34,29 @@ interface MessageDao {
     suspend fun chatSyncSosThreads(limit: Int): List<String>
 
     @Query("SELECT msgId AS id, timestamp AS sentAt, conversationKind AS kind, senderName, senderNodeId, " +
-        "COALESCE(text, '') AS text, sosId, locationLat, locationLng FROM messages " +
-        "WHERE msgId IN (:ids) AND $CHAT_SYNCABLE AND conversationKind IN ('COMMUNITY', 'SOS') " +
-        "AND imageBase64 IS NULL AND audioBase64 IS NULL")
+        "COALESCE(text, '') AS text, sosId, locationLat, locationLng, $CHAT_SYNC_MEDIA_KIND FROM messages " +
+        "WHERE msgId IN (:ids) AND $CHAT_SYNCABLE AND conversationKind IN ('COMMUNITY', 'SOS')")
     suspend fun chatSyncRows(ids: List<String>): List<ChatSyncRow>
+
+    @Query("SELECT * FROM messages WHERE msgId = :id AND $CHAT_SYNCABLE AND conversationKind IN ('COMMUNITY', 'SOS') " +
+        "AND (imageBase64 IS NOT NULL OR audioBase64 IS NOT NULL)")
+    suspend fun chatSyncMessage(id: String): MessageEntity?
+
+    @Query("SELECT msgId AS id, conversationKind AS kind, sosId FROM messages WHERE syncState = 2 " +
+        "ORDER BY timestamp DESC")
+    suspend fun pendingSyncMedia(): List<PendingSyncMedia>
+
+    @Query("SELECT msgId FROM messages WHERE targetName IS NULL AND conversationKind = :kind AND sosId = :sosId " +
+        "AND (imageBase64 IS NOT NULL OR audioBase64 IS NOT NULL OR syncState = 2) " +
+        "ORDER BY timestamp DESC, msgId LIMIT :limit")
+    suspend fun newestMediaIds(kind: String, sosId: String, limit: Int): List<String>
+
+    @Query("UPDATE messages SET syncState = 3 WHERE syncState = 2 AND msgId IN (:ids)")
+    suspend fun markMediaNotSynced(ids: List<String>): Int
+
+    @Query("UPDATE messages SET imageBase64 = :image, audioBase64 = :audio, syncState = 1 " +
+        "WHERE msgId = :id AND senderNodeId = :senderNodeId AND syncState IN (2, 3)")
+    suspend fun fillSyncedMedia(id: String, senderNodeId: String, image: String?, audio: String?): Int
 
     @Query("SELECT * FROM messages WHERE targetName IS NULL AND conversationKind = 'COMMUNITY' ORDER BY timestamp ASC")
     fun getPublicMessages(): Flow<List<MessageEntity>>

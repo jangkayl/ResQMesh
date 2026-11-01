@@ -22,6 +22,8 @@ internal class RecordingDispatcherCallback(
 
     override fun onConversationMessage(endpointId: String, payload: MeshPayload) { conversations += payload }
     override fun onSosPacket(endpointId: String, payload: MeshPayload) { sosPackets += payload }
+    val chatSyncPackets = mutableListOf<MeshPayload>()
+    override fun onChatSyncPacket(endpointId: String, payload: MeshPayload) { chatSyncPackets += payload }
     override fun getMyDeviceName() = myName
     override fun getMyNodeId() = myId
     override fun getSeenIdCache() = seen

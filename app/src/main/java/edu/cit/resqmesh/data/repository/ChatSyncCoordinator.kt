@@ -1,6 +1,7 @@
 package edu.cit.resqmesh.data.repository
 
 import edu.cit.resqmesh.core.logging.AppLogger
+import edu.cit.resqmesh.core.model.ChatMessage
 import edu.cit.resqmesh.core.model.ConnectedDevice
 import edu.cit.resqmesh.core.network.MeshNetworkGateway
 import edu.cit.resqmesh.core.network.MeshPayload
@@ -33,20 +34,32 @@ import kotlinx.serialization.protobuf.ProtoBuf
 internal data class ChatSyncPacket(
     val request: String, val op: String = ChatSyncCoordinator.INDEX, val digest: String = "", val cursor: Int = 0,
     val next: Int = -1, val unchanged: Boolean = false, val ids: List<String> = emptyList(),
-    val entries: List<ChatSyncEntry> = emptyList(), val rows: List<ChatSyncRow> = emptyList()
+    val entries: List<ChatSyncEntry> = emptyList(), val rows: List<ChatSyncRow> = emptyList(), val size: Int = 0
 )
 
-private val chatSyncWire = Json { ignoreUnknownKeys = true }
+internal val chatSyncWire = Json { ignoreUnknownKeys = true }
 
-/** Takes one pulled row into local storage. */
-fun interface ChatSyncSink {
+/** Takes pulled rows and attachments into local storage. */
+interface ChatSyncSink {
     suspend fun ingest(row: ChatSyncRow): ChatSyncIngestion
+    suspend fun ingestMedia(payload: MeshPayload): Boolean
 }
 
+private fun newChatSyncRequest() = UUID.randomUUID().toString()
+
 /** Builds answers from local history. Small pages stay in the small-frame lane, so sync yields to live messages. */
-internal class ChatSyncPages(private val store: MessageStore, private val blocked: (String) -> Boolean) {
+internal class ChatSyncPages(
+    private val store: MessageStore,
+    private val blocked: (String) -> Boolean,
+    private val mediaFrame: (ChatMessage) -> ByteArray
+) {
     suspend fun answer(packet: ChatSyncPacket): ChatSyncPacket =
         if (packet.op == ChatSyncCoordinator.ROWS) rowsPage(packet) else indexPage(packet)
+
+    /** The rebuilt frame for one held attachment, when it fits the budget the requester has left. */
+    suspend fun mediaCopy(packet: ChatSyncPacket): ByteArray? =
+        packet.ids.firstOrNull()?.let { store.chatSyncMessage(it) }?.takeUnless { blocked(it.senderName) }
+            ?.let(mediaFrame)?.takeIf { it.size <= packet.cursor }
 
     private suspend fun indexPage(packet: ChatSyncPacket): ChatSyncPacket {
         val entries = store.chatSyncIndex(
@@ -106,20 +119,23 @@ private fun decodeChatSync(payload: MeshPayload): ChatSyncPacket? =
  * that link, is stored silently and is never relayed onward; each neighbor's own sync spreads it further.
  */
 @OptIn(kotlinx.serialization.ExperimentalSerializationApi::class, FlowPreview::class)
+@Suppress("LongParameterList") // the media frame builder is a seam over Android Base64
 internal class ChatSyncCoordinator(
     private val gateway: MeshNetworkGateway, private val peers: MeshReadyPeerEvents,
     private val store: MessageStore, private val scope: CoroutineScope,
     private val sink: ChatSyncSink,
-    changes: Flow<Unit>
+    changes: Flow<Unit>,
+    mediaFrame: (ChatMessage) -> ByteArray = ::chatSyncMediaFrame
 ) {
-    private data class Link(val node: String, val endpoint: String, val generation: Long)
-    private data class Waiting(val link: Link, val result: CompletableDeferred<ChatSyncPacket>)
+    private data class Waiting(val link: ChatSyncLink, val result: CompletableDeferred<ChatSyncPacket>)
     private class Index(val digest: String, val entries: List<ChatSyncEntry>)
-    private val jobs = ConcurrentHashMap<Link, Job>()
+    private val jobs = ConcurrentHashMap<ChatSyncLink, Job>()
+    private val mediaJobs = ConcurrentHashMap<ChatSyncLink, Job>()
+    private val media = ChatMediaPuller(store, gateway, sink, peers, ::request)
     private val waiting = ConcurrentHashMap<String, Waiting>()
     private val synced = ConcurrentHashMap<String, String>()
     private val requestGate = SingleFlightGate(REQUEST)
-    private val pages = ChatSyncPages(store, gateway::isDeviceBlocked)
+    private val pages = ChatSyncPages(store, gateway::isDeviceBlocked, mediaFrame)
 
     init {
         gateway.onChatSyncPacket = ::receive
@@ -133,43 +149,51 @@ internal class ChatSyncCoordinator(
         }
     }
 
-    private fun link(p: ConnectedDevice) = Link(p.nodeId, p.endpointId, gateway.linkEstablishedAt(p.endpointId))
-    private fun current(l: Link) = gateway.hasReadyEndpoint(l.endpoint) && peers.peers.value.any {
+    private fun link(p: ConnectedDevice) = ChatSyncLink(p.nodeId, p.endpointId, gateway.linkEstablishedAt(p.endpointId))
+    private fun current(l: ChatSyncLink) = gateway.hasReadyEndpoint(l.endpoint) && peers.peers.value.any {
         link(it) == l && !gateway.isDeviceBlocked(it.name)
     }
 
     @Synchronized private fun refresh() {
-        jobs.entries.toList().forEach { (l, job) -> if (!current(l)) { job.cancel(); jobs.remove(l, job) } }
+        listOf(jobs, mediaJobs).forEach { running ->
+            running.entries.toList().forEach { (l, job) -> if (!current(l)) { job.cancel(); running.remove(l, job) } }
+        }
+        media.retain { current(it) }
         peers.peers.value.filter { it.nodeId.isNotBlank() }.forEach { peer ->
             val l = link(peer)
-            if (current(l) && jobs[l]?.isActive != true) {
-                val job = scope.launch(start = CoroutineStart.LAZY) {
-                    try { reconcile(l) } catch (e: CancellationException) { throw e }
-                    catch (_: Exception) { AppLogger.d(TAG, "pending peer=${l.node}") }
-                }
-                jobs[l] = job; job.start()
+            if (current(l)) {
+                launchOnce(jobs, l) { reconcile(l) }
+                launchOnce(mediaJobs, l) { media.pull(l) }
             }
         }
     }
 
-    private suspend fun reconcile(l: Link) {
-        val index = fetchIndex(l) ?: return
-        val wanted = index.entries.filter {
-            !it.hasMedia && !gateway.isDeviceBlocked(it.senderName) && !store.contains(it.id)
+    private fun launchOnce(running: ConcurrentHashMap<ChatSyncLink, Job>, l: ChatSyncLink, work: suspend () -> Unit) {
+        if (running[l]?.isActive == true) return
+        val job = scope.launch(start = CoroutineStart.LAZY) {
+            try { work() } catch (e: CancellationException) { throw e }
+            catch (_: Exception) { AppLogger.d(TAG, "pending peer=${l.node}") }
         }
+        running[l] = job; job.start()
+    }
+
+    private suspend fun reconcile(l: ChatSyncLink) {
+        val index = fetchIndex(l) ?: return
+        val wanted = index.entries.filter { !gateway.isDeviceBlocked(it.senderName) && !store.contains(it.id) }
         if (pull(l, wanted)) synced[l.node] = index.digest
+        if (wanted.any { it.mediaKind.isNotEmpty() }) refresh()
         AppLogger.d(TAG, "pass peer=${l.node} offered=${index.entries.size} wanted=${wanted.size}")
     }
 
     /** Null when the neighbor still offers what was last taken from it, or its list moved mid-read. */
-    private suspend fun fetchIndex(l: Link): Index? {
-        val first = request(l, ChatSyncPacket(newRequest(), digest = synced[l.node].orEmpty()))
+    private suspend fun fetchIndex(l: ChatSyncLink): Index? {
+        val first = request(l, ChatSyncPacket(newChatSyncRequest(), digest = synced[l.node].orEmpty()))
         val entries = first.entries.toMutableList()
         var next = if (first.unchanged) -1 else first.next
         var stable = !first.unchanged
         var read = 1
         while (stable && next >= 0 && read++ < MAX_INDEX_PAGES) {
-            val page = request(l, ChatSyncPacket(newRequest(), digest = first.digest, cursor = next))
+            val page = request(l, ChatSyncPacket(newChatSyncRequest(), digest = first.digest, cursor = next))
             if (page.next in 0..next) error("Invalid chat sync cursor")
             stable = page.digest == first.digest
             entries += page.entries
@@ -179,13 +203,13 @@ internal class ChatSyncCoordinator(
     }
 
     /** True when nothing is left to retry from this neighbor. */
-    private suspend fun pull(l: Link, wanted: List<ChatSyncEntry>): Boolean {
+    private suspend fun pull(l: ChatSyncLink, wanted: List<ChatSyncEntry>): Boolean {
         var remaining = wanted
         var deferred = false
         var read = 0
         while (remaining.isNotEmpty() && read++ < MAX_ROW_PAGES) {
             val batch = remaining.take(MAX_ROWS_PER_PAGE).associateBy { it.id }
-            val page = request(l, ChatSyncPacket(newRequest(), ROWS, ids = batch.keys.toList()))
+            val page = request(l, ChatSyncPacket(newChatSyncRequest(), ROWS, ids = batch.keys.toList()))
             val served = page.rows.filter { batch[it.id]?.describes(it) == true }
             served.forEach { if (sink.ingest(it) == ChatSyncIngestion.DEFERRED) deferred = true }
             val done = if (served.isEmpty()) batch.keys else served.map { it.id }.toSet()
@@ -194,9 +218,7 @@ internal class ChatSyncCoordinator(
         return remaining.isEmpty() && !deferred
     }
 
-    private fun newRequest() = UUID.randomUUID().toString()
-
-    private suspend fun request(l: Link, packet: ChatSyncPacket): ChatSyncPacket {
+    private suspend fun request(l: ChatSyncLink, packet: ChatSyncPacket): ChatSyncPacket {
         val response = CompletableDeferred<ChatSyncPacket>()
         waiting[packet.request] = Waiting(l, response)
         try {
@@ -215,13 +237,18 @@ internal class ChatSyncCoordinator(
         senderNodeId = gateway.myNodeId))
 
     fun receive(endpoint: String, payload: MeshPayload) {
+        if (payload.type == "CONVERSATION") {
+            scope.launch { media.receive(endpoint, payload) }
+            return
+        }
         val packet = decodeChatSync(payload) ?: return
         if (payload.type == RESPONSE) {
             waiting[packet.request]?.takeIf { it.link.endpoint == endpoint && current(it.link) }
                 ?.result?.complete(packet)
         } else peers.peers.value.firstOrNull { it.endpointId == endpoint }?.let(::link)?.let { l ->
             scope.launch { requestGate.run(endpoint) {
-                if (current(l)) gateway.sendDirectPayload(endpoint, envelope(RESPONSE, pages.answer(packet)))
+                val reply = if (packet.op == MEDIA) media.serve(l, packet, pages) else pages.answer(packet)
+                if (current(l)) gateway.sendDirectPayload(endpoint, envelope(RESPONSE, reply))
             } }
         }
     }
@@ -229,6 +256,7 @@ internal class ChatSyncCoordinator(
     companion object {
         const val INDEX = "INDEX"
         const val ROWS = "ROWS"
+        const val MEDIA = "MEDIA"
         const val REQUEST = "CHAT_SYNC_REQ"
         const val RESPONSE = "CHAT_SYNC_RES"
         const val MAX_MESSAGES_PER_CONVERSATION = 50

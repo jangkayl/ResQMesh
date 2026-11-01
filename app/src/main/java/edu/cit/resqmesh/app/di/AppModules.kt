@@ -31,7 +31,10 @@ import edu.cit.resqmesh.data.local.AppDatabase
 import edu.cit.resqmesh.data.location.DefaultLocationClient
 import edu.cit.resqmesh.data.location.DefaultLocationClientFactory
 import edu.cit.resqmesh.data.repository.BlockRelationshipStore
+import edu.cit.resqmesh.core.network.MeshPayload
+import edu.cit.resqmesh.data.local.entity.ChatSyncRow
 import edu.cit.resqmesh.data.repository.ChatSyncCoordinator
+import edu.cit.resqmesh.data.repository.ChatSyncSink
 import edu.cit.resqmesh.data.repository.IdentityProvider
 import edu.cit.resqmesh.data.repository.IncidentEventSigning
 import edu.cit.resqmesh.data.repository.IncidentRepository
@@ -167,7 +170,10 @@ val repositoryModule = module {
             peers = get(),
             store = get(),
             scope = get<AppCoroutineScope>().scope,
-            sink = { row -> repository.ingestSyncedChat(row) },
+            sink = object : ChatSyncSink {
+                override suspend fun ingest(row: ChatSyncRow) = repository.ingestSyncedChat(row)
+                override suspend fun ingestMedia(payload: MeshPayload) = repository.ingestSyncedMedia(payload)
+            },
             // A newly known alert can release replies a neighbor offered earlier.
             changes = get<SosRepository>().alerts.map { alerts -> alerts.map { it.sosId } }
                 .distinctUntilChanged().map { }

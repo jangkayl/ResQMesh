@@ -135,4 +135,4 @@ No live PTT; older `LIVE_AUDIO` drops. `liveAudioChunk` carries transfers. 30s n
 
 ## D33: Late public media relay
 
-Relays keep public media 10 minutes for later READY neighbors, each once, behind live work. Finished transfers need no sender link. Text keeps its roster. Old Radio skips autoplay. Chat sync pulls the newest 50 Community/SOS texts, never private or Radio.
+Relays keep public media 10 minutes for later READY neighbors, each once, behind live work. Finished transfers need no sender link. Text keeps its roster. Chat sync pulls the newest 50 Community/SOS texts and 10 attachments, never private or Radio.

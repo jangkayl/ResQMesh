@@ -200,6 +200,7 @@ class MeshRepository(
 
     private fun onNetworkConversationMessage(endpoint: String, payload: MeshPayload): Unit = inbound.onNetworkConversationMessage(endpoint, payload)
     suspend fun ingestSyncedChat(row: edu.cit.resqmesh.data.local.entity.ChatSyncRow) = inbound.ingestSynced(row)
+    suspend fun ingestSyncedMedia(payload: MeshPayload) = inbound.ingestSyncedMedia(payload)
 
 
 

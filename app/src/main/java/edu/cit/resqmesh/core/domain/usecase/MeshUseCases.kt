@@ -99,6 +99,8 @@ class RescanUseCase(private val repository: MeshNodeRepository) {
 class SendPublicMessageUseCase(private val repository: MeshNodeRepository) {
     fun conversation(kind: String, channel: String, sosId: String, text: String, audio: String? = null): String =
         repository.sendPublicMessage(text, null, audio, conversationKind = kind, channelId = channel, sosId = sosId)
+    fun sosReply(sosId: String, text: String, audio: String?, image: String?): String =
+        repository.sendPublicMessage(text, image, audio, conversationKind = "SOS", sosId = sosId)
     val feedback: SharedFlow<String> get() = repository.publicSendFeedback
     operator fun invoke(text: String, imageBase64: String?, audioBase64: String?, locationLat: Double? = null, locationLng: Double? = null, isSOS: Boolean = false, isSOSCancel: Boolean = false): String {
         return repository.sendPublicMessage(text, imageBase64, audioBase64, locationLat, locationLng, isSOS, isSOSCancel)

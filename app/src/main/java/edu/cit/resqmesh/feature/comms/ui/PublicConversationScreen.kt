@@ -27,7 +27,11 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import edu.cit.resqmesh.core.model.ConversationPolicy
 import edu.cit.resqmesh.core.audio.MediaHelper
+import edu.cit.resqmesh.feature.comms.ui.components.CatchUpLine
 import edu.cit.resqmesh.feature.comms.ui.components.ChatBubble
+import edu.cit.resqmesh.feature.comms.ui.components.SyncedHistoryDivider
+import edu.cit.resqmesh.feature.comms.ui.components.isLiveMessage
+import edu.cit.resqmesh.feature.comms.ui.components.newestSyncedId
 import edu.cit.resqmesh.feature.comms.ui.components.composer.ChatBudgetLine
 import edu.cit.resqmesh.feature.comms.ui.components.composer.chatBudgetWaitDescription
 import edu.cit.resqmesh.feature.comms.viewmodel.CommunicationViewModel
@@ -51,6 +55,7 @@ fun PublicConversationScreen(
     val key = ConversationPolicy.key(kind, channel, sosId)
     val messages = ConversationPolicy.messages(all, kind, channel, sosId)
     val displayMessages = remember(messages) { messages.asReversed() }
+    val newestSynced = remember(messages) { newestSyncedId(messages) }
     var input by remember(key) { mutableStateOf(states.firstOrNull { it.conversationId == key }?.draft.orEmpty()) }
     var restored by remember(key) { mutableStateOf(false) }
 
@@ -66,7 +71,8 @@ fun PublicConversationScreen(
     val latestMessageId = messages.lastOrNull()?.id
     LaunchedEffect(latestMessageId, key) {
         vm.read(key)
-        messages.filter { !it.isMine && it.seenBy.isEmpty() }.forEach { vm.markMessageAsSeen(it.id, false) }
+        messages.filter { !it.isMine && it.seenBy.isEmpty() && isLiveMessage(it) }
+            .forEach { vm.markMessageAsSeen(it.id, false) }
         if (latestMessageId != null) {
             listState.scrollToItem(0)
         }
@@ -116,7 +122,10 @@ fun PublicConversationScreen(
                     verticalArrangement = Arrangement.spacedBy(8.dp, Alignment.Bottom)
                 ) {
                     items(displayMessages, key = { it.id }) { message ->
-                        ChatBubble(message, media)
+                        Column {
+                            ChatBubble(message, media)
+                            if (message.id == newestSynced) SyncedHistoryDivider()
+                        }
                     }
                     if (messages.isEmpty()) {
                         item {
@@ -190,6 +199,8 @@ fun PublicConversationScreen(
                         }
                     }
 
+                    CatchUpLine(messages)
+
                     // Floating Details Card Slot (Solid card with outer margin for floating effect)
                     Box(
                         modifier = Modifier
@@ -222,6 +233,12 @@ fun PublicConversationScreen(
                             modifier = Modifier.padding(14.dp).testTag("conversation_read_only"),
                             textAlign = TextAlign.Center
                         )
+                    }
+                } else if (kind == "SOS") {
+                    SosConversationComposer(vm, media, sosId, input) {
+                        input = it
+                        restored = true
+                        vm.draft(key, it)
                     }
                 } else Column {
                     ChatBudgetLine(sendBudget)

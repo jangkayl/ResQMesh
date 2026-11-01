@@ -10,10 +10,10 @@ data class ChatSyncEntry(
     val kind: String,
     val senderName: String,
     val sosId: String = "",
-    val hasMedia: Boolean = false
+    val mediaKind: String = ""
 )
 
-/** The text of a public message. Attachments never travel in a sync page. */
+/** The text of a public message. Attachments never travel in a sync page; [mediaKind] says one exists. */
 @Serializable
 data class ChatSyncRow(
     val id: String,
@@ -24,7 +24,11 @@ data class ChatSyncRow(
     val text: String,
     val sosId: String = "",
     val locationLat: Double? = null,
-    val locationLng: Double? = null
+    val locationLng: Double? = null,
+    val mediaKind: String = ""
 )
+
+/** A placeholder still waiting for its attachment. */
+data class PendingSyncMedia(val id: String, val kind: String, val sosId: String)
 
 enum class ChatSyncIngestion { STORED, REJECTED, DEFERRED }

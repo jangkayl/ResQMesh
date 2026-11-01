@@ -533,7 +533,7 @@
     <ID>LongParameterList:OutboundFrameReporter.kt$OutboundFrameReporter$(endpoint: String, bytes: ByteArray, stage: OutboundFrameEvent.Stage, transport: String, queuedAt: Long = 0L, startedAt: Long = 0L)</ID>
     <ID>LongParameterList:PayloadDispatcherCallback.kt$PayloadDispatcherCallback$(endpointId: String, msgId: String, senderName: String, text: String, isPrivate: Boolean, isSystem: Boolean, imageBase64: String?, audioBase64: String?, locationLat: Double?, locationLng: Double?, medium: String, routePath: List&lt;String&gt;, channelId: String)</ID>
     <ID>LongParameterList:PayloadFactory.kt$PayloadFactory$( msgId: String, timestamp: Long, senderName: String, targetName: String, text: String, imageBase64: String?, audioBase64: String?, locationLat: Double?, locationLng: Double?, directedRoute: List&lt;String&gt;, targetPubKey: String?, channelId: String, ttl: Int = 0, transmissionId: String = msgId )</ID>
-    <ID>LongParameterList:PayloadFactory.kt$PayloadFactory$( msgId: String, timestamp: Long, senderName: String, text: String, imageBase64: String?, audioBase64: String?, locationLat: Double?, locationLng: Double?, isSOS: Boolean, isSOSCancel: Boolean, channelId: String, ttl: Int = 0, conversationKind: String = "COMMUNITY", sosId: String = "", senderNodeId: String = "" )</ID>
+    <ID>LongParameterList:PayloadFactory.kt$PayloadFactory$( msgId: String, timestamp: Long, senderName: String, text: String, imageBase64: String?, audioBase64: String?, locationLat: Double?, locationLng: Double?, isSOS: Boolean, isSOSCancel: Boolean, channelId: String, ttl: Int = 0, conversationKind: String = "COMMUNITY", sosId: String = "", senderNodeId: String = "", chatSync: Boolean = false )</ID>
     <ID>LongParameterList:PayloadFactory.kt$PayloadFactory$( transmissionId: String, payloadType: String, operationId: String, senderName: String, targetName: String, directedRoute: List&lt;String&gt;, targetPublicKey: String, envelopeJson: String )</ID>
     <ID>LongParameterList:ProfileScreen.kt$( viewModel: SetupViewModel, appearance: AppAppearance, onAppearanceSelected: (AppAppearance) -&gt; Unit, onPermissions: () -&gt; Unit, onOfflineMaps: () -&gt; Unit = {}, onHelp: () -&gt; Unit = {}, onAbout: () -&gt; Unit = {}, onBack: () -&gt; Unit )</ID>
     <ID>LongParameterList:PublicConversationScreen.kt$( vm: CommunicationViewModel, media: MediaHelper, kind: String, channel: String = "", sosId: String = "", title: String, readOnly: Boolean = false, onBack: () -&gt; Unit, header: @Composable (isCompact: Boolean) -&gt; Unit = {} )</ID>
@@ -567,6 +567,7 @@
     <ID>MagicNumber:ActiveSosReminder.kt$650</ID>
     <ID>MagicNumber:AppDatabaseMigrations.kt$&lt;no name provided&gt;$10</ID>
     <ID>MagicNumber:AppDatabaseMigrations.kt$&lt;no name provided&gt;$11</ID>
+    <ID>MagicNumber:AppDatabaseMigrations.kt$&lt;no name provided&gt;$12</ID>
     <ID>MagicNumber:AppDatabaseMigrations.kt$&lt;no name provided&gt;$3</ID>
     <ID>MagicNumber:AppDatabaseMigrations.kt$&lt;no name provided&gt;$4</ID>
     <ID>MagicNumber:AppDatabaseMigrations.kt$&lt;no name provided&gt;$5</ID>
@@ -919,6 +920,7 @@
     <ID>MagicNumber:MeshPayload.kt$MeshPayload$36</ID>
     <ID>MagicNumber:MeshPayload.kt$MeshPayload$37</ID>
     <ID>MagicNumber:MeshPayload.kt$MeshPayload$38</ID>
+    <ID>MagicNumber:MeshPayload.kt$MeshPayload$39</ID>
     <ID>MagicNumber:MeshPayload.kt$MeshPayload$4</ID>
     <ID>MagicNumber:MeshPayload.kt$MeshPayload$5</ID>
     <ID>MagicNumber:MeshPayload.kt$MeshPayload$6</ID>
