@@ -34,6 +34,8 @@ private const val TAG_END = 0xE007F
 private const val MAX_COMBINING_RUN = 4
 private const val PEER_HEAD_MAX = 48
 private const val PEER_FALLBACK_NAME = "Unknown Node"
+private const val NAME_PUNCTUATION = " .,'-’"
+private const val VARIATION_SELECTOR_START = 0xFE00
 private const val ZWJ = '‍'
 private const val VARIATION_SELECTOR_16 = '️'
 
@@ -64,7 +66,22 @@ object TextSanitizer {
     private fun isCleanOut(c: Int) = c < ASCII_CONTROL_LIMIT || c in DEL_CODE..C1_CONTROL_END ||
         isBidiControl(c) || isInvisibleFormat(c)
 
-    private fun cleaned(input: String, singleLine: Boolean, dropHash: Boolean): String {
+    /** Letters of any language with their marks, digits, spaces and common name punctuation; no emoji or symbols. */
+    private fun isNameCharacter(c: Int): Boolean {
+        if (c in VARIATION_SELECTOR_START..VARIATION_SELECTOR_16.code) return false
+        val type = Character.getType(c)
+        return Character.isLetterOrDigit(c) || String(Character.toChars(c)) in NAME_PUNCTUATION ||
+            type == Character.NON_SPACING_MARK.toInt() || type == Character.COMBINING_SPACING_MARK.toInt()
+    }
+
+    /** Live filter for the name field. Unlike [sanitize] it keeps spaces at the ends so typing is not disturbed. */
+    fun keepNameCharacters(input: String): String {
+        val sb = StringBuilder(input.length)
+        input.codePoints().forEach { if (isNameCharacter(it)) sb.appendCodePoint(it) }
+        return sb.toString()
+    }
+
+    private fun cleaned(input: String, singleLine: Boolean, nameOnly: Boolean): String {
         val sb = StringBuilder(input.length)
         var i = 0
         while (i < input.length) {
@@ -76,7 +93,7 @@ object TextSanitizer {
                 c == 0x09 -> sb.append(' ')
                 isCleanOut(c) -> Unit
                 c in Character.MIN_SURROGATE.code..Character.MAX_SURROGATE.code -> Unit // lone surrogate
-                dropHash && c == '#'.code -> Unit
+                nameOnly && !isNameCharacter(c) -> Unit
                 else -> sb.appendCodePoint(c)
             }
         }
@@ -109,14 +126,14 @@ object TextSanitizer {
     }
 
     fun sanitize(input: String, field: TextField): String {
-        var out = cleaned(input, field.singleLine, dropHash = field == TextField.DISPLAY_NAME)
+        var out = cleaned(input, field.singleLine, nameOnly = field == TextField.DISPLAY_NAME)
         if (field.singleLine) out = out.replace(Regex(" {$MIN_COLLAPSE_RUN,}"), " ")
         return out.trim()
     }
 
     /** Peer-supplied display name: control/bidi/invisible removal and a clamp, keeping '#' so `#NODEID` survives. */
     fun inboundPeerName(name: String): String {
-        val out = cleaned(name, singleLine = true, dropHash = false).replace(Regex(" {$MIN_COLLAPSE_RUN,}"), " ").trim()
+        val out = cleaned(name, singleLine = true, nameOnly = false).replace(Regex(" {$MIN_COLLAPSE_RUN,}"), " ").trim()
         val hash = out.lastIndexOf('#')
         val head = TextPolicy.clampLength(if (hash < 0) out else out.substring(0, hash), PEER_HEAD_MAX).trim()
         val suffix = if (hash < 0) "" else out.substring(hash)

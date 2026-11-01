@@ -138,6 +138,33 @@ class TextPolicyTest {
     }
 
     @Test
+    fun displayNameRejectsEmojiAndSymbols() {
+        val name = TextField.DISPLAY_NAME
+        assertEquals("Ana", TextSanitizer.sanitize("😀Ana❤️", name))
+        assertEquals("1", TextSanitizer.sanitize("1️⃣", name))
+        assertEquals("", TextSanitizer.sanitize("🇵🇭", name))
+        assertEquals(ValidationResult.Blank, TextPolicy.validate("😀😀", name))
+        assertEquals("Ana", TextSanitizer.sanitize("A\$n*a@!", name))
+    }
+
+    @Test
+    fun displayNameKeepsRealNames() {
+        listOf("Juan dela Cruz", "Peña", "O'Brien", "Anne-Marie", "Jose Jr.", "Cruz, Juan", "SM-A536E", "ناصر", "हिन्दी", "สมชาย").forEach {
+            assertEquals(it, TextSanitizer.sanitize(it, TextField.DISPLAY_NAME))
+        }
+    }
+
+    @Test
+    fun liveNameFilterKeepsSpacesWhileTyping() {
+        assertEquals("Ana ", TextSanitizer.keepNameCharacters("Ana😀 "))
+    }
+
+    @Test
+    fun emojiStaysAllowedOutsideNames() {
+        assertEquals("hi 😀", TextSanitizer.sanitize("hi 😀", TextField.MESSAGE))
+    }
+
+    @Test
     fun hashIsDroppedOnlyForDisplayName() {
         assertEquals("ab", TextSanitizer.sanitize("a#b", TextField.DISPLAY_NAME))
         assertEquals("a#b", TextSanitizer.sanitize("a#b", TextField.MESSAGE))

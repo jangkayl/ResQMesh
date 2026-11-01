@@ -7,7 +7,8 @@ The change:
 - Commas in names no longer split receipts or routes.
 - Emoji are no longer cut in half in avatars, advertised names or limits.
 - Replying to a multi-line message keeps the quote on one line.
-- Invisible characters, direction overrides and long runs of stacked marks are removed. `#` is removed from new display names.
+- Invisible characters, direction overrides and long runs of stacked marks are removed.
+- New display names allow only letters of any language, numbers, spaces and `. , ' -`. Emoji, symbols and `#` cannot be typed or pasted. A name saved before this change stays until setup is run again, and other phones' names are not filtered.
 - Text from other phones is cleaned and limited locally, and relayed data stays unchanged.
 - The map zip path check rejects a sibling folder sharing the same prefix.
 
@@ -21,7 +22,7 @@ Phones A, B and C on the debug APK, with C out of direct range of A if possible,
 
 1. **Unknown name:** set A's name to `Unknown Hero`. Expected: B lists A, and they exchange private messages both ways.
 2. **Comma name:** set B's name to `Cruz, Juan`. A sends B a private message, and B opens it. Expected: one reader in the receipt, and the same after restarting A.
-3. **Emoji name:** set C's name to start with an emoji, for example `😀Ana`. Expected: avatars show a whole emoji in chat, peers and incidents, with no box or `?`.
+3. **Emoji name:** type and paste `😀Ana` into the name field. Expected: the emoji is removed and only `Ana` remains. Then enter `Peña`, `O'Brien` and `Anne-Marie`. Expected: all accepted unchanged.
 4. **Emoji messages:** send public and private messages with `😀`, `👨‍👩‍👧`, `🇵🇭`, `1️⃣` and `❤️`. Expected: they arrive unchanged, including over the relay.
 5. **Emoji at the limit:** paste emoji past the 1,000-character limit. Expected: no broken character at the end.
 6. **Multi-line reply:** send a two-line message and reply to it. Expected: the quote is one line, and only your reply is in the body.
