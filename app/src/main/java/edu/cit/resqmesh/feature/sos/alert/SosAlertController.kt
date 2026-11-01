@@ -30,6 +30,6 @@ class SosAlertController(context: Context, private val media: MediaHelper,
         if (ringing.isEmpty()) { media.stopEmergencySiren(); vibrator.cancel() }
     }
     override fun silence(id: String) { scope.launch(Dispatchers.Main.immediate) { stop(id); notifications.clearSos(id) } }
-    override fun ended(id: String) = silence(id)
+    override fun ended(id: String) { silence(id); notifications.clearSosMessages(id) }
     override fun offline() { scope.launch(Dispatchers.Main.immediate) { ringing.keys.toList().forEach(::stop) } }
 }

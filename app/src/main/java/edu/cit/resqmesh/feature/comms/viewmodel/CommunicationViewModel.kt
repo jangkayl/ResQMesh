@@ -53,7 +53,9 @@ class CommunicationViewModel(
     private val imageBudget: OutgoingImageBudget,
     private val sosBudget: OutgoingSosBudget,
     private val voiceHold: RadioVoiceHold,
-    private val locationPreferences: edu.cit.resqmesh.core.location.LocationPreferences
+    private val locationPreferences: edu.cit.resqmesh.core.location.LocationPreferences,
+    private val notificationPreferences: edu.cit.resqmesh.core.notification.NotificationPreferences,
+    private val sosMessages: edu.cit.resqmesh.core.notification.SosMessageNotifier
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ChatUiState())
@@ -220,6 +222,10 @@ class CommunicationViewModel(
         }
         return sent
     }
+    val sosMessageAlertsEnabled: StateFlow<Boolean> = notificationPreferences.sosMessageAlertsEnabled
+    val mutedSosThreads: StateFlow<Set<String>> = notificationPreferences.mutedSosThreads
+    fun setSosThreadMuted(id: String, muted: Boolean) = notificationPreferences.setSosThreadMuted(id, muted)
+    fun sosThreadVisible(id: String, visible: Boolean) = sosMessages.threadVisible(id, visible)
     fun isOwnSos(alert: edu.cit.resqmesh.core.model.SosAlert): Boolean = sosRepository.isOwnSos(alert)
     fun sosActivity(id: String) = sosRepository.sosActivity(id)
     fun silenceSos(id: String) { viewModelScope.launch { sosRepository.silence(id) } }

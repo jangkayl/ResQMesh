@@ -17,6 +17,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import edu.cit.resqmesh.core.ui.theme.ResQTheme
 import edu.cit.resqmesh.core.audio.MediaHelper
 import edu.cit.resqmesh.core.model.toChatMessage
@@ -24,6 +27,7 @@ import edu.cit.resqmesh.feature.comms.viewmodel.CommunicationViewModel
 import edu.cit.resqmesh.feature.comms.ui.PublicConversationScreen
 import edu.cit.resqmesh.feature.sos.ui.components.CompactSosHeader
 import edu.cit.resqmesh.feature.sos.ui.components.ExpandedSosHeader
+import edu.cit.resqmesh.feature.sos.ui.components.SosMessageBell
 import edu.cit.resqmesh.feature.sos.ui.components.getEmergencyColor
 import edu.cit.resqmesh.feature.sos.ui.components.getEmergencyIcon
 
@@ -43,6 +47,20 @@ fun SosThreadScreen(
     val activity by remember(id) { vm.sosActivity(id) }.collectAsState(initial = emptyList())
     val leave = { vm.silenceSos(id); onBack() }
     BackHandler(onBack = leave)
+    val messageAlertsEnabled by vm.sosMessageAlertsEnabled.collectAsState()
+    val mutedThreads by vm.mutedSosThreads.collectAsState()
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner, id) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) vm.sosThreadVisible(id, true)
+            if (event == Lifecycle.Event.ON_PAUSE) vm.sosThreadVisible(id, false)
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+            vm.sosThreadVisible(id, false)
+        }
+    }
 
     if (showActivity) {
         AlertDialog(
@@ -175,6 +193,11 @@ fun SosThreadScreen(
         title = alert?.let { "${it.originName} · ${it.emergencyType}" } ?: "Loading SOS",
         readOnly = alert?.ended != false,
         onBack = leave,
+        topAction = {
+            if (alert?.ended == false) {
+                SosMessageBell(messageAlertsEnabled, id in mutedThreads) { vm.setSosThreadMuted(id, it) }
+            }
+        },
         header = { isCompact ->
             if (alert != null) {
                 val locationWithheld = remember(id, alert.latitude) {

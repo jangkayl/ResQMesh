@@ -139,8 +139,12 @@ val repositoryModule = module {
             readyPeerEvents = get(),
             peerNameStore = get(),
             sosRepository = get(),
-            chatBudget = get()
+            chatBudget = get(),
+            sosMessages = get()
         )
+    }
+    single<edu.cit.resqmesh.core.notification.SosMessageNotifier> {
+        edu.cit.resqmesh.feature.sos.alert.SosMessageController(get(), get(), get<AppCoroutineScope>().scope)
     }
 
     single { LocalIdentityManager(androidContext(), get<AppDatabase>().userDao()) }
@@ -281,7 +285,9 @@ val viewModelModule = module {
             imageBudget = get(),
             sosBudget = get(),
             voiceHold = get(),
-            locationPreferences = get()
+            locationPreferences = get(),
+            notificationPreferences = get(),
+            sosMessages = get()
         )
     }
     viewModel { WalkieTalkieViewModel(useCases = get(), mediaHelper = get()) }

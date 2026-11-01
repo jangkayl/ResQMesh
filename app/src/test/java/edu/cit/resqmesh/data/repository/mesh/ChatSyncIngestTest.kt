@@ -5,6 +5,7 @@ import edu.cit.resqmesh.core.model.ChatMessage
 import edu.cit.resqmesh.core.model.ChatSyncState
 import edu.cit.resqmesh.core.network.MeshNetworkGateway
 import edu.cit.resqmesh.core.network.MeshPayload
+import edu.cit.resqmesh.core.notification.SosMessageNotifier
 import edu.cit.resqmesh.data.local.entity.ChatSyncIngestion
 import edu.cit.resqmesh.data.local.entity.ChatSyncRow
 import edu.cit.resqmesh.data.repository.MeshRouter
@@ -56,6 +57,7 @@ class ChatSyncIngestTest {
     private class Fixture(scope: CoroutineScope, knownAlerts: Set<String> = emptySet(), canReply: Boolean = false) {
         val store = Store()
         val networkCalls = mutableListOf<String>()
+        val notified = mutableListOf<String>()
         val voice = MutableSharedFlow<ChatMessage>(replay = 1)
         private val network = Proxy.newProxyInstance(
             MeshNetworkGateway::class.java.classLoader, arrayOf(MeshNetworkGateway::class.java)
@@ -73,7 +75,10 @@ class ChatSyncIngestTest {
         val inbound = MeshInboundMessages(network, store, PeerPublicKeyDirectory(prefs), scope,
             SosReplyCapability({ canReply }, { it in knownAlerts }), MeshRouter(), MutableStateFlow("1"),
             MutableStateFlow(emptyList()), MutableStateFlow(null), voice, { "Me#ME" }, { emptyList() },
-            { _, _ -> }, Mutex(), clock = { NOW })
+            { _, _ -> }, Mutex(), clock = { NOW }, sosMessages = object : SosMessageNotifier {
+                override fun received(message: ChatMessage) { notified += message.id }
+                override fun threadVisible(id: String, visible: Boolean) = Unit
+            })
     }
 
     private fun copy(id: String) = ProtoBuf.decodeFromByteArray<MeshPayload>(chatSyncMediaFrame(ChatMessage(
@@ -122,6 +127,21 @@ class ChatSyncIngestTest {
         val ended = Fixture(backgroundScope, canReply = false)
         ended.inbound.onNetworkConversationMessage("B", sosVoice("late")); runCurrent()
         assertTrue(ended.store.rows.isEmpty())
+        assertEquals(listOf("live"), active.notified)
+        assertTrue(ended.notified.isEmpty())
+    }
+
+    @Test fun onlyTheFirstLiveCopyOfAnSosMessageNotifies() = runTest {
+        val f = Fixture(backgroundScope, knownAlerts = setOf("s1"), canReply = true)
+        f.inbound.onNetworkConversationMessage("B", sosVoice("live")); runCurrent()
+        f.inbound.onNetworkConversationMessage("C", sosVoice("live")); runCurrent()
+        assertEquals(listOf("live"), f.notified)
+    }
+
+    @Test fun syncedSosRowsDoNotNotify() = runTest {
+        val f = Fixture(backgroundScope, knownAlerts = setOf("s1"), canReply = true)
+        f.inbound.ingestSynced(row("old", "SOS", "s1"))
+        assertTrue(f.notified.isEmpty())
     }
 
     private fun row(id: String = "m", kind: String = "COMMUNITY", sosId: String = "", sender: String = "A1",

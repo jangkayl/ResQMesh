@@ -45,6 +45,7 @@ class SetupViewModel(
     val isBackgroundMeshEnabled: StateFlow<Boolean> = meshSessionController.backgroundMeshEnabled
     val isAutoDetectLocationEnabled: StateFlow<Boolean> = locationPreferences.autoDetectEnabled
     val isIncidentAlertsEnabled: StateFlow<Boolean> = notificationPreferences.incidentAlertsEnabled
+    val isSosMessageAlertsEnabled: StateFlow<Boolean> = notificationPreferences.sosMessageAlertsEnabled
 
     init {
         viewModelScope.launch {
@@ -216,5 +217,9 @@ class SetupViewModel(
 
     fun setIncidentAlertsEnabled(enabled: Boolean) {
         notificationPreferences.setIncidentAlertsEnabled(enabled)
+    }
+
+    fun setSosMessageAlertsEnabled(enabled: Boolean) {
+        notificationPreferences.setSosMessageAlertsEnabled(enabled)
     }
 }

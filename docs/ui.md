@@ -33,9 +33,9 @@ Acceptance, hop custody, recipient arrival and application confirmation are dist
 
 Inbox rows do not mark private messages seen; visible chat bubbles do. Keep Unread selectable at zero with filter-specific empty states. Community reader circles require seenBy receipts.
 
-Community, each Radio channel and each SOS isolate history/unread/drafts. Save off-channel Radio silently; autoplay only new selected-channel notes while monitoring. Tuning/Off clears bounded playback queues; old notes do not autoplay. Private audio stays manual. SOS pauses Radio; manual playback takes priority. Cancelled holds discard partial notes.
+Community, each Radio channel and each SOS isolate history/unread/drafts. Save off-channel Radio silently; autoplay only new selected-channel notes while monitoring. Tuning/Off clears bounded playback queues. Private audio stays manual. SOS pauses Radio; manual playback takes priority. Cancelled holds discard partial notes.
 
-SOS creation uses deliberate slide-to-send; early release resets. Creation Cancel/Back returns to the hub. Sender thread Back preserves SOS and its reopen banner. End requires confirmation; receiver Back silences locally. Alert-specific cancellation cannot end another alert; terminal history stays read-only. Show queued, link-sent and neighbor-confirmed states separately.
+SOS creation uses deliberate slide-to-send; early release resets. Creation Cancel/Back returns to the hub. Sender thread Back preserves SOS and its reopen banner. End requires confirmation; receiver Back silences locally. Bell mutes thread messages only. Alert-specific cancellation cannot end another alert; terminal history stays read-only. Show queued, link-sent and neighbor-confirmed states separately.
 
 SOS location row: per-SOS include (default on), Allow/Turn on, never blocks sending. SOS cards retain category/status/transmission, location accuracy, time and history. Header time fallback never proves GPS freshness. Reserve measured floating-header/reminder regions, reverse conversations and keep latest messages/composer above the IME. Short/large-text threads expose scrollable SOS controls; badges wrap. Ended badges say ENDED, not rescue completed.
 

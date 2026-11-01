@@ -46,6 +46,7 @@ fun PublicConversationScreen(
     title: String,
     readOnly: Boolean = false,
     onBack: () -> Unit,
+    topAction: @Composable () -> Unit = {},
     header: @Composable (isCompact: Boolean) -> Unit = {}
 ) {
     val all by vm.allPublicMessages.collectAsState()
@@ -196,6 +197,7 @@ fun PublicConversationScreen(
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
+                            topAction()
                         }
                     }
 
