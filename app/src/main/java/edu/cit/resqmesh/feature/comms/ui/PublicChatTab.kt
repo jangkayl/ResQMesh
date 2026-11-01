@@ -189,9 +189,9 @@ fun PublicChatTab(
                                 }
                                 currentReply.imageBase64 != null -> photoText
                                 currentReply.audioBase64 != null -> voiceNoteText
-                                else -> currentReply.text.take(60).ifBlank { "Attachment" }
+                                else -> ReplyQuote.snippet(currentReply.text).ifBlank { "Attachment" }
                             }
-                            "> $quoteSender: $quoteSnippet\n$rawMessage"
+                            ReplyQuote.prefix(quoteSender, quoteSnippet) + rawMessage
                         } else {
                             rawMessage
                         }

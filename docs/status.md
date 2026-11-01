@@ -33,7 +33,7 @@ Basic block, incident, SOS and recovery checks have user-reported successes; the
 
 **Layer boundaries / P2 subset** (`refactor/layer-boundaries`, [plan](plans/layer-boundaries.md)): The user reported the [smoke card](testing/layer-boundaries-smoke-card.md) passing on three phones (2026-10-17); merged.
 
-**Batch C hygiene / Phase 0** (`refactor/batch-c-hygiene`): the user reported all [smoke card](testing/batch-c-hygiene-smoke-card.md) steps working on 2026-10-17.
+**Batch C hygiene / Phase 0** (`refactor/batch-c-hygiene`): user-reported [smoke card](testing/batch-c-hygiene-smoke-card.md) pass, 2026-10-17.
 
 **Dead screens**: merged; device pending.
 
@@ -43,7 +43,7 @@ Basic block, incident, SOS and recovery checks have user-reported successes; the
 
 **Code smells refactor:** [card](testing/code-smells-refactor-card.md) pending.
 
-**Batch A cleanup**: the user reported all [smoke card](testing/batch-a-cleanup-smoke-card.md) steps working on 2026-10-16.
+**Batch A cleanup**: user-reported [smoke card](testing/batch-a-cleanup-smoke-card.md) pass, 2026-10-16.
 
 **Developer console** (branch `feat/developer-console`, [plan](plans/developer-mode.md)): Stage 1 and live follow are pushed; Stage 2 (traces, timeline) has local checks only and awaits the [phone card](testing/developer-mode-card.md). Stage 3 (signal and queue stats) is pending.
 
@@ -60,6 +60,8 @@ Basic block, incident, SOS and recovery checks have user-reported successes; the
 **Map page UX** (`fix/map-page-ux`): [card](testing/map-page-ux-card.md) pending.
 
 **Adaptive location** (`feat/adaptive-location`): [card](testing/adaptive-location-card.md) pending.
+
+**Text input hardening** (`fix/text-input-hardening`): [card](testing/text-input-hardening-card.md) pending.
 
 ## Next actions
 

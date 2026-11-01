@@ -65,7 +65,7 @@ class IncidentHelpWorkflow(
     suspend fun offerHelp(incidentId: String, note: String): Boolean = mutex.withLock {
         reconcileWithdrawnSelectionLocked(incidentId)
         val clean = TextSanitizer.sanitize(note, TextField.HELP_NOTE)
-        if (!isValidHelpNoteLength(clean.length)) return@withLock false
+        if (!isValidHelpNoteLength(clean.length) || !TextSanitizer.hasVisibleContent(clean)) return@withLock false
         val incident = incidents.getIncidentById(incidentId) ?: return@withLock false
         if (incident.workflowVersion != HELP_WORKFLOW_VERSION || incident.status in TERMINAL) return@withLock false
         val user = identity.getOrCreateUser()

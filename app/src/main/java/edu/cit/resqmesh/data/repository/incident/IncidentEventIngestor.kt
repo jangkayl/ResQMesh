@@ -4,7 +4,8 @@ import edu.cit.resqmesh.data.local.entity.EventValidationStatus
 import edu.cit.resqmesh.core.model.HELP_WORKFLOW_VERSION
 import edu.cit.resqmesh.core.model.EventType
 import edu.cit.resqmesh.core.model.Incident
-import edu.cit.resqmesh.data.mapper.toModel
+import edu.cit.resqmesh.core.security.input.TextSanitizer
+import edu.cit.resqmesh.data.mapper.toDisplayModel
 import edu.cit.resqmesh.core.logging.AppLogger
 import edu.cit.resqmesh.data.local.dao.DomainEventDao
 import edu.cit.resqmesh.data.local.dao.IncidentDao
@@ -123,8 +124,8 @@ internal class IncidentEventIngestor(
 
     private suspend fun notifyAppliedSafely(event: DomainEventEntity) {
         try {
-            val incident = incidentDao.getIncidentById(event.entityId)?.toModel() ?: return
-            notifyApplied(event, incident)
+            val incident = incidentDao.getIncidentById(event.entityId)?.toDisplayModel() ?: return
+            notifyApplied(event.copy(actorName = TextSanitizer.inboundPeerName(event.actorName)), incident)
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (e: Exception) {

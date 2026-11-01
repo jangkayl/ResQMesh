@@ -43,7 +43,7 @@ fun DeviceCard(
             ) {
                 Box(contentAlignment = Alignment.Center) {
                     Text(
-                        text = name.take(1).uppercase(),
+                        text = edu.cit.resqmesh.core.security.input.TextPolicy.firstGrapheme(name).uppercase(),
                         color = if (isConnecting) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onPrimary,
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold

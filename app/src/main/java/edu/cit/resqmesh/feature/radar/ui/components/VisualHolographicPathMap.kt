@@ -149,7 +149,7 @@ internal fun VisualHolographicPathMap(
                     Spacer(Modifier.height(4.dp))
 
                     Text(
-                        text = name.take(8),
+                        text = edu.cit.resqmesh.core.security.input.TextPolicy.safePrefix(name, 8),
                         fontFamily = FontFamily.Monospace,
                         fontSize = 10.sp,
                         fontWeight = FontWeight.Bold,

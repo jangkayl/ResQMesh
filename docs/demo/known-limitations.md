@@ -19,6 +19,7 @@ A capstone prototype for offline text, private messages, voice notes, SOS alerts
 - **Private messages are encrypted** (RSA-2048 key wrap plus AES-256-GCM), but sender authentication, forward secrecy and verified identities are **not** claimed. Keys are trusted the first time phones meet, and there is no QR or safety-number verification yet.
 - **Public messages and SOS:** anyone nearby running the app can read them. SOS and incident events are signed. Public text is not.
 - **Spam and flood protection** (per-sender rate limits, signed origins) is planned after the demo ([security plan](../plans/security-hardening.md)). A modified app could currently flood or spoof public traffic.
+- **Reply quotes are plain text:** any message starting with `> ` displays as a reply, so a quote does not prove the quoted person said it. Lookalike names are also not detected.
 - **Blocking** is a link-routing tool, not a security feature. Relayed messages from a blocked phone may still arrive.
 - Messages are stored on the phone without app-level database encryption (planned). Android's device encryption still applies.
 

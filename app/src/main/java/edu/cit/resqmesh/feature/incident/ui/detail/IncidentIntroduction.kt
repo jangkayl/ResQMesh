@@ -1,5 +1,6 @@
 package edu.cit.resqmesh.feature.incident.ui.detail
 
+import edu.cit.resqmesh.core.security.input.TextPolicy
 import android.text.format.DateUtils
 import androidx.compose.animation.*
 import androidx.compose.foundation.BorderStroke
@@ -102,7 +103,7 @@ internal fun IncidentIntroduction(
             ) {
                 Box(contentAlignment = Alignment.Center) {
                     Text(
-                        text = incident.creatorName.take(1).uppercase(),
+                        text = TextPolicy.firstGrapheme(incident.creatorName).uppercase(),
                         style = MaterialTheme.typography.titleMedium.copy(
                             fontSize = 16.sp,
                             fontWeight = FontWeight.Bold

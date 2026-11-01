@@ -16,6 +16,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import edu.cit.resqmesh.core.model.NodeIdentity
+import edu.cit.resqmesh.core.security.input.TextPolicy
 import kotlin.math.absoluteValue
 
 @Composable
@@ -29,8 +30,12 @@ fun UserAvatar(
         val cleanName = NodeIdentity.displayNameOf(name).ifBlank { name }
         val parts = cleanName.split(" ", "_", "-").filter { it.isNotBlank() }
         when {
-            parts.size >= 2 -> "${parts[0].take(1)}${parts[1].take(1)}".uppercase()
-            cleanName.isNotBlank() -> cleanName.take(2).uppercase()
+            parts.size >= 2 ->
+                "${TextPolicy.firstGrapheme(parts[0])}${TextPolicy.firstGrapheme(parts[1])}".uppercase()
+            cleanName.isNotBlank() -> {
+                val first = TextPolicy.firstGrapheme(cleanName)
+                (first + TextPolicy.firstGrapheme(cleanName.substring(first.length))).uppercase()
+            }
             else -> "?"
         }
     }

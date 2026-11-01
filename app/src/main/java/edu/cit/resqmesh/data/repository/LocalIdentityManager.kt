@@ -39,7 +39,7 @@ class LocalIdentityManager internal constructor(
     override suspend fun getOrCreateUser(displayName: String?): UserEntity = mutex.withLock {
         val cleanName = displayName
             ?.let { TextSanitizer.sanitize(it, TextField.DISPLAY_NAME) }
-            ?.takeIf { it.isNotBlank() }
+            ?.takeIf { TextSanitizer.hasVisibleContent(it) }
         require(cleanName == null || cleanName.length <= TextField.DISPLAY_NAME.maxLength) {
             "Display name cannot exceed ${TextField.DISPLAY_NAME.maxLength} characters"
         }

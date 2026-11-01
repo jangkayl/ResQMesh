@@ -200,6 +200,20 @@ class SosMapScreenTest {
     }
 
     @Test
+    fun extractPackageZip_siblingDirectorySharingThePrefix_isRejected() {
+        val zipBytes = createZipArchive(
+            mapOf(
+                MapStorageGuard.PMTILES_FILENAME to "fake-pmtiles-content".toByteArray(),
+                MapStorageGuard.STYLE_FILENAME to "{\"version\": 8}".toByteArray(),
+                "../cebu-v1.tmp-evil/escaped.txt" to "outside".toByteArray()
+            )
+        )
+
+        assertNull(storageGuard.extractPackageZip(zipBytes.inputStream(), version = 1))
+        assertFalse(tempDir.walkTopDown().any { it.name == "escaped.txt" })
+    }
+
+    @Test
     fun storageGuardIntegration_fakePackageLifecycle_transitionsState() {
         // Initially no package installed
         val sos = createSosMessage()

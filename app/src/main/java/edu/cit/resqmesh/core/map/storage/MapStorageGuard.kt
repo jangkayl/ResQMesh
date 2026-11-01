@@ -165,7 +165,7 @@ class MapStorageGuard(
             while (entry != null) {
                 val entryFile = File(destinationDir, entry.name)
                 // Guard against Zip Slip vulnerability
-                if (!entryFile.canonicalPath.startsWith(destinationDir.canonicalPath)) {
+                if (!entryFile.canonicalPath.startsWith(destinationDir.canonicalPath + File.separator)) {
                     throw SecurityException("Zip entry attempted path traversal: ${entry.name}")
                 }
 

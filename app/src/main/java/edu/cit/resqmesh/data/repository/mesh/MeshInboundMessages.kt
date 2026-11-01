@@ -5,6 +5,8 @@ import edu.cit.resqmesh.core.model.ConnectedDevice
 import edu.cit.resqmesh.core.model.NodeIdentity
 import edu.cit.resqmesh.core.network.MeshPayload
 import edu.cit.resqmesh.core.network.MeshNetworkGateway
+import edu.cit.resqmesh.core.security.input.TextField
+import edu.cit.resqmesh.core.security.input.TextSanitizer
 import edu.cit.resqmesh.core.network.dispatch.InboundPayloadValidator.Companion.MAX_TTL
 import edu.cit.resqmesh.core.network.ratelimit.ReceiptReplayLimiter
 import edu.cit.resqmesh.core.logging.AppLogger
@@ -28,6 +30,17 @@ private const val MAX_SENDER_NAME_LENGTH = 160
 private const val MAX_CONVERSATION_TEXT_LENGTH = 8192
 private val RADIO_CHANNEL_IDS = (1..5).map { it.toString() }
 
+private const val MESSAGE_UNAVAILABLE = "[Message unavailable]"
+
+/**
+ * Cleaned text for the local copy. Text that was only invisible characters, with no attachment or location, would
+ * render as an empty bubble, so it shows a placeholder instead; storage, custody and receipts are unaffected.
+ */
+internal fun inboundDisplayText(text: String, hasAttachment: Boolean): String {
+    val clean = TextSanitizer.inbound(text, TextField.MESSAGE)
+    return if (clean.isEmpty() && !hasAttachment) MESSAGE_UNAVAILABLE else clean
+}
+
 /** A decoded chat frame as the transport hands it to the repository. */
 internal data class InboundChatPayload(
     val endpointId: String,
@@ -46,8 +59,8 @@ internal data class InboundChatPayload(
 ) {
     fun toChatMessage(isDirect: Boolean) = ChatMessage(
         id = msgId,
-        senderName = sender,
-        text = text,
+        senderName = TextSanitizer.inboundPeerName(sender),
+        text = inboundDisplayText(text, imageBase64 != null || audioBase64 != null || locationLat != null),
         imageBase64 = imageBase64,
         audioBase64 = audioBase64,
         locationLat = locationLat,
@@ -113,9 +126,9 @@ internal class MeshInboundMessages(
         }
         val message = inbound.toChatMessage(isDirect = _connectedDevices.value.any { NodeIdentity.matches(it.name, sender) })
         if (inbound.isPrivate) {
-            repositoryScope.launch { receivePrivate(inbound.endpointId, message, inbound.routePath) }
+            repositoryScope.launch { receivePrivate(inbound.endpointId, message, inbound.routePath, sender) }
         } else {
-            repositoryScope.launch { storePublicMessage(message) }
+            repositoryScope.launch { storePublicMessage(message, sender) }
             if (message.isSOS) {
                 _incomingSosAlert.value = message
             }
@@ -126,18 +139,18 @@ internal class MeshInboundMessages(
         }
     }
 
-    private suspend fun storePublicMessage(message: ChatMessage) {
+    /** [rawSender] is the unmodified wire name; routing and replay limits keep using it, only the stored copy is cleaned. */
+    private suspend fun storePublicMessage(message: ChatMessage, rawSender: String) {
         val duplicate = messageStore.contains(message.id)
         if (!duplicate) messageStore.save(message, targetName = null)
         networkManager.markPayloadStored(message.id)
-        if (!duplicate || receiptReplays.allow(message.senderName, message.id)) {
+        if (!duplicate || receiptReplays.allow(rawSender, message.id)) {
             networkManager.broadcastDeliveredReceipt(message.id, isPrivate = false)
         }
     }
 
-    private suspend fun receivePrivate(endpointId: String, message: ChatMessage, routePath: List<String>) {
+    private suspend fun receivePrivate(endpointId: String, message: ChatMessage, routePath: List<String>, sender: String) {
         val msgId = message.id
-        val sender = message.senderName
         val inserted = messageStore.saveIncomingPrivateIfAbsent(message)
         if (inserted == PrivateMessageInsert.REJECTED) return
         AppLogger.d("MeshNetwork_E2EE", "PRIVATE_STORED message=$msgId insertion=$inserted")
@@ -155,7 +168,7 @@ internal class MeshInboundMessages(
             networkManager.broadcastSeenReceipt(msgId, true, endpointId, reversedRoute)
         }
         if (inserted == PrivateMessageInsert.INSERTED) {
-            networkManager.showPrivateMessageNotification(sender, message.text)
+            networkManager.showPrivateMessageNotification(message.senderName, message.text)
         }
     }
 
@@ -218,7 +231,8 @@ internal class MeshInboundMessages(
     private suspend fun storeIfNew(p: MeshPayload, audioBase64: String?, imageBase64: String?): ChatMessage? =
         outboxMutex.withLock {
             if (messageStore.contains(p.id)) return@withLock null
-            val message = ChatMessage(p.id, p.senderName, p.text, imageBase64, audioBase64, p.locationLat, p.locationLng,
+            val message = ChatMessage(p.id, TextSanitizer.inboundPeerName(p.senderName),
+                inboundDisplayText(p.text, imageBase64 != null || audioBase64 != null || p.locationLat != null), imageBase64, audioBase64, p.locationLat, p.locationLng,
                 false, timestamp = System.currentTimeMillis(), isHopped = p.relayHopCount > 0,
                 outboundRoute = p.routePath, conversationKind = p.conversationKind, channelId = p.channelId,
                 sosId = p.sosId, senderNodeId = p.senderNodeId)

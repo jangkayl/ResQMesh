@@ -4,6 +4,7 @@ import edu.cit.resqmesh.core.domain.repository.IncidentFeedRepository
 import edu.cit.resqmesh.core.model.DomainEvent
 import edu.cit.resqmesh.core.model.Incident
 import edu.cit.resqmesh.core.model.IncidentOffer
+import edu.cit.resqmesh.data.mapper.toDisplayModel
 import edu.cit.resqmesh.data.mapper.toModel
 import edu.cit.resqmesh.data.repository.IncidentRepository
 import kotlinx.coroutines.flow.Flow
@@ -13,17 +14,17 @@ import kotlinx.coroutines.flow.map
 @Suppress("TooManyFunctions")
 class IncidentFeedRepositoryAdapter(private val repository: IncidentRepository) : IncidentFeedRepository {
     override fun getActiveIncidents(): Flow<List<Incident>> =
-        repository.getActiveIncidents().map { list -> list.map { it.toModel() } }
+        repository.getActiveIncidents().map { list -> list.map { it.toDisplayModel() } }
     override fun getAllIncidents(): Flow<List<Incident>> =
-        repository.getAllIncidents().map { list -> list.map { it.toModel() } }
+        repository.getAllIncidents().map { list -> list.map { it.toDisplayModel() } }
     override fun observeIncidentById(id: String): Flow<Incident?> =
-        repository.observeIncidentById(id).map { it?.toModel() }
+        repository.observeIncidentById(id).map { it?.toDisplayModel() }
     override fun observeEventsForIncident(id: String): Flow<List<DomainEvent>> =
-        repository.observeEventsForIncident(id).map { list -> list.map { it.toModel() } }
+        repository.observeEventsForIncident(id).map { list -> list.map { it.toDisplayModel() } }
     override fun observeOffersForIncident(id: String): Flow<List<IncidentOffer>> =
-        (repository.observeOffersForIncident(id) ?: flowOf(emptyList())).map { list -> list.map { it.toModel() } }
+        (repository.observeOffersForIncident(id) ?: flowOf(emptyList())).map { list -> list.map { it.toDisplayModel() } }
     override fun observeAllActiveOffers(): Flow<List<IncidentOffer>> =
-        (repository.observeAllActiveOffers() ?: flowOf(emptyList())).map { list -> list.map { it.toModel() } }
+        (repository.observeAllActiveOffers() ?: flowOf(emptyList())).map { list -> list.map { it.toDisplayModel() } }
     override fun localIncidentSigningKey(): String? = repository.localIncidentSigningKey()
 
     override suspend fun createIncident(

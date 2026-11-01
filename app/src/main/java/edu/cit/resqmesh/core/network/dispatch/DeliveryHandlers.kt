@@ -117,7 +117,12 @@ class StandardMessageHandler : PayloadHandler {
         var imageBase64 = inflateMedia(payload.imageBytes, isAudio = false)
         var audioBase64 = inflateMedia(payload.audioBytes, isAudio = true)
         if (audioBase64 != null) voiceNote(msgId, TraceScope.PUBLIC, endpointId)
-        if (mediaRejected) text = if (text.isBlank()) ATTACHMENT_UNAVAILABLE else "$text\n$ATTACHMENT_UNAVAILABLE"
+        if (mediaRejected) {
+            // Clamp the sender's text first so the local inbound clamp can never cut the marker off.
+            val room = edu.cit.resqmesh.core.security.input.TextField.MESSAGE.maxLength - ATTACHMENT_UNAVAILABLE.length - 1
+            val kept = edu.cit.resqmesh.core.security.input.TextPolicy.clampLength(text, room)
+            text = if (kept.isBlank()) ATTACHMENT_UNAVAILABLE else "$kept\n$ATTACHMENT_UNAVAILABLE"
+        }
         var locationLat = if (isPrivate) null else payload.locationLat
         var locationLng = if (isPrivate) null else payload.locationLng
 

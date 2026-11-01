@@ -1,6 +1,7 @@
 package edu.cit.resqmesh.feature.setup.ui
 
 import edu.cit.resqmesh.core.security.input.TextField
+import edu.cit.resqmesh.core.security.input.TextSanitizer
 import android.os.Build
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateDpAsState
@@ -57,14 +58,14 @@ import kotlinx.coroutines.launch
 @Composable
 fun IdentitySetupScreen(viewModel: SetupViewModel, onIdentityGenerated: () -> Unit) {
     val context = LocalContext.current
-    var customName by remember { mutableStateOf(viewModel.getSavedName(context)) }
+    var customName by remember { mutableStateOf(TextSanitizer.keepNameCharacters(viewModel.getSavedName(context))) }
     val scope = rememberCoroutineScope()
     var saving by remember { mutableStateOf(false) }
     var startError by remember { mutableStateOf<String?>(null) }
 
     IdentitySetupContent(
         customName = customName,
-        onCustomNameChange = { customName = it },
+        onCustomNameChange = { customName = TextSanitizer.keepNameCharacters(it) },
         isSaving = saving,
         errorMessage = startError,
         onIdentityGenerated = {

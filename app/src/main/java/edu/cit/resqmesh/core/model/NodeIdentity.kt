@@ -39,6 +39,7 @@ object NodeIdentity {
 
     /** Placeholder assigned to an inbound GATT server link before the handshake reveals its name. */
     const val UNKNOWN_NAME = "Unknown Node"
+    private const val SHORT_UNKNOWN_NAME = "Unknown"
 
     /** Extracts the stable node ID from a fully qualified name, or null when absent. */
     fun idOf(fullName: String?): String? {
@@ -87,10 +88,15 @@ object NodeIdentity {
         )
         .orEmpty()
 
-    /** True when the name carries no usable identity yet (blank or an "Unknown ..." placeholder). */
+    /**
+     * True when the name carries no usable identity yet: blank, or exactly a placeholder with no node
+     * ID. A person may have "Unknown" in their name, so this must never be a substring match.
+     */
     fun isPlaceholder(fullName: String?): Boolean {
         val name = fullName?.trim().orEmpty()
-        return name.isEmpty() || name.contains("Unknown", ignoreCase = true)
+        if (name.isEmpty()) return true
+        if (idOf(name) != null) return false
+        return name.equals(UNKNOWN_NAME, ignoreCase = true) || name.equals(SHORT_UNKNOWN_NAME, ignoreCase = true)
     }
 
     /** Re-attaches a node ID to a (possibly truncated) advertised display name. */
