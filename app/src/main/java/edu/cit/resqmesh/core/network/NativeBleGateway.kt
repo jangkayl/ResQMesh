@@ -51,7 +51,9 @@ class NativeBleGateway(private val manager: NativeBleManager) : MeshNetworkGatew
     override fun disconnectFromEndpoint(endpointId: String) = manager.disconnectFromEndpoint(endpointId)
     override fun blockDevice(deviceName: String) = manager.blockDevice(deviceName)
     override fun unblockDevice(deviceName: String) = manager.unblockDevice(deviceName)
-    override fun denyDirectIdentity(deviceName: String) = manager.denyDirectIdentity(deviceName)
+    override var onBlockedPeerPulse by manager::onBlockedPeerPulse
+    override fun denyDirectIdentity(deviceName: String, teardownGraceMs: Long) =
+        manager.denyDirectIdentity(deviceName, teardownGraceMs)
     override fun releaseDirectIdentity(deviceName: String) = manager.releaseDirectIdentity(deviceName)
     override fun disconnectDirectIdentity(deviceName: String, reason: String) = manager.disconnectDirectIdentity(deviceName, reason)
     override fun isDeviceBlocked(deviceName: String) = manager.isDeviceBlocked(deviceName)

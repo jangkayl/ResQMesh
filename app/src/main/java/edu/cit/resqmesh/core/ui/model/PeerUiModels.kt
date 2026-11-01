@@ -22,8 +22,14 @@ data class NodeItemData(
     val isConnected: Boolean = false,
     val isActiveRelay: Boolean = false,
     val isBlocked: Boolean = false,
+    /** The active block was installed by the other person (REMOTE origin). */
+    val blockedByThem: Boolean = false,
+    /** We released our side, but the other person may still refuse the link (tombstone kept). */
+    val releasedLocally: Boolean = false,
     /** Human friendly text for display only. Falls back to [name] when empty. */
     val label: String = "",
     /** Current repository-verified path. Empty for nearby/offline peers. */
-    val route: List<String> = emptyList()
+    val route: List<String> = emptyList(),
+    /** Best-effort: another ready neighbour may reach this peer if the direct link is blocked. */
+    val hasAlternateRoute: Boolean = true
 )

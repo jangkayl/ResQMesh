@@ -42,6 +42,8 @@ class BleStateStore(val guards: InboundGuards = InboundGuards()) {
     val connectionInteractionTimes = ConcurrentHashMap<String, Long>()
     val l2capOutboundProgressTimes = ConcurrentHashMap<String, Long>()
     val blockedDevices = ConcurrentHashMap<String, Boolean>()
+    /** NodeIdentity.key -> wall-clock deadline before which the gate must not tear a block handshake down. */
+    val blockTeardownDeadlines = ConcurrentHashMap<String, Long>()
     val orphanDetectionTime = ConcurrentHashMap<String, Long>()
     
     val endpointLastSeen = ConcurrentHashMap<String, Long>()

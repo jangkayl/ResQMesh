@@ -38,7 +38,7 @@ MeshRepository keeps public flows/router and initialization-time callback bindin
 
 Keystore-derived stable IDs survive endpoint/name changes. Room names resolve by ID; advertisements cannot overwrite them. Headers resolve current names; history preserves recorded labels. Names retain #nodeId; setup omits technical tags, while compatible incoming custom tags remain unverified.
 
-Blocks persist by stable identity. Encrypted BLOCK_REQUEST travels directly or by relay; complementary denial and BLOCK_ACK precede direct teardown. Each phone releases only its local record. Relayed text/private/SOS/receipts/audio remain allowed. Unknown inbound addresses require a gated direct SYSTEM identity before ordinary traffic/publication; blocked identity pulses retire the captured generation.
+Blocks persist by stable identity. Encrypted BLOCK_REQUEST travels directly or by relay; complementary denial and BLOCK_ACK precede teardown after a pulse-hold grace. Each phone releases only its local record. Relayed text/private/SOS/receipts/audio remain allowed. Blocked-link frames drop except block control. Unadmitted-link frames stay ungated; blocked identity pulses retire the captured generation.
 
 Keep direct READY, direct configuring/unresponsive, routed, recently advertising and offline states separate. Directed per-origin topology snapshots accept empty withdrawals, reject old versions, refresh fully every 30 seconds and lease cached fragments for 90 seconds. Only identified, unblocked READY neighbors are advertised. UI/delivery paths root at current READY first hops; stale reverse snapshots cannot restore withdrawals. Relayed SYSTEM pulses never rename their physical forwarder and have a four-hop limit. Legacy name-only topology is display-only.
 

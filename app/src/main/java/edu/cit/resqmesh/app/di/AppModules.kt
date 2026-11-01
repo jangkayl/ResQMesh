@@ -220,6 +220,8 @@ val domainModule = module {
             observePrivateMessages = ObservePrivateMessagesUseCase(get()),
             observePeerNames = ObservePeerNamesUseCase(get()),
             observeBlockedDeviceNames = ObserveBlockedDeviceNamesUseCase(get()),
+            observeBlockRelationships = ObserveBlockRelationshipsUseCase(get()),
+            hasAlternateRoute = HasAlternateRouteUseCase(get()),
             linkDiagnostics = LinkDiagnosticsUseCase(get())
         )
     }

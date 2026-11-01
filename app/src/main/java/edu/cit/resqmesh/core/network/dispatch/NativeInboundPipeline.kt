@@ -7,6 +7,7 @@ import edu.cit.resqmesh.core.logging.trace.TraceDir
 import edu.cit.resqmesh.core.logging.trace.TraceDropReason
 import edu.cit.resqmesh.core.logging.trace.TraceStage
 import edu.cit.resqmesh.core.network.DetachedSender
+import edu.cit.resqmesh.core.network.MeshPayload
 import edu.cit.resqmesh.core.network.PacketTraceEmitter
 import edu.cit.resqmesh.core.network.ReliableMeshTransfers
 import edu.cit.resqmesh.core.network.bluetooth.state.BleLinkRole
@@ -37,7 +38,10 @@ internal class NativeInboundPipeline(
     private val sendSystemPulse: () -> Unit,
     private val connectedListener: () -> ((ConnectedDevice) -> Unit)?,
     private val livenessListener: () -> ((String, Boolean) -> Unit)?,
-    private val dispatch: (String, ByteArray) -> Unit
+    private val dispatch: (String, ByteArray) -> Unit,
+    private val blockedPulseHandler: () -> ((String, MeshPayload) -> Boolean)? = { null },
+    private val clock: () -> Long = System::currentTimeMillis,
+    private val blockedDeliveryGraceMs: Long = BLOCKED_DELIVERY_GRACE_MS
 ) {
     private val transportGeneration get() = generation()
     private val myNodeId get() = nodeIdentity()
@@ -91,6 +95,12 @@ internal class NativeInboundPipeline(
             }
             // PIECE/ACK frames returned above: a 2 MiB transfer is ~2048 one-KiB pieces, far above 64 frames/s,
             // and their volume is already bounded by the bytes/s budget and the transfer window.
+            if (BlockGatePolicy.dropsFrame(store.connectedEndpointNames[endpointId], isDeviceBlocked, payload)) {
+                PacketTraceEmitter.drop(
+                    payload, TraceDropReason.VALIDATOR_REJECTED, endpointId, payloadBytes.size, transport
+                )
+                return
+            }
             if (!store.guards.admitFrame("$endpointId/frames")) {
                 PacketTraceEmitter.drop(payload, TraceDropReason.FRAME_RATE, endpointId, payloadBytes.size, transport)
                 return
@@ -105,15 +115,31 @@ internal class NativeInboundPipeline(
             // published or normal traffic is dispatched. Relayed packets never take this path.
             val isDirectIdentityPulse = payload.type == "SYSTEM" && payload.routePath.isEmpty() && payload.senderName.isNotEmpty()
             if (isDirectIdentityPulse && isDeviceBlocked(payload.senderName)) {
-                AppLogger.d("BLE_MESH", "Identity gate rejected direct blocked peer ${payload.senderName} on $endpointId")
+                val gateKey = NodeIdentity.key(payload.senderName)
+                val now = clock()
+                if (BlockGatePolicy.holdsPulse(store.blockTeardownDeadlines[gateKey], now)) {
+                    AppLogger.d("BLE_MESH", "Identity gate holding blocked peer ${payload.senderName}")
+                    return
+                }
+                store.blockTeardownDeadlines.remove(gateKey)
                 val rejectedLinks = BleLinkRole.entries.mapNotNull { store.links.current(endpointId, it) }
-                handler.post {
-                    if (!isTransportGenerationCurrent(capturedGeneration)) return@post
+                // A locally pending block whose request never reached the peer: deliver it on this fresh link,
+                // keep the link open for the ACK, then close through the same ownership-checked retirement.
+                val delivered = blockedPulseHandler()?.invoke(endpointId, payload) == true
+                if (delivered) {
+                    store.blockTeardownDeadlines[gateKey] = now + blockedDeliveryGraceMs
+                    AppLogger.d("BLE_MESH", "Identity gate delivered block request to ${payload.senderName}")
+                } else {
+                    AppLogger.d("BLE_MESH", "Identity gate rejected blocked peer ${payload.senderName} on $endpointId")
+                }
+                val retire = Runnable {
+                    if (!isTransportGenerationCurrent(capturedGeneration)) return@Runnable
                     // The receiving socket can still be Unknown Node. Retire it by captured ownership,
                     // never by the unbound name, and never retire a replacement on the same endpoint.
                     if (store.links.ownsEndpoint(endpointId, rejectedLinks)) disconnectFromEndpoint(endpointId)
                     disconnectDirectIdentity(payload.senderName, "identity gate")
                 }
+                if (delivered) handler.postDelayed(retire, blockedDeliveryGraceMs) else handler.post(retire)
                 return
             }
 
@@ -163,5 +189,10 @@ internal class NativeInboundPipeline(
         }
 
         dispatch(endpointId, payloadBytes)
+    }
+
+    private companion object {
+        /** Mirrors the block ACK grace: how long a delivered request keeps the link open. */
+        const val BLOCKED_DELIVERY_GRACE_MS = 1_000L
     }
 }

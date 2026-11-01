@@ -28,14 +28,34 @@ internal fun networkStatus(kind: NodeKind): String = when (kind) {
     NodeKind.BLOCKED_OFFLINE -> "Blocked"
 }
 
-internal fun networkSummaryLabel(nodes: List<NodeItemData>): String = when {
-    nodes.any { it.kind == NodeKind.DIRECT } -> "${nodes.count { it.kind == NodeKind.DIRECT }} direct"
-    nodes.any { it.kind == NodeKind.RELAY || it.kind == NodeKind.HOPPED } -> "${nodes.count { it.kind == NodeKind.RELAY || it.kind == NodeKind.HOPPED }} relayed"
-    nodes.isNotEmpty() -> "${nodes.size} found"
-    else -> "No people nearby"
+/**
+ * Chip text for a row. A blocked row says where the person is, not that a link exists: a socket still
+ * present on a blocked peer is being closed, so it reads "Closing link" rather than Direct or Connecting.
+ */
+internal fun networkStatus(node: NodeItemData): String {
+    if (!node.isBlocked) return networkStatus(node.kind)
+    val where = when (node.kind) {
+        NodeKind.DIRECT, NodeKind.UNRESPONSIVE, NodeKind.HANDSHAKING -> "Closing link"
+        NodeKind.RELAY, NodeKind.HOPPED -> "Relayed"
+        NodeKind.DISCOVERED, NodeKind.SYNCING -> "Nearby"
+        NodeKind.OFFLINE, NodeKind.BLOCKED_OFFLINE -> "Offline"
+    }
+    return "Blocked · $where"
 }
 
-@Composable
+/** Blocked peers never count as direct, relayed or found: they are not reachable for a direct link. */
+internal fun networkSummaryLabel(nodes: List<NodeItemData>): String {
+    val usable = nodes.filter { !it.isBlocked }
+    val direct = usable.count { it.kind == NodeKind.DIRECT }
+    val relayed = usable.count { it.kind == NodeKind.RELAY || it.kind == NodeKind.HOPPED }
+    return when {
+        direct > 0 -> "$direct direct"
+        relayed > 0 -> "$relayed relayed"
+        usable.isNotEmpty() -> "${usable.size} found"
+        else -> "No people nearby"
+    }
+}
+
 internal fun networkStatusTone(kind: NodeKind) = when (kind) {
     NodeKind.DIRECT -> ResQStatusTone.Success
     NodeKind.UNRESPONSIVE, NodeKind.HANDSHAKING, NodeKind.SYNCING -> ResQStatusTone.Warning
@@ -43,3 +63,6 @@ internal fun networkStatusTone(kind: NodeKind) = when (kind) {
     NodeKind.DISCOVERED -> ResQStatusTone.Neutral
     NodeKind.OFFLINE, NodeKind.BLOCKED_OFFLINE -> ResQStatusTone.Neutral
 }
+
+internal fun networkStatusTone(node: NodeItemData): ResQStatusTone =
+    if (node.isBlocked) ResQStatusTone.Critical else networkStatusTone(node.kind)

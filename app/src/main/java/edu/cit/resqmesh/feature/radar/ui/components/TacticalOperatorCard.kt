@@ -29,7 +29,7 @@ import edu.cit.resqmesh.core.ui.model.NodeKind
 
 @Composable
 internal fun TacticalOperatorCard(node: NodeItemData, onClick: () -> Unit) {
-    val status = networkStatus(node.kind)
+    val status = networkStatus(node)
     val isLight = MaterialTheme.colorScheme.background.luminance() > 0.5f
     val accentColor = when {
         node.isBlocked -> Color(0xFFFF334B)
@@ -141,7 +141,7 @@ internal fun TacticalOperatorCard(node: NodeItemData, onClick: () -> Unit) {
                 Spacer(Modifier.height(3.dp))
 
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    ResQStatusChip(status, networkStatusTone(node.kind))
+                    ResQStatusChip(status, networkStatusTone(node))
                     if (node.endpointId.isNotBlank()) {
                         Spacer(Modifier.width(8.dp))
                         Text(

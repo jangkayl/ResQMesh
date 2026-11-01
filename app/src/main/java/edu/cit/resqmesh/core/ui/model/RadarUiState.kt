@@ -1,5 +1,6 @@
 package edu.cit.resqmesh.core.ui.model
 
+import edu.cit.resqmesh.core.model.BlockRelationship
 import edu.cit.resqmesh.core.model.ConnectedDevice
 import edu.cit.resqmesh.core.model.ScannedDevice
 import edu.cit.resqmesh.core.model.KnownNode
@@ -10,5 +11,7 @@ data class RadarUiState(
     val recentOfflineDevices: List<ConnectedDevice> = emptyList(),
     val knownNodes: List<KnownNode> = emptyList(),
     val blockedDeviceNames: Set<String> = emptySet(),
+    /** Every stored relationship, including the RELEASED_LOCALLY tombstone, keyed by node identity. */
+    val blockRelationships: Map<String, BlockRelationship> = emptyMap(),
     val topology: Map<String, Set<String>> = emptyMap()
 )

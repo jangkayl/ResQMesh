@@ -186,12 +186,16 @@ internal class BleLinkRetirementController(
         }
     }
 
-    fun denyDirectIdentity(deviceName: String) {
-        store.blockedDevices[NodeIdentity.key(deviceName)] = true
+    /** [teardownGraceMs] > 0 lets a live block handshake finish before the identity gate disconnects. */
+    fun denyDirectIdentity(deviceName: String, teardownGraceMs: Long = 0L) {
+        val key = NodeIdentity.key(deviceName)
+        store.blockedDevices[key] = true
+        if (teardownGraceMs > 0L) store.blockTeardownDeadlines[key] = System.currentTimeMillis() + teardownGraceMs
     }
 
     fun releaseDirectIdentity(deviceName: String) {
         store.blockedDevices.remove(NodeIdentity.key(deviceName))
+        store.blockTeardownDeadlines.remove(NodeIdentity.key(deviceName))
         store.blockedDevices.keys
             .filter { NodeIdentity.matches(it, deviceName) }
             .forEach { store.blockedDevices.remove(it) }

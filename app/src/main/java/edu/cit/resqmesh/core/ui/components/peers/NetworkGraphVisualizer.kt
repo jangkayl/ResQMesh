@@ -80,8 +80,11 @@ fun NetworkGraphVisualizer(
             it.kind == NodeKind.HOPPED || it.kind == NodeKind.DISCOVERED || it.kind == NodeKind.SYNCING
         }.map { it.name }.toSet()
 
+        // Blocked peers in range or relayed stay on the graph in red; out-of-range ones are filtered above.
+        val blockedNames = graphNodes.filter { it.isBlocked }.map { it.name }.toSet()
         val primaryColor = ResQTheme.colors.glowPrimary
         val successColor = ResQTheme.colors.success
+        val blockedColor = ResQTheme.colors.sos
         
         Canvas(modifier = Modifier.fillMaxSize()) {
             val center = Offset(size.width / 2f, size.height / 2f)
@@ -131,7 +134,10 @@ fun NetworkGraphVisualizer(
 
             ring1.forEach { target ->
                 nodePositions[target]?.let { targetPosition ->
-                    drawLine(color = primaryColor.copy(alpha = 0.2f), start = center, end = targetPosition, strokeWidth = 3f)
+                    val lineColor = if (target in blockedNames) blockedColor else primaryColor
+                    drawLine(
+                        color = lineColor.copy(alpha = 0.2f), start = center, end = targetPosition, strokeWidth = 3f
+                    )
                 }
             }
 
@@ -139,6 +145,7 @@ fun NetworkGraphVisualizer(
             nodePositions.forEach { (node, pos) ->
                 val (color, sizeDp) = when {
                     node == centerNode -> Pair(successColor, 14.dp.toPx())
+                    node in blockedNames -> Pair(blockedColor, (if (ring1.contains(node)) 10.dp else 6.dp).toPx())
                     ring1.contains(node) -> Pair(primaryColor, 10.dp.toPx())
                     else -> Pair(Color.Gray, 6.dp.toPx())
                 }

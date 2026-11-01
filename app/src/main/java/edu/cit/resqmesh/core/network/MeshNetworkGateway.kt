@@ -63,7 +63,11 @@ interface MeshNetworkGateway {
     fun disconnectFromEndpoint(endpointId: String)
     fun blockDevice(deviceName: String)
     fun unblockDevice(deviceName: String)
-    fun denyDirectIdentity(deviceName: String)
+    /** Blocked peer with a pending local request reached a fresh link; true when a request was sent on it. */
+    var onBlockedPeerPulse: ((String, MeshPayload) -> Boolean)?
+        get() = null
+        set(@Suppress("UNUSED_PARAMETER") value) {}
+    fun denyDirectIdentity(deviceName: String, teardownGraceMs: Long = 0L)
     fun releaseDirectIdentity(deviceName: String)
     fun disconnectDirectIdentity(deviceName: String, reason: String)
     fun isDeviceBlocked(deviceName: String): Boolean

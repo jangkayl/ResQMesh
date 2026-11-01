@@ -76,6 +76,7 @@ class NativeBleManager(
     var canRetireForBridge: ((String) -> Boolean)? = null
     var onDeviceBlocked: ((String) -> Unit)? = null
     var onDeviceUnblocked: ((String) -> Unit)? = null
+    var onBlockedPeerPulse: ((String, MeshPayload) -> Boolean)? = null
     override var onBlockRequest: ((String, MeshPayload, BlockControlEnvelope) -> Unit)? = null
     override var onBlockAck: ((String, MeshPayload, BlockControlEnvelope) -> Unit)? = null
     override var onDomainEvent: ((String, MeshPayload) -> Unit)? = null
@@ -583,6 +584,7 @@ class NativeBleManager(
         removeHeartbeat = { endpoint -> heartbeatCoordinator.remove(endpoint) },
         disconnectFromEndpoint = ::disconnectFromEndpoint,
         disconnectDirectIdentity = ::disconnectDirectIdentity,
+        blockedPulseHandler = { onBlockedPeerPulse },
         sendSystemPulse = { sendSystemPulse() },
         connectedListener = { onDeviceConnected },
         livenessListener = { onDeviceLivenessChanged },
@@ -663,7 +665,8 @@ class NativeBleManager(
     fun disconnectFromEndpoint(endpointId: String) = linkRetirement.disconnectFromEndpoint(endpointId)
 
     /** Installs direct-link denial by stable identity without tearing down a live control path. */
-    fun denyDirectIdentity(deviceName: String) = linkRetirement.denyDirectIdentity(deviceName)
+    fun denyDirectIdentity(deviceName: String, teardownGraceMs: Long = 0L) =
+        linkRetirement.denyDirectIdentity(deviceName, teardownGraceMs)
 
     fun releaseDirectIdentity(deviceName: String) = linkRetirement.releaseDirectIdentity(deviceName)
 

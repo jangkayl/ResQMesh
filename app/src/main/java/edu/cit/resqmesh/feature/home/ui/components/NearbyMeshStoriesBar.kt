@@ -37,14 +37,22 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import edu.cit.resqmesh.core.ui.theme.ModernMint
 import edu.cit.resqmesh.core.ui.theme.ModernSky
+import edu.cit.resqmesh.core.ui.theme.ResQTheme
 import edu.cit.resqmesh.core.ui.model.NodeItemData
 import edu.cit.resqmesh.core.ui.model.NodeKind
 
-/** Peers shown on Home: blocked peers stay out; recently offline peers stay visible, last. */
+/**
+ * Peers shown on Home: recently offline peers stay visible after active ones, and blocked peers are
+ * shown last (drawn red, never counted as reachable).
+ */
 internal fun homeStoryPeers(nodes: List<NodeItemData>): List<NodeItemData> =
-    nodes
-        .filter { !it.isBlocked && it.kind != NodeKind.BLOCKED_OFFLINE }
-        .sortedBy { it.kind == NodeKind.OFFLINE }
+    nodes.sortedBy {
+        when {
+            it.isBlocked -> 2
+            it.kind == NodeKind.OFFLINE -> 1
+            else -> 0
+        }
+    }
 
 @Composable
 internal fun NearbyMeshStoriesBar(
@@ -72,7 +80,7 @@ internal fun NearbyMeshStoriesBar(
             }
         }
     }
-    val activePeerCount = storyPeers.count { it.kind != NodeKind.OFFLINE }
+    val activePeerCount = storyPeers.count { it.kind != NodeKind.OFFLINE && !it.isBlocked }
 
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Row(
@@ -167,6 +175,7 @@ internal fun NearbyMeshStoriesBar(
                 storyPeers.forEach { peer ->
                     val isOffline = peer.kind == NodeKind.OFFLINE
                     val ringColor = when {
+                        peer.isBlocked -> ResQTheme.colors.sos
                         isOffline -> MaterialTheme.colorScheme.onSurfaceVariant
                         peer.kind == NodeKind.DIRECT -> ModernMint
                         else -> ModernSky
@@ -192,7 +201,11 @@ internal fun NearbyMeshStoriesBar(
                                         text = initial,
                                         style = MaterialTheme.typography.titleMedium,
                                         fontWeight = FontWeight.Bold,
-                                        color = if (isOffline) ringColor else MaterialTheme.colorScheme.onSurface
+                                        color = if (isOffline || peer.isBlocked) {
+                                            ringColor
+                                        } else {
+                                            MaterialTheme.colorScheme.onSurface
+                                        }
                                     )
                                 }
                             }

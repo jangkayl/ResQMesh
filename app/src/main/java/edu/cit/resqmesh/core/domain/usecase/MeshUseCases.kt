@@ -1,5 +1,6 @@
 package edu.cit.resqmesh.core.domain.usecase
 
+import edu.cit.resqmesh.core.model.BlockRelationship
 import edu.cit.resqmesh.core.model.ChatMessage
 import edu.cit.resqmesh.core.model.ConnectedDevice
 import edu.cit.resqmesh.core.model.KnownNode
@@ -42,6 +43,8 @@ data class MeshUseCases(
     val observePrivateMessages: ObservePrivateMessagesUseCase,
     val observePeerNames: ObservePeerNamesUseCase,
     val observeBlockedDeviceNames: ObserveBlockedDeviceNamesUseCase,
+    val observeBlockRelationships: ObserveBlockRelationshipsUseCase,
+    val hasAlternateRoute: HasAlternateRouteUseCase,
     val linkDiagnostics: LinkDiagnosticsUseCase
 )
 
@@ -193,4 +196,13 @@ class LinkDiagnosticsUseCase(private val gateway: MeshNetworkGateway) {
 
 class ObserveBlockedDeviceNamesUseCase(private val repository: MeshNodeRepository) {
     operator fun invoke(): StateFlow<Set<String>> = repository.blockedDeviceNames
+}
+
+class ObserveBlockRelationshipsUseCase(private val repository: MeshNodeRepository) {
+    operator fun invoke(): StateFlow<Map<String, BlockRelationship>> = repository.blockRelationships
+}
+
+/** Best-effort check that a peer is reachable through other phones; never a delivery guarantee. */
+class HasAlternateRouteUseCase(private val repository: MeshNodeRepository) {
+    operator fun invoke(peerName: String): Boolean = repository.hasAlternateRoute(peerName)
 }

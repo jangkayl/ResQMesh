@@ -44,7 +44,7 @@ CI repeats debug build, unit tests, Lint, Android-test compilation, detekt (base
 
 ## D11: Mutual direct-link denial, independent local release
 
-Stable-ID block requests/ACKs establish denial before direct teardown. Both phones persist records and unblock locally. Relayed text/private/SOS/receipts/audio remain allowed. See validation. This is routing-debug policy, not authenticated security.
+Stable-ID block requests/ACKs establish denial before direct teardown. Both phones persist records and unblock locally. Relayed text/private/SOS/receipts/audio remain allowed. No-relay blocks stay hard. This is routing-debug policy, not authenticated security.
 
 ## D12: Conservative recovery and cluster bridging
 

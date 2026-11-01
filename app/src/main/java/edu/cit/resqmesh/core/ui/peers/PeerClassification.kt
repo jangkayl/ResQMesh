@@ -5,6 +5,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import edu.cit.resqmesh.core.model.BlockRelationshipOrigin
+import edu.cit.resqmesh.core.model.BlockRelationshipStatus
 import edu.cit.resqmesh.core.model.NodeIdentity
 import edu.cit.resqmesh.core.ui.model.RadarUiState
 import edu.cit.resqmesh.core.ui.model.NodeItemData
@@ -31,6 +33,9 @@ internal fun classifyRadarNodes(state: RadarUiState): List<NodeItemData> {
     fun blockedNameFor(name: String): String? =
         state.blockedDeviceNames.firstOrNull { NodeIdentity.matches(it, name) }
 
+    fun isBlockedById(nodeId: String): Boolean =
+        nodeId.isNotEmpty() && state.blockedDeviceNames.any { NodeIdentity.idOf(it) == nodeId }
+
     fun label(fullName: String): String {
         val display = NodeIdentity.displayNameOf(fullName).ifBlank { fullName }
         return display
@@ -50,7 +55,10 @@ internal fun classifyRadarNodes(state: RadarUiState): List<NodeItemData> {
                     status = "Linking (Handshaking)",
                     kind = NodeKind.HANDSHAKING,
                     isConnected = true,
-                    isActiveRelay = false
+                    isActiveRelay = false,
+                    // A still-handshaking link keeps its blocked state, matched by name or node ID.
+                    isBlocked = (!NodeIdentity.isPlaceholder(device.name) && blockedNameFor(device.name) != null) ||
+                        isBlockedById(device.nodeId)
                 )
             } else if (!device.isPeerResponsive) {
                 NodeItemData(
@@ -160,7 +168,10 @@ internal fun classifyRadarNodes(state: RadarUiState): List<NodeItemData> {
     // 5. Blocked nodes that are entirely out of range, so the user can still unblock them.
     val visible = directNodes + indirectNodes + discoveredNodes + offlineNodes
     val offlineBlockedNodes = state.blockedDeviceNames
-        .filter { blockedName -> visible.none { NodeIdentity.matches(it.name, blockedName) } }
+        .filter { blockedName ->
+            visible.none { NodeIdentity.matches(it.name, blockedName) } &&
+                state.connectedDevices.none { it.nodeId.isNotEmpty() && NodeIdentity.idOf(blockedName) == it.nodeId }
+        }
         .map { name ->
             NodeItemData(
                 endpointId = "",
@@ -174,5 +185,18 @@ internal fun classifyRadarNodes(state: RadarUiState): List<NodeItemData> {
             )
         }
 
-    return visible + offlineBlockedNodes
+    return (visible + offlineBlockedNodes).map { node -> withRelationship(node, state) }
+}
+
+/** Adds who installed the block and whether our side was released, from the stored relationship. */
+private fun withRelationship(node: NodeItemData, state: RadarUiState): NodeItemData {
+    val relationship = state.blockRelationships.values.firstOrNull { NodeIdentity.matches(it.peerName, node.name) }
+        ?: return node
+    return when {
+        node.isBlocked && relationship.deniesDirectLink ->
+            node.copy(blockedByThem = relationship.origin == BlockRelationshipOrigin.REMOTE)
+        !node.isBlocked && relationship.status == BlockRelationshipStatus.RELEASED_LOCALLY ->
+            node.copy(releasedLocally = true)
+        else -> node
+    }
 }

@@ -105,7 +105,7 @@ class BlockRelationshipStore(private val preferences: SharedPreferences) {
                     replyPublicKey = json.optString("replyPublicKey")
                 )
                 val key = NodeIdentity.key(relationship.peerName)
-                if (key.isNotBlank()) put(key, relationship)
+                if (key.isNotBlank() && isBlockable(relationship.peerName)) put(key, relationship)
             }
         }
     }.getOrDefault(emptyMap())
@@ -126,8 +126,12 @@ class BlockRelationshipStore(private val preferences: SharedPreferences) {
         preferences.edit().putString(KEY_RELATIONSHIPS, array.toString()).apply()
     }
 
-    private companion object {
-        const val PREFERENCES = "resqmesh_block_relationships"
-        const val KEY_RELATIONSHIPS = "relationships_v1"
+    companion object {
+        /** A placeholder or ID-less name would match every unnamed link, so it can never be blocked. */
+        fun isBlockable(peerName: String?): Boolean =
+            !NodeIdentity.isPlaceholder(peerName) && NodeIdentity.idOf(peerName) != null
+
+        private const val PREFERENCES = "resqmesh_block_relationships"
+        private const val KEY_RELATIONSHIPS = "relationships_v1"
     }
 }

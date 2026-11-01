@@ -161,6 +161,7 @@ class MeshRepository(
                 onMessageSeen = ::onNetworkMessageSeen
             )
         )
+        networkManager.onBlockedPeerPulse = { endpoint, payload -> blocks.onBlockedPeerPulse(endpoint, payload) }
     }
 
     private fun onNetworkStatusChanged(status: String): Unit = peers.onNetworkStatusChanged(status)
@@ -244,6 +245,8 @@ class MeshRepository(
     fun blockDevice(deviceName: String) = blocks.blockDevice(deviceName)
 
     fun unblockDevice(deviceName: String) = blocks.unblockDevice(deviceName)
+
+    fun hasAlternateRoute(peerName: String): Boolean = blocks.hasAlternateRoute(peerName)
 
 
 

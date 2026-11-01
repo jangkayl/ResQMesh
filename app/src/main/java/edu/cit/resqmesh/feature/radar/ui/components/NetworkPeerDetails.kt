@@ -103,7 +103,16 @@ internal fun NetworkPeerDetails(
                     fontWeight = FontWeight.Bold
                 )
             }
-            ResQStatusChip(networkStatus(node.kind), networkStatusTone(node.kind))
+            ResQStatusChip(networkStatus(node), networkStatusTone(node))
+        }
+
+        blockNotice(node)?.let { notice ->
+            Text(
+                text = notice,
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = if (node.isBlocked) Color(0xFFFF334B) else MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
 
         // 1. Visual Holographic Known Mesh Path Card
@@ -265,7 +274,7 @@ internal fun NetworkPeerDetails(
                         )
                         Spacer(Modifier.width(8.dp))
                         Text(
-                            text = if (node.isBlocked) "MESSAGE VIA MESH HOP" else "SEND MESSAGE",
+                            text = messageActionLabel(node),
                             fontFamily = FontFamily.Monospace,
                             fontWeight = FontWeight.Black,
                             fontSize = 12.sp,
@@ -280,7 +289,7 @@ internal fun NetworkPeerDetails(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                if (node.kind == NodeKind.DIRECT || node.kind == NodeKind.UNRESPONSIVE) {
+                if (showsDisconnectAction(node)) {
                     Surface(
                         modifier = Modifier
                             .weight(1f)
@@ -302,7 +311,7 @@ internal fun NetworkPeerDetails(
                     }
                 }
 
-                if (node.endpointId.isNotEmpty() && (node.kind == NodeKind.DISCOVERED || node.kind == NodeKind.SYNCING)) {
+                if (showsConnectAction(node)) {
                     Surface(
                         modifier = Modifier
                             .weight(1f)
@@ -324,7 +333,7 @@ internal fun NetworkPeerDetails(
                     }
                 }
 
-                Surface(
+                if (showsBlockAction(node)) Surface(
                     modifier = Modifier
                         .weight(1f)
                         .height(44.dp),
@@ -368,7 +377,7 @@ internal fun NetworkPeerDetails(
         AlertDialog(
             onDismissRequest = { confirmBlock = false },
             title = { Text("Block ${node.label}?") },
-            text = { Text("Your phones will stop connecting directly. Each person must unblock to connect again. Messages may still pass through other phones.") },
+            text = { Text(blockDialogMessage(node.hasAlternateRoute)) },
             confirmButton = { TextButton(onClick = { confirmBlock = false; onBlock() }) { Text("Block", color = Color(0xFFFF5252)) } },
             dismissButton = { TextButton(onClick = { confirmBlock = false }) { Text("Cancel") } }
         )
