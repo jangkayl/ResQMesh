@@ -19,6 +19,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import edu.cit.resqmesh.core.ui.theme.Spacing
 import edu.cit.resqmesh.core.model.DomainEvent
+import edu.cit.resqmesh.core.security.input.TextSanitizer
 import org.json.JSONObject
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -77,7 +78,8 @@ internal fun IncidentActivity(
                             "INCIDENT_OFFER_UPDATED" -> "${evt.actorName} offered help"
                             "INCIDENT_OFFER_WITHDRAWN" -> "${evt.actorName} withdrew their offer"
                             "INCIDENT_LEAD_SELECTED" -> {
-                                val target = runCatching { JSONObject(evt.payloadJson).optString("helperName") }.getOrNull()?.takeIf { it.isNotBlank() } ?: "a helper"
+                                val target = runCatching { JSONObject(evt.payloadJson).optString("helperName") }.getOrNull()
+                                    ?.let(TextSanitizer::inboundPeerName)?.takeIf { it.isNotBlank() } ?: "a helper"
                                 "${evt.actorName} selected $target"
                             }
                             "INCIDENT_LEAD_CONFIRMED" -> "${evt.actorName} confirmed they can help"

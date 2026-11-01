@@ -1,5 +1,7 @@
 package edu.cit.resqmesh.data.repository
 
+import edu.cit.resqmesh.core.security.input.TextField
+import edu.cit.resqmesh.core.security.input.TextSanitizer
 import edu.cit.resqmesh.data.local.entity.DomainEventEntity
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
@@ -48,7 +50,8 @@ object SosProtocol {
 enum class SosIngestion { APPLIED, DUPLICATE, STALE, REJECTED }
 
 fun edu.cit.resqmesh.data.local.entity.SosAlertEntity.asMessage() = edu.cit.resqmesh.core.model.ChatMessage(
-    id = sosId, senderName = originName, text = "$emergencyType emergency", imageBase64 = null, audioBase64 = null,
+    id = sosId, senderName = TextSanitizer.inboundPeerName(originName),
+    text = "${TextSanitizer.inbound(emergencyType, TextField.INCIDENT_TITLE)} emergency", imageBase64 = null, audioBase64 = null,
     locationLat = latitude, locationLng = longitude, isMine = false, timestamp = createdAt,
     isSOS = true, conversationKind = "SOS", sosId = sosId, senderNodeId = originNodeId)
 

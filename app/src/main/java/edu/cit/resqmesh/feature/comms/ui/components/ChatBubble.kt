@@ -1,5 +1,6 @@
 package edu.cit.resqmesh.feature.comms.ui.components
 
+import edu.cit.resqmesh.feature.comms.ui.ReplyQuote
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -207,16 +208,7 @@ fun ChatBubble(
                         Spacer(Modifier.height(2.dp))
                     }
 
-                    val (replyQuote, actualText) = remember(message.text) {
-                        if (message.text.startsWith("> ") && message.text.contains("\n")) {
-                            val firstNewline = message.text.indexOf("\n")
-                            val quote = message.text.substring(2, firstNewline).trim()
-                            val rest = message.text.substring(firstNewline + 1).trim()
-                            quote to rest
-                        } else {
-                            null to message.text
-                        }
-                    }
+                    val (replyQuote, actualText) = remember(message.text) { ReplyQuote.parse(message.text) }
 
                     if (replyQuote != null) {
                         Surface(
@@ -324,7 +316,7 @@ fun ChatBubble(
                                         ) {
                                             Box(contentAlignment = Alignment.Center) {
                                                 Text(
-                                                    text = reader.take(1).uppercase(),
+                                                    text = edu.cit.resqmesh.core.security.input.TextPolicy.firstGrapheme(reader).uppercase(),
                                                     style = MaterialTheme.typography.labelSmall.copy(
                                                         fontSize = 8.sp,
                                                         lineHeight = 8.sp
@@ -371,7 +363,7 @@ fun ChatBubble(
                                         ) {
                                             Box(contentAlignment = Alignment.Center) {
                                                 Text(
-                                                    text = reader.take(1).uppercase(),
+                                                    text = edu.cit.resqmesh.core.security.input.TextPolicy.firstGrapheme(reader).uppercase(),
                                                     style = MaterialTheme.typography.labelSmall.copy(
                                                         fontSize = 8.sp,
                                                         lineHeight = 8.sp

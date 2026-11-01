@@ -1,5 +1,6 @@
 package edu.cit.resqmesh.feature.incident.ui.detail
 
+import edu.cit.resqmesh.core.security.input.TextPolicy
 import edu.cit.resqmesh.core.model.HELP_WORKFLOW_VERSION
 import androidx.compose.animation.*
 import androidx.compose.foundation.BorderStroke
@@ -129,7 +130,7 @@ internal fun SelectedIncidentHelper(
                     ) {
                         Box(contentAlignment = Alignment.Center) {
                             Text(
-                                text = helperName.take(1).uppercase(),
+                                text = TextPolicy.firstGrapheme(helperName).uppercase(),
                                 style = MaterialTheme.typography.titleSmall.copy(
                                     fontSize = 14.sp,
                                     fontWeight = FontWeight.Bold

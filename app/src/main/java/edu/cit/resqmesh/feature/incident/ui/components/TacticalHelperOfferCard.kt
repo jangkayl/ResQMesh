@@ -1,5 +1,6 @@
 package edu.cit.resqmesh.feature.incident.ui.components
 
+import edu.cit.resqmesh.core.security.input.TextPolicy
 import android.text.format.DateUtils
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
@@ -61,7 +62,7 @@ fun TacticalHelperOfferCard(
     }
 
     val displayName = if (helper.isMe) "You" else offer.helperName
-    val initialLetter = (if (helper.isMe) "Y" else offer.helperName.take(1)).uppercase()
+    val initialLetter = (if (helper.isMe) "Y" else TextPolicy.firstGrapheme(offer.helperName)).uppercase()
     val relativeTime = DateUtils.getRelativeTimeSpanString(
         offer.updatedAt,
         System.currentTimeMillis(),

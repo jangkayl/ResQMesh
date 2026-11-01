@@ -295,6 +295,11 @@ class BleRadioController(
         if (value.toByteArray().size <= maxBytes) return value
         var end = value.length
         while (end > 0) {
+            // A lone surrogate encodes as '?', so never cut between a surrogate pair.
+            if (end < value.length && value[end - 1].isHighSurrogate() && value[end].isLowSurrogate()) {
+                end--
+                continue
+            }
             val candidate = value.substring(0, end)
             if (candidate.toByteArray().size <= maxBytes) return candidate
             end--

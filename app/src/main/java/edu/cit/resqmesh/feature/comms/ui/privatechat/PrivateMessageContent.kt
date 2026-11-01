@@ -1,5 +1,6 @@
 package edu.cit.resqmesh.feature.comms.ui.privatechat
 
+import edu.cit.resqmesh.feature.comms.ui.ReplyQuote
 import edu.cit.resqmesh.feature.comms.ui.DeliveryFeedback
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -118,16 +119,7 @@ internal fun PrivateMessageBubble(
                         Spacer(Modifier.height(Spacing.ExtraSmall))
                     }
 
-                    val (replyQuote, actualText) = remember(message.text) {
-                        if (message.text.startsWith("> ") && message.text.contains("\n")) {
-                            val firstNewline = message.text.indexOf("\n")
-                            val quote = message.text.substring(2, firstNewline).trim()
-                            val rest = message.text.substring(firstNewline + 1).trim()
-                            quote to rest
-                        } else {
-                            null to message.text
-                        }
-                    }
+                    val (replyQuote, actualText) = remember(message.text) { ReplyQuote.parse(message.text) }
 
                     if (replyQuote != null) {
                         Surface(

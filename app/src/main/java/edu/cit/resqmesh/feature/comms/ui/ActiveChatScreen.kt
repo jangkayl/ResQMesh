@@ -46,7 +46,6 @@ import edu.cit.resqmesh.core.ui.theme.TestResQMeshTheme
 import edu.cit.resqmesh.core.audio.MediaHelper
 import edu.cit.resqmesh.feature.comms.viewmodel.CommunicationViewModel
 import edu.cit.resqmesh.core.security.input.TextField
-import edu.cit.resqmesh.core.security.input.TextPolicy
 import java.util.Locale
 
 @Composable
@@ -72,7 +71,9 @@ fun ActiveChatScreen(
         recipientCandidates(uiState).firstOrNull { NodeIdentity.matches(it.name, name) }
     }
     val displayName = remember(conversationName, uiState.peerNames) {
-        NodeIdentity.displayNameOf(NodeIdentity.currentName(conversationName, uiState.peerNames)).ifBlank { conversationName }
+        edu.cit.resqmesh.core.security.input.TextSanitizer.inboundPeerName(
+            NodeIdentity.displayNameOf(NodeIdentity.currentName(conversationName, uiState.peerNames)).ifBlank { conversationName }
+        )
     }
     val context = LocalContext.current
     val voiceNoteText = stringResource(R.string.private_chat_voice_note)
@@ -297,8 +298,6 @@ private fun PrivateChatEmptyPreview() {
 }
 
 
-private const val QUOTE_SNIPPET_MAX = 60
-
 /** Bounded "> sender: snippet" quote line (with trailing newline) prepended to a private reply. */
 private fun quotePrefix(replyTo: ChatMessage, peerName: String, photoText: String, voiceNoteText: String): String {
     val sender = if (replyTo.isMine) "Me" else peerName
@@ -308,7 +307,7 @@ private fun quotePrefix(replyTo: ChatMessage, peerName: String, photoText: Strin
         lat != null && lng != null -> "📍 Shared Location (%.4f, %.4f)".format(Locale.US, lat, lng)
         replyTo.imageBase64 != null -> photoText
         replyTo.audioBase64 != null -> voiceNoteText
-        else -> TextPolicy.clampLength(replyTo.text, QUOTE_SNIPPET_MAX).ifBlank { "Attachment" }
+        else -> ReplyQuote.snippet(replyTo.text).ifBlank { "Attachment" }
     }
-    return "> $sender: $snippet\n"
+    return ReplyQuote.prefix(sender, snippet)
 }
