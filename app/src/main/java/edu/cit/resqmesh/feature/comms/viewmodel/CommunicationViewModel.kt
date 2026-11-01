@@ -199,8 +199,14 @@ class CommunicationViewModel(
         return admission != ChatSendGate.Admission.NO_BUDGET
     }
     /** Returns true only when the reply was sent; otherwise the caller keeps its text and attachments. */
-    fun sendSosReply(sosId: String, text: String, audio: String?, image: String?): Boolean {
-        val credits = if (image != null) ImageQuality.STANDARD.credits else 0
+    fun sendSosReply(
+        sosId: String,
+        text: String,
+        audio: String?,
+        image: String?,
+        imageQuality: ImageQuality = ImageQuality.STANDARD
+    ): Boolean {
+        val credits = if (image != null) imageQuality.credits else 0
         if (!imageBudget.canAfford(credits)) return false
         val clean = checkedMessageText(text)
         val admission = if (clean == null) ChatSendGate.Admission.DEBOUNCED

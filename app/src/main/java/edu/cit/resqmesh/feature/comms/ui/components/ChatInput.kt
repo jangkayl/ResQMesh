@@ -89,8 +89,7 @@ fun ChatInput(
     maxInputLength: Int = TextField.MESSAGE.maxLength,
     sendBudget: ChatBudgetState? = null,
     imageBudget: ImageBudgetState? = null,
-    showLocation: Boolean = true,
-    showImageQuality: Boolean = true
+    showLocation: Boolean = true
 ) {
     val haptics = LocalHapticFeedback.current
     val image = rememberComposerImage(mediaHelper, pendingImage, onImageSelected)
@@ -223,8 +222,7 @@ fun ChatInput(
 
         LocationAcquisitionBanner(isAcquiringLocation)
 
-        ComposerAttachmentPreview(pendingImage, pendingAudio, onClearImage, onClearAudio, image, imageBudget,
-            showImageQuality)
+        ComposerAttachmentPreview(pendingImage, pendingAudio, onClearImage, onClearAudio, image, imageBudget)
 
         ComposerActionPopup(isTyping, isPopupExpanded, isAcquiringLocation, showLocation,
             onPickImage = {

@@ -38,8 +38,7 @@ internal fun ComposerAttachmentPreview(
     onClearImage: () -> Unit,
     onClearAudio: () -> Unit,
     image: ComposerImageController,
-    imageBudget: ImageBudgetState?,
-    showImageQuality: Boolean = true
+    imageBudget: ImageBudgetState?
 ) {
     // 2. Pending Attachments Preview
     if (pendingImage != null || pendingAudio != null) {
@@ -80,7 +79,7 @@ internal fun ComposerAttachmentPreview(
                         )
                     }
                 }
-                if (pendingImage != null && showImageQuality) ImageQualityRow(image, imageBudget)
+                if (pendingImage != null) ImageQualityRow(image, imageBudget)
             }
         }
     }

@@ -19,7 +19,7 @@ Late or new phones should receive recent Community and SOS chat without slowing 
 1. **Sender time (done on `fix/late-relay-pacing`):** received conversation rows keep sender time, capped at local time.
 2. **Text sync (local):** `ChatSyncCoordinator` reads a neighbor's index on READY, when known alerts change and every 30 seconds, then pulls missing text rows by id. Rows are accepted only when requested on that link and matching their index entry. Pages stay under about 3.5 KiB, except one longer message.
 3. **Media sync (local):** `ChatMediaPuller` follows after a 10-second settle, one message at a time, newest first, using `ReliableMeshTransfers` late copies. Limits are 10 per conversation and 1 MiB per neighbor. Copies carry `chatSync`, skip the origin limit and are stored only if requested from that neighbor. Room 12 adds sync state for placeholders, the `Synced · time` label, the `Synced history above` divider and the catch-up line. Synced rows skip unread counts and seen receipts. A live or late copy also fills a waiting placeholder.
-4. **SOS voice and images (local):** media is allowed while an SOS is active, through `ChatInput` with the lowest image tier and no location button, because the alert carries location. All phones need the same build.
+4. **SOS voice and images (local):** media is allowed while an SOS is active, through `ChatInput` with the same image quality choice and credits as Community, and no location button, because the alert carries location. All phones need the same build.
 
 ## Limits
 

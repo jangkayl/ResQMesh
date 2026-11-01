@@ -25,7 +25,7 @@ Use debug builds on phones A, B and C. C is the late joiner, with its app fully 
 11. **Media cap:** send 12 images in Community with C closed. Expect the newest 10 to fill and two rows showing `Image not synced`.
 12. **Live first:** during step 11, send a text and a short image from C. Expect them ahead of older images. Report both times.
 13. **Late labels:** expect grey `Synced · time` on synced rows, one `Synced history above` divider, `Catching up · 3 of 10` until media ends, no unread badge and no chat jump.
-14. **SOS media:** in an active SOS, send a voice note, gallery image and camera photo from each side. Expect all on the other phones. Expect no location button or image quality choice, and a read-only thread after the SOS ends.
+14. **SOS media:** in an active SOS, send a voice note, gallery image and camera photo from each side. Expect all on the other phones. Expect no location button, and a read-only thread after the SOS ends. Expect the same Standard, High and Very High choice as Community. Send a Very High image from each side and the same image in Community, then compare sharpness and report both send times. A second image sent too soon waits for credits, as in Community.
 15. **Upgrade:** install over an existing build. Expect old chat history intact with no `Synced` labels.
 16. **Reconnect:** turn Bluetooth off on C, send texts from A, turn it on. Expect the missed texts within about 40 seconds, with no duplicates.
 17. **Blocked sender:** block a sender on C. Expect its messages not to sync.
@@ -40,4 +40,4 @@ Search `CHAT_SYNC` (`pass peer=`, `pending peer=`, `media filled`), `TRANSFER_RE
 
 ## Report
 
-Build identity, devices, per-step pass or fail, the timings from steps 1, 3, 4 and 12, and any bounded excerpt with no private content.
+Build identity, devices, per-step pass or fail, the timings from steps 1, 3, 4, 12 and 14, and any bounded excerpt with no private content.

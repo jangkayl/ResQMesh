@@ -14,7 +14,7 @@ import edu.cit.resqmesh.feature.comms.ui.components.ChatInput
 import edu.cit.resqmesh.feature.comms.ui.components.VoiceNoteLimitEffect
 import edu.cit.resqmesh.feature.comms.viewmodel.CommunicationViewModel
 
-/** The public composer for an active SOS: images stay at the lowest tier, and the alert carries location. */
+/** The public composer for an active SOS, without the location button because the alert carries location. */
 @Suppress("FunctionNaming")
 @Composable
 internal fun SosConversationComposer(
@@ -27,6 +27,7 @@ internal fun SosConversationComposer(
     val sendBudget by vm.chatBudgetState.collectAsState()
     val imageBudget by vm.imageBudgetState.collectAsState()
     var pendingImage by remember(sosId) { mutableStateOf<String?>(null) }
+    var pendingImageQuality by remember(sosId) { mutableStateOf(ImageQuality.STANDARD) }
     var pendingAudio by remember(sosId) { mutableStateOf<String?>(null) }
     var isRecording by remember(sosId) { mutableStateOf(false) }
     val voiceNoteText = stringResource(R.string.private_chat_voice_note)
@@ -41,7 +42,7 @@ internal fun SosConversationComposer(
         inputText = input,
         onTextChange = onInputChange,
         pendingImage = pendingImage,
-        onImageSelected = { image: String, _: ImageQuality -> pendingImage = image },
+        onImageSelected = { image, quality -> pendingImage = image; pendingImageQuality = quality },
         onClearImage = { pendingImage = null },
         pendingAudio = pendingAudio,
         onClearAudio = { pendingAudio = null },
@@ -62,7 +63,7 @@ internal fun SosConversationComposer(
                 else -> ""
             }
             // False means nothing was sent: keep the text and attachments.
-            if (text.isNotBlank() && vm.sendSosReply(sosId, text, pendingAudio, pendingImage)) {
+            if (text.isNotBlank() && vm.sendSosReply(sosId, text, pendingAudio, pendingImage, pendingImageQuality)) {
                 onInputChange("")
                 pendingImage = null
                 pendingAudio = null
@@ -72,7 +73,6 @@ internal fun SosConversationComposer(
         mediaHelper = media,
         sendBudget = sendBudget,
         imageBudget = imageBudget,
-        showLocation = false,
-        showImageQuality = false
+        showLocation = false
     )
 }
