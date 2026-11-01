@@ -4,6 +4,7 @@ import edu.cit.resqmesh.core.model.ChatMessage
 import edu.cit.resqmesh.core.model.NodeIdentity
 import edu.cit.resqmesh.data.local.dao.MessageDao
 import edu.cit.resqmesh.data.local.entity.MessageEntity
+import edu.cit.resqmesh.data.local.entity.StoredNameList
 import edu.cit.resqmesh.data.local.entity.toMessageEntity
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -67,17 +68,17 @@ class RoomMessageStore(private val dao: MessageDao) : MessageStore {
     override suspend fun markDelivered(messageId: String, readerName: String) {
         val message = dao.getMessageById(messageId) ?: return
         if (message.isMine && message.targetName != null && !NodeIdentity.matches(message.targetName, readerName)) return
-        val readers = message.deliveredTo.split(',').filter { it.isNotEmpty() && it != "FAILED" && it != "PENDING" }
+        val readers = StoredNameList.decode(message.deliveredTo).filter { it.isNotEmpty() && it != "FAILED" && it != "PENDING" }
         if (readerName in readers) return
-        dao.updateDeliveredTo(messageId, (readers + readerName).joinToString(","))
+        dao.updateDeliveredTo(messageId, StoredNameList.encode(readers + readerName))
     }
 
     override suspend fun markSeen(messageId: String, readerName: String) {
         val message = dao.getMessageById(messageId) ?: return
         if (message.isMine && message.targetName != null && !NodeIdentity.matches(message.targetName, readerName)) return
-        val readers = message.seenBy.split(',').filter { it.isNotEmpty() && it != "FAILED" && it != "PENDING" }
+        val readers = StoredNameList.decode(message.seenBy).filter { it.isNotEmpty() && it != "FAILED" && it != "PENDING" }
         if (readerName in readers) return
-        dao.updateSeenBy(messageId, (readers + readerName).joinToString(","))
+        dao.updateSeenBy(messageId, StoredNameList.encode(readers + readerName))
     }
 
     override suspend fun markFailed(messageId: String) {
