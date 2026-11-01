@@ -22,6 +22,10 @@ Three phones, A, B and C, all on the same build. A and C are in radio range of e
 
 Grep a bounded window for `block acknowledgement received`, `block request acknowledged`, `Identity gate rejected`, `Skipping GATT connect to blocked peer`.
 
+## Known limits
+
+With no relay, the block stays hard: text and SOS wait for a relay, and the block dialog warns first. BLOCK_REQUEST is unauthenticated, so it can be forged. A reinstall creates a new ID that escapes a block. Frames on unadmitted links are not gated. These belong to SEC-01.
+
 ## Report
 
 Step, repetition, APK, phone models, time, expected and actual result, and capture folder. If step 4 or 7 shows sustained reconnecting, record it: that is the trigger for the conditional reconnect backoff. Mark unavailable steps UNTESTED.
