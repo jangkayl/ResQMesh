@@ -8,7 +8,7 @@ Prepare for the capstone demo (within two weeks of 2026-10-16) and deployment re
 
 ## Working by user report
 
-The current candidate is the October 6 APK `1AE82B6C...`; the user reports F1–F14 PASS on it, including the incident UI repair cases. Earlier October 4 reports cover four-phone text/receipts/notes/SOS, recovery, background, blocking, incidents and offline maps. Models, counts, timings and transport coverage were not supplied, so these are qualitative results, not measured rates.
+The current candidate is the October 6 APK `1AE82B6C...`; the user reports F1–F14 PASS on it, including the incident UI repair cases. Earlier October 4 reports cover four-phone text/receipts/notes/SOS, recovery, background, blocking, incidents and offline maps. Models, counts, timings and transport coverage were not supplied, so these are qualitative results.
 
 ## Implemented
 
@@ -29,7 +29,7 @@ Behavior and source ownership are in [architecture](architecture.md); accepted p
 | TRUST-01 | Work/evidence pending | First-contact verification and defined identity/security guarantees. |
 | SEC-01 | Phase A user-reported PASS; Phase B on `feat/security-phase-b` (2026-10-18), gate passes, no device evidence; user-reported spam loss and SOS re-raise drop (2026-10-29) fixed by sender budgets | Run the [Phase B card](testing/security-phase-b-card.md) after the freeze, then merge. Phases C–E wait ([plan](plans/security-hardening.md)). SOS raises budgeted; sync-delivered active SOS alarm. |
 
-Basic block, incident, SOS and recovery checks have user-reported successes; their adversarial, load and repeated cases remain pending, not known defects. See the [physical checklist](testing/physical-reliability-tests.md).
+Basic block, incident, SOS and recovery checks have user-reported successes; their adversarial, load and repeated cases remain pending. See the [physical checklist](testing/physical-reliability-tests.md).
 
 **Layer boundaries / P2 subset** (`refactor/layer-boundaries`, [plan](plans/layer-boundaries.md)): The user reported the [smoke card](testing/layer-boundaries-smoke-card.md) passing on three phones (2026-10-17); merged.
 
@@ -64,6 +64,8 @@ Basic block, incident, SOS and recovery checks have user-reported successes; the
 **Text input hardening** (`fix/text-input-hardening`): [card](testing/text-input-hardening-card.md) pending.
 
 **Block hardening** (`fix/block-hardening`): [card](testing/block-hardening-card.md) pending.
+
+**Late relay pacing** (`fix/late-relay-pacing`): [card](testing/late-relay-pacing-card.md) pending.
 
 ## Next actions
 

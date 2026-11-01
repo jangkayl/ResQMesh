@@ -41,6 +41,10 @@ internal fun inboundDisplayText(text: String, hasAttachment: Boolean): String {
     return if (clean.isEmpty() && !hasAttachment) MESSAGE_UNAVAILABLE else clean
 }
 
+/** Sender time, so a late copy keeps its age. A missing or future time falls back to [receivedAt]. */
+internal fun senderTime(sentAt: Long, receivedAt: Long): Long =
+    if (sentAt > 0) minOf(sentAt, receivedAt) else receivedAt
+
 /** A decoded chat frame as the transport hands it to the repository. */
 internal data class InboundChatPayload(
     val endpointId: String,
@@ -93,7 +97,7 @@ internal class MeshInboundMessages(
     private val readyPeers: () -> List<ConnectedDevice>,
     private val observeName: (String, Boolean) -> Unit,
     private val outboxMutex: Mutex,
-    clock: () -> Long = System::currentTimeMillis
+    private val clock: () -> Long = System::currentTimeMillis
 ) {
     private val receiptReplays = ReceiptReplayLimiter(clock = clock)
     private val myNodeName get() = localName()
@@ -242,7 +246,7 @@ internal class MeshInboundMessages(
             val message = ChatMessage(p.id, TextSanitizer.inboundPeerName(p.senderName),
                 inboundDisplayText(p.text, imageBase64 != null || audioBase64 != null || p.locationLat != null),
                 imageBase64, audioBase64, p.locationLat, p.locationLng,
-                false, timestamp = System.currentTimeMillis(), isHopped = p.relayHopCount > 0,
+                false, timestamp = senderTime(p.createdAt, clock()), isHopped = p.relayHopCount > 0,
                 outboundRoute = p.routePath, conversationKind = p.conversationKind, channelId = p.channelId,
                 sosId = p.sosId, senderNodeId = p.senderNodeId)
             messageStore.save(message, null)

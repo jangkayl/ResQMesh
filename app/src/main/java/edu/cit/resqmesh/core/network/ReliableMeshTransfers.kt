@@ -56,6 +56,7 @@ internal class ReliableMeshTransfers(
     private val relayFailures = mutableSetOf<Pair<String, String>>()
     private val relayHolds = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
     private val rosterLogs = BoundedLruMap<String, String>(MAX_ROSTER_LOGS)
+    private val lateRelayPeersSince = mutableMapOf<String, Long>()
     private var lastRelayPass = 0L
     private val outgoingMessages = BoundedLruMap<String, String>(MAX_TRACKED_MESSAGES)
     private var timer = false
@@ -123,16 +124,23 @@ internal class ReliableMeshTransfers(
         }.onFailure { log("TRANSFER_STORAGE_FAILED direction=relay-hold") }
     }
 
-    /** Waits for release: the frozen roster finishes first, then only the window bounds retries. */
+    /**
+     * Waits for release: the frozen roster finishes first, then only the window bounds retries.
+     * Catch-up stays behind live work: each neighbor settles first, then takes one held copy at a time, newest first.
+     */
     private fun forwardHeldRelays() {
         val neighbors = relayPeers()
-        journal.relayHolds().filter { it.stored && it.relayHoldUntil > now() }.forEach { record ->
+        // A neighbor that drops and returns settles again, so link setup always goes first.
+        lateRelayPeersSince.keys.retainAll(neighbors)
+        neighbors.forEach { lateRelayPeersSince.getOrPut(it) { now() } }
+        journal.relayHolds().filter { it.stored && it.relayHoldUntil > now() }
+            .sortedByDescending { it.relayHoldUntil }.forEach { record ->
             val skipped = lateRelaySkips(record, neighbors).toMutableMap()
             val due = neighbors - skipped.keys
             val accepted = mutableSetOf<String>()
             val onward = if (due.isEmpty()) ByteArray(0) else heldRelayBytes(record) ?: return@forEach
             due.forEach { peer ->
-                if (offer(peer, onward, false, durableRelay = true).accepted) accepted += peer
+                if (offer(peer, onward, false, durableRelay = true, lateRelay = true).accepted) accepted += peer
                 else skipped[peer] = "queue_full"
             }
             logRoster(record.payloadId, "late", accepted, skipped)
@@ -156,6 +164,8 @@ internal class ReliableMeshTransfers(
                 peer in record.relayVisited -> peer to "visited"
                 peer in forwarded -> peer to "forwarded"
                 !ready(peer) -> peer to "not_ready"
+                now() - lateRelayPeersSince.getValue(peer) < LATE_RELAY_SETTLE_MS -> peer to "settling"
+                hasOutboundTo(peer) -> peer to "busy"
                 else -> null
             }
         }.toMap()
@@ -164,7 +174,7 @@ internal class ReliableMeshTransfers(
     private fun logRelayEvent(payloadId: String, event: String) =
         log("RELAY_ROSTER payload=${payloadId.take(MAX_LOG_ID)} event=$event")
 
-    @Synchronized fun offer(peer: String, bytes: ByteArray, priority: Boolean, durableRelay: Boolean = false): TransportDispatchResult {
+    @Synchronized fun offer(peer: String, bytes: ByteArray, priority: Boolean, durableRelay: Boolean = false, lateRelay: Boolean = false): TransportDispatchResult {
         if (peer.isBlank() || bytes.size !in 1..TransferJournal.MAX_BYTES) return TransportDispatchResult.REJECTED_INVALID_FRAME
         val payload = runCatching { ProtoBuf.decodeFromByteArray<MeshPayload>(bytes) }.getOrNull()
             ?: return TransportDispatchResult.REJECTED_INVALID_FRAME
@@ -186,7 +196,8 @@ internal class ReliableMeshTransfers(
             try {
                 val record = TransferRecord(peer, id, id, bytes.size, true, payload.id,
                     payload.targetMessageId.ifBlank { payload.id }, priority,
-                    now() + if (durableRelay) RETENTION_MS else NON_DURABLE_RETENTION_MS, durableRelay)
+                    now() + if (durableRelay) RETENTION_MS else NON_DURABLE_RETENTION_MS, durableRelay,
+                    lateRelay = lateRelay)
                 val existing = journal.find(peer, id, true)
                 if (!journal.create(record, bytes)) {
                     if (durableRelay) relayFailures.add(peer to payload.id)
@@ -499,7 +510,7 @@ internal class ReliableMeshTransfers(
 
     private fun dispatchTurn(flight: TransferFlight, perPeer: MutableMap<String, Int>, at: Long) {
         val peer = flight.record.peer
-        if (!ready(peer)) return
+        if (!ready(peer) || yieldsToLive(flight)) return
         if (!flight.queried || (flight.waitingStatus && flight.queryUntil <= at)) {
             sendStatusQuery(flight, perPeer, at)
             return
@@ -507,6 +518,9 @@ internal class ReliableMeshTransfers(
         if (flight.waitingStatus || (perPeer[peer] ?: 0) >= WINDOW) return
         sendNextPiece(flight, perPeer, at)
     }
+
+    private fun yieldsToLive(flight: TransferFlight) = flight.record.lateRelay &&
+        flights.values.any { it.record.peer == flight.record.peer && !it.record.lateRelay }
 
     private fun sendStatusQuery(flight: TransferFlight, perPeer: MutableMap<String, Int>, at: Long) {
         val peer = flight.record.peer
@@ -607,6 +621,8 @@ internal class ReliableMeshTransfers(
         const val ACK_WAIT_MS = 3_000L
         const val RETENTION_MS = 24 * 60 * 60 * 1000L
         const val RELAY_HOLD_MS = 10 * 60 * 1000L
+        /** With the retained tick, late forwarding to a new neighbor starts 10-15 seconds after it is seen. */
+        const val LATE_RELAY_SETTLE_MS = 10_000L
         private const val NON_DURABLE_RETENTION_MS = 90_000L
         private const val QUEUED_STALL_MS = 30_000L
         private const val STARTED_STALL_MS = 60_000L

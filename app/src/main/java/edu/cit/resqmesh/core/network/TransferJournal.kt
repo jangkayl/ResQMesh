@@ -22,7 +22,9 @@ internal data class TransferRecord(
     val requiresRelayRoster: Boolean = false,
     /** Late-forward window. [relayHoldBytes] above zero means the onward copy is still on disk. */
     val relayHoldUntil: Long = 0L, val relayHoldBytes: Int = 0,
-    val relayVisited: List<String> = emptyList()
+    val relayVisited: List<String> = emptyList(),
+    /** An outgoing copy sent from a late-forward hold; it yields the link to live transfers. */
+    val lateRelay: Boolean = false
 )
 
 /** App-private, backup-excluded custody. Caller serializes IO on one worker, never the UI thread. */
