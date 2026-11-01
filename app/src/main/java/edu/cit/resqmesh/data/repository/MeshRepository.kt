@@ -99,7 +99,7 @@ class MeshRepository(
     val isOnline = _isOnline.asStateFlow()
 
     private var myNodeName: String = ""
-    private val sosReplies = sosRepository?.let { SosReplyCapability(it::canReply) }
+    private val sosReplies = sosRepository?.let { SosReplyCapability(it::canReply, it::isKnown) }
     val blockRelationships = blockStore.relationships
     private val blocks: MeshBlockCoordinator = createBlockCoordinator()
     private val outbound: MeshOutboundDelivery = createOutboundDelivery()
@@ -199,6 +199,8 @@ class MeshRepository(
     private fun onNetworkSosCancelled(): Unit = media.onNetworkSosCancelled()
 
     private fun onNetworkConversationMessage(endpoint: String, payload: MeshPayload): Unit = inbound.onNetworkConversationMessage(endpoint, payload)
+    suspend fun ingestSyncedChat(row: edu.cit.resqmesh.data.local.entity.ChatSyncRow) = inbound.ingestSynced(row)
+    suspend fun ingestSyncedMedia(payload: MeshPayload) = inbound.ingestSyncedMedia(payload)
 
 
 

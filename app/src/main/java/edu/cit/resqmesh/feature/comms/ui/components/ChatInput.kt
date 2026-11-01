@@ -88,7 +88,9 @@ fun ChatInput(
     onCancelReply: () -> Unit = {},
     maxInputLength: Int = TextField.MESSAGE.maxLength,
     sendBudget: ChatBudgetState? = null,
-    imageBudget: ImageBudgetState? = null
+    imageBudget: ImageBudgetState? = null,
+    showLocation: Boolean = true,
+    showImageQuality: Boolean = true
 ) {
     val haptics = LocalHapticFeedback.current
     val image = rememberComposerImage(mediaHelper, pendingImage, onImageSelected)
@@ -221,9 +223,10 @@ fun ChatInput(
 
         LocationAcquisitionBanner(isAcquiringLocation)
 
-        ComposerAttachmentPreview(pendingImage, pendingAudio, onClearImage, onClearAudio, image, imageBudget)
+        ComposerAttachmentPreview(pendingImage, pendingAudio, onClearImage, onClearAudio, image, imageBudget,
+            showImageQuality)
 
-        ComposerActionPopup(isTyping, isPopupExpanded, isAcquiringLocation,
+        ComposerActionPopup(isTyping, isPopupExpanded, isAcquiringLocation, showLocation,
             onPickImage = {
                                 haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                 image.pickFromGallery()
@@ -294,7 +297,7 @@ fun ChatInput(
                             )
                         }
 
-                        IconButton(
+                        if (showLocation) IconButton(
                             onClick = onSendLocation,
                             enabled = !isAcquiringLocation,
                             modifier = Modifier.size(38.dp)

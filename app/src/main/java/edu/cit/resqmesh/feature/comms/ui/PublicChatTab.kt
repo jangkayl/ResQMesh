@@ -59,8 +59,12 @@ import edu.cit.resqmesh.core.ui.components.layout.ResQAuroraBackground
 import edu.cit.resqmesh.core.ui.theme.Spacing
 import edu.cit.resqmesh.core.audio.MediaHelper
 import edu.cit.resqmesh.feature.comms.ui.components.ChatBubble
+import edu.cit.resqmesh.feature.comms.ui.components.CatchUpLine
 import edu.cit.resqmesh.feature.comms.ui.components.ChatInput
 import edu.cit.resqmesh.feature.comms.ui.components.SeenByBottomSheet
+import edu.cit.resqmesh.feature.comms.ui.components.SyncedHistoryDivider
+import edu.cit.resqmesh.feature.comms.ui.components.isLiveMessage
+import edu.cit.resqmesh.feature.comms.ui.components.newestSyncedId
 import edu.cit.resqmesh.feature.comms.viewmodel.CommunicationViewModel
 import java.util.Locale
 
@@ -108,6 +112,8 @@ fun PublicChatTab(
         if (latestMessageId != null) listState.scrollToItem(0)
     }
 
+    val newestSynced = remember(sortedMessages) { newestSyncedId(sortedMessages) }
+
     var displayLimit by remember { mutableStateOf(50) }
     val displayedMessages = remember(sortedMessages, displayLimit) {
         sortedMessages.take(displayLimit)
@@ -147,11 +153,14 @@ fun PublicChatTab(
         Scaffold(
             containerColor = androidx.compose.ui.graphics.Color.Transparent,
             topBar = {
-                CommunityHeader(
-                    channelId = channelId,
-                    onBack = onBack,
-                    onChannelSelected = viewModel::setChannel
-                )
+                androidx.compose.foundation.layout.Column {
+                    CommunityHeader(
+                        channelId = channelId,
+                        onBack = onBack,
+                        onChannelSelected = viewModel::setChannel
+                    )
+                    CatchUpLine(sortedMessages)
+                }
             },
             bottomBar = {
                 ChatInput(
@@ -247,22 +256,25 @@ fun PublicChatTab(
                     reverseLayout = true
                 ) {
                     itemsIndexed(displayedMessages, key = { _, message -> message.id }) { index, message ->
-                        if (!message.isMine && !message.seenBy.contains("Me")) {
+                        if (!message.isMine && !message.seenBy.contains("Me") && isLiveMessage(message)) {
                             LaunchedEffect(message.id) {
                                 viewModel.markMessageAsSeen(message.id, isPrivate = false)
                             }
                         }
                         val isLatestInBlock = (index == 0 || displayedMessages[index - 1].senderName != message.senderName)
-                        ChatBubble(
-                            message = message,
-                            mediaHelper = mediaHelper,
-                            showAvatar = isLatestInBlock,
-                            showSenderName = isLatestInBlock,
-                            onUserClick = { onChatSelected(it) },
-                            onShowSeenBy = { readers -> activeSeenReaders = readers },
-                            onReplyClick = { replyingToMessage = it },
-                            onViewMap = onViewMap
-                        )
+                        androidx.compose.foundation.layout.Column {
+                            ChatBubble(
+                                message = message,
+                                mediaHelper = mediaHelper,
+                                showAvatar = isLatestInBlock,
+                                showSenderName = isLatestInBlock,
+                                onUserClick = { onChatSelected(it) },
+                                onShowSeenBy = { readers -> activeSeenReaders = readers },
+                                onReplyClick = { replyingToMessage = it },
+                                onViewMap = onViewMap
+                            )
+                            if (message.id == newestSynced) SyncedHistoryDivider()
+                        }
                     }
                 }
             }

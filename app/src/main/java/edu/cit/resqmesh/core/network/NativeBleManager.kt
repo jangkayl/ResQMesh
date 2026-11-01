@@ -56,6 +56,7 @@ class NativeBleManager(
     var onOutboundFrame: ((OutboundFrameEvent) -> Unit)? = null
     override var onConversationMessage: ((String, MeshPayload) -> Unit)? = null
     override var onSosPacket: ((String, MeshPayload) -> Unit)? = null
+    override var onChatSyncPacket: ((String, MeshPayload) -> Unit)? = null
     val gattServerManager = edu.cit.resqmesh.core.network.bluetooth.gatt.GattServerManager(context, this)
     val gattClientManager = edu.cit.resqmesh.core.network.bluetooth.gatt.GattClientManager(context, this)
     val store = edu.cit.resqmesh.core.network.bluetooth.state.BleStateStore(guards)
@@ -236,6 +237,7 @@ class NativeBleManager(
     )
 
     fun hasPendingTransfer(messageId: String) = reliableTransfers.hasOutbound(messageId)
+    fun sendSyncCopy(nodeId: String, payload: ByteArray) = outboundDispatcher.sendSyncCopy(nodeId, payload)
     fun hasPendingCustody(payloadId: String) = reliableTransfers.hasPendingCustody(payloadId)
     fun markPayloadStored(messageId: String) = reliableTransfers.stored(messageId)
     fun preferredEndpointForPeer(nodeId: String): String? = endpointForPeer(nodeId.uppercase())

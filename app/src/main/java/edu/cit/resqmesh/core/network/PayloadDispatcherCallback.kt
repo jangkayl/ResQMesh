@@ -5,6 +5,7 @@ import edu.cit.resqmesh.core.network.dedup.ExpiringIdCache
 interface PayloadDispatcherCallback {
     fun onConversationMessage(endpointId: String, payload: MeshPayload) {}
     fun onSosPacket(endpointId: String, payload: MeshPayload) {}
+    fun onChatSyncPacket(endpointId: String, payload: MeshPayload) {}
     fun getMyDeviceName(): String
     fun getMyNodeId(): String
     fun getSeenIdCache(): ExpiringIdCache

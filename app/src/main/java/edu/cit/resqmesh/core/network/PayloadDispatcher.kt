@@ -96,7 +96,20 @@ class PayloadDispatcher(
                 callback.onSosPacket(endpointId, payload)
                 return
             }
+            if (payload.type in setOf("CHAT_SYNC_REQ", "CHAT_SYNC_RES")) {
+                if (!admit(endpointId, payload)) {
+                    drop(payload, TraceDropReason.ORIGIN_LIMIT, endpointId, payloadBytes)
+                    return
+                }
+                callback.onChatSyncPacket(endpointId, payload)
+                return
+            }
             if (payload.type == "CONVERSATION") {
+                // Not charged to the origin: the copy is accepted only if this phone asked for its id.
+                if (payload.chatSync) {
+                    callback.onChatSyncPacket(endpointId, payload)
+                    return
+                }
                 if (!admit(endpointId, payload)) {
                     drop(payload, TraceDropReason.ORIGIN_LIMIT, endpointId, payloadBytes)
                     return

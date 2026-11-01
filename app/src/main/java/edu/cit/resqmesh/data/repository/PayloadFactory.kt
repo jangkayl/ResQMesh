@@ -27,11 +27,13 @@ object PayloadFactory {
         ttl: Int = 0,
         conversationKind: String = "COMMUNITY",
         sosId: String = "",
-        senderNodeId: String = ""
+        senderNodeId: String = "",
+        chatSync: Boolean = false
     ): ByteArray {
         val payload = MeshPayload(
             id = msgId,
             type = "CONVERSATION",
+            chatSync = chatSync,
             conversationKind = conversationKind,
             sosId = sosId,
             senderNodeId = senderNodeId,

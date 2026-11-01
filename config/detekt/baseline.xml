@@ -125,7 +125,7 @@
     <ID>CyclomaticComplexMethod:ProfileScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun ProfileScreen( viewModel: SetupViewModel, appearance: AppAppearance, onAppearanceSelected: (AppAppearance) -&gt; Unit, onPermissions: () -&gt; Unit, onOfflineMaps: () -&gt; Unit = {}, onHelp: () -&gt; Unit = {}, onAbout: () -&gt; Unit = {}, onBack: () -&gt; Unit )</ID>
     <ID>CyclomaticComplexMethod:PublicChatTab.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun PublicChatTab( viewModel: CommunicationViewModel, mediaHelper: MediaHelper, onBack: () -&gt; Unit, onChatSelected: (String) -&gt; Unit = {}, onViewMap: (Double, Double, String, String) -&gt; Unit = { _, _, _, _ -&gt; } )</ID>
     <ID>CyclomaticComplexMethod:PublicConversationScreen.kt$@Composable fun PublicConversationScreen( vm: CommunicationViewModel, media: MediaHelper, kind: String, channel: String = "", sosId: String = "", title: String, readOnly: Boolean = false, onBack: () -&gt; Unit, header: @Composable (isCompact: Boolean) -&gt; Unit = {} )</ID>
-    <ID>CyclomaticComplexMethod:ReliableMeshTransfers.kt$ReliableMeshTransfers$@Synchronized fun offer(peer: String, bytes: ByteArray, priority: Boolean, durableRelay: Boolean = false): TransportDispatchResult</ID>
+    <ID>CyclomaticComplexMethod:ReliableMeshTransfers.kt$ReliableMeshTransfers$@Synchronized fun offer(peer: String, bytes: ByteArray, priority: Boolean, durableRelay: Boolean = false, lateRelay: Boolean = false): TransportDispatchResult</ID>
     <ID>CyclomaticComplexMethod:ReliableMeshTransfers.kt$ReliableMeshTransfers$fun frame(envelope: MeshPayload, stage: OutboundFrameEvent.Stage)</ID>
     <ID>CyclomaticComplexMethod:ResQButton.kt$@Composable fun ResQButton( onClick: () -&gt; Unit, modifier: Modifier = Modifier, variant: ButtonVariant = ButtonVariant.Primary, enabled: Boolean = true, contentPadding: PaddingValues = ButtonDefaults.ContentPadding, content: @Composable RowScope.() -&gt; Unit )</ID>
     <ID>CyclomaticComplexMethod:SetupViewModel.kt$SetupViewModel$suspend fun checkHardwareAndGoOnline(context: Context, customName: String, nodeTag: String, teamKey: String): MeshStartError?</ID>
@@ -533,7 +533,7 @@
     <ID>LongParameterList:OutboundFrameReporter.kt$OutboundFrameReporter$(endpoint: String, bytes: ByteArray, stage: OutboundFrameEvent.Stage, transport: String, queuedAt: Long = 0L, startedAt: Long = 0L)</ID>
     <ID>LongParameterList:PayloadDispatcherCallback.kt$PayloadDispatcherCallback$(endpointId: String, msgId: String, senderName: String, text: String, isPrivate: Boolean, isSystem: Boolean, imageBase64: String?, audioBase64: String?, locationLat: Double?, locationLng: Double?, medium: String, routePath: List&lt;String&gt;, channelId: String)</ID>
     <ID>LongParameterList:PayloadFactory.kt$PayloadFactory$( msgId: String, timestamp: Long, senderName: String, targetName: String, text: String, imageBase64: String?, audioBase64: String?, locationLat: Double?, locationLng: Double?, directedRoute: List&lt;String&gt;, targetPubKey: String?, channelId: String, ttl: Int = 0, transmissionId: String = msgId )</ID>
-    <ID>LongParameterList:PayloadFactory.kt$PayloadFactory$( msgId: String, timestamp: Long, senderName: String, text: String, imageBase64: String?, audioBase64: String?, locationLat: Double?, locationLng: Double?, isSOS: Boolean, isSOSCancel: Boolean, channelId: String, ttl: Int = 0, conversationKind: String = "COMMUNITY", sosId: String = "", senderNodeId: String = "" )</ID>
+    <ID>LongParameterList:PayloadFactory.kt$PayloadFactory$( msgId: String, timestamp: Long, senderName: String, text: String, imageBase64: String?, audioBase64: String?, locationLat: Double?, locationLng: Double?, isSOS: Boolean, isSOSCancel: Boolean, channelId: String, ttl: Int = 0, conversationKind: String = "COMMUNITY", sosId: String = "", senderNodeId: String = "", chatSync: Boolean = false )</ID>
     <ID>LongParameterList:PayloadFactory.kt$PayloadFactory$( transmissionId: String, payloadType: String, operationId: String, senderName: String, targetName: String, directedRoute: List&lt;String&gt;, targetPublicKey: String, envelopeJson: String )</ID>
     <ID>LongParameterList:ProfileScreen.kt$( viewModel: SetupViewModel, appearance: AppAppearance, onAppearanceSelected: (AppAppearance) -&gt; Unit, onPermissions: () -&gt; Unit, onOfflineMaps: () -&gt; Unit = {}, onHelp: () -&gt; Unit = {}, onAbout: () -&gt; Unit = {}, onBack: () -&gt; Unit )</ID>
     <ID>LongParameterList:PublicConversationScreen.kt$( vm: CommunicationViewModel, media: MediaHelper, kind: String, channel: String = "", sosId: String = "", title: String, readOnly: Boolean = false, onBack: () -&gt; Unit, header: @Composable (isCompact: Boolean) -&gt; Unit = {} )</ID>
@@ -567,6 +567,7 @@
     <ID>MagicNumber:ActiveSosReminder.kt$650</ID>
     <ID>MagicNumber:AppDatabaseMigrations.kt$&lt;no name provided&gt;$10</ID>
     <ID>MagicNumber:AppDatabaseMigrations.kt$&lt;no name provided&gt;$11</ID>
+    <ID>MagicNumber:AppDatabaseMigrations.kt$&lt;no name provided&gt;$12</ID>
     <ID>MagicNumber:AppDatabaseMigrations.kt$&lt;no name provided&gt;$3</ID>
     <ID>MagicNumber:AppDatabaseMigrations.kt$&lt;no name provided&gt;$4</ID>
     <ID>MagicNumber:AppDatabaseMigrations.kt$&lt;no name provided&gt;$5</ID>
@@ -919,6 +920,7 @@
     <ID>MagicNumber:MeshPayload.kt$MeshPayload$36</ID>
     <ID>MagicNumber:MeshPayload.kt$MeshPayload$37</ID>
     <ID>MagicNumber:MeshPayload.kt$MeshPayload$38</ID>
+    <ID>MagicNumber:MeshPayload.kt$MeshPayload$39</ID>
     <ID>MagicNumber:MeshPayload.kt$MeshPayload$4</ID>
     <ID>MagicNumber:MeshPayload.kt$MeshPayload$5</ID>
     <ID>MagicNumber:MeshPayload.kt$MeshPayload$6</ID>
@@ -2190,7 +2192,7 @@
     <ID>ReturnCount:PrivateTransferProgress.kt$PrivateTransferProgress$fun shouldRetry(now: Long, acceptedAt: Long, retained: Boolean): Boolean</ID>
     <ID>ReturnCount:RecipientReceiptPolicy.kt$RecipientReceiptPolicy$fun accepts(isMine: Boolean, targetName: String?, reader: String, isPrivate: Boolean): Boolean</ID>
     <ID>ReturnCount:RelayForwarder.kt$RelayForwarder$@Synchronized fun forward(id: String, nodeId: String, bytes: ByteArray, priority: Boolean): TransportDispatchResult</ID>
-    <ID>ReturnCount:ReliableMeshTransfers.kt$ReliableMeshTransfers$@Synchronized fun offer(peer: String, bytes: ByteArray, priority: Boolean, durableRelay: Boolean = false): TransportDispatchResult</ID>
+    <ID>ReturnCount:ReliableMeshTransfers.kt$ReliableMeshTransfers$@Synchronized fun offer(peer: String, bytes: ByteArray, priority: Boolean, durableRelay: Boolean = false, lateRelay: Boolean = false): TransportDispatchResult</ID>
     <ID>ReturnCount:ReliableMeshTransfers.kt$ReliableMeshTransfers$private fun dispatchTurn(flight: TransferFlight, perPeer: MutableMap&lt;String, Int&gt;, at: Long)</ID>
     <ID>ReturnCount:ReliableMeshTransfers.kt$ReliableMeshTransfers$private fun handleAck(peer: String, packet: TransferPiece)</ID>
     <ID>ReturnCount:ReliableMeshTransfers.kt$ReliableMeshTransfers$private fun reassemble(peer: String, packet: TransferPiece, assembled: TransferRecord): TransferRecord?</ID>

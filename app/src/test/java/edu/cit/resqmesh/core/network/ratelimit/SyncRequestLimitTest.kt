@@ -20,6 +20,7 @@ class SyncRequestLimitTest {
     @Test fun anyBurstFromTheAdmittedPeerIsServed() {
         repeat(1_000) { assertTrue(request()) }
         repeat(1_000) { assertTrue(request(type = "SOS_SYNC_REQ")) }
+        repeat(1_000) { assertTrue(request(type = "CHAT_SYNC_REQ")) }
     }
 
     @Test fun requestBeforeAdmissionIsServedForTheCoordinatorToCheck() {
@@ -28,6 +29,7 @@ class SyncRequestLimitTest {
 
     @Test fun relayedSyncRequestsAreRejected() {
         assertFalse(request(sender = "C001", hops = 1, route = listOf("Far#C001", "Peer#A001")))
+        assertFalse(request(type = "CHAT_SYNC_REQ", sender = "C001", hops = 1, route = listOf("Far#C001", "Peer#A001")))
     }
 
     @Test fun originMismatchAndSelfOriginClaimsAreRejected() {

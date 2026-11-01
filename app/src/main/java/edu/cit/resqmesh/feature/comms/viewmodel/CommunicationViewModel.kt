@@ -172,7 +172,9 @@ class CommunicationViewModel(
     fun read(key: String) { viewModelScope.launch { conversationRepository.markRead(key, System.currentTimeMillis()) } }
     fun unread(key: String, messages: List<edu.cit.resqmesh.core.model.ChatMessage>): Int {
         val time = conversationStates.value.firstOrNull { it.conversationId == key }?.lastReadAt ?: 0L
-        return messages.count { !it.isMine && it.timestamp > time }
+        return messages.count {
+            !it.isMine && it.timestamp > time && it.syncState == edu.cit.resqmesh.core.model.ChatSyncState.NONE
+        }
     }
     /** Radio voice notes waiting for a send token (held app-wide, see [RadioVoiceHold]). */
     val voiceHeld: StateFlow<Int> = voiceHold.held
@@ -195,6 +197,22 @@ class CommunicationViewModel(
             }
         }
         return admission != ChatSendGate.Admission.NO_BUDGET
+    }
+    /** Returns true only when the reply was sent; otherwise the caller keeps its text and attachments. */
+    fun sendSosReply(sosId: String, text: String, audio: String?, image: String?): Boolean {
+        val credits = if (image != null) ImageQuality.STANDARD.credits else 0
+        if (!imageBudget.canAfford(credits)) return false
+        val clean = checkedMessageText(text)
+        val admission = if (clean == null) ChatSendGate.Admission.DEBOUNCED
+        else sendGate.admit("conv:SOS:$sosId:${mediaKind(image, audio)}")
+        var sent = false
+        if (clean != null && admission == ChatSendGate.Admission.GO) {
+            imageBudget.tryConsume(credits)
+            sent = useCases.sendPublicMessage.sosReply(sosId, clean, audio, image).isNotEmpty()
+            sendGate.settle(sent)
+            if (!sent) imageBudget.refund(credits)
+        }
+        return sent
     }
     fun isOwnSos(alert: edu.cit.resqmesh.core.model.SosAlert): Boolean = sosRepository.isOwnSos(alert)
     fun sosActivity(id: String) = sosRepository.sosActivity(id)

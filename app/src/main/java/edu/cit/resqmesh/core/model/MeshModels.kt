@@ -21,8 +21,19 @@ data class ChatMessage(
     val conversationKind: String = if (isPrivate) "PRIVATE" else "COMMUNITY",
     val channelId: String = "",
     val sosId: String = "",
-    val senderNodeId: String = ""
+    val senderNodeId: String = "",
+    val syncState: Int = ChatSyncState.NONE,
+    /** VOICE or IMAGE while the message came through chat sync; kept after its media arrives. */
+    val syncMediaKind: String = ""
 )
+
+/** How a stored public message reached this phone. Live messages stay [NONE]. */
+object ChatSyncState {
+    const val NONE = 0
+    const val SYNCED = 1
+    const val MEDIA_PENDING = 2
+    const val MEDIA_NOT_SYNCED = 3
+}
 
 data class ConnectedDevice(
     val endpointId: String,

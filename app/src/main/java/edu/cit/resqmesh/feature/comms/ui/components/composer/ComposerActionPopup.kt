@@ -30,6 +30,7 @@ internal fun ComposerActionPopup(
     isTyping: Boolean,
     isPopupExpanded: Boolean,
     isAcquiringLocation: Boolean,
+    showLocation: Boolean,
     onPickImage: () -> Unit,
     onTakePhoto: () -> Unit,
     onPickLocation: () -> Unit,
@@ -95,7 +96,7 @@ internal fun ComposerActionPopup(
                     }
 
                     // Location Sharing Button
-                    Surface(
+                    if (showLocation) Surface(
                         shape = CircleShape,
                         color = ResQTheme.colors.success.copy(alpha = 0.15f),
                         border = BorderStroke(1.dp, ResQTheme.colors.success.copy(alpha = 0.35f)),

@@ -48,7 +48,9 @@ data class MeshPayload(
     @ProtoNumber(36) val identityProtocol: Int = 0,
     @ProtoNumber(37) val identityExchangeId: String = "",
     /** Direct SYSTEM capability only. Legacy peers retain whole-frame compatibility. */
-    @ProtoNumber(38) val transferProtocol: Int = 0
+    @ProtoNumber(38) val transferProtocol: Int = 0,
+    /** A requested history copy for one direct neighbor: never relayed, receipted or played. */
+    @ProtoNumber(39) val chatSync: Boolean = false
 ) {
     override fun equals(other: Any?): Boolean {
         if (this === other) return true

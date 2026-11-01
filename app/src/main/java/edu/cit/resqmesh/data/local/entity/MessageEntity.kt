@@ -22,7 +22,9 @@ data class MessageEntity(
     @androidx.room.ColumnInfo(defaultValue = "'COMMUNITY'") val conversationKind: String = "COMMUNITY",
     @androidx.room.ColumnInfo(defaultValue = "''") val channelId: String = "",
     @androidx.room.ColumnInfo(defaultValue = "''") val sosId: String = "",
-    @androidx.room.ColumnInfo(defaultValue = "''") val senderNodeId: String = ""
+    @androidx.room.ColumnInfo(defaultValue = "''") val senderNodeId: String = "",
+    @androidx.room.ColumnInfo(defaultValue = "0") val syncState: Int = 0,
+    @androidx.room.ColumnInfo(defaultValue = "''") val syncMediaKind: String = ""
 ) {
     fun toChatMessage(): edu.cit.resqmesh.core.model.ChatMessage {
         return edu.cit.resqmesh.core.model.ChatMessage(
@@ -44,7 +46,9 @@ data class MessageEntity(
             conversationKind = conversationKind,
             channelId = channelId,
             sosId = sosId,
-            senderNodeId = senderNodeId
+            senderNodeId = senderNodeId,
+            syncState = syncState,
+            syncMediaKind = syncMediaKind
         )
     }
 }
@@ -68,6 +72,8 @@ fun edu.cit.resqmesh.core.model.ChatMessage.toMessageEntity(targetName: String?)
         conversationKind = this.conversationKind,
         channelId = this.channelId,
         sosId = this.sosId,
-        senderNodeId = this.senderNodeId
+        senderNodeId = this.senderNodeId,
+        syncState = this.syncState,
+        syncMediaKind = this.syncMediaKind
     )
 }

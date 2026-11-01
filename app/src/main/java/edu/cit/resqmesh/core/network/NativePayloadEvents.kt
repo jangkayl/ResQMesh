@@ -4,6 +4,7 @@ package edu.cit.resqmesh.core.network
 interface NativePayloadEvents {
     val onConversationMessage: ((String, MeshPayload) -> Unit)?
     val onSosPacket: ((String, MeshPayload) -> Unit)?
+    val onChatSyncPacket: ((String, MeshPayload) -> Unit)? get() = null
     val onMessageSeen: ((String, String) -> Unit)?
     val onMessageDelivered: ((String, String, List<String>) -> Unit)?
     val onPublicKeyReceived: ((String, String, String) -> Unit)?

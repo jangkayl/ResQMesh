@@ -84,7 +84,7 @@ Large recorded notes must survive disconnects without unbounded memory: protocol
 
 ## D21: Incident history and projection digests
 
-Broadcasts stay the fast path; periodic history/state digest comparison repairs missed incident events. Signed authority and pending dependencies gate completion, and queue acceptance never proves convergence. Intervals and paging: [architecture](architecture.md).
+Broadcasts stay the fast path; periodic history/state digest comparison repairs missed incident events. Signed authority and pending dependencies gate completion, and queue acceptance never proves convergence.
 
 ## D22: Independent conversation and SOS ownership
 
@@ -94,7 +94,7 @@ Deferred designs: [archive index](../archive/docs-superseded-2026-10-04/README.m
 
 ## D23: Preserve behavior during networking decomposition
 
-Structural refactors preserve facade APIs, callback order, generation fences, persistence, queues, routing, crypto and Compose lifetimes, and imply no performance or delivery change. Target 200–400-line owners; NativeBleManager keeps a reviewed 743-line exception. Results: [validation](validation.md).
+Structural refactors preserve facade APIs, callback order, generation fences, persistence, queues, routing, crypto and Compose lifetimes, and imply no performance or delivery change. Target 200–400-line owners; NativeBleManager keeps a reviewed 743-line exception.
 
 ## D24: Private-envelope crypto direction
 
@@ -102,11 +102,11 @@ Hybrid encryption stays; the planned RSA-OAEP envelope was superseded on 2026-10
 
 ## D26: Origin-charged limits and a single wire break
 
-The threat model is a malicious nearby phone. Rate limits charge the originating node after dedup and signature checks, never the relay, and per-link limits only shape traffic. User input limits come from one `TextPolicy`. After the freeze, protocol v2 is one coordinated break (every test phone reinstalled together), and later changes stay compatible. Storage uses SQLCipher with a Keystore-wrapped raw key. Plan: [security hardening](plans/security-hardening.md).
+The threat model is a malicious nearby phone. Rate limits charge the originating node after dedup and signature checks, never the relay, and per-link limits only shape traffic. User input limits come from one `TextPolicy`. After the freeze, protocol v2 is one coordinated break (every test phone reinstalled together), and later changes stay compatible. Storage uses SQLCipher with a Keystore-wrapped raw key.
 
 ## D25: Packages before Gradle modules
 
-Enforce layer boundaries with packages and `scripts/ci/check_boundaries.ps1` ([plan](plans/layer-boundaries.md)). It uses adapters rather than renamed repositories, String-typed models and `feature-no-data`, and adds use cases only for multi-step flows. Cross-feature rules wait for P3. The project stays one module; other behavior-touching refactors wait until after the demo freeze.
+Enforce layer boundaries with packages and `scripts/ci/check_boundaries.ps1` ([plan](plans/layer-boundaries.md)). It uses adapters rather than renamed repositories, String-typed models and `feature-no-data`, and adds use cases only for multi-step flows. The project stays one module; other behavior-touching refactors wait until after the demo freeze.
 
 ## D27: User-controlled location
 
@@ -119,7 +119,7 @@ New Critical/Serious incidents notify everyone unless toggled off; reporter/help
 
 ## D29: Bounded incident sync, paced creation
 
-Sync (protocol 3) carries open and 24 h closed incidents, at most 100, with full history; older stay local. Sync is never rate limited. Per signing key, reports are paced 3 then 1/20 s and offer changes 5/min per incident; receivers pace live broadcasts only; withdrawals and lead decisions are exempt.
+Sync (protocol 3) carries open and 24 h closed incidents, at most 100, with full history; older stay local. Per signing key, reports are paced 3 then 1/20 s and offer changes 5/min per incident; receivers pace live broadcasts only; withdrawals and lead decisions are exempt.
 
 ## D30: Release developer console
 
@@ -135,4 +135,4 @@ No live PTT; older `LIVE_AUDIO` drops. `liveAudioChunk` carries transfers. 30s n
 
 ## D33: Late public media relay
 
-Relays keep public media 10 minutes for later READY neighbors, each once. Finished transfers need no sender link. Text keeps its roster.
+Relays keep public media 10 minutes for later READY neighbors, each once, behind live work. Finished transfers need no sender link. Text keeps its roster. Chat sync pulls the newest 50 Community/SOS texts and 10 attachments, never private or Radio.

@@ -24,4 +24,11 @@ class ConversationPolicyTest {
         assertFalse(ConversationPolicy.autoplay(message("COMMUNITY"), "1", true))
         assertFalse(ConversationPolicy.autoplay(message("RADIO", "1"), "1", false))
     }
+    @Test fun autoplaySkipsLateCopiesButToleratesClockDrift() {
+        val sent = message("RADIO", "1").copy(timestamp = 1_000_000L)
+        val limit = sent.timestamp + ConversationPolicy.MAX_AUTOPLAY_AGE_MS
+        assertTrue(ConversationPolicy.autoplay(sent, "1", true, nowMs = limit))
+        assertFalse(ConversationPolicy.autoplay(sent, "1", true, nowMs = limit + 1))
+        assertTrue(ConversationPolicy.autoplay(sent, "1", true, nowMs = sent.timestamp - 60_000L))
+    }
 }

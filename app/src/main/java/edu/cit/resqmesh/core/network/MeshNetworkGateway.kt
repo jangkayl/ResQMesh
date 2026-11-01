@@ -24,6 +24,9 @@ interface MeshNetworkGateway {
     var onSosPacket: ((String, MeshPayload) -> Unit)?
         get() = null
         set(@Suppress("UNUSED_PARAMETER") value) {}
+    var onChatSyncPacket: ((String, MeshPayload) -> Unit)?
+        get() = null
+        set(@Suppress("UNUSED_PARAMETER") value) {}
     var myDeviceName: String
     var myNodeId: String
     var onDeviceConnected: ((ConnectedDevice) -> Unit)?
@@ -75,6 +78,9 @@ interface MeshNetworkGateway {
     fun broadcastPriorityPayload(payloadBytes: ByteArray, excludeEndpointId: String? = null): BroadcastDispatchResult
     fun sendDirectPayload(targetEndpointId: String, payloadBytes: ByteArray): TransportDispatchResult
     fun sendPriorityPayload(targetEndpointId: String, payloadBytes: ByteArray): TransportDispatchResult
+    /** Queues a history copy for [nodeId] behind live transfers on that link. */
+    fun sendSyncCopy(nodeId: String, payloadBytes: ByteArray): TransportDispatchResult =
+        TransportDispatchResult.REJECTED_NOT_READY
     fun showPrivateMessageNotification(sender: String, text: String) {}
     fun wakePrivateReceipts() {}
     fun broadcastSeenReceipt(

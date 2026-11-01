@@ -82,11 +82,74 @@ class ReliableMeshTransfersTest {
     }
 
     private val relayMark = "RELAY_ROSTER"
-    private fun imageFrame(route: List<String> = listOf("B#B")) = ProtoBuf.encodeToByteArray(MeshPayload(
-        id = "note", type = "MESSAGE", senderName = "Origin#A", routePath = route, imageBytes = ByteArray(8192)))
+    private fun imageFrame(route: List<String> = listOf("B#B"), id: String = "note") =
+        ProtoBuf.encodeToByteArray(MeshPayload(id = id, type = "MESSAGE", senderName = "Origin#A",
+            routePath = route, imageBytes = ByteArray(8192)))
     private fun World.relayed(a: World.Node, b: World.Node) {
         a.engine.offer("B", imageFrame(emptyList()), false); pump()
         assertEquals(1, b.arrived.size)
+    }
+    /** B meets C now, and C finishes settling; moving the clock alone leaves held copies for the next wake. */
+    private fun World.settle(b: World.Node, c: World.Node) {
+        c.online = true; b.neighbors = setOf("C")
+        b.engine.wake("C", reconcile = false)
+        time += ReliableMeshTransfers.LATE_RELAY_SETTLE_MS
+    }
+    private fun World.holdNotes(a: World.Node, b: World.Node, vararg ids: String) = ids.forEach { id ->
+        a.engine.offer("B", imageFrame(emptyList(), id), false); pump()
+        b.engine.relayTargets(id, emptySet(), imageFrame(id = id))
+        advance(1_000)
+    }
+
+    @Test fun newNeighborWaitsToSettleBeforeLateForwardingStarts() {
+        val w = World(); val a = w.Node("A"); val b = w.Node("B"); val c = w.Node("C", online = false)
+        w.relayed(a, b)
+        b.engine.relayTargets("note", emptySet(), imageFrame())
+        w.settle(b, c)
+        w.time -= 1
+        b.engine.wake("C", reconcile = false); w.pump()
+        assertTrue(c.arrived.isEmpty())
+        assertTrue(b.logs.any { it.contains("C:settling") })
+        w.time += 1
+        b.engine.wake("C", reconcile = false); w.pump()
+        assertEquals(1, c.arrived.size)
+    }
+
+    @Test fun neighborThatDropsSettlesAgain() {
+        val w = World(); val a = w.Node("A"); val b = w.Node("B"); val c = w.Node("C", online = false)
+        w.relayed(a, b)
+        b.engine.relayTargets("note", emptySet(), imageFrame())
+        w.settle(b, c)
+        b.neighbors = emptySet(); b.engine.wake()
+        b.neighbors = setOf("C"); b.engine.wake("C", reconcile = false); w.pump()
+        assertTrue(c.arrived.isEmpty())
+    }
+
+    @Test fun heldCopiesGoOneAtATimeNewestFirst() {
+        val w = World(); val a = w.Node("A"); val b = w.Node("B"); val c = w.Node("C", online = false)
+        w.holdNotes(a, b, "oldest", "middle", "newest")
+        w.settle(b, c)
+        repeat(3) { b.engine.wake("C", reconcile = false); w.pump() }
+        assertEquals(listOf("newest", "middle", "oldest"), c.arrived.map { it.id })
+    }
+
+    @Test fun onlyOneHeldCopyIsOfferedWhileThePeerIsBusy() {
+        val w = World(); val a = w.Node("A"); val b = w.Node("B"); val c = w.Node("C", online = false)
+        w.holdNotes(a, b, "first", "second")
+        w.settle(b, c)
+        b.engine.wake("C", reconcile = false)
+        assertEquals(1, b.logs.count { it.startsWith("TRANSFER_RETAINED") && it.contains("nextHop=C") })
+        assertTrue(b.logs.any { it.contains("C:busy") })
+    }
+
+    @Test fun liveTransferFinishesBeforeARunningLateCopyContinues() {
+        val w = World(); val a = w.Node("A"); val b = w.Node("B"); val c = w.Node("C", online = false)
+        w.relayed(a, b)
+        b.engine.relayTargets("note", emptySet(), imageFrame())
+        w.settle(b, c)
+        b.engine.wake("C", reconcile = false)
+        b.engine.offer("C", w.payload("live"), false, durableRelay = true); w.pump()
+        assertEquals(listOf("live", "note"), c.arrived.map { it.id })
     }
 
     @Test fun peerReadyOnlyAfterFirstRelayStillGetsTheImage() {
@@ -95,7 +158,7 @@ class ReliableMeshTransfersTest {
         assertEquals(emptySet<String>(), b.engine.relayTargets("note", emptySet(), imageFrame()))
         assertFalse(b.engine.hasPendingCustody("note"))
         assertTrue(b.engine.hasRelayHold("note"))
-        c.online = true; b.neighbors = setOf("C")
+        w.settle(b, c)
         b.engine.wake("C", reconcile = false); w.pump()
         assertEquals(listOf("B#B"), c.arrived.single().routePath)
         assertTrue(b.logs.any { it.contains("$relayMark payload=note event=late chosen=C") })
@@ -177,6 +240,8 @@ class ReliableMeshTransfersTest {
         assertTrue(restarted.engine.hasRelayHold("note"))
         assertTrue(restarted.engine.alreadyForwarded("note", "C"))
         d.online = true; restarted.neighbors = setOf("C", "D")
+        restarted.engine.wake("D", reconcile = false)
+        w.time += ReliableMeshTransfers.LATE_RELAY_SETTLE_MS
         restarted.engine.wake("D", reconcile = false); w.pump()
         assertEquals(1, c.arrived.size)
         assertEquals(1, d.arrived.size)

@@ -1,6 +1,7 @@
 package edu.cit.resqmesh.data.repository.mesh
 
 import edu.cit.resqmesh.core.model.ChatMessage
+import edu.cit.resqmesh.core.model.ChatSyncState
 import edu.cit.resqmesh.core.model.ConnectedDevice
 import edu.cit.resqmesh.core.model.NodeIdentity
 import edu.cit.resqmesh.core.network.MeshPayload
@@ -19,6 +20,8 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import edu.cit.resqmesh.data.local.entity.ChatSyncIngestion
+import edu.cit.resqmesh.data.local.entity.ChatSyncRow
 import edu.cit.resqmesh.data.repository.MeshRouter
 import edu.cit.resqmesh.data.repository.MessageStore
 import edu.cit.resqmesh.data.repository.PeerPublicKeyDirectory
@@ -40,6 +43,10 @@ internal fun inboundDisplayText(text: String, hasAttachment: Boolean): String {
     val clean = TextSanitizer.inbound(text, TextField.MESSAGE)
     return if (clean.isEmpty() && !hasAttachment) MESSAGE_UNAVAILABLE else clean
 }
+
+/** Sender time, so a late copy keeps its age. A missing or future time falls back to [receivedAt]. */
+internal fun senderTime(sentAt: Long, receivedAt: Long): Long =
+    if (sentAt > 0) minOf(sentAt, receivedAt) else receivedAt
 
 /** A decoded chat frame as the transport hands it to the repository. */
 internal data class InboundChatPayload(
@@ -93,7 +100,7 @@ internal class MeshInboundMessages(
     private val readyPeers: () -> List<ConnectedDevice>,
     private val observeName: (String, Boolean) -> Unit,
     private val outboxMutex: Mutex,
-    clock: () -> Long = System::currentTimeMillis
+    private val clock: () -> Long = System::currentTimeMillis
 ) {
     private val receiptReplays = ReceiptReplayLimiter(clock = clock)
     private val myNodeName get() = localName()
@@ -229,8 +236,7 @@ internal class MeshInboundMessages(
             p.senderName.length !in 1..MAX_SENDER_NAME_LENGTH || p.text.length > MAX_CONVERSATION_TEXT_LENGTH || p.isPrivate || p.isEncrypted ||
             p.conversationKind !in setOf("COMMUNITY", "RADIO", "SOS") || p.ttl !in 1..MAX_TTL || p.relayHopCount !in 0..MAX_TTL) return false
         if (p.conversationKind == "RADIO" && p.channelId !in RADIO_CHANNEL_IDS) return false
-        val sosBlocked = p.audioBytes != null || p.imageBytes != null || sosRepository?.canReply(p.sosId) != true
-        if (p.conversationKind == "SOS" && sosBlocked) return false
+        if (p.conversationKind == "SOS" && sosRepository?.canReply(p.sosId) != true) return false
         val maxMedia = BinaryCompressor.MAX_MEDIA_BYTES
         return (p.audioBytes?.size ?: 0) <= maxMedia && (p.imageBytes?.size ?: 0) <= maxMedia
     }
@@ -238,16 +244,59 @@ internal class MeshInboundMessages(
     /** The stored message, or null when this conversation message was already known. */
     private suspend fun storeIfNew(p: MeshPayload, audioBase64: String?, imageBase64: String?): ChatMessage? =
         outboxMutex.withLock {
-            if (messageStore.contains(p.id)) return@withLock null
+            if (messageStore.contains(p.id)) {
+                // A live or late copy can arrive before the sync pull does; it fills the placeholder.
+                if (audioBase64 != null || imageBase64 != null) {
+                    messageStore.fillSyncedMedia(p.id, p.senderNodeId, imageBase64, audioBase64)
+                }
+                return@withLock null
+            }
             val message = ChatMessage(p.id, TextSanitizer.inboundPeerName(p.senderName),
                 inboundDisplayText(p.text, imageBase64 != null || audioBase64 != null || p.locationLat != null),
                 imageBase64, audioBase64, p.locationLat, p.locationLng,
-                false, timestamp = System.currentTimeMillis(), isHopped = p.relayHopCount > 0,
+                false, timestamp = senderTime(p.createdAt, clock()), isHopped = p.relayHopCount > 0,
                 outboundRoute = p.routePath, conversationKind = p.conversationKind, channelId = p.channelId,
                 sosId = p.sosId, senderNodeId = p.senderNodeId)
             messageStore.save(message, null)
             message
         }
+
+    /** Stores one pulled row silently: no receipt, autoplay, notification or relay. */
+    suspend fun ingestSynced(row: ChatSyncRow): ChatSyncIngestion = when {
+        !isAcceptableSynced(row) -> ChatSyncIngestion.REJECTED
+        row.kind == "SOS" && sosRepository?.isKnown(row.sosId) != true -> ChatSyncIngestion.DEFERRED
+        else -> {
+            if (storeSyncedIfNew(row)) recordPeerName(row.senderName)
+            ChatSyncIngestion.STORED
+        }
+    }
+
+    private suspend fun storeSyncedIfNew(row: ChatSyncRow): Boolean = outboxMutex.withLock {
+        val fresh = !messageStore.contains(row.id)
+        if (fresh) messageStore.save(ChatMessage(row.id, TextSanitizer.inboundPeerName(row.senderName),
+            inboundDisplayText(row.text, row.locationLat != null || row.mediaKind.isNotEmpty()), null, null,
+            row.locationLat, row.locationLng, false, timestamp = senderTime(row.sentAt, clock()), isHopped = true,
+            conversationKind = row.kind, sosId = row.sosId, senderNodeId = row.senderNodeId,
+            syncState = if (row.mediaKind.isEmpty()) ChatSyncState.SYNCED else ChatSyncState.MEDIA_PENDING,
+            syncMediaKind = row.mediaKind), null)
+        fresh
+    }
+
+    /** Fills one placeholder from a requested copy. Silent, like the row it completes. */
+    suspend fun ingestSyncedMedia(p: MeshPayload): Boolean {
+        val attachments = runCatching {
+            p.audioBytes?.let { inflateToBase64(it) } to p.imageBytes?.let { inflateToBase64(it) }
+        }.getOrNull()
+        val (audio, image) = attachments ?: (null to null)
+        return (audio != null || image != null) &&
+            outboxMutex.withLock { messageStore.fillSyncedMedia(p.id, p.senderNodeId, image, audio) }
+    }
+
+    private fun isAcceptableSynced(row: ChatSyncRow) = row.senderNodeId.isNotBlank() &&
+        !row.senderNodeId.equals(networkManager.myNodeId, ignoreCase = true) && row.sentAt > 0 &&
+        row.id.length in 1..MAX_MESSAGE_ID_LENGTH && row.senderName.length in 1..MAX_SENDER_NAME_LENGTH &&
+        row.text.length <= MAX_CONVERSATION_TEXT_LENGTH && row.kind in setOf("COMMUNITY", "SOS") &&
+        row.mediaKind in setOf("", "VOICE", "IMAGE")
 
     fun deleteConversationWith(peerName: String) {
         repositoryScope.launch {
