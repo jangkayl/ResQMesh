@@ -3,6 +3,8 @@ package edu.cit.resqmesh.data.repository
 import edu.cit.resqmesh.core.model.ChatMessage
 import edu.cit.resqmesh.core.model.NodeIdentity
 import edu.cit.resqmesh.data.local.dao.MessageDao
+import edu.cit.resqmesh.data.local.entity.ChatSyncEntry
+import edu.cit.resqmesh.data.local.entity.ChatSyncRow
 import edu.cit.resqmesh.data.local.entity.MessageEntity
 import edu.cit.resqmesh.data.local.entity.StoredNameList
 import edu.cit.resqmesh.data.local.entity.toMessageEntity
@@ -33,6 +35,9 @@ interface MessageStore {
     suspend fun markSent(messageId: String)
     suspend fun getPendingOutbox(): List<Pair<ChatMessage, String?>>
     suspend fun deleteConversation(peerName: String)
+    /** Newest offerable Community and SOS messages, [limit] per conversation. */
+    suspend fun chatSyncIndex(limit: Int, maxSosThreads: Int): List<ChatSyncEntry> = emptyList()
+    suspend fun chatSyncRows(ids: List<String>): List<ChatSyncRow> = emptyList()
 }
 
 enum class PrivateMessageInsert { INSERTED, DUPLICATE, REJECTED }
@@ -53,6 +58,10 @@ class RoomMessageStore(private val dao: MessageDao) : MessageStore {
             else -> PrivateMessageInsert.REJECTED
         }
     override suspend fun contains(id: String) = dao.getMessageById(id) != null
+    override suspend fun chatSyncIndex(limit: Int, maxSosThreads: Int): List<ChatSyncEntry> =
+        dao.chatSyncCommunity(limit) +
+            dao.chatSyncSosThreads(maxSosThreads).flatMap { dao.chatSyncSosThread(it, limit) }
+    override suspend fun chatSyncRows(ids: List<String>): List<ChatSyncRow> = dao.chatSyncRows(ids)
     override val allPublicMessages = dao.getAllPublicMessages().map { rows -> rows.map { it.toChatMessage() } }
     override val publicMessages: Flow<List<ChatMessage>> = dao.getPublicMessages().map { messages ->
         messages.map { it.toChatMessage() }

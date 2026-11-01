@@ -24,6 +24,9 @@ interface MeshNetworkGateway {
     var onSosPacket: ((String, MeshPayload) -> Unit)?
         get() = null
         set(@Suppress("UNUSED_PARAMETER") value) {}
+    var onChatSyncPacket: ((String, MeshPayload) -> Unit)?
+        get() = null
+        set(@Suppress("UNUSED_PARAMETER") value) {}
     var myDeviceName: String
     var myNodeId: String
     var onDeviceConnected: ((ConnectedDevice) -> Unit)?

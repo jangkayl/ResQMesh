@@ -18,7 +18,7 @@ Dispatch handles presence, messages, receipts, incident sync, SOS and audio; inc
 
 NativeBleManager owns orchestration/policy; collaborators own radio, admission, GATT, L2CAP and liveness. BlePresencePublisher owns pulse counters/publication; NativePayloadCallbacks forwards current listeners synchronously through NativePayloadEvents. GattClientHost/GattServerHost and NativeGattHost proxy the same facade resources without copying state, adding scheduling or changing lifetime. BleLinkRegistry stores generation-owned state/queues. Client READY requires discovery/CCCD; server READY requires subscription.
 
-NativeInboundPipeline owns decode/identity/transfer gates; NativeOutboundDispatcher owns selection, relay tracking, fallback/enqueue and promotion. OutboundFrameReporter publishes progress/custody. BleTransportSessionController owns receiver/retry/shutdown; BlePeerDirectory and retirement/heartbeat owners share the store/handler/coordinator. BleTransportResources retains platform handles/registration epoch. GATT client helpers share one captured attempt; server handlers/acceptor share one registration. Permission-sensitive operations retain checked entry points. Admission shares one candidate/advertisement session.
+NativeInboundPipeline owns decode/identity/transfer gates; NativeOutboundDispatcher owns selection, relay tracking, fallback/enqueue and promotion. OutboundFrameReporter publishes progress/custody. BleTransportSessionController owns receiver/retry/shutdown; BlePeerDirectory and retirement/heartbeat owners share the store/handler/coordinator. BleTransportResources retains platform handles/registration epoch. GATT client helpers share one captured attempt; server handlers/acceptor share one registration.
 
 BleSessionLifecycle separates requested sessions from running radio. OFF/permission loss suspends transport; restoration rebuilds GATT, waits for service registration and resumes advertising/scanning. Go offline cancels recovery.
 
@@ -55,7 +55,7 @@ Peer text is cleaned on local copies only, never relayed, signed or hashed data;
 
 Public sends persist pending before dispatch. Per-neighbor acceptance, wholly rejected retries, partial feedback and a serialized flush avoid whole-broadcast retries after acceptance.
 
-Room 11 stores explicit Community/Radio/SOS destinations. History/drafts/unread stay scoped; off-channel Radio stores silently and monitoring plays only selected-channel notes under two minutes old. Retries retain destinations. Migration 10→11 hides legacy unscoped SOS/audio without deleting records.
+Room 11 stores explicit Community/Radio/SOS destinations. History/drafts/unread stay scoped; off-channel Radio stores silently and monitoring plays only selected-channel notes under two minutes old. ChatSyncCoordinator silently pulls recent Community/SOS text from direct neighbors, never relaying it ([plan](plans/chat-sync.md)). Migration 10→11 hides legacy unscoped SOS/audio without deleting records.
 
 Incidents use stable reporter/helper authority, signed prerequisites and transactional projections. Withdrawal/offline offer changes reopen selection without advancing reporter versions. IncidentSyncCoordinator (protocol 3) compares cached hashes over the requester's scope (open plus 24 h closures, max 100) on READY, changes and every 30 seconds; missing dependencies block completion. Out-of-order help events defer or become history; rejections are re-validated. IncidentEventIngestor owns projection mutex/rebuild flag.
 

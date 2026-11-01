@@ -34,6 +34,9 @@ internal class NativePayloadCallbacks(
     override fun onSosPacket(endpointId: String, payload: MeshPayload) {
         events.onSosPacket?.invoke(endpointId, payload)
     }
+    override fun onChatSyncPacket(endpointId: String, payload: MeshPayload) {
+        events.onChatSyncPacket?.invoke(endpointId, payload)
+    }
     override fun getMyDeviceName() = events.myDeviceName
     override fun getMyNodeId() = events.myNodeId
     override fun getSeenIdCache() = seenIds()

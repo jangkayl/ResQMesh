@@ -12,6 +12,7 @@ class NativeBleGateway(private val manager: NativeBleManager) : MeshNetworkGatew
     override fun preferredEndpointForPeer(nodeId: String) = manager.preferredEndpointForPeer(nodeId)
     override var onConversationMessage by manager::onConversationMessage
     override var onSosPacket by manager::onSosPacket
+    override var onChatSyncPacket by manager::onChatSyncPacket
     override var myDeviceName: String
         get() = manager.myDeviceName
         set(value) { manager.myDeviceName = value }

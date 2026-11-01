@@ -233,6 +233,7 @@ class SosRepository(
     }
 
     suspend fun canReply(id: String): Boolean = store.alert(id)?.ended == false
+    suspend fun isKnown(id: String): Boolean = store.alert(id) != null
     fun owns(alert: SosAlertEntity) = alert.originNodeId == identity.getDeviceId() && alert.signingKey == signing.publicKey
 
     private suspend fun dispatch(e: SosEvent) {

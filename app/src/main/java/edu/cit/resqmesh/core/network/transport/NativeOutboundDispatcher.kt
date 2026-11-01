@@ -92,7 +92,8 @@ internal class NativeOutboundDispatcher(
     fun isControlPayload(bytes: ByteArray): Boolean = runCatching {
         val p = ProtoBuf.decodeFromByteArray<MeshPayload>(bytes)
         p.type in setOf("SYSTEM", "PING", "PONG", "SEEN", "DELIVERED", "BLOCK_REQUEST", "BLOCK_ACK",
-            "SOS_EVENT", "SOS_SYNC_REQ", "SOS_SYNC_RES", "EVENT_SYNC_REQ", ReliableMeshTransfers.ACK) ||
+            "SOS_EVENT", "SOS_SYNC_REQ", "SOS_SYNC_RES", "EVENT_SYNC_REQ", "CHAT_SYNC_REQ",
+            ReliableMeshTransfers.ACK) ||
             (p.type == ReliableMeshTransfers.PIECE && ProtoBuf.decodeFromByteArray<TransferPiece>(p.liveAudioChunk!!).let { it.priority || it.status })
     }.getOrDefault(false)
 

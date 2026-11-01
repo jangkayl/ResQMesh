@@ -56,6 +56,7 @@ class NativeBleManager(
     var onOutboundFrame: ((OutboundFrameEvent) -> Unit)? = null
     override var onConversationMessage: ((String, MeshPayload) -> Unit)? = null
     override var onSosPacket: ((String, MeshPayload) -> Unit)? = null
+    override var onChatSyncPacket: ((String, MeshPayload) -> Unit)? = null
     val gattServerManager = edu.cit.resqmesh.core.network.bluetooth.gatt.GattServerManager(context, this)
     val gattClientManager = edu.cit.resqmesh.core.network.bluetooth.gatt.GattClientManager(context, this)
     val store = edu.cit.resqmesh.core.network.bluetooth.state.BleStateStore(guards)

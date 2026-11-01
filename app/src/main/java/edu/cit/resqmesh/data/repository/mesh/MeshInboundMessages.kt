@@ -19,6 +19,8 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import edu.cit.resqmesh.data.local.entity.ChatSyncIngestion
+import edu.cit.resqmesh.data.local.entity.ChatSyncRow
 import edu.cit.resqmesh.data.repository.MeshRouter
 import edu.cit.resqmesh.data.repository.MessageStore
 import edu.cit.resqmesh.data.repository.PeerPublicKeyDirectory
@@ -252,6 +254,30 @@ internal class MeshInboundMessages(
             messageStore.save(message, null)
             message
         }
+
+    /** Stores one pulled row silently: no receipt, autoplay, notification or relay. */
+    suspend fun ingestSynced(row: ChatSyncRow): ChatSyncIngestion = when {
+        !isAcceptableSynced(row) -> ChatSyncIngestion.REJECTED
+        row.kind == "SOS" && sosRepository?.isKnown(row.sosId) != true -> ChatSyncIngestion.DEFERRED
+        else -> {
+            if (storeSyncedIfNew(row)) recordPeerName(row.senderName)
+            ChatSyncIngestion.STORED
+        }
+    }
+
+    private suspend fun storeSyncedIfNew(row: ChatSyncRow): Boolean = outboxMutex.withLock {
+        val fresh = !messageStore.contains(row.id)
+        if (fresh) messageStore.save(ChatMessage(row.id, TextSanitizer.inboundPeerName(row.senderName),
+            inboundDisplayText(row.text, row.locationLat != null), null, null, row.locationLat, row.locationLng,
+            false, timestamp = senderTime(row.sentAt, clock()), isHopped = true, conversationKind = row.kind,
+            sosId = row.sosId, senderNodeId = row.senderNodeId), null)
+        fresh
+    }
+
+    private fun isAcceptableSynced(row: ChatSyncRow) = row.senderNodeId.isNotBlank() &&
+        !row.senderNodeId.equals(networkManager.myNodeId, ignoreCase = true) && row.sentAt > 0 &&
+        row.id.length in 1..MAX_MESSAGE_ID_LENGTH && row.senderName.length in 1..MAX_SENDER_NAME_LENGTH &&
+        row.text.length <= MAX_CONVERSATION_TEXT_LENGTH && row.kind in setOf("COMMUNITY", "SOS")
 
     fun deleteConversationWith(peerName: String) {
         repositoryScope.launch {

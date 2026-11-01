@@ -148,4 +148,4 @@ class InboundOriginGate(
 }
 
 
-private val SYNC_REQUEST_TYPES = setOf("SOS_SYNC_REQ", "EVENT_SYNC_REQ")
+private val SYNC_REQUEST_TYPES = setOf("SOS_SYNC_REQ", "EVENT_SYNC_REQ", "CHAT_SYNC_REQ")

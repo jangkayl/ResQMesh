@@ -5,11 +5,37 @@ import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Transaction
+import edu.cit.resqmesh.data.local.entity.ChatSyncEntry
+import edu.cit.resqmesh.data.local.entity.ChatSyncRow
 import edu.cit.resqmesh.data.local.entity.MessageEntity
 import kotlinx.coroutines.flow.Flow
 
+/** Public rows a neighbor may be offered: never private, never unsent, never without a stable sender. */
+private const val CHAT_SYNCABLE = "targetName IS NULL AND isSOS = 0 AND senderNodeId != '' " +
+    "AND deliveredTo NOT IN ('PENDING', 'FAILED')"
+private const val CHAT_SYNC_ENTRY = "SELECT msgId AS id, timestamp AS sentAt, conversationKind AS kind, senderName, " +
+    "sosId, (imageBase64 IS NOT NULL OR audioBase64 IS NOT NULL) AS hasMedia FROM messages"
+
 @Dao
 interface MessageDao {
+    @Query("$CHAT_SYNC_ENTRY WHERE $CHAT_SYNCABLE AND conversationKind = 'COMMUNITY' " +
+        "ORDER BY timestamp DESC, msgId LIMIT :limit")
+    suspend fun chatSyncCommunity(limit: Int): List<ChatSyncEntry>
+
+    @Query("$CHAT_SYNC_ENTRY WHERE $CHAT_SYNCABLE AND conversationKind = 'SOS' AND sosId = :sosId " +
+        "ORDER BY timestamp DESC, msgId LIMIT :limit")
+    suspend fun chatSyncSosThread(sosId: String, limit: Int): List<ChatSyncEntry>
+
+    @Query("SELECT sosId FROM messages WHERE $CHAT_SYNCABLE AND conversationKind = 'SOS' AND sosId != '' " +
+        "GROUP BY sosId ORDER BY MAX(timestamp) DESC LIMIT :limit")
+    suspend fun chatSyncSosThreads(limit: Int): List<String>
+
+    @Query("SELECT msgId AS id, timestamp AS sentAt, conversationKind AS kind, senderName, senderNodeId, " +
+        "COALESCE(text, '') AS text, sosId, locationLat, locationLng FROM messages " +
+        "WHERE msgId IN (:ids) AND $CHAT_SYNCABLE AND conversationKind IN ('COMMUNITY', 'SOS') " +
+        "AND imageBase64 IS NULL AND audioBase64 IS NULL")
+    suspend fun chatSyncRows(ids: List<String>): List<ChatSyncRow>
+
     @Query("SELECT * FROM messages WHERE targetName IS NULL AND conversationKind = 'COMMUNITY' ORDER BY timestamp ASC")
     fun getPublicMessages(): Flow<List<MessageEntity>>
 

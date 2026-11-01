@@ -96,6 +96,14 @@ class PayloadDispatcher(
                 callback.onSosPacket(endpointId, payload)
                 return
             }
+            if (payload.type in setOf("CHAT_SYNC_REQ", "CHAT_SYNC_RES")) {
+                if (!admit(endpointId, payload)) {
+                    drop(payload, TraceDropReason.ORIGIN_LIMIT, endpointId, payloadBytes)
+                    return
+                }
+                callback.onChatSyncPacket(endpointId, payload)
+                return
+            }
             if (payload.type == "CONVERSATION") {
                 if (!admit(endpointId, payload)) {
                     drop(payload, TraceDropReason.ORIGIN_LIMIT, endpointId, payloadBytes)

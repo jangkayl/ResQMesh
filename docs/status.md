@@ -1,6 +1,6 @@
 # Current status
 
-Last reviewed: 2026-10-17. Baseline: `a9a27ed` on `main` (also `origin/fix/incident-ui-ux`). Build hashes and test counts live in [validation](validation.md).
+Last reviewed: 2026-10-17. Baseline: `a9a27ed` on `main`. Build hashes and test counts live in [validation](validation.md).
 
 ## Current objective
 
@@ -66,6 +66,8 @@ Basic block, incident, SOS and recovery checks have user-reported successes; the
 **Block hardening** (`fix/block-hardening`): [card](testing/block-hardening-card.md) pending.
 
 **Late relay pacing** (`fix/late-relay-pacing`): [card](testing/late-relay-pacing-card.md) pending.
+
+**Chat sync**: [plan](plans/chat-sync.md), [card](testing/chat-sync-card.md) pending.
 
 ## Next actions
 

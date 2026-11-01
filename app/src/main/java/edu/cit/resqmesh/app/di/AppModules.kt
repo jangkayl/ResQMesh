@@ -31,6 +31,7 @@ import edu.cit.resqmesh.data.local.AppDatabase
 import edu.cit.resqmesh.data.location.DefaultLocationClient
 import edu.cit.resqmesh.data.location.DefaultLocationClientFactory
 import edu.cit.resqmesh.data.repository.BlockRelationshipStore
+import edu.cit.resqmesh.data.repository.ChatSyncCoordinator
 import edu.cit.resqmesh.data.repository.IdentityProvider
 import edu.cit.resqmesh.data.repository.IncidentEventSigning
 import edu.cit.resqmesh.data.repository.IncidentRepository
@@ -61,6 +62,8 @@ import edu.cit.resqmesh.feature.profile.viewmodel.OfflineMapViewModel
 import edu.cit.resqmesh.feature.radar.viewmodel.RadarViewModel
 import edu.cit.resqmesh.feature.setup.viewmodel.SetupViewModel
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import org.koin.android.ext.koin.androidContext
 import org.koin.androidx.viewmodel.dsl.viewModel
 import org.koin.dsl.module
@@ -155,6 +158,19 @@ val repositoryModule = module {
             scope = get<AppCoroutineScope>().scope,
             sink = get(),
             originGate = get<InboundGuards>().origins
+        )
+    }
+    single(createdAtStart = true) {
+        val repository = get<MeshRepository>()
+        ChatSyncCoordinator(
+            gateway = get(),
+            peers = get(),
+            store = get(),
+            scope = get<AppCoroutineScope>().scope,
+            sink = { row -> repository.ingestSyncedChat(row) },
+            // A newly known alert can release replies a neighbor offered earlier.
+            changes = get<SosRepository>().alerts.map { alerts -> alerts.map { it.sosId } }
+                .distinctUntilChanged().map { }
         )
     }
     single<edu.cit.resqmesh.core.notification.IncidentNotifier> {
