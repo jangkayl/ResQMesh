@@ -108,9 +108,11 @@ internal fun inboxMeshStatus(
         )
     }
     val isChecking = nodes.any {
+        !it.isBlocked && (
         it.kind == edu.cit.resqmesh.core.ui.model.NodeKind.UNRESPONSIVE ||
         it.kind == edu.cit.resqmesh.core.ui.model.NodeKind.HANDSHAKING ||
         it.kind == edu.cit.resqmesh.core.ui.model.NodeKind.SYNCING
+        )
     }
     return InboxMeshStatus(
         active = active,

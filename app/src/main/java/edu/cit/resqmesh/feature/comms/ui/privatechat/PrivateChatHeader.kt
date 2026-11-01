@@ -90,7 +90,11 @@ internal fun PrivateChatHeader(
                             .background(availability.color())
                     )
                     Text(
-                        text = availability.label(),
+                        text = if (availability == RecipientAvailability.Blocked) {
+                            stringResource(R.string.private_chat_blocked_relay_only)
+                        } else {
+                            availability.label()
+                        },
                         style = MaterialTheme.typography.labelSmall,
                         color = availability.color(),
                         fontWeight = FontWeight.SemiBold

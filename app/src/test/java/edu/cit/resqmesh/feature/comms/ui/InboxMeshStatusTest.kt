@@ -52,4 +52,18 @@ class InboxMeshStatusTest {
 
     private fun node(name: String, kind: NodeKind, blocked: Boolean = false) =
         NodeItemData(endpointId = name, name = name, label = name, status = "", kind = kind, isBlocked = blocked)
+
+    @Test
+    fun blockedCheckingAndHandshakingPeersDoNotSetChecking() {
+        val status = inboxMeshStatus(
+            active = true,
+            nodes = listOf(
+                node("Blocked checking", NodeKind.UNRESPONSIVE, blocked = true),
+                node("Blocked linking", NodeKind.HANDSHAKING, blocked = true)
+            )
+        )
+
+        assertEquals(0, status.reachableCount)
+        assertFalse(status.checking)
+    }
 }

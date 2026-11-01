@@ -1,5 +1,8 @@
 package edu.cit.resqmesh.feature.radar.ui
 
+import edu.cit.resqmesh.core.model.BlockRelationship
+import edu.cit.resqmesh.core.model.BlockRelationshipOrigin
+import edu.cit.resqmesh.core.model.BlockRelationshipStatus
 import edu.cit.resqmesh.core.model.ConnectedDevice
 import edu.cit.resqmesh.core.model.KnownNode
 import edu.cit.resqmesh.core.model.ScannedDevice
@@ -104,5 +107,61 @@ class RadarNodeClassificationTest {
         assertEquals(NodeKind.HOPPED, blocked.kind)
         assertTrue(!unblocked.isBlocked)
         assertEquals(NodeKind.HOPPED, unblocked.kind)
+    }
+
+    @Test fun blockedHandshakingLinkStaysBlockedByNodeId() {
+        val nodes = classifyRadarNodes(RadarUiState(
+            connectedDevices = listOf(
+                ConnectedDevice("ep-12345", "Unknown Node", nodeId = "BBBB", isPayloadReady = false)
+            ),
+            blockedDeviceNames = setOf("Bea [NODE]#BBBB")
+        ))
+
+        val row = nodes.single()
+        assertEquals(NodeKind.HANDSHAKING, row.kind)
+        assertTrue(row.isBlocked)
+    }
+
+    @Test fun unblockedHandshakingLinkIsNotBlocked() {
+        val nodes = classifyRadarNodes(RadarUiState(
+            connectedDevices = listOf(
+                ConnectedDevice("ep-12345", "Unknown Node", nodeId = "CCCC", isPayloadReady = false)
+            ),
+            blockedDeviceNames = setOf("Bea [NODE]#BBBB")
+        ))
+
+        assertTrue(nodes.first { it.kind == NodeKind.HANDSHAKING }.isBlocked.not())
+    }
+
+    @Test fun blockedScannedPeerIsDiscoveredAndBlockedNotOffline() {
+        val nodes = classifyRadarNodes(RadarUiState(
+            scannedDevices = listOf(ScannedDevice("aa:bb", "Bea [NODE]#BBBB", 0L)),
+            blockedDeviceNames = setOf("Bea [NODE]#BBBB")
+        ))
+
+        val row = nodes.single()
+        assertEquals(NodeKind.DISCOVERED, row.kind)
+        assertTrue(row.isBlocked)
+    }
+    @Test fun relationshipOriginAndTombstoneReachTheRows() {
+        val theyBlocked = BlockRelationship(
+            "Bea [NODE]#BBBB", "op1", BlockRelationshipOrigin.REMOTE, BlockRelationshipStatus.CONFIRMED, 0L
+        )
+        val released = BlockRelationship(
+            "Cai [NODE]#CCCC", "op2", BlockRelationshipOrigin.LOCAL, BlockRelationshipStatus.RELEASED_LOCALLY, 0L
+        )
+        val nodes = classifyRadarNodes(RadarUiState(
+            scannedDevices = listOf(
+                ScannedDevice("aa:bb", "Bea [NODE]#BBBB", 0L),
+                ScannedDevice("cc:dd", "Cai [NODE]#CCCC", 0L)
+            ),
+            blockedDeviceNames = setOf("Bea [NODE]#BBBB"),
+            blockRelationships = mapOf("BBBB" to theyBlocked, "CCCC" to released)
+        ))
+
+        val bea = nodes.first { it.name.startsWith("Bea") }
+        val cai = nodes.first { it.name.startsWith("Cai") }
+        assertTrue(bea.isBlocked && bea.blockedByThem && !bea.releasedLocally)
+        assertTrue(!cai.isBlocked && !cai.blockedByThem && cai.releasedLocally)
     }
 }

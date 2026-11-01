@@ -245,6 +245,8 @@ class MeshRepository(
 
     fun unblockDevice(deviceName: String) = blocks.unblockDevice(deviceName)
 
+    fun hasAlternateRoute(peerName: String): Boolean = blocks.hasAlternateRoute(peerName)
+
 
 
 

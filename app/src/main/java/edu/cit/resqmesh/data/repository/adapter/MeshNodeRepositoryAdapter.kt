@@ -21,6 +21,7 @@ class MeshNodeRepositoryAdapter(private val repository: MeshRepository) : MeshNo
     override val privateMessages get() = repository.privateMessages
     override val peerNames get() = repository.peerNames
     override val blockedDeviceNames get() = repository.blockedDeviceNames
+    override val blockRelationships get() = repository.blockRelationships
 
     override fun startNode(customName: String, nodeTag: String, teamKey: String, nodeId: String) =
         repository.startNode(customName, nodeTag, teamKey, nodeId)
@@ -30,6 +31,7 @@ class MeshNodeRepositoryAdapter(private val repository: MeshRepository) : MeshNo
     override fun disconnectDevice(endpointId: String) = repository.disconnectDevice(endpointId)
     override fun blockDevice(deviceName: String) = repository.blockDevice(deviceName)
     override fun unblockDevice(deviceName: String) = repository.unblockDevice(deviceName)
+    override fun hasAlternateRoute(peerName: String) = repository.hasAlternateRoute(peerName)
     override fun forceConnect(endpointId: String, endpointName: String) =
         repository.forceConnect(endpointId, endpointName)
     override fun rescan() = repository.rescan()

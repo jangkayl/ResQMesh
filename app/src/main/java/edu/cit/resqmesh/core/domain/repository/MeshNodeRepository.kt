@@ -1,5 +1,6 @@
 package edu.cit.resqmesh.core.domain.repository
 
+import edu.cit.resqmesh.core.model.BlockRelationship
 import edu.cit.resqmesh.core.model.ChatMessage
 import edu.cit.resqmesh.core.model.ConnectedDevice
 import edu.cit.resqmesh.core.model.KnownNode
@@ -25,6 +26,7 @@ interface MeshNodeRepository {
     val privateMessages: StateFlow<Map<String, List<ChatMessage>>>
     val peerNames: StateFlow<Map<String, String>>
     val blockedDeviceNames: StateFlow<Set<String>>
+    val blockRelationships: StateFlow<Map<String, BlockRelationship>>
 
     fun startNode(customName: String, nodeTag: String, teamKey: String, nodeId: String)
     fun stopNode()
@@ -33,6 +35,7 @@ interface MeshNodeRepository {
     fun disconnectDevice(endpointId: String)
     fun blockDevice(deviceName: String)
     fun unblockDevice(deviceName: String)
+    fun hasAlternateRoute(peerName: String): Boolean
     fun forceConnect(endpointId: String, endpointName: String)
     fun rescan()
     @Suppress("LongParameterList")

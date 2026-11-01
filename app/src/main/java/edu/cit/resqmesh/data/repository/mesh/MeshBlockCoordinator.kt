@@ -99,6 +99,16 @@ internal class MeshBlockCoordinator(
         publishBlockedDevices()
     }
 
+    /**
+     * Best effort only: true when a route to [peerName] exists without a direct link to it, using the
+     * topology currently advertised by other ready neighbours. It does not guarantee delivery.
+     */
+    fun hasAlternateRoute(peerName: String): Boolean {
+        val others = readyConnectedDevices().filterNot { NodeIdentity.matches(it.name, peerName) }
+        if (others.isEmpty()) return false
+        return meshRouter.findShortestPath(myNodeName, peerName, others).isNotEmpty()
+    }
+
     private fun startBlockRetry(relationship: BlockRelationship) {
         val key = NodeIdentity.key(relationship.peerName)
         if (blockRetryJobs[key]?.isActive == true) return

@@ -11,6 +11,8 @@ import edu.cit.resqmesh.core.network.bluetooth.admission.BleAdmissionConstants.C
 import edu.cit.resqmesh.core.network.bluetooth.admission.BleAdmissionConstants.MAX_CANDIDATES
 import edu.cit.resqmesh.core.network.bluetooth.admission.BleAdmissionConstants.FALLBACK_INITIATOR_DELAY_MS
 
+private const val BLOCKED_SCAN_REPUBLISH_MS = 2_000L
+
 internal class BleAdvertisementAdmission(
     override val capabilities: BleAdmissionCapabilities,
     override val session: BleAdmissionSession,
@@ -29,6 +31,29 @@ internal class BleAdvertisementAdmission(
         advertisements.entries.removeAll { now - it.value.second > CANDIDATE_FRESH_MS }
         advertisements.values.toList().forEach { (ad, _) -> handle(ad, observed = false) }
         drainCandidates()
+    }
+
+    /**
+     * A blocked peer in radio range stays visible to the UI. This only publishes the scan row and
+     * refreshes its liveness so the normal 8 s scan expiry removes it; it never adds an
+     * advertisement, candidate or connect attempt, and leaves link bookkeeping untouched.
+     */
+    private fun publishBlockedScan(advertisement: BleAdvertisement, now: Long) {
+        val endpoint = advertisement.endpointId
+        val previous = store.endpointLastSeen.put(endpoint, now)
+        if (previous != null && now - previous < BLOCKED_SCAN_REPUBLISH_MS) return
+        later {
+            onScanned(
+                ScanEvent(
+                    endpointId = endpoint,
+                    name = advertisement.peerName,
+                    nodeId = advertisement.nodeId,
+                    peerConnections = advertisement.directConnections,
+                    peerScore = advertisement.electionScore,
+                    isConnecting = false
+                )
+            )
+        }
     }
 
     fun handle(advertisement: BleAdvertisement, observed: Boolean) {
@@ -52,6 +77,7 @@ internal class BleAdvertisementAdmission(
                 now = now
             )
             removeCandidate(peerName)
+            if (observed && reason == BleAdmissionReason.BLOCKED) publishBlockedScan(advertisement, now)
             return
         }
 

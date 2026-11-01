@@ -1,6 +1,7 @@
 package edu.cit.resqmesh.core.network.bluetooth
 
 import android.bluetooth.BluetoothDevice
+import edu.cit.resqmesh.core.model.ScanEvent
 import edu.cit.resqmesh.core.network.bluetooth.state.BleLinkRole
 import edu.cit.resqmesh.core.network.bluetooth.state.BleLinkState
 import edu.cit.resqmesh.core.network.bluetooth.state.BleStateStore
@@ -11,7 +12,7 @@ import org.junit.Test
 
 class BlePeerAdmissionControllerTest {
 
-    private class TestScheduler : BleAdmissionScheduler {
+    internal class TestScheduler : BleAdmissionScheduler {
         val postedTasks = mutableListOf<() -> Unit>()
         val delayedTasks = mutableListOf<Pair<Long, () -> Unit>>()
 
@@ -34,7 +35,7 @@ class BlePeerAdmissionControllerTest {
         }
     }
 
-    private class TestFixture(
+    internal class TestFixture(
         val localNameStr: String = "Alice#A1",
         var localScoreStr: String = "900AA",
         var directLinks: Int = 0,
@@ -52,6 +53,7 @@ class BlePeerAdmissionControllerTest {
         val decisions = mutableListOf<BleAdmissionDecision>()
         val connectCalls = mutableListOf<Pair<String, String>>()
         val blockedPeers = mutableSetOf<String>()
+        val scans = mutableListOf<ScanEvent>()
         val redundant = mutableSetOf<String>()
         val retired = mutableListOf<String>()
         var idle = true
@@ -73,7 +75,7 @@ class BlePeerAdmissionControllerTest {
                 connectCalls.add(endpoint to peer)
                 connectResult
             },
-            onScanned = {},
+            onScanned = { scans.add(it) },
             onDisconnected = {},
             onPulse = {},
             handshakeInfo = { handshakeInfoSupplier() },

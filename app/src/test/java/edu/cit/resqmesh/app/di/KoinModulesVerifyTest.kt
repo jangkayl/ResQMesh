@@ -94,6 +94,8 @@ class KoinModulesVerifyTest {
                 ObservePrivateMessagesUseCase::class,
                 ObservePeerNamesUseCase::class,
                 ObserveBlockedDeviceNamesUseCase::class,
+                ObserveBlockRelationshipsUseCase::class,
+                HasAlternateRouteUseCase::class,
                 LinkDiagnosticsUseCase::class
             )
         )

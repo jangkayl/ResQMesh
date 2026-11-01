@@ -49,4 +49,24 @@ class HomeNetworkSummaryTest {
         assertEquals(1, summary.relayedPeers)
         assertEquals(1, summary.nearbyPeers)
     }
+
+    @Test
+    fun summary_doesNotCountBlockedPeersAsReachable() {
+        val summary = homeNetworkSummary(
+            RadarUiState(
+                connectedDevices = listOf(
+                    ConnectedDevice("direct", "Ari [NODE]#A1", isPayloadReady = true, isPeerResponsive = true),
+                    ConnectedDevice("checking", "Bea [NODE]#B2", isPayloadReady = true, isPeerResponsive = false)
+                ),
+                knownNodes = listOf(KnownNode("Cai [NODE]#C3", isDirect = false, lastSeen = 0L)),
+                scannedDevices = listOf(ScannedDevice("nearby", "Dee [NODE]#D4", 0L)),
+                blockedDeviceNames = setOf("Ari [NODE]#A1", "Bea [NODE]#B2", "Cai [NODE]#C3", "Dee [NODE]#D4")
+            )
+        )
+
+        assertEquals(0, summary.directPeers)
+        assertEquals(0, summary.checkingPeers)
+        assertEquals(0, summary.relayedPeers)
+        assertEquals(0, summary.nearbyPeers)
+    }
 }

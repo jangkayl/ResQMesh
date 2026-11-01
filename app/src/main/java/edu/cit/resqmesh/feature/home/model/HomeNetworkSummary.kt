@@ -37,23 +37,27 @@ data class HomeNetworkSummary(
     }
 }
 
+private fun isNamedReadyPeer(device: ConnectedDevice): Boolean =
+    device.isPayloadReady && !device.isProvisional && !NodeIdentity.isPlaceholder(device.name)
+
+private fun isActiveDirect(device: ConnectedDevice): Boolean = isNamedReadyPeer(device) && device.isPeerResponsive
+
+private fun isChecking(device: ConnectedDevice): Boolean = isNamedReadyPeer(device) && !device.isPeerResponsive
+
+// A blocked peer is never reachable for a direct link, so it counts in none of these totals.
+private fun RadarUiState.isBlocked(name: String): Boolean = blockedDeviceNames.any { NodeIdentity.matches(it, name) }
+
 internal fun homeNetworkSummary(state: RadarUiState): HomeNetworkSummary {
-    fun isActiveDirect(device: ConnectedDevice): Boolean =
-        device.isPayloadReady && device.isPeerResponsive &&
-            !device.isProvisional && !NodeIdentity.isPlaceholder(device.name)
-
-    fun isChecking(device: ConnectedDevice): Boolean =
-        device.isPayloadReady && !device.isPeerResponsive &&
-            !device.isProvisional && !NodeIdentity.isPlaceholder(device.name)
-
-    val directNames = state.connectedDevices.filter(::isActiveDirect).map { it.name }
-    val checkingNames = state.connectedDevices.filter(::isChecking).map { it.name }
+    val directNames = state.connectedDevices.filter(::isActiveDirect)
+        .filterNot { state.isBlocked(it.name) }.map { it.name }
+    val checkingNames = state.connectedDevices.filter(::isChecking)
+        .filterNot { state.isBlocked(it.name) }.map { it.name }
     val relayedNames = state.knownNodes
-        .filter { !it.isDirect && !NodeIdentity.isPlaceholder(it.name) }
+        .filter { !it.isDirect && !NodeIdentity.isPlaceholder(it.name) && !state.isBlocked(it.name) }
         .map { it.name }
 
     val nearby = state.scannedDevices.count { scanned ->
-        !NodeIdentity.isPlaceholder(scanned.name) &&
+        !NodeIdentity.isPlaceholder(scanned.name) && !state.isBlocked(scanned.name) &&
             directNames.none { NodeIdentity.matches(it, scanned.name) } &&
             checkingNames.none { NodeIdentity.matches(it, scanned.name) } &&
             relayedNames.none { NodeIdentity.matches(it, scanned.name) }

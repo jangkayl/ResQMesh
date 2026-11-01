@@ -67,6 +67,11 @@ class RadarViewModel(private val useCases: edu.cit.resqmesh.core.domain.usecase.
             }
         }
         viewModelScope.launch {
+            useCases.observeBlockRelationships().collect { relationships ->
+                _uiState.update { it.copy(blockRelationships = relationships) }
+            }
+        }
+        viewModelScope.launch {
             useCases.observeKnownNodes().collect { known ->
                 val previous = _uiState.value
                 val now = System.currentTimeMillis()
@@ -100,6 +105,9 @@ class RadarViewModel(private val useCases: edu.cit.resqmesh.core.domain.usecase.
     fun unblockDevice(deviceName: String) {
         useCases.unblockDevice(deviceName)
     }
+
+    /** Best effort: another phone currently advertises a route to the peer. */
+    fun hasAlternateRoute(peerName: String): Boolean = useCases.hasAlternateRoute(peerName)
 
     fun forceConnect(endpointId: String, endpointName: String) {
         useCases.forceConnect(endpointId, endpointName)

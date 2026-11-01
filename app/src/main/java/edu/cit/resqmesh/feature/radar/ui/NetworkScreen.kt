@@ -44,7 +44,13 @@ fun NetworkScreen(
 
     if (selectedNode != null) {
         NetworkPeerDetails(
-            node = selectedNode,
+            node = selectedNode.copy(
+                hasAlternateRoute = remember(
+                    selectedNode.name, state.knownNodes, state.connectedDevices, state.topology
+                ) {
+                    viewModel.hasAlternateRoute(selectedNode.name)
+                }
+            ),
             knownPath = knownMeshPath(selectedNode),
             onBack = { selectedNodeKey = null },
             onDisconnect = { viewModel.disconnectDevice(selectedNode.endpointId) },

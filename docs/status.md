@@ -63,6 +63,8 @@ Basic block, incident, SOS and recovery checks have user-reported successes; the
 
 **Text input hardening** (`fix/text-input-hardening`): [card](testing/text-input-hardening-card.md) pending.
 
+**Block hardening** (`fix/block-hardening`): [card](testing/block-hardening-card.md) pending.
+
 ## Next actions
 
 Deployment target (user-confirmed 2026-10-17): capstone demo first, then a signed sideloaded pilot beta. Play Store is out of scope.

@@ -30,16 +30,19 @@ class HomeStoryPeersTest {
         assertEquals(listOf("Bea", "Cai", "Ari"), peers.map { it.name })
     }
 
+
     @Test
-    fun blockedPeersStayHidden() {
+    fun blockedPeersShowLastIncludingOutOfRangeOnes() {
         val peers = homeStoryPeers(
             listOf(
                 node("Ari", NodeKind.BLOCKED_OFFLINE, isBlocked = true),
-                node("Bea", NodeKind.OFFLINE, isBlocked = true),
-                node("Cai", NodeKind.DIRECT, isBlocked = true)
+                node("Bea", NodeKind.OFFLINE),
+                node("Cai", NodeKind.DIRECT, isBlocked = true),
+                node("Dee", NodeKind.DIRECT)
             )
         )
 
-        assertEquals(emptyList<String>(), peers.map { it.name })
+        assertEquals(listOf("Dee", "Bea", "Ari", "Cai"), peers.map { it.name })
+        assertEquals(listOf(false, false, true, true), peers.map { it.isBlocked })
     }
 }
