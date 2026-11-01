@@ -13,7 +13,9 @@ interface PeerNameStore {
 
 class RoomPeerNameStore(private val dao: PeerNameDao) : PeerNameStore {
     override val names: Flow<Map<String, String>> = dao.observeNames().map { entries ->
-        entries.associate { it.nodeId to edu.cit.resqmesh.core.security.input.TextSanitizer.inboundPeerName(it.fullName) }
+        entries.associate {
+            it.nodeId to edu.cit.resqmesh.core.security.input.TextSanitizer.inboundPeerName(it.fullName)
+        }
     }
 
     override suspend fun observeFullName(fullName: String) {

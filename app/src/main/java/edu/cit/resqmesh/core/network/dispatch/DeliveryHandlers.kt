@@ -119,7 +119,8 @@ class StandardMessageHandler : PayloadHandler {
         if (audioBase64 != null) voiceNote(msgId, TraceScope.PUBLIC, endpointId)
         if (mediaRejected) {
             // Clamp the sender's text first so the local inbound clamp can never cut the marker off.
-            val room = edu.cit.resqmesh.core.security.input.TextField.MESSAGE.maxLength - ATTACHMENT_UNAVAILABLE.length - 1
+            val room = edu.cit.resqmesh.core.security.input.TextField.MESSAGE.maxLength -
+                ATTACHMENT_UNAVAILABLE.length - 1
             val kept = edu.cit.resqmesh.core.security.input.TextPolicy.clampLength(text, room)
             text = if (kept.isBlank()) ATTACHMENT_UNAVAILABLE else "$kept\n$ATTACHMENT_UNAVAILABLE"
         }

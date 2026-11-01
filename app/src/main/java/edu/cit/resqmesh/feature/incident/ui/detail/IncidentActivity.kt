@@ -78,7 +78,9 @@ internal fun IncidentActivity(
                             "INCIDENT_OFFER_UPDATED" -> "${evt.actorName} offered help"
                             "INCIDENT_OFFER_WITHDRAWN" -> "${evt.actorName} withdrew their offer"
                             "INCIDENT_LEAD_SELECTED" -> {
-                                val target = runCatching { JSONObject(evt.payloadJson).optString("helperName") }.getOrNull()
+                                val target = runCatching {
+                                    JSONObject(evt.payloadJson).optString("helperName")
+                                }.getOrNull()
                                     ?.let(TextSanitizer::inboundPeerName)?.takeIf { it.isNotBlank() } ?: "a helper"
                                 "${evt.actorName} selected $target"
                             }

@@ -22,7 +22,8 @@ class IncidentFeedRepositoryAdapter(private val repository: IncidentRepository) 
     override fun observeEventsForIncident(id: String): Flow<List<DomainEvent>> =
         repository.observeEventsForIncident(id).map { list -> list.map { it.toDisplayModel() } }
     override fun observeOffersForIncident(id: String): Flow<List<IncidentOffer>> =
-        (repository.observeOffersForIncident(id) ?: flowOf(emptyList())).map { list -> list.map { it.toDisplayModel() } }
+        (repository.observeOffersForIncident(id) ?: flowOf(emptyList()))
+            .map { list -> list.map { it.toDisplayModel() } }
     override fun observeAllActiveOffers(): Flow<List<IncidentOffer>> =
         (repository.observeAllActiveOffers() ?: flowOf(emptyList())).map { list -> list.map { it.toDisplayModel() } }
     override fun localIncidentSigningKey(): String? = repository.localIncidentSigningKey()

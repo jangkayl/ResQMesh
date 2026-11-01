@@ -94,9 +94,10 @@ object NodeIdentity {
      */
     fun isPlaceholder(fullName: String?): Boolean {
         val name = fullName?.trim().orEmpty()
-        if (name.isEmpty()) return true
-        if (idOf(name) != null) return false
-        return name.equals(UNKNOWN_NAME, ignoreCase = true) || name.equals(SHORT_UNKNOWN_NAME, ignoreCase = true)
+        return name.isEmpty() || (
+            idOf(name) == null &&
+                (name.equals(UNKNOWN_NAME, ignoreCase = true) || name.equals(SHORT_UNKNOWN_NAME, ignoreCase = true))
+            )
     }
 
     /** Re-attaches a node ID to a (possibly truncated) advertised display name. */

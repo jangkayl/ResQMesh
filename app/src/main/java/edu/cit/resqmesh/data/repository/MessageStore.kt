@@ -68,7 +68,8 @@ class RoomMessageStore(private val dao: MessageDao) : MessageStore {
     override suspend fun markDelivered(messageId: String, readerName: String) {
         val message = dao.getMessageById(messageId) ?: return
         if (message.isMine && message.targetName != null && !NodeIdentity.matches(message.targetName, readerName)) return
-        val readers = StoredNameList.decode(message.deliveredTo).filter { it.isNotEmpty() && it != "FAILED" && it != "PENDING" }
+        val readers = StoredNameList.decode(message.deliveredTo)
+            .filter { it.isNotEmpty() && it != "FAILED" && it != "PENDING" }
         if (readerName in readers) return
         dao.updateDeliveredTo(messageId, StoredNameList.encode(readers + readerName))
     }
@@ -76,7 +77,8 @@ class RoomMessageStore(private val dao: MessageDao) : MessageStore {
     override suspend fun markSeen(messageId: String, readerName: String) {
         val message = dao.getMessageById(messageId) ?: return
         if (message.isMine && message.targetName != null && !NodeIdentity.matches(message.targetName, readerName)) return
-        val readers = StoredNameList.decode(message.seenBy).filter { it.isNotEmpty() && it != "FAILED" && it != "PENDING" }
+        val readers = StoredNameList.decode(message.seenBy)
+            .filter { it.isNotEmpty() && it != "FAILED" && it != "PENDING" }
         if (readerName in readers) return
         dao.updateSeenBy(messageId, StoredNameList.encode(readers + readerName))
     }

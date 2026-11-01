@@ -51,7 +51,8 @@ enum class SosIngestion { APPLIED, DUPLICATE, STALE, REJECTED }
 
 fun edu.cit.resqmesh.data.local.entity.SosAlertEntity.asMessage() = edu.cit.resqmesh.core.model.ChatMessage(
     id = sosId, senderName = TextSanitizer.inboundPeerName(originName),
-    text = "${TextSanitizer.inbound(emergencyType, TextField.INCIDENT_TITLE)} emergency", imageBase64 = null, audioBase64 = null,
+    text = "${TextSanitizer.inbound(emergencyType, TextField.INCIDENT_TITLE)} emergency",
+    imageBase64 = null, audioBase64 = null,
     locationLat = latitude, locationLng = longitude, isMine = false, timestamp = createdAt,
     isSOS = true, conversationKind = "SOS", sosId = sosId, senderNodeId = originNodeId)
 
