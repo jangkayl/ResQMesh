@@ -11,6 +11,7 @@ import edu.cit.resqmesh.core.network.bluetooth.state.BleLinkState
 import edu.cit.resqmesh.core.network.bluetooth.state.MeshFrameCodec
 import edu.cit.resqmesh.core.logging.AppLogger
 import edu.cit.resqmesh.core.network.bluetooth.gatt.GattClientHost
+import edu.cit.resqmesh.core.network.bluetooth.gatt.server.GattWritePolicy
 
 internal class GattClientCallback(
     override val attempt: GattClientAttempt
@@ -28,8 +29,9 @@ internal class GattClientCallback(
                 val mac = gatt.device.address
                 if (status == BluetoothGatt.GATT_SUCCESS) {
                     AppLogger.d("BLE_MESH", "MTU Expanded to $mtu.")
-                    store.connectionMtu[mac] = mtu - 3
-                    link.mtu = mtu - 3
+                    val payloadSize = GattWritePolicy.payloadSizeForMtu(mtu)
+                    store.connectionMtu[mac] = payloadSize
+                    link.mtu = payloadSize
                 } else {
                     AppLogger.d("BLE_MESH", "MTU Expansion failed. Samsung Fallback to 23 bytes.")
                     store.connectionMtu[mac] = 20

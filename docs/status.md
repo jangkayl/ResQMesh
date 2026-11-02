@@ -12,18 +12,18 @@ The current candidate is the October 6 APK `1AE82B6C...`; the user reports F1–
 
 ## Implemented
 
-Behavior and source ownership are in [architecture](architecture.md); accepted policies are in [decisions](decisions.md). The whole-app maintainability decomposition is merged (NativeBleManager keeps a reviewed 743-line facade exception); its evidence is archived in the [October 16 snapshot](../archive/README.md). Home offline grey, including hopped peers, awaits phone validation.
+Behavior and source ownership are in [architecture](architecture.md); accepted policies are in [decisions](decisions.md). The whole-app maintainability decomposition is merged (NativeBleManager keeps a reviewed 743-line facade exception); its evidence is archived in the [October 16 snapshot](../archive/README.md). Home offline grey awaits phone validation.
 
 ## Open issues
 
 | ID | State | Outstanding work |
 | --- | --- | --- |
 | UX-01 | User-reported concern; details pending | UI/UX issues not yet described. Record screens, steps and screenshots when supplied. |
-| PERF-01 | User-reported lag on app open; fixes local, device evidence pending | Source review: 3 s splash, keystore on Main, per-scan Home recomposition, logger list copies, BLE parsing on the main looper. The first four are fixed in `3b234bf`; BLE threading is deferred because of mesh risk. The user reported the `3b234bf` debug APK as less laggy on 2026-10-17, with some lag remaining. Adb on one phone shows 3.3 s debug against 0.8 s release cold start ([validation](validation.md)), so the remaining lag is mostly debug overhead. Demo and beta builds should use the release variant. Release builds keep app Logcat markers debug-only, so capture sessions still need debug builds. The two-phone mesh steps of the [startup lag card](testing/startup-lag-card.md) are pending. |
+| PERF-01 | User-reported lag on app open; fixes local, device evidence pending | Source review: 3 s splash, keystore on Main, per-scan Home recomposition, logger list copies, BLE parsing on the main looper. The first four are fixed in `3b234bf`; BLE threading is deferred because of mesh risk. The user reported the `3b234bf` debug APK as less laggy on 2026-10-17. Adb on one phone shows 3.3 s debug against 0.8 s release cold start ([validation](validation.md)), so the remaining lag is mostly debug overhead. Demo and beta builds should use the release variant. Release builds keep app Logcat markers debug-only, so capture sessions still need debug builds. The two-phone mesh steps of the [startup lag card](testing/startup-lag-card.md) are pending. |
 | MESH-02 | User-reported concern; details pending | Mesh issues beyond DELIVERY-01 not yet described. Record topology, APK, times and focused captures when supplied. |
 | DELIVERY-01 | User-reported failure; relay fix local, device evidence pending | On A→B→C→D, public/private text or voice sometimes fails to reach D; public images sometimes miss across a hop. Cause unproven. |
 | UI-02 | Local failures; acceptance blocked | Four emulator navigation assertions fail on both the pre-refactor baseline and the current candidate. |
-| DEPLOY-01 | Evidence/work pending (replaces RELEASE-01) | Release signing, upgrade path, install guide, process-death/OEM/background battery matrix, accessibility and novice usability. |
+| DEPLOY-01 | Evidence/work pending | Release signing, upgrade path, install guide, process-death/OEM/background battery matrix, accessibility and novice usability. |
 | MEASURE-01 | Evidence pending | Repeated arrival/receipt counts, latency, sustained load/fallback and route-withdrawal coverage. |
 | SCALE-01 | Evidence pending | Five/ten-phone matrices, range and capacity. |
 | TRUST-01 | Work/evidence pending | First-contact verification and defined identity/security guarantees. |
@@ -38,6 +38,8 @@ Basic block, incident, SOS and recovery checks have user-reported successes; the
 **Dead screens**: merged; device pending.
 
 **SOS message notifications** (`feat/sos-message-notifications`): [card](testing/sos-message-notifications-card.md) pending.
+
+**GATT write cap:** SM-A276B crash fix; user reported good.
 
 **Location controls** (`feat/location-controls`): local checks pass; [card](testing/location-controls-card.md) pending. Incident alerts: [card](testing/incident-notifications-card.md).
 

@@ -11,6 +11,7 @@ class GattWritePolicyTest {
         assertEquals(20, GattWritePolicy.payloadSizeForMtu(-5))
         assertEquals(20, GattWritePolicy.payloadSizeForMtu(23))
         assertEquals(244, GattWritePolicy.payloadSizeForMtu(247))
+        assertEquals(512, GattWritePolicy.payloadSizeForMtu(517))
         assertEquals(512, GattWritePolicy.payloadSizeForMtu(Int.MAX_VALUE))
     }
 
