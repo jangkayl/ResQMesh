@@ -39,6 +39,8 @@ Basic block, incident, SOS and recovery checks have user-reported successes; the
 
 **SOS message notifications** (`feat/sos-message-notifications`): [card](testing/sos-message-notifications-card.md) pending.
 
+**SOS banner, developer PIN crash** (`fix/dev-pin-sos-banner`): [card](testing/sos-banner-dev-pin-card.md) pending.
+
 **GATT write cap:** SM-A276B crash fix; user reported good.
 
 **Location controls** (`feat/location-controls`): local checks pass; [card](testing/location-controls-card.md) pending. Incident alerts: [card](testing/incident-notifications-card.md).
@@ -46,8 +48,6 @@ Basic block, incident, SOS and recovery checks have user-reported successes; the
 **Reconnect sync fix** (`fix/incident-reconnect-sync`): bounded sync, paced creation (D29); [card](testing/incident-reconnect-sync-card.md) pending.
 
 **Code smells refactor:** [card](testing/code-smells-refactor-card.md) pending.
-
-**Batch A cleanup**: user-reported [smoke card](testing/batch-a-cleanup-smoke-card.md) pass, 2026-10-16.
 
 **Developer console** (branch `feat/developer-console`, [plan](plans/developer-mode.md)): Stage 1 and live follow are pushed; Stage 2 (traces, timeline) has local checks only and awaits the [phone card](testing/developer-mode-card.md). Stage 3 (signal and queue stats) is pending.
 

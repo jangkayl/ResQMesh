@@ -1,6 +1,7 @@
 package edu.cit.resqmesh.feature.sos.ui
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.animateContentSize
 import androidx.compose.ui.platform.testTag
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -12,6 +13,7 @@ import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.outlined.History
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -25,6 +27,7 @@ import edu.cit.resqmesh.core.audio.MediaHelper
 import edu.cit.resqmesh.core.model.toChatMessage
 import edu.cit.resqmesh.feature.comms.viewmodel.CommunicationViewModel
 import edu.cit.resqmesh.feature.comms.ui.PublicConversationScreen
+import edu.cit.resqmesh.feature.sos.ui.components.CollapsedSosHeader
 import edu.cit.resqmesh.feature.sos.ui.components.CompactSosHeader
 import edu.cit.resqmesh.feature.sos.ui.components.ExpandedSosHeader
 import edu.cit.resqmesh.feature.sos.ui.components.SosMessageBell
@@ -44,6 +47,7 @@ fun SosThreadScreen(
     val alert = alerts.firstOrNull { it.sosId == id }
     var confirmEnd by remember(id) { mutableStateOf(false) }
     var showActivity by remember(id) { mutableStateOf(false) }
+    var bannerCollapsed by rememberSaveable(id) { mutableStateOf(false) }
     val activity by remember(id) { vm.sosActivity(id) }.collectAsState(initial = emptyList())
     val leave = { vm.silenceSos(id); onBack() }
     BackHandler(onBack = leave)
@@ -203,36 +207,47 @@ fun SosThreadScreen(
                 val locationWithheld = remember(id, alert.latitude) {
                     alert.latitude == null && vm.isOwnSos(alert) && vm.isSosLocationWithheld(id)
                 }
-                if (isCompact) {
-                    CompactSosHeader(
-                        alert = alert,
-                        categoryColor = categoryColor,
-                        categoryIcon = categoryIcon,
-                        onMap = {
-                            vm.silenceSos(id)
-                            onMap(alert.toChatMessage())
-                        },
-                        onEnd = { confirmEnd = true },
-                        onSilence = { vm.silenceSos(id) },
-                        onActivity = { showActivity = true },
-                        isOwner = vm.isOwnSos(alert),
-                        locationWithheld = locationWithheld
-                    )
-                } else {
-                    ExpandedSosHeader(
-                        alert = alert,
-                        categoryColor = categoryColor,
-                        categoryIcon = categoryIcon,
-                        onMap = {
-                            vm.silenceSos(id)
-                            onMap(alert.toChatMessage())
-                        },
-                        onEnd = { confirmEnd = true },
-                        onSilence = { vm.silenceSos(id) },
-                        onActivity = { showActivity = true },
-                        isOwner = vm.isOwnSos(alert),
-                        locationWithheld = locationWithheld
-                    )
+                Box(Modifier.animateContentSize()) {
+                    if (isCompact) {
+                        CompactSosHeader(
+                            alert = alert,
+                            categoryColor = categoryColor,
+                            categoryIcon = categoryIcon,
+                            onMap = {
+                                vm.silenceSos(id)
+                                onMap(alert.toChatMessage())
+                            },
+                            onEnd = { confirmEnd = true },
+                            onSilence = { vm.silenceSos(id) },
+                            onActivity = { showActivity = true },
+                            isOwner = vm.isOwnSos(alert),
+                            locationWithheld = locationWithheld
+                        )
+                    } else if (bannerCollapsed) {
+                        CollapsedSosHeader(
+                            alert = alert,
+                            categoryColor = categoryColor,
+                            categoryIcon = categoryIcon,
+                            onExpand = { bannerCollapsed = false },
+                            locationWithheld = locationWithheld
+                        )
+                    } else {
+                        ExpandedSosHeader(
+                            alert = alert,
+                            categoryColor = categoryColor,
+                            categoryIcon = categoryIcon,
+                            onMap = {
+                                vm.silenceSos(id)
+                                onMap(alert.toChatMessage())
+                            },
+                            onEnd = { confirmEnd = true },
+                            onSilence = { vm.silenceSos(id) },
+                            onActivity = { showActivity = true },
+                            onCollapse = { bannerCollapsed = true },
+                            isOwner = vm.isOwnSos(alert),
+                            locationWithheld = locationWithheld
+                        )
+                    }
                 }
             }
         }
