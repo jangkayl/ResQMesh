@@ -99,6 +99,37 @@ class SosNavigationTest {
         }
     }
 
+    @Test fun tappingBannerCollapsesAndReopensIt() = runBlocking {
+        val koin = GlobalContext.get()
+        val repo = koin.get<SosRepository>()
+        val vm = koin.get<CommunicationViewModel>()
+        val id = repo.create("Banner test")
+        repo.alerts.first { rows -> rows.any { it.sosId == id } }
+        try {
+            // Fixed size and font scale: the small-screen header has no collapse.
+            compose.setContent {
+                val density = LocalDensity.current.density
+                CompositionLocalProvider(LocalDensity provides Density(density, 1f)) {
+                    TestResQMeshTheme {
+                        Box(Modifier.size(360.dp, 700.dp)) {
+                            SosThreadScreen(vm, koin.get<MediaHelper>(), id, onBack = {}, onMap = {})
+                        }
+                    }
+                }
+            }
+            val tapBannerEdge: TouchInjectionScope.() -> Unit = { click(androidx.compose.ui.geometry.Offset(10f, 10f)) }
+            compose.onNodeWithTag("sos_end").assertIsDisplayed()
+            compose.onNodeWithTag("sos_banner_toggle").performTouchInput(tapBannerEdge)
+            compose.onNodeWithTag("sos_end").assertDoesNotExist()
+            compose.onNodeWithText("ACTIVE").assertIsDisplayed()
+            compose.onNodeWithTag("sos_banner_toggle").performTouchInput(tapBannerEdge)
+            compose.onNodeWithTag("sos_end").assertIsDisplayed()
+        } finally {
+            repo.end(id)
+            androidx.lifecycle.ViewModelStore().apply { put("vm", vm); clear() }
+        }
+    }
+
     @Test fun receiverBackSilencesOnlyThisPhone() = runBlocking {
         val koin = GlobalContext.get()
         val repo = koin.get<SosRepository>()
@@ -154,7 +185,6 @@ class SosNavigationTest {
             val input = compose.onNodeWithTag("conversation_input").fetchSemanticsNode().boundsInRoot
             assertTrue(input.bottom <= host.bottom)
             capture("compact-thread")
-            compose.onNodeWithTag("sos_controls").performClick()
             compose.onNodeWithTag("sos_end").performScrollTo().assertIsDisplayed()
             capture("compact-controls")
             compose.onNodeWithTag("sos_end").performClick()
@@ -268,10 +298,10 @@ class SosNavigationTest {
                 }
             }
             compose.onNodeWithTag("conversation_input").performTextInput("Keyboard reply")
-            compose.onNodeWithTag("sos_controls").performClick()
+            compose.onNodeWithTag("sos_end").performClick()
             compose.runOnIdle { availableHeight = 720.dp }
             androidx.test.espresso.Espresso.closeSoftKeyboard()
-            compose.onNodeWithTag("sos_controls_dialog").assertIsDisplayed()
+            compose.onNodeWithTag("sos_keep_active").assertIsDisplayed()
             capture("keyboard-controls-restored-height")
             assertFalse(repo.alerts.value.first { it.sosId == id }.ended)
         } finally {

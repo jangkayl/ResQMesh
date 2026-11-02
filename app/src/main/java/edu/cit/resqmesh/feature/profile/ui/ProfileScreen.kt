@@ -500,7 +500,7 @@ fun ProfileScreen(
             },
             confirmButton = {
                 Button(
-                    enabled = !verifyingPin,
+                    enabled = !verifyingPin && pinInput.isNotEmpty(),
                     onClick = {
                         verifyingPin = true
                         scope.launch {

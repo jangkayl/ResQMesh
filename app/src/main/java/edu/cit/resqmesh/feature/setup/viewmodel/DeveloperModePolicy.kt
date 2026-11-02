@@ -16,9 +16,9 @@ object DeveloperModePolicy {
     fun isEnabled(pinHash: String, storedFlag: Boolean, storedHash: String?): Boolean =
         isConfigured(pinHash) && storedFlag && storedHash == pinHash
 
-    /** Slow by design (PBKDF2): call off the main thread. */
+    /** Slow by design (PBKDF2): call off the main thread. Android's PBKDF2 throws on an empty password. */
     fun acceptsPin(pinHash: String, salt: String, pin: String?): Boolean {
-        if (!isConfigured(pinHash) || pin == null || !isAscii(pin)) return false
+        if (!isConfigured(pinHash) || pin.isNullOrEmpty() || !isAscii(pin)) return false
         return MessageDigest.isEqual(hash(salt, pin).toByteArray(Charsets.UTF_8), pinHash.toByteArray(Charsets.UTF_8))
     }
 
