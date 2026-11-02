@@ -11,7 +11,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Cancel
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.ExpandLess
-import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Map
@@ -42,21 +41,24 @@ internal fun formatSosHeaderTime(timestamp: Long): String {
     }.getOrDefault("Just now")
 }
 
-private fun sosStatusTimestamp(alert: SosAlert): Long = when {
+internal fun sosStatusTimestamp(alert: SosAlert): Long = when {
     alert.ended -> alert.updatedAt.takeIf { it > 1_000_000_000_000L } ?: alert.createdAt
     alert.updatedAt > 1_000_000_000_000L -> alert.updatedAt
     alert.createdAt > 1_000_000_000_000L -> alert.createdAt
     else -> System.currentTimeMillis()
 }
 
-private fun sosShortLocationLabel(alert: SosAlert, locationWithheld: Boolean): String = when {
+internal fun sosShortLocationLabel(alert: SosAlert, locationWithheld: Boolean): String = when {
     alert.latitude != null -> "±${alert.accuracyMeters?.toInt() ?: "?"}m"
     locationWithheld -> "Not shared"
     alert.ended -> "No GPS"
     else -> "Acquiring..."
 }
 
-@OptIn(ExperimentalLayoutApi::class)
+private val BannerActionPadding = PaddingValues(horizontal = 6.dp, vertical = 4.dp)
+private val BannerActionShape = RoundedCornerShape(10.dp)
+
+@Suppress("FunctionNaming", "LongParameterList")
 @Composable
 internal fun ExpandedSosHeader(
     alert: SosAlert,
@@ -72,7 +74,6 @@ internal fun ExpandedSosHeader(
     locationWithheld: Boolean = false
 ) {
     val isLight = MaterialTheme.colorScheme.background.luminance() > 0.5f
-    val statusTimestamp = sosStatusTimestamp(alert)
     Surface(
         modifier = Modifier
             .fillMaxWidth()
@@ -93,347 +94,207 @@ internal fun ExpandedSosHeader(
                 .testTag("sos_banner_toggle")
                 .padding(horizontal = 10.dp, vertical = 8.dp)
         ) {
-            // Row 1: Left: Badges; Right: Collapse hint
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+            ExpandedSosBadges(alert, categoryColor, categoryIcon, isLight)
+            Spacer(Modifier.height(6.dp))
+            ExpandedSosTransmission(alert)
+            Spacer(Modifier.height(2.dp))
+            ExpandedSosLocation(alert, locationWithheld)
+            Spacer(Modifier.height(8.dp))
+            ExpandedSosActions(alert, isOwner, onMap, onEnd, onSilence, onActivity)
+        }
+    }
+}
+
+@Suppress("FunctionNaming")
+@Composable
+private fun ExpandedSosBadges(alert: SosAlert, categoryColor: Color, categoryIcon: ImageVector, isLight: Boolean) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Surface(
+                shape = RoundedCornerShape(8.dp),
+                color = categoryColor.copy(alpha = 0.15f),
+                border = BorderStroke(1.dp, categoryColor.copy(alpha = 0.4f))
             ) {
-                // Category & Status Badges
                 Row(
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Surface(
-                        shape = RoundedCornerShape(8.dp),
-                        color = categoryColor.copy(alpha = 0.15f),
-                        border = BorderStroke(1.dp, categoryColor.copy(alpha = 0.4f))
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(
-                                imageVector = categoryIcon,
-                                contentDescription = null,
-                                tint = categoryColor,
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Spacer(Modifier.width(6.dp))
-                            Text(
-                                text = alert.emergencyType,
-                                style = MaterialTheme.typography.labelSmall,
-                                fontWeight = FontWeight.Black,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                        }
-                    }
-
-                    Surface(
-                        shape = RoundedCornerShape(8.dp),
-                        color = when {
-                            alert.ended -> MaterialTheme.colorScheme.surfaceVariant
-                            alert.locallySilenced -> Color(0xFFFFB300).copy(alpha = 0.15f)
-                            else -> Color(0xFFDC2626).copy(alpha = 0.15f)
-                        },
-                        border = BorderStroke(
-                            1.dp,
-                            when {
-                                alert.ended -> MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
-                                alert.locallySilenced -> Color(0xFFFFB300).copy(alpha = 0.4f)
-                                else -> Color(0xFFDC2626).copy(alpha = 0.4f)
-                            }
-                        )
-                    ) {
-                        Text(
-                            text = when {
-                                alert.ended -> "ENDED"
-                                alert.locallySilenced -> "SILENCED LOCALLY"
-                                else -> "ACTIVE SOS"
-                            },
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.Black,
-                            color = when {
-                                alert.ended -> MaterialTheme.colorScheme.onSurfaceVariant
-                                alert.locallySilenced -> if (isLight) Color(0xFFB45309) else Color(0xFFFDE68A)
-                                else -> if (isLight) Color(0xFFDC2626) else Color(0xFFFCA5A5)
-                            },
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                        )
-                    }
-                }
-
-                Icon(
-                    imageVector = Icons.Default.ExpandLess,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(20.dp)
-                )
-            }
-
-            Spacer(Modifier.height(6.dp))
-
-            // Row 2: Transmission status (Left) + Timestamp (Right)
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.weight(1f, fill = false)
-                ) {
                     Icon(
-                        imageVector = if (alert.ended) Icons.Default.CheckCircle else Icons.Default.Sensors,
+                        imageVector = categoryIcon,
                         contentDescription = null,
-                        tint = if (alert.ended) ResQTheme.colors.success else MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(14.dp)
+                        tint = categoryColor,
+                        modifier = Modifier.size(16.dp)
                     )
                     Spacer(Modifier.width(6.dp))
                     Text(
-                        text = if (alert.ended) "Emergency ended" else sosTransmissionLabel(alert.transmission),
-                        style = MaterialTheme.typography.bodySmall,
-                        fontWeight = FontWeight.Bold,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
+                        text = alert.emergencyType,
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Black,
+                        color = MaterialTheme.colorScheme.onSurface
                     )
                 }
-
-                Spacer(Modifier.width(8.dp))
-
-                Text(
-                    text = formatSosHeaderTime(statusTimestamp),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
             }
+            ExpandedSosStatusBadge(alert, isLight)
+        }
 
-            Spacer(Modifier.height(2.dp))
+        Icon(
+            imageVector = Icons.Default.ExpandLess,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(20.dp)
+        )
+    }
+}
 
-            // Row 3: Location telemetry (Spans full width)
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
+@Suppress("FunctionNaming")
+@Composable
+private fun ExpandedSosTransmission(alert: SosAlert) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.weight(1f, fill = false)
+        ) {
+            Icon(
+                imageVector = if (alert.ended) Icons.Default.CheckCircle else Icons.Default.Sensors,
+                contentDescription = null,
+                tint = if (alert.ended) ResQTheme.colors.success else MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(14.dp)
+            )
+            Spacer(Modifier.width(6.dp))
+            Text(
+                text = if (alert.ended) "Emergency ended" else sosTransmissionLabel(alert.transmission),
+                style = MaterialTheme.typography.bodySmall,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+
+        Spacer(Modifier.width(8.dp))
+
+        Text(
+            text = formatSosHeaderTime(sosStatusTimestamp(alert)),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
+@Suppress("FunctionNaming")
+@Composable
+private fun ExpandedSosLocation(alert: SosAlert, locationWithheld: Boolean) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(
+            imageVector = Icons.Default.LocationOn,
+            contentDescription = null,
+            tint = if (alert.latitude != null) ResQTheme.colors.success else MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(14.dp)
+        )
+        Spacer(Modifier.width(6.dp))
+        Text(
+            text = when {
+                alert.latitude != null -> "Pinned (${String.format(java.util.Locale.US, "%.4f, %.4f", alert.latitude, alert.longitude)}) · ±${alert.accuracyMeters?.toInt() ?: "?"}m"
+                locationWithheld -> "Location not shared"
+                alert.ended -> "Location telemetry unavailable"
+                else -> "Finding your location…"
+            },
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+    }
+}
+
+@Suppress("FunctionNaming", "LongParameterList")
+@Composable
+private fun ExpandedSosActions(
+    alert: SosAlert,
+    isOwner: Boolean,
+    onMap: () -> Unit,
+    onEnd: () -> Unit,
+    onSilence: () -> Unit,
+    onActivity: () -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        OutlinedButton(
+            onClick = onMap,
+            modifier = Modifier.weight(1f).heightIn(min = 40.dp),
+            contentPadding = BannerActionPadding,
+            shape = BannerActionShape
+        ) {
+            BannerActionLabel(Icons.Default.Map, "Map")
+        }
+
+        OutlinedButton(
+            onClick = onActivity,
+            modifier = Modifier.weight(1f).heightIn(min = 40.dp).testTag("sos_activity"),
+            contentPadding = BannerActionPadding,
+            shape = BannerActionShape
+        ) {
+            BannerActionLabel(Icons.Default.History, "History")
+        }
+
+        if (!alert.ended && isOwner) {
+            Button(
+                onClick = onEnd,
+                modifier = Modifier.weight(1.4f).heightIn(min = 40.dp).testTag("sos_end"),
+                contentPadding = BannerActionPadding,
+                shape = BannerActionShape,
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFB42318))
             ) {
-                Icon(
-                    imageVector = Icons.Default.LocationOn,
-                    contentDescription = null,
-                    tint = if (alert.latitude != null) ResQTheme.colors.success else MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(14.dp)
-                )
-                Spacer(Modifier.width(6.dp))
-                Text(
-                    text = when {
-                        alert.latitude != null -> "Pinned (${String.format(java.util.Locale.US, "%.4f, %.4f", alert.latitude, alert.longitude)}) · ±${alert.accuracyMeters?.toInt() ?: "?"}m"
-                        locationWithheld -> "Location not shared"
-                        alert.ended -> "Location telemetry unavailable"
-                        else -> "Finding your location…"
-                    },
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
+                BannerActionLabel(Icons.Default.Cancel, "End my SOS")
             }
-
-            Spacer(Modifier.height(8.dp))
-
-            // Row 4: Map, History and End/Silence share one line
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                verticalAlignment = Alignment.CenterVertically
+        } else if (!alert.ended) {
+            OutlinedButton(
+                onClick = onSilence,
+                modifier = Modifier.weight(1.4f).heightIn(min = 40.dp).testTag("sos_silence"),
+                contentPadding = BannerActionPadding,
+                shape = BannerActionShape
             ) {
-                OutlinedButton(
-                    onClick = onMap,
-                    modifier = Modifier
-                        .weight(1f)
-                        .heightIn(min = 40.dp),
-                    contentPadding = PaddingValues(horizontal = 6.dp, vertical = 4.dp),
-                    shape = RoundedCornerShape(10.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Map,
-                        contentDescription = null,
-                        modifier = Modifier.size(16.dp)
-                    )
-                    Spacer(Modifier.width(4.dp))
-                    Text(
-                        "Map",
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = FontWeight.Bold,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
-
-                OutlinedButton(
-                    onClick = onActivity,
-                    modifier = Modifier
-                        .weight(1f)
-                        .heightIn(min = 40.dp)
-                        .testTag("sos_activity"),
-                    contentPadding = PaddingValues(horizontal = 6.dp, vertical = 4.dp),
-                    shape = RoundedCornerShape(10.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.History,
-                        contentDescription = null,
-                        modifier = Modifier.size(16.dp)
-                    )
-                    Spacer(Modifier.width(4.dp))
-                    Text(
-                        "History",
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = FontWeight.Bold,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
-
-                if (!alert.ended && isOwner) {
-                    Button(
-                        onClick = onEnd,
-                        modifier = Modifier
-                            .weight(1.4f)
-                            .heightIn(min = 40.dp)
-                            .testTag("sos_end"),
-                        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 4.dp),
-                        shape = RoundedCornerShape(10.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFB42318))
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Cancel,
-                            contentDescription = null,
-                            modifier = Modifier.size(16.dp)
-                        )
-                        Spacer(Modifier.width(4.dp))
-                        Text(
-                            "End my SOS",
-                            style = MaterialTheme.typography.labelMedium,
-                            fontWeight = FontWeight.Bold,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
-                } else if (!alert.ended) {
-                    OutlinedButton(
-                        onClick = onSilence,
-                        modifier = Modifier
-                            .weight(1.4f)
-                            .heightIn(min = 40.dp),
-                        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 4.dp),
-                        shape = RoundedCornerShape(10.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.NotificationsOff,
-                            contentDescription = null,
-                            modifier = Modifier.size(16.dp)
-                        )
-                        Spacer(Modifier.width(4.dp))
-                        Text(
-                            if (alert.locallySilenced) "Silenced" else "Silence",
-                            style = MaterialTheme.typography.labelMedium,
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier.testTag("sos_silence"),
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
-                }
+                BannerActionLabel(
+                    Icons.Default.NotificationsOff,
+                    if (alert.locallySilenced) "Silenced" else "Silence"
+                )
             }
         }
     }
 }
 
-/** One-line strip shown after the banner is tapped; tapping it brings the full banner back. */
+@Suppress("FunctionNaming")
 @Composable
-internal fun CollapsedSosHeader(
-    alert: SosAlert,
-    categoryColor: Color,
-    categoryIcon: ImageVector,
-    onExpand: () -> Unit,
-    /** Own SOS sent with "Include my location" off. */
-    locationWithheld: Boolean = false
-) {
-    val isLight = MaterialTheme.colorScheme.background.luminance() > 0.5f
-    Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(top = 6.dp, bottom = 6.dp),
-        shape = RoundedCornerShape(12.dp),
-        color = MaterialTheme.colorScheme.surface,
-        border = BorderStroke(
-            1.dp,
-            if (alert.ended) MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
-            else categoryColor.copy(alpha = 0.65f)
-        ),
-        shadowElevation = if (isLight) 2.dp else 4.dp
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clickable(onClickLabel = "Show SOS details", onClick = onExpand)
-                .testTag("sos_banner_toggle")
-                .heightIn(min = 44.dp)
-                .padding(horizontal = 10.dp, vertical = 6.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Icon(
-                imageVector = categoryIcon,
-                contentDescription = null,
-                tint = categoryColor,
-                modifier = Modifier.size(16.dp)
-            )
-            Spacer(Modifier.width(6.dp))
-            Text(
-                text = alert.emergencyType,
-                style = MaterialTheme.typography.labelMedium,
-                fontWeight = FontWeight.Black,
-                color = MaterialTheme.colorScheme.onSurface,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f, fill = false)
-            )
-            Spacer(Modifier.width(8.dp))
-            Surface(
-                shape = RoundedCornerShape(6.dp),
-                color = when {
-                    alert.ended -> MaterialTheme.colorScheme.surfaceVariant
-                    alert.locallySilenced -> Color(0xFFFFB300).copy(alpha = 0.15f)
-                    else -> ResQTheme.colors.sos.copy(alpha = 0.15f)
-                }
-            ) {
-                Text(
-                    text = when {
-                        alert.ended -> "ENDED"
-                        alert.locallySilenced -> "SILENCED"
-                        else -> "ACTIVE"
-                    },
-                    style = MaterialTheme.typography.labelSmall,
-                    fontWeight = FontWeight.Black,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    maxLines = 1,
-                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp)
-                )
-            }
-            Spacer(Modifier.width(8.dp))
-            Text(
-                text = "${sosShortLocationLabel(alert, locationWithheld)} · ${formatSosHeaderTime(sosStatusTimestamp(alert))}",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f)
-            )
-            Icon(
-                imageVector = Icons.Default.ExpandMore,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(20.dp)
-            )
-        }
-    }
+private fun BannerActionLabel(icon: ImageVector, label: String) {
+    Icon(
+        imageVector = icon,
+        contentDescription = null,
+        modifier = Modifier.size(16.dp)
+    )
+    Spacer(Modifier.width(4.dp))
+    Text(
+        label,
+        style = MaterialTheme.typography.labelMedium,
+        fontWeight = FontWeight.Bold,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis
+    )
 }
 
 @Composable
