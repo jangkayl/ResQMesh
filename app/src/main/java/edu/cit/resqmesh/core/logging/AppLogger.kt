@@ -64,6 +64,8 @@ object AppLogger {
     private val timeFormat = SimpleDateFormat("HH:mm:ss.SSS", Locale.getDefault())
 
     fun d(tag: String, message: String) {
+        // Nothing would keep the entry, so skip classifying it on every release call.
+        if (!BuildConfig.DEBUG && !TraceGate.enabled) return
         event(
             category = TerminalLogClassifier.categoryFor(tag, message),
             event = tag,

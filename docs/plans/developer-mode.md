@@ -35,7 +35,7 @@ The console only observes mesh behavior; traces stay in memory and exports hold 
 - Emits store small typed events with no string formatting on hot paths. Timestamp formatting and MAC redaction happen at read time.
 - The ViewModel snapshots every 250 ms off the main thread only while the screen is subscribed, and skips when nothing changed. Pause freezes the published copy.
 - Links and Overview read live state, not a log-fed copy. `LinkDiagnostic` is built from `BleLinkRegistry` by `BleLinkDiagnostics` (read-only; `L2capTransport.hasWriter` gives GATT or GATT+L2CAP) and exposed through `MeshNetworkGateway.linkDiagnostics()` and a use case. The ViewModel polls about once a second only while collected, off the main thread, and publishes only changed results. `LinkGrouper` groups by node ID, then a non-placeholder identity key, then endpoint; a placeholder name never groups and no row says "Unknown" (unidentified shows "Identifying…"). The old `AppLogger` link table is removed; disconnect history stays in Logs.
-- `TraceGate.enabled` is pushed in from the application and `SetupViewModel`; `core/` never imports `DeveloperModePolicy`. Off means emits return at once and the rings clear.
+- `TraceGate.enabled` is pushed in from the application and `SetupViewModel`; `core/` never imports `DeveloperModePolicy`. Off means emits return at once and the rings clear; in release, `AppLogger.d` also returns before classifying the message.
 - `packetKey = targetMessageId.ifBlank { id }` links receipts to their message timeline.
 - `type` is an enum with OTHER, so peer-supplied strings are never formatted.
 
