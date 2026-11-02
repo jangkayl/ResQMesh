@@ -6,6 +6,7 @@ import edu.cit.resqmesh.core.model.ConnectedDevice
 import edu.cit.resqmesh.core.model.NodeIdentity
 import edu.cit.resqmesh.core.network.MeshPayload
 import edu.cit.resqmesh.core.network.MeshNetworkGateway
+import edu.cit.resqmesh.core.notification.SosMessageNotifier
 import edu.cit.resqmesh.core.security.input.TextField
 import edu.cit.resqmesh.core.security.input.TextSanitizer
 import edu.cit.resqmesh.core.network.dispatch.InboundPayloadValidator.Companion.MAX_TTL
@@ -100,7 +101,8 @@ internal class MeshInboundMessages(
     private val readyPeers: () -> List<ConnectedDevice>,
     private val observeName: (String, Boolean) -> Unit,
     private val outboxMutex: Mutex,
-    private val clock: () -> Long = System::currentTimeMillis
+    private val clock: () -> Long = System::currentTimeMillis,
+    private val sosMessages: SosMessageNotifier? = null
 ) {
     private val receiptReplays = ReceiptReplayLimiter(clock = clock)
     private val myNodeName get() = localName()
@@ -224,6 +226,7 @@ internal class MeshInboundMessages(
         if (!fresh && !networkManager.hasPendingCustody(p.id)) return
         if (fresh) recordPeerName(p.senderName)
         message?.takeIf { it.conversationKind == "RADIO" && it.audioBase64 != null }?.let { incomingVoiceMessage.tryEmit(it) }
+        message?.takeIf { it.conversationKind == "SOS" }?.let { sosMessages?.received(it) }
         if (p.ttl > 1 && p.relayHopCount < MAX_TTL) {
             networkManager.broadcastPayload(ProtoBuf.encodeToByteArray(p.copy(ttl = p.ttl - 1,
                 relayHopCount = p.relayHopCount + 1, routePath = p.routePath + myNodeName)), endpoint)

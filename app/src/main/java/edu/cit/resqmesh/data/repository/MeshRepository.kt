@@ -44,7 +44,8 @@ class MeshRepository(
     private val sosRepository: SosRepository? = null,
     private val clock: () -> Long = System::currentTimeMillis,
     private val chatBudget: edu.cit.resqmesh.core.network.ratelimit.OutgoingChatBudget =
-        edu.cit.resqmesh.core.network.ratelimit.OutgoingChatBudget(clock = clock)
+        edu.cit.resqmesh.core.network.ratelimit.OutgoingChatBudget(clock = clock),
+    private val sosMessages: edu.cit.resqmesh.core.notification.SosMessageNotifier? = null
 ) {
 
     private val _connectionStatus = MutableStateFlow("Ready to deploy Mesh Node.")
@@ -358,7 +359,8 @@ class MeshRepository(
         ::readyConnectedDevices,
         ::recordPeerName,
         outbound.outboxMutex,
-        clock
+        clock,
+        sosMessages
     )
 
     private fun createConversationMedia() = MeshConversationMedia(

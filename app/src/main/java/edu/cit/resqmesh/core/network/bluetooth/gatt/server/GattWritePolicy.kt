@@ -10,7 +10,7 @@ internal object GattWritePolicy {
     const val MAX_PAYLOAD_BYTES = 512
     private const val ATT_OVERHEAD_BYTES = 3
 
-    /** Usable bytes per ATT write for a negotiated MTU, clamped against bogus peer values. */
+    /** Usable bytes per ATT write for a negotiated MTU. Android throws above 512, and MTU 517 is common. */
     fun payloadSizeForMtu(mtu: Int): Int = (mtu - ATT_OVERHEAD_BYTES).coerceIn(MIN_PAYLOAD_BYTES, MAX_PAYLOAD_BYTES)
 
     /** Status for a write request before any buffering; GATT_SUCCESS means "accept". */

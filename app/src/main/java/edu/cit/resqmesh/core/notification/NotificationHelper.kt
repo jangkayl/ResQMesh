@@ -21,13 +21,16 @@ class NotificationHelper(private val context: Context) {
     private val channelId = "resqmesh_private_messages_v2"
     private val emergencyChannelId = "resqmesh_emergency_v4"
     private val incidentChannelId = "resqmesh_incidents_v1"
+    private val sosMessageChannelId = "resqmesh_sos_messages_v1"
 
     // Bounded message history per sender (max 7 messages) for Android MessagingStyle notifications
     private data class NotificationMessage(
         val text: String,
-        val timestamp: Long
+        val timestamp: Long,
+        val sender: String = ""
     )
     private val conversationHistories = ConcurrentHashMap<String, ArrayDeque<NotificationMessage>>()
+    private val sosMessageHistories = ConcurrentHashMap<String, ArrayDeque<NotificationMessage>>()
 
     init {
         createNotificationChannels()
@@ -82,6 +85,17 @@ class NotificationHelper(private val context: Context) {
                 setShowBadge(true)
             }
             notificationManager.createNotificationChannel(incidentChannel)
+
+            // 4. SOS chat: an ordinary message channel, never the alarm or a Do Not Disturb bypass
+            val sosMessageChannel = NotificationChannel(
+                sosMessageChannelId,
+                "SOS messages",
+                NotificationManager.IMPORTANCE_HIGH
+            ).apply {
+                description = "Replies, voice notes and images in active SOS chats"
+                setShowBadge(true)
+            }
+            notificationManager.createNotificationChannel(sosMessageChannel)
         }
     }
 
@@ -259,6 +273,69 @@ class NotificationHelper(private val context: Context) {
         }
     }
 
+    /**
+     * Shows or updates the single notification for an SOS chat. Without [playSound] the text
+     * updates quietly. Tapping opens that chat through the existing SOS route.
+     */
+    fun showSosMessageNotification(sosId: String, senderName: String, messageText: String, playSound: Boolean) {
+        if (!NotificationManagerCompat.from(context).areNotificationsEnabled()) return
+        val history = sosMessageHistories.getOrPut(sosId) { ArrayDeque() }
+        val style = NotificationCompat.MessagingStyle(Person.Builder().setName("You").build())
+            .setConversationTitle("SOS chat")
+            .setGroupConversation(true)
+        synchronized(history) {
+            history.addLast(NotificationMessage(messageText, System.currentTimeMillis(), senderName))
+            while (history.size > 7) {
+                history.removeFirst()
+            }
+            for (msg in history) {
+                style.addMessage(
+                    NotificationCompat.MessagingStyle.Message(
+                        msg.text,
+                        msg.timestamp,
+                        Person.Builder().setName(msg.sender).build()
+                    )
+                )
+            }
+        }
+        val openIntent = Intent(context, NotificationRouterActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
+            putExtra("EXTRA_TRIGGER_SOS", true)
+            putExtra("EXTRA_SOS_ID", sosId)
+        }
+        val pendingIntent = PendingIntent.getActivity(
+            context,
+            ("sos_messages_open_$sosId").hashCode(),
+            openIntent,
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+        )
+        val builder = NotificationCompat.Builder(context, sosMessageChannelId)
+            .setSmallIcon(R.drawable.resqmesh_logo)
+            .setStyle(style)
+            .setContentTitle("SOS chat")
+            .setContentText("$senderName: $messageText")
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setCategory(NotificationCompat.CATEGORY_MESSAGE)
+            .setAutoCancel(true)
+            .setOnlyAlertOnce(!playSound)
+            .setContentIntent(pendingIntent)
+            .setColor(0xFFFF5A00.toInt())
+        try {
+            NotificationManagerCompat.from(context).notify("sos_messages_$sosId", SOS_MESSAGE_TAG_ID, builder.build())
+        } catch (e: SecurityException) {
+            e.printStackTrace()
+        }
+    }
+
+    fun clearSosMessages(id: String) {
+        sosMessageHistories.remove(id)
+        NotificationManagerCompat.from(context).cancel("sos_messages_$id", SOS_MESSAGE_TAG_ID)
+    }
+
+    fun clearAllSosMessages() {
+        sosMessageHistories.keys.toList().forEach(::clearSosMessages)
+    }
+
     fun clearIncident(id: String) { NotificationManagerCompat.from(context).cancel("incident_$id", 2) }
 
     fun clearSos(id: String) { NotificationManagerCompat.from(context).cancel("sos_$id", 1) }
@@ -274,5 +351,9 @@ class NotificationHelper(private val context: Context) {
         } catch (e: Exception) {
             e.printStackTrace()
         }
+    }
+
+    private companion object {
+        const val SOS_MESSAGE_TAG_ID = 3
     }
 }

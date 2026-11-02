@@ -119,7 +119,7 @@ New Critical/Serious incidents notify everyone unless toggled off; reporter/help
 
 ## D29: Bounded incident sync, paced creation
 
-Sync (protocol 3) carries open and 24 h closed incidents, at most 100, with full history; older stay local. Per signing key, reports are paced 3 then 1/20 s and offer changes 5/min per incident; receivers pace live broadcasts only; withdrawals and lead decisions are exempt.
+Sync (protocol 3) carries open and 24 h closed incidents, at most 100, with full history; older stay local. Per signing key, reports are paced 3 then 1/20 s and offer changes 5/min per incident; receivers pace live broadcasts only.
 
 ## D30: Release developer console
 
@@ -127,7 +127,7 @@ Hidden; requires build-set PIN. [Plan](plans/developer-mode.md).
 
 ## D31: Voice notes only
 
-No live PTT; older `LIVE_AUDIO` drops. `liveAudioChunk` carries transfers. 30s note cap.
+No live PTT; older `LIVE_AUDIO` drops. 30s note cap.
 
 ## D32: Byte-capped WebP images
 
@@ -135,4 +135,8 @@ No live PTT; older `LIVE_AUDIO` drops. `liveAudioChunk` carries transfers. 30s n
 
 ## D33: Late public media relay
 
-Relays keep public media 10 minutes for later READY neighbors, each once, behind live work. Finished transfers need no sender link. Text keeps its roster. Chat sync pulls the newest 50 Community/SOS texts and 10 attachments, never private or Radio.
+Relays keep public media 10 minutes for later READY neighbors, each once, behind live work. Chat sync pulls the newest 50 Community/SOS texts and 10 attachments, never private or Radio.
+
+## D34: SOS message notifications
+
+Live SOS chat notifies per thread; bell and Settings mute messages, never alarms.

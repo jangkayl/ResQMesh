@@ -68,6 +68,7 @@ fun ProfileScreen(
     val isBackgroundMeshEnabled by viewModel.isBackgroundMeshEnabled.collectAsState()
     val isAutoDetectLocation by viewModel.isAutoDetectLocationEnabled.collectAsState()
     val isIncidentAlerts by viewModel.isIncidentAlertsEnabled.collectAsState()
+    val isSosMessageAlerts by viewModel.isSosMessageAlertsEnabled.collectAsState()
     var showConnectionConfirm by remember { mutableStateOf(false) }
     var connectionError by remember { mutableStateOf<MeshStartError?>(null) }
     val scope = rememberCoroutineScope()
@@ -327,6 +328,25 @@ fun ProfileScreen(
                         Switch(
                             checked = isIncidentAlerts,
                             onCheckedChange = viewModel::setIncidentAlertsEnabled
+                        )
+                    }
+                )
+                DividerLine()
+                SettingRow(
+                    icon = Icons.Default.NotificationsActive,
+                    title = "SOS message notifications",
+                    subtitle = if (isSosMessageAlerts) {
+                        "Notifies you of new messages in active SOS chats. Use the bell in a chat to mute it."
+                    } else {
+                        "Off. New SOS alarms still sound."
+                    },
+                    onClick = {
+                        viewModel.setSosMessageAlertsEnabled(!isSosMessageAlerts)
+                    },
+                    trailing = {
+                        Switch(
+                            checked = isSosMessageAlerts,
+                            onCheckedChange = viewModel::setSosMessageAlertsEnabled
                         )
                     }
                 )
