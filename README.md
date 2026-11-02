@@ -13,42 +13,35 @@ ResQMesh is an Android capstone and production-oriented prototype for nearby mes
 
 Native BLE advertising/scanning discovers peers; GATT establishes client/server links. Optional L2CAP carries payloads; GATT retains setup, control and fallback. Peers relay traffic beyond direct neighbors. Wi-Fi Direct and Nearby Connections are inactive.
 
-Persistent conversations, independent SOS alerts, reporter-selected helpers and local maps use offline identity without mandatory online login.
+All features use offline identity without mandatory online login.
 
 **Project stage:** working prototype with reported phone successes. Intermittent far-end delivery loss remains open; operational reliability is unproven.
 
-### Explore the repository
-
-- [Features](#features)
-- [How the system works](#how-the-system-works)
-- [Project structure](#project-structure)
-- [Technology stack](#technology-stack)
-- [Getting started](#getting-started)
-- [Testing and diagnostics](#testing-and-diagnostics)
-- [Current progress](#current-progress-and-known-limitations)
-- [Documentation](#documentation)
-- [Contributing](#contributing)
+[Features](#features) · [How it works](#how-the-system-works) · [Structure](#project-structure) · [Stack](#technology-stack) · [Setup](#getting-started) · [Testing](#testing-and-diagnostics) · [Progress](#current-progress-and-known-limitations) · [Docs](#documentation) · [Contributing](#contributing)
 
 ## Features
 
 | Area | What the application provides |
 | --- | --- |
-| **Mesh discovery** | Nearby BLE discovery, direct-link readiness and recovery, with direct, relayed, checking, nearby and offline states |
-| **Community messaging** | Public text and supported attachments, persistent history and visible pending/rejection feedback |
+| **Mesh discovery** | Nearby BLE discovery, direct-link readiness and recovery, with direct, relayed, checking, nearby, offline and blocked states |
+| **Community messaging** | Public text and attachments, including camera/gallery WebP images at three byte-capped qualities, persistent history and visible pending/rejection feedback |
 | **Private conversations** | Encrypted text and recorded notes, stable recipient identity, directed routing and application delivery/read receipts |
-| **Radio channels** | Separate channel histories, recorded notes and monitoring of newly received notes on the selected channel |
-| **SOS** | Alert creation, dedicated conversations, location/map access, receiver-local silence and origin-controlled termination |
+| **Radio channels** | Separate channel histories, recorded notes and monitoring of newly received notes on the selected channel; no live push-to-talk |
+| **SOS** | Alert creation, dedicated conversations with voice and images, per-thread message mute (never alarms), location/map access, receiver-local silence and origin-controlled termination |
+| **Chat sync** | Silent pull of recent Community/SOS text and attachments from direct neighbors; never private or Radio |
 | **Emergency incidents** | Reports, helper offers, reporter selection, helper confirmation, withdrawal/replacement and resolved/cancelled history |
-| **Offline maps** | MapLibre rendering of local PMTiles packages, signed manifests, integrity checks and atomic package activation |
+| **Location** | User-controlled auto-detection, warm GPS, live map position and paced SOS updates |
+| **Offline maps** | MapLibre rendering of local PMTiles packages, resumable downloads, signed manifests, integrity checks and atomic package activation |
 | **Local persistence** | Room-backed messages, conversations, incident events, SOS state and eligible outgoing work |
 | **Background sessions** | Opt-in foreground-service anchoring, session status and an explicit Go offline action |
 | **Presentation** | Compose screens, Night/Daylight appearances, setup guidance and peer/network visualization |
+| **Developer console** | Hidden diagnostics unlocked by a build-set PIN |
 
 ### Communication and emergency workflows
 
 **Private messaging:** usable routes and trusted keys are required. Missing keys/key changes pause or refuse sends. Pending work persists; recipients store messages before issuing receipts. Encryption uses Keystore RSA and per-message AES-GCM.
 
-**Recorded voice:** notes retain their conversation/channel. Large supported envelopes use resumable journaled pieces and integrity checks. Radio monitors new selected-channel notes; history/private notes play manually.
+**Recorded voice:** notes stop at 30 seconds and retain their conversation/channel. Large supported envelopes use resumable journaled pieces and integrity checks. Radio monitors new selected-channel notes; history/private notes play manually.
 
 **SOS:** each alert owns its thread/lifecycle. Sender Back preserves it; receivers silence locally. Ending one alert leaves others active. Signed terminal state reconciles after reconnect.
 
@@ -91,43 +84,51 @@ Relayed:      A ─── B ─── C ─── D
                     Intermediate phones forward traffic
 ```
 
-Each device allows **three direct neighbors**; total reachable nodes can exceed that limit. Verify indirect paths for relay tests because nearby phones can form shortcuts.
+Each device allows **three direct neighbors**; total reachable nodes can exceed that limit. Verify indirect paths for relay tests because nearby phones can form shortcuts. Relays keep public media 10 minutes for later READY neighbors, behind live traffic.
 
 Radio connection, READY, indirect reachability and visibility differ. Acceptance means local ownership; custody means neighbor journal storage; private DELIVERED requires the recipient's receipt.
 
 Blocking controls **direct-link eligibility** on both endpoints, with independent local release. Relaying may remain available; blocking provides neither content muting nor authenticated access control.
 
-See [Architecture](docs/architecture.md) for lifecycle ownership, directed topology, persistence and synchronization.
+See [Architecture](docs/architecture.md) for details.
 
 ## Project structure
 
 ```text
 ResQMesh/
 ├── app/
-│   ├── schemas/                         # Exported Room database schemas
+│   ├── schemas/                         # Room schemas
 │   └── src/
 │       ├── main/
 │       │   ├── AndroidManifest.xml
-│       │   ├── res/                     # Resources, icons and branding
+│       │   ├── res/                     # Resources
 │       │   └── java/edu/cit/resqmesh/
-│       │       ├── MainActivity.kt      # Android activity entry point
+│       │       ├── MainActivity.kt
 │       │       ├── ResqMeshApplication.kt
-│       │       ├── app/navigation/      # App composition and destinations
-│       │       ├── core/
+│       │       ├── app/
 │       │       │   ├── di/              # Dependency injection
+│       │       │   └── navigation/      # App composition and destinations
+│       │       ├── core/
+│       │       │   ├── audio/           # Media policy
 │       │       │   ├── domain/          # Shared use cases
 │       │       │   ├── location/        # Location capture and status
+│       │       │   ├── logging/         # Logging and traces
 │       │       │   ├── map/             # Offline packages and verification
 │       │       │   ├── model/           # Shared application models
 │       │       │   ├── network/         # BLE, GATT, L2CAP, payloads, crypto
+│       │       │   ├── notification/    # Alerts
+│       │       │   ├── security/        # Input validation
 │       │       │   ├── service/         # Session/background anchoring
 │       │       │   ├── ui/              # Shared components and theme
 │       │       │   └── utils/           # Diagnostics and helpers
 │       │       ├── data/
 │       │       │   ├── local/           # Room database, dao/ and entity/
+│       │       │   ├── location/        # Location client
+│       │       │   ├── mapper/          # Entity/model mappers
 │       │       │   └── repository/      # Mesh, routing, incident/SOS state
 │       │       └── feature/
 │       │           ├── comms/          # Community, private chat and Radio
+│       │           ├── devtools/       # Developer console
 │       │           ├── home/           # Mission/home presentation
 │       │           ├── incident/       # Incident coordination screens
 │       │           ├── profile/        # Settings, identity and offline maps
@@ -143,17 +144,20 @@ ResQMesh/
 │   ├── decisions.md                    # Accepted engineering policies
 │   ├── research.md                     # Evaluation and claim limits
 │   ├── ui.md                           # Stable presentation rules
+│   ├── demo/                           # Guide and limitations
 │   ├── plans/                          # Active preparation plans
 │   └── testing/                        # Physical-phone test cards
-├── scripts/                            # Docs/structure checks and capture
-│   └── map/                            # Map packaging/signing procedures
-├── tools/                              # Local development helpers
-├── captures/                           # Local evidence; excluded from Git
+├── scripts/
+│   ├── ci/                             # CI checks
+│   ├── device/                         # Device tools
+│   └── map/                            # Map packaging
+├── captures/                           # Local evidence (ignored)
 ├── archive/                            # Historical/deferred documentation
+├── config/detekt/                      # Static-analysis rules
 ├── .github/workflows/                  # CI checks
 ├── gradle/                             # Wrapper and dependency catalog
-├── AGENTS.md                           # Shared task/context router for all AI tools
-├── CLAUDE.md, GEMINI.md                # Tool entry files that import AGENTS.md
+├── AGENTS.md                           # Shared AI-tool router
+├── CLAUDE.md, GEMINI.md                # Import AGENTS.md
 └── README.md
 ```
 
@@ -176,7 +180,7 @@ Features use `ui/`, `ui/components/`, `viewmodel/` and `model/` where applicable
 
 ### Prerequisites
 
-Use Android Studio, JDK 17 or a compatible newer runtime, and the configured Android SDK. Gradle is included through the wrapper. Radio tests require physical BLE-capable phones; ADB supports focused captures.
+Use Android Studio, JDK 17 or a compatible newer runtime, and the configured Android SDK. Radio tests require physical BLE-capable phones; ADB supports focused captures.
 
 ### Clone and build
 
@@ -186,9 +190,9 @@ cd ResQMesh
 .\gradlew.bat :app:assembleDebug --console=plain
 ```
 
-Open the repository root in Android Studio and complete Gradle/SDK setup. Local SDK configuration belongs in the ignored `local.properties`.
+Open the repository root in Android Studio and complete Gradle/SDK setup. Local SDK configuration and the optional `resqmesh.devPin` belong in the ignored `local.properties`.
 
-Output: **`app/build/outputs/apk/debug/app-debug.apk`**.
+Output: **`app/build/outputs/apk/debug/app-debug.apk`**. `scripts/device/manage_devices.ps1` builds and installs without Android Studio.
 
 ### First phone session
 
@@ -201,18 +205,18 @@ Output: **`app/build/outputs/apk/debug/app-debug.apk`**.
 
 Preserve app data/keys for restart and upgrade tests. Enable background mesh explicitly for locked-screen runs. Download a supported map package before offline map use.
 
-Permissions cover Bluetooth discovery/connection, location features, microphone, notifications and vibration as applicable. Initial map download needs network access; activated map resources render locally. Core mesh messaging requires no internet/server connection.
+Permissions cover Bluetooth discovery/connection, location features, microphone, notifications and vibration. Initial map download needs network access; activated map resources render locally. Core mesh messaging requires no internet/server connection.
 
 ## Testing and diagnostics
 
 ```powershell
-.\gradlew.bat :app:testDebugUnitTest :app:lintDebug --console=plain
-.\gradlew.bat :app:compileDebugAndroidTestKotlin --console=plain
+.\gradlew.bat :app:testDebugUnitTest :app:lintDebug :app:assembleDebugAndroidTest detekt --console=plain
+powershell -ExecutionPolicy Bypass -File .\scripts\ci\check_boundaries.ps1
 powershell -ExecutionPolicy Bypass -File .\scripts\ci\check_docs.ps1
 git diff --check
 ```
 
-Android-test compilation is separate from execution; builds/emulators do not prove BLE behavior. The local mixed workspace has a recorded untracked reconnect-fixture compilation blocker; historical passes do not waive it.
+Android-test compilation is separate from execution; builds/emulators do not prove BLE behavior.
 
 Use the [physical checklist](docs/testing/physical-reliability-tests.md) and [Validation](docs/validation.md) for build identities and exact cases. Users install and operate physical phones.
 
@@ -224,7 +228,7 @@ Report APK hash, models/API, topology, actual transport, background setting, cou
 
 ## Current progress and known limitations
 
-Working prototype with qualitative user-reported phone successes. Current objective, open issues (including intermittent relay loss, DELIVERY-01) and next actions: [status](docs/status.md). Build identity and evidence: [validation](docs/validation.md).
+Open issues (including intermittent relay loss, DELIVERY-01) and next actions: [status](docs/status.md). Build identity and evidence: [validation](docs/validation.md).
 
 Measured scale, latency, range, battery/OEM behavior, accessibility, novice usability and release/upgrade readiness remain pending. Authenticated E2EE, forward secrecy, verified personal identity and guaranteed self-healing/delivery are not claimed.
 
@@ -239,11 +243,10 @@ Measured scale, latency, range, battery/OEM behavior, accessibility, novice usab
 | [Research](docs/research.md) | Evaluation methodology and defensible claims |
 | [UI guidance](docs/ui.md) | Presentation and interaction rules |
 | [Capstone preparation](docs/plans/capstone-demo-readiness.md) | Demo, evidence and installation preparation |
+| [User guide](docs/demo/user-guide.md), [known limitations](docs/demo/known-limitations.md) | Demo usage and honest limits |
 
-[AGENTS.md](AGENTS.md) routes engineering tasks to minimum context for Codex, Claude Code and Gemini. [Archived material](archive/README.md) preserves superseded plans; it is historical reference. Resource requests, safety check-ins, expanded replication and further transport/repository extraction remain deferred proposals.
+[AGENTS.md](AGENTS.md) routes AI-tool tasks. [Archived material](archive/README.md) is historical reference only.
 
 ## Contributing
 
-Read status/relevant docs, preserve unrelated work, make focused changes and run checks. Update canonical docs and provide device test cards. Failed checks block readiness; PR creation/merge requires explicit instruction.
-
-Report build, devices, steps, expected/actual outcomes and failure times without private contents. Preserve achievements alongside failures.
+Follow [AGENTS.md](AGENTS.md): focused changes, passing checks, updated docs and device test cards. PRs require explicit instruction.
