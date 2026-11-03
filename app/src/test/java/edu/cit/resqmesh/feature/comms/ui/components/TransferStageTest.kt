@@ -45,7 +45,8 @@ class TransferStageTest {
         assertEquals(64, combined.total)
         assertEquals(65, combined.percent)
         assertEquals(1, combined.reprobes)
-        assertEquals(SendProgress.State.FAILED, SendProgressBoard.combine(listOf(progress(SendProgress.State.FAILED))).state)
+        val allFailed = SendProgressBoard.combine(listOf(progress(SendProgress.State.FAILED)))
+        assertEquals(SendProgress.State.FAILED, allFailed.state)
     }
 
     private fun progress(state: SendProgress.State) = SendProgress(12, 32, state)

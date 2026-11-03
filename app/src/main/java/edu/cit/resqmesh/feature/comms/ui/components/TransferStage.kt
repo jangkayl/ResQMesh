@@ -26,10 +26,9 @@ internal enum class TransferStage { Waiting, Sending, Stalled, ReachedPhone, Rea
 
 /** Null when there is nothing to show: not mine, no live progress, or a receipt already says more. */
 internal fun transferStage(message: ChatMessage, progress: SendProgress?): TransferStage? {
-    if (!message.isMine || progress == null) return null
     val feedback = deliveryFeedback(message)
-    if (feedback == DeliveryFeedback.Delivered || feedback == DeliveryFeedback.Read) return null
-    return when (progress.state) {
+    val receipted = feedback == DeliveryFeedback.Delivered || feedback == DeliveryFeedback.Read
+    return if (!message.isMine || progress == null || receipted) null else when (progress.state) {
         SendProgress.State.QUEUED -> TransferStage.Waiting
         SendProgress.State.SENDING -> TransferStage.Sending
         SendProgress.State.STALLED -> TransferStage.Stalled
@@ -46,6 +45,7 @@ private val TransferStage.inFlight get() =
     this == TransferStage.Waiting || this == TransferStage.Sending || this == TransferStage.Stalled
 
 /** Piece bar and stage label shown above the bubble's time row while a piece transfer is live. */
+@Suppress("FunctionNaming")
 @Composable
 internal fun TransferProgressLine(stage: TransferStage, progress: SendProgress, color: Color) {
     Column(modifier = Modifier.fillMaxWidth().padding(top = 4.dp)) {

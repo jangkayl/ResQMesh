@@ -420,7 +420,8 @@ internal class ReliableMeshTransfers(
                 val key = "${record.peer}:${record.id}"
                 synchronized(this) { reserved[key] = bytes.size }
                 outgoingMessages[key] = record.messageId
-                flights[key] = TransferFlight(record, bytes, queuedAt = now()).also { report(it, SendProgress.State.QUEUED) }
+                flights[key] = TransferFlight(record, bytes, queuedAt = now())
+                    .also { report(it, SendProgress.State.QUEUED) }
                 if (record.durableRelay) runCatching {
                     commitOnwardCustody(record.peer, ProtoBuf.decodeFromByteArray<MeshPayload>(bytes))
                 }.onFailure { log("TRANSFER_STORAGE_FAILED direction=relay-progress") }
@@ -531,7 +532,8 @@ internal class ReliableMeshTransfers(
     private fun reprobe(flight: TransferFlight, perPeer: MutableMap<String, Int>, at: Long) {
         val peer = flight.record.peer
         perPeer[peer] = ((perPeer[peer] ?: 0) - flight.pending.size).coerceAtLeast(0)
-        log("TRANSFER_REPROBE transfer=${flight.record.id.take(12)} peer=$peer acked=${flight.acknowledged.size}/${flight.pieceCount}")
+        log("TRANSFER_REPROBE transfer=${flight.record.id.take(12)} peer=$peer " +
+            "acked=${flight.acknowledged.size}/${flight.pieceCount}")
         flight.resetProbe(); flight.attempts.clear(); flight.progressAt = at
         flight.reprobes++
         report(flight, SendProgress.State.STALLED)
