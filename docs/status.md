@@ -59,6 +59,8 @@ Basic block, incident, SOS and recovery checks have user-reported successes; the
 
 **Image quality** (`feat/image-quality`): user-rated quality good; [card](testing/image-quality-card.md) pending.
 
+**Transfer-stall** (`fix/transfer-stall-reprobe`): [card](testing/transfer-stall-reprobe-card.md) pending.
+
 **BLE range** (`fix/ble-range-probe-scan`, D1): [card](testing/ble-range-probe-test-card.md) pending.
 
 **Map download** (`fix/map-download-reliability`): user-reported slowness; speed unmeasured; [card](testing/map-download-reliability-card.md) pending.
