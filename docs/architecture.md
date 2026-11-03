@@ -22,7 +22,7 @@ NativeInboundPipeline owns decode/identity/transfer gates; NativeOutboundDispatc
 
 BleSessionLifecycle separates requested sessions from running radio. OFF/permission loss suspends transport; restoration rebuilds GATT, awaits service registration, resumes advertising/scanning. Go offline cancels recovery.
 
-Generations fence callbacks, buffers and pending sockets. Retirement removes local ownership before Android cancellation. Server indications capture issued flight/operation at ingress; unresolved indications can prevent same-address reuse. Idle registration may renew without retiring client peers; healthy server peers defer renewal. GATT runs on the main handler.
+Generations fence callbacks, buffers and pending sockets. Retirement removes local ownership before Android cancellation. Server indications capture issued flight/operation at ingress; unresolved indications block same-address reuse ≤10s. Idle registration may renew without retiring client peers; healthy server peers defer renewal. GATT runs on the main handler.
 
 Scans allow four starts/30 s plus failure backoff. Setup begins at 20-byte ATT; ReadyPayloadSetup serializes PSM reads, optional MTU 247 and writes. Unresolved operations keep gates; L2CAP survives ATT stalls and sends headers with first chunks. Same-ACL guards prevent duplicate roles. Election/handshake gates serialize attempts; Refresh reconciles orphans. Connect 5–15s (grows per-peer); handshake 5s. Identity exchange follows READY. Isolated discovery retries; 15-second advertising silence rescans. Range Boost: LOW_LATENCY scans when isolated/SOS; BleCapabilities reports PHY. AUTO default; explicit-LE retry after absent ATT discovery response.
 

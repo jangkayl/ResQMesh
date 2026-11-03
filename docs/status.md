@@ -61,7 +61,7 @@ Block, incident, SOS and recovery: basic user-reported successes; adversarial, l
 
 **Transfer-stall/progress** (`feat/transfer-progress`): [card](testing/transfer-stall-reprobe-card.md) pending.
 
-**L2CAP header, connect timeout**: [card](testing/l2cap-single-write-header-card.md), [card](testing/adaptive-connect-timeout-card.md) pending.
+**BLE fixes**: [header](testing/l2cap-single-write-header-card.md), [timeout](testing/adaptive-connect-timeout-card.md), [indication](testing/indication-tombstone-expiry-card.md) cards pending.
 
 **BLE range** (`fix/ble-range-probe-scan`, D1): [card](testing/ble-range-probe-test-card.md) pending.
 
