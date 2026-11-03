@@ -143,6 +143,14 @@
     <string name="private_chat_status_read">Read</string>
     <string name="private_chat_status_failed">Failed</string>
     <string name="private_chat_status_pending">Pending</string>
+    <string name="transfer_waiting">Waiting for link · %1$d/%2$d</string>
+    <string name="transfer_sending">Sending %1$d/%2$d · %3$d%%</string>
+    <string name="transfer_stalled">Stalled, re-checking… %1$d/%2$d</string>
+    <string name="transfer_reached_phone">Received by phone</string>
+    <string name="transfer_reached_next_phone">Reached next phone</string>
+    <string name="transfer_reached_nearby">Sent to nearby phones</string>
+    <string name="transfer_failed">Transfer failed</string>
+    <string name="transfer_dev_detail">resent %1$d · re-checked %2$d</string>
     <string name="community_title">Community</string>
     <string name="community_description">Public messages</string>
     <string name="community_back_action">Back to messages</string>

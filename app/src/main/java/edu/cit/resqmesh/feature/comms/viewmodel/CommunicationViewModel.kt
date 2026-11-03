@@ -30,6 +30,8 @@ import edu.cit.resqmesh.core.domain.usecase.messaging.PrivateSendResult
 import edu.cit.resqmesh.core.domain.usecase.messaging.SendPrivateChatMessageUseCase
 import edu.cit.resqmesh.core.domain.usecase.sos.RaiseSosUseCase
 import edu.cit.resqmesh.core.network.ratelimit.ChatBudgetState
+import edu.cit.resqmesh.core.network.SendProgress
+import edu.cit.resqmesh.core.network.SendProgressBoard
 import edu.cit.resqmesh.core.audio.ImageQuality
 import edu.cit.resqmesh.core.network.ratelimit.ImageBudgetState
 import edu.cit.resqmesh.core.network.ratelimit.OutgoingChatBudget
@@ -84,6 +86,9 @@ class CommunicationViewModel(
     private val trackOwnSos = TrackOwnSosLocationUseCase(locationClient, sosRepository)
     private val sendDebouncer = SendDebouncer(SEND_DEBOUNCE_MS) { android.os.SystemClock.elapsedRealtime() }
     private val sendGate = ChatSendGate(chatBudget, sendDebouncer)
+
+    /** Live sender piece progress by message ID; in memory, hop custody only, never a receipt. */
+    val transferProgress: StateFlow<Map<String, SendProgress>> = SendProgressBoard.progress
 
     /** Send budget for the composers. Ticks once a second only while collected and not full. */
     val chatBudgetState: StateFlow<ChatBudgetState> = channelFlow {

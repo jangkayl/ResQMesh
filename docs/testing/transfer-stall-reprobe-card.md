@@ -1,10 +1,14 @@
-# Transfer stall re-probe card
+# Transfer stall re-probe and progress card
 
-Branch `fix/transfer-stall-reprobe`. Record the APK SHA-256, variant and install time with each result.
+Branches `fix/transfer-stall-reprobe` and `feat/transfer-progress`. Record the APK SHA-256, variant and install time with each result.
 
 ## Report that opened this
 
 User report, 2026-11-03, release APK (hash not supplied): a direct private image SM-A236E→CPH2127 waited a long time and arrived only after the link disconnected and reconnected. The CPH2127 Bluetooth log showed L2CAP congestion, then the channel closing about 20 s after each reopen with a 30 s gap. No app markers (release build); the A236E log was not captured. The stall re-probe addresses the transfer waiting for a reconnect; the link congestion cause is unproven.
+
+## Results
+
+- 2026-11-03, user report, release APK `app-release.apk` built 22:35, SHA-256 prefix `355d74f9421c5743` on CPH2127, V2424 and SM-P615 (SM-A236E not on ADB; its build unverified): images send fast. CPH2127 Bluetooth log 22:35–22:49: two L2CAP drops after congestion bursts; the next channel reopened 1.2 s after a drop (30 s before). No crashes. App markers not in Logcat (release); card steps not run.
 
 ## Setup
 
@@ -34,3 +38,18 @@ User report, 2026-11-03, release APK (hash not supplied): a direct private image
 ## Report
 
 APK hash, phones, distance, quality level, send/arrival times per attempt, count of `TRANSFER_REPROBE` lines per transfer, and whether a reconnect was needed.
+
+## Progress display (`feat/transfer-progress`)
+
+Same setup. Developer mode on adds a "resent · re-checked" line under the bar.
+
+1. Private image A236E→CPH2127, direct: the sender bubble shows a bar with "Sending n/N · p%", then "Received by phone", then "Delivered"/"Read" once receipts arrive.
+2. Turn the CPH2127 Bluetooth off mid-send: the bubble shows "Waiting for link"; turn it back on and the count resumes without restarting at 0.
+3. Range-limited send (step 3 above): if the bar stops, it reads "Stalled, re-checking…" within about 10 seconds, then continues.
+4. Private image through a relay phone: the bubble ends at "Reached next phone" until the delivery receipt, never "Delivered" early.
+5. Community image with two neighbors: the bar combines both and ends at "Sent to nearby phones".
+6. Text-only messages and the receiver's bubbles show no bar.
+
+Failure indicators: the bar moves backwards, "Delivered" before a receipt, a bar stuck on a delivered message, a bar on the receiver side, or chat scrolling lag while a bar updates.
+
+Report: which steps showed which labels, the final n/N and any resent/re-checked counts.

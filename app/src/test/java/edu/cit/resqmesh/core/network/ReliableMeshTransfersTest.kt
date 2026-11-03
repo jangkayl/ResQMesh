@@ -26,6 +26,7 @@ class ReliableMeshTransfersTest {
             val arrived = mutableListOf<MeshPayload>()
             val events = mutableListOf<OutboundFrameEvent.Stage>()
             val logs = mutableListOf<String>()
+            val progress = mutableListOf<SendProgress>()
             var autoStore = true
             var onward: ((ByteArray) -> Unit)? = null
             var neighbors = setOf<String>()
@@ -57,7 +58,8 @@ class ReliableMeshTransfersTest {
                         if (autoStore) engine.stored(payload.targetMessageId.ifBlank { payload.id })
                     }, response = { _, _ -> logs.add("RECEIPT_REPLAY") },
                     event = { _, stage, _, _ -> events.add(stage) }, now = { time }, log = { logs.add(it) },
-                    blocked = { it in blockedPeers }, relayPeers = { neighbors })
+                    blocked = { it in blockedPeers }, relayPeers = { neighbors },
+                    progress = { _, _, p -> progress.add(p) })
                 starting = false
                 boot.forEach { it() }
             }
@@ -420,7 +422,26 @@ class ReliableMeshTransfersTest {
         repeat(10) { w.advance(100); w.pump() }
         assertTrue(w.sent.any(::isStatus))
         assertTrue(a.logs.any { it.startsWith("TRANSFER_REPROBE") })
+        assertTrue(a.progress.any { it.state == SendProgress.State.STALLED && it.reprobes == 1 })
+        assertTrue(a.progress.any { it.resent > 0 })
+        assertEquals(SendProgress.State.HOP_COMPLETE, a.progress.last().state)
         assertEquals(OutboundFrameEvent.Stage.COMPLETED, a.events.last())
+        assertEquals(1, b.arrived.size)
+    }
+
+    @Test fun senderProgressCountsAcknowledgedPiecesUpToHopCustody() {
+        val w = World(); val a = w.Node("A"); val b = w.Node("B", online = false)
+        a.engine.offer("B", w.payload(size = 8192), false)
+        assertEquals(SendProgress.State.QUEUED, a.progress.single().state)
+        b.online = true
+        a.engine.wake("B", reconcile = false); w.pump()
+        val sending = a.progress.filter { it.state == SendProgress.State.SENDING }
+        assertTrue(sending.isNotEmpty())
+        assertEquals(sending.map { it.acked }.sorted(), sending.map { it.acked })
+        val done = a.progress.last()
+        assertEquals(SendProgress.State.HOP_COMPLETE, done.state)
+        assertEquals(done.total, done.acked)
+        assertEquals(0, done.resent)
         assertEquals(1, b.arrived.size)
     }
 
