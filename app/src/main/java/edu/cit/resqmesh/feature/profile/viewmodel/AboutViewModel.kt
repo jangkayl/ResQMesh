@@ -1,7 +1,10 @@
 package edu.cit.resqmesh.feature.profile.viewmodel
 
+import android.content.Context
+import android.os.Build
 import androidx.lifecycle.ViewModel
 import edu.cit.resqmesh.BuildConfig
+import edu.cit.resqmesh.core.network.bluetooth.BleCapabilities
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -16,6 +19,8 @@ data class AboutUiState(
     val appName: String = "ResQMesh",
     val versionName: String = BuildConfig.VERSION_NAME,
     val versionCode: Int = BuildConfig.VERSION_CODE,
+    val longRangeStatus: String = "Unknown",
+    val phy2MStatus: String = "Unknown",
     val tagline: String = "Offline BLE messaging prototype",
     val missionStatement: String = "ResQMesh is an Android prototype for nearby text, private messaging, SOS, and voice notes. Phones use native Bluetooth Low Energy links and may relay messages through other phones without cellular data or Wi-Fi. Delivery depends on available links and routes.",
     val pillars: List<AboutPillar> = listOf(
@@ -57,7 +62,29 @@ data class AboutUiState(
     )
 )
 
-class AboutViewModel : ViewModel() {
-    private val _uiState = MutableStateFlow(AboutUiState())
+class AboutViewModel(context: Context) : ViewModel() {
+    private val _uiState = MutableStateFlow(buildState(context.applicationContext))
     val uiState: StateFlow<AboutUiState> = _uiState.asStateFlow()
+}
+
+private fun buildState(context: Context): AboutUiState {
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
+        return AboutUiState(
+            longRangeStatus = "Unavailable (Android 8+ required)",
+            phy2MStatus = "Unavailable"
+        )
+    }
+    val caps = BleCapabilities.read(context)
+    return AboutUiState(
+        longRangeStatus = when (caps.codedPhy) {
+            true -> "Supported"
+            false -> "Not supported"
+            null -> "Unknown"
+        },
+        phy2MStatus = when (caps.phy2M) {
+            true -> "Yes"
+            false -> "No"
+            null -> "Unknown"
+        }
+    )
 }

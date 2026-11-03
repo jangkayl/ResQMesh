@@ -99,6 +99,9 @@ class NativeBleManager(
         return if (isLongRange) 10 else 4
     }
 
+    /** True while this device has its own active SOS; set from the repository layer, read by scan-mode policy. */
+    @Volatile var localSosActive: Boolean = false
+
     /** Shared platform handles retained for the GATT client/server managers. */
     val bluetoothManager = context.getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
     val bluetoothAdapter = bluetoothManager.adapter
@@ -114,7 +117,12 @@ class NativeBleManager(
         isNodeActive = { store.isNodeActive.get() },
         hasReadyConnection = ::hasPayloadReadyDirectLink,
         onAdvertisement = ::handleAdvertisement,
-        onAdvertisingFailure = ::retryAdvertising
+        onAdvertisingFailure = ::retryAdvertising,
+        isRangeBoostEnabled = {
+            context.getSharedPreferences("resqmesh_prefs", Context.MODE_PRIVATE)
+                .getBoolean("ble_range_boost_enabled", true)
+        },
+        isLocalSosActive = { localSosActive }
     )
 
     private val transportResources = BleTransportResources()
