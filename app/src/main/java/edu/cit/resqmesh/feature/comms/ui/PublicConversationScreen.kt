@@ -52,6 +52,7 @@ fun PublicConversationScreen(
     val all by vm.allPublicMessages.collectAsState()
     val states by vm.conversationStates.collectAsState()
     val sendBudget by vm.chatBudgetState.collectAsState()
+    val transfers by vm.transferProgress.collectAsState()
     val budgetWaiting = sendBudget.remaining <= 0
     val key = ConversationPolicy.key(kind, channel, sosId)
     val messages = ConversationPolicy.messages(all, kind, channel, sosId)
@@ -124,7 +125,7 @@ fun PublicConversationScreen(
                 ) {
                     items(displayMessages, key = { it.id }) { message ->
                         Column {
-                            ChatBubble(message, media)
+                            ChatBubble(message, media, transferProgress = transfers[message.id])
                             if (message.id == newestSynced) SyncedHistoryDivider()
                         }
                     }

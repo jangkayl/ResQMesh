@@ -42,7 +42,8 @@ internal class ReliableMeshTransfers(
     private val log: (String) -> Unit = {},
     private val trace: (TransferTrace) -> Unit = {},
     private val blocked: (String) -> Boolean = { false },
-    private val relayPeers: () -> Set<String> = { emptySet() }
+    private val relayPeers: () -> Set<String> = { emptySet() },
+    private val progress: (String, String, SendProgress) -> Unit = SendProgressBoard::update
 ) {
     private lateinit var journal: TransferJournal
     private val flights = linkedMapOf<String, TransferFlight>()
@@ -208,6 +209,7 @@ internal class ReliableMeshTransfers(
                 }
                 flights.putIfAbsent(key, TransferFlight(journal.find(peer, id, true)!!, bytes,
                     queuedAt = now(), queried = existing == null))
+                flights[key]?.let { report(it, SendProgress.State.QUEUED) }
                 committed = true
                 relayFailures.remove(peer to payload.id)
                 event(bytes, OutboundFrameEvent.Stage.QUEUED, now(), 0)
@@ -299,7 +301,7 @@ internal class ReliableMeshTransfers(
         flight.pending.remove(packet.index)
         flight.pendingWireIds.remove(packet.index)
         traceOutProgress(flight, grew)
-        if (packet.complete) finishFlight(flight, true)
+        if (packet.complete) finishFlight(flight, true) else report(flight, SendProgress.State.SENDING)
         runTransferCycle()
     }
 
@@ -313,7 +315,7 @@ internal class ReliableMeshTransfers(
             .forEach { flight.acknowledged.add(it) }
         flight.waitingStatus = false
         traceOutProgress(flight, flight.acknowledged.size > before)
-        if (packet.complete) finishFlight(flight, true)
+        if (packet.complete) finishFlight(flight, true) else report(flight, SendProgress.State.SENDING)
         runTransferCycle()
     }
 
@@ -418,7 +420,7 @@ internal class ReliableMeshTransfers(
                 val key = "${record.peer}:${record.id}"
                 synchronized(this) { reserved[key] = bytes.size }
                 outgoingMessages[key] = record.messageId
-                flights[key] = TransferFlight(record, bytes, queuedAt = now())
+                flights[key] = TransferFlight(record, bytes, queuedAt = now()).also { report(it, SendProgress.State.QUEUED) }
                 if (record.durableRelay) runCatching {
                     commitOnwardCustody(record.peer, ProtoBuf.decodeFromByteArray<MeshPayload>(bytes))
                 }.onFailure { log("TRANSFER_STORAGE_FAILED direction=relay-progress") }
@@ -511,7 +513,8 @@ internal class ReliableMeshTransfers(
 
     private fun dispatchTurn(flight: TransferFlight, perPeer: MutableMap<String, Int>, at: Long) {
         val peer = flight.record.peer
-        if (!ready(peer) || yieldsToLive(flight)) return
+        if (!ready(peer)) { report(flight, SendProgress.State.QUEUED); return }
+        if (yieldsToLive(flight)) return
         if (flight.isStalled(at, STALL_REPROBE_MS)) reprobe(flight, perPeer, at)
         if (!flight.queried || (flight.waitingStatus && flight.queryUntil <= at)) {
             sendStatusQuery(flight, perPeer, at)
@@ -530,6 +533,16 @@ internal class ReliableMeshTransfers(
         perPeer[peer] = ((perPeer[peer] ?: 0) - flight.pending.size).coerceAtLeast(0)
         log("TRANSFER_REPROBE transfer=${flight.record.id.take(12)} peer=$peer acked=${flight.acknowledged.size}/${flight.pieceCount}")
         flight.resetProbe(); flight.attempts.clear(); flight.progressAt = at
+        flight.reprobes++
+        report(flight, SendProgress.State.STALLED)
+    }
+
+    /** Publishes sender progress only when it changes; the board is in memory and never a receipt. */
+    private fun report(flight: TransferFlight, state: SendProgress.State) {
+        val snapshot = SendProgress(flight.acknowledged.size, flight.pieceCount, state, flight.resent, flight.reprobes)
+        if (snapshot == flight.reported) return
+        flight.reported = snapshot
+        progress(flight.record.messageId, flight.record.peer, snapshot.copy(updatedAt = now()))
     }
 
     private fun yieldsToLive(flight: TransferFlight) = flight.record.lateRelay &&
@@ -561,6 +574,8 @@ internal class ReliableMeshTransfers(
         if (flight.pending.isEmpty()) flight.progressAt = at
         flight.pending[index] = at + PIECE_RETRY_MS
         flight.attempts[index] = (flight.attempts[index] ?: 0) + 1
+        if (!flight.everSent.add(index)) flight.resent++
+        report(flight, SendProgress.State.SENDING)
         perPeer[peer] = (perPeer[peer] ?: 0) + 1
         val piece = TransferPiece(flight.record.id, flight.record.digest, flight.record.size, index,
             flight.pieceBytes(index), priority = flight.record.priority)
@@ -603,6 +618,8 @@ internal class ReliableMeshTransfers(
 
     private fun finishFlight(flight: TransferFlight, success: Boolean) {
         val key = flight.key
+        if (success) flight.acknowledged.addAll(0 until flight.pieceCount)
+        report(flight, if (success) SendProgress.State.HOP_COMPLETE else SendProgress.State.FAILED)
         flights.remove(key); releaseReservation(key); journal.delete(flight.record)
         event(flight.bytes, if (success) OutboundFrameEvent.Stage.COMPLETED else OutboundFrameEvent.Stage.FAILED,
             flight.queuedAt, flight.startedAt)

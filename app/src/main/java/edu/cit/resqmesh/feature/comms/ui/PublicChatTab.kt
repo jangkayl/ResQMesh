@@ -80,6 +80,7 @@ fun PublicChatTab(
     val uiState by viewModel.uiState.collectAsState()
     val channelId by viewModel.currentChannelId.collectAsState()
     val isAcquiringLocation by viewModel.isAcquiringLocation.collectAsState()
+    val transfers by viewModel.transferProgress.collectAsState()
     val sendBudget by viewModel.chatBudgetState.collectAsState()
     val imageBudget by viewModel.imageBudgetState.collectAsState()
 
@@ -271,7 +272,8 @@ fun PublicChatTab(
                                 onUserClick = { onChatSelected(it) },
                                 onShowSeenBy = { readers -> activeSeenReaders = readers },
                                 onReplyClick = { replyingToMessage = it },
-                                onViewMap = onViewMap
+                                onViewMap = onViewMap,
+                                transferProgress = transfers[message.id]
                             )
                             if (message.id == newestSynced) SyncedHistoryDivider()
                         }

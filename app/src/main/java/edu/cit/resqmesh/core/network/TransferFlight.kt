@@ -19,6 +19,11 @@ internal class TransferFlight(
     var queryWireId: String = ""
     /** Last ACK growth or status reply, or when pieces started waiting with none in flight. */
     var progressAt: Long = queuedAt
+    /** Pieces sent more than once and silent-peer re-probes, for the sender's progress display. */
+    var resent: Int = 0
+    var reprobes: Int = 0
+    val everSent: MutableSet<Int> = mutableSetOf()
+    var reported: SendProgress? = null
 
     val key get() = "${record.peer}:${record.id}"
     val pieceCount get() = TransferJournal.pieceCount(record.size)

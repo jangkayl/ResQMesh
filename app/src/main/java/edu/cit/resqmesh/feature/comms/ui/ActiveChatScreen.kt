@@ -61,6 +61,7 @@ fun ActiveChatScreen(
     val isAcquiringLocation by viewModel.isAcquiringLocation.collectAsState()
     val sendBudget by viewModel.chatBudgetState.collectAsState()
     val imageBudget by viewModel.imageBudgetState.collectAsState()
+    val transfers by viewModel.transferProgress.collectAsState()
     val conversationEntry = uiState.privateMessages.entries.firstOrNull {
         NodeIdentity.key(it.key) == NodeIdentity.key(name)
     }
@@ -259,7 +260,8 @@ fun ActiveChatScreen(
                             onViewMap = { latitude, longitude ->
                                 onViewMap(latitude, longitude, message.senderName, message.text)
                             },
-                            onReplyClick = { replyingToMessage = it }
+                            onReplyClick = { replyingToMessage = it },
+                            transferProgress = transfers[message.id]
                         )
                     }
                 }

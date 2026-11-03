@@ -29,7 +29,7 @@ Callbacks, cached topology, unblock and service-active do not independently prov
 
 ## Messaging, voice and emergency feedback
 
-Acceptance, hop custody, recipient arrival and application confirmation are distinct. Public rejection/partial acceptance needs feedback. Private failures explain unavailable routes/keys, preserve drafts and never imply delivery.
+Acceptance, hop custody, recipient arrival and application confirmation are distinct; sender piece progress is memory-only and custody never reads Delivered. Public rejection/partial acceptance needs feedback. Private failures explain unavailable routes/keys, preserve drafts and never imply delivery.
 
 Inbox rows do not mark private messages seen; visible chat bubbles do. Keep Unread selectable at zero with filter-specific empty states. Community reader circles require seenBy receipts.
 
@@ -41,7 +41,7 @@ SOS location row: per-SOS include (default on), Allow/Turn on, never blocks send
 
 Incidents use historical reporter names and ownership badges. Identity loading/errors explain unavailable controls. Details use one page and docked actions. Selected offers cannot be edited; withdrawal removes selection and requires fresh approval. Route loss never reassigns. Connection labels describe the selected helper's actual route.
 
-Helper chat shortcuts qualify the historical label with the offer's stable mesh node ID. Hide shortcuts for self or missing IDs; reporter user IDs and signing keys cannot substitute for a mesh ID. Quick filters expose selected semantics and 48dp targets; label the search input for accessibility. Selected-helper route text wraps, and helper replacement controls grow from a 48dp minimum. Keep existing filtering, ordering and workflow authority.
+Helper chat shortcuts qualify the historical label with the offer's stable mesh node ID. Hide shortcuts for self/missing IDs; reporter user IDs or signing keys never substitute. Quick filters expose selection and 48dp targets; label search for accessibility. Selected-helper route text wraps; replacement controls grow from 48dp minimum. Keep existing filtering, ordering and workflow authority.
 
 Never display debug plaintext, keys, ciphertext previews or sensitive location.
 

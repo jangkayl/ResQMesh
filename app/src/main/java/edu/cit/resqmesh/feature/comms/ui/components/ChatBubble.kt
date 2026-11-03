@@ -47,6 +47,7 @@ import edu.cit.resqmesh.core.model.NodeIdentity
 import edu.cit.resqmesh.core.ui.theme.Spacing
 import edu.cit.resqmesh.core.audio.MediaHelper
 import edu.cit.resqmesh.feature.comms.ui.deliveryLabel
+import edu.cit.resqmesh.core.network.SendProgress
 import edu.cit.resqmesh.feature.comms.ui.messageTime
 import kotlin.math.absoluteValue
 
@@ -64,9 +65,11 @@ fun ChatBubble(
     onUserClick: ((String) -> Unit)? = null,
     onShowSeenBy: ((List<String>) -> Unit)? = null,
     onReplyClick: ((ChatMessage) -> Unit)? = null,
-    onViewMap: ((Double, Double, String, String) -> Unit)? = null
+    onViewMap: ((Double, Double, String, String) -> Unit)? = null,
+    transferProgress: SendProgress? = null
 ) {
     val mine = message.isMine
+    val stage = transferStage(message, transferProgress)
     val isSos = message.isSOS
     val bubbleColor = when {
         isSos -> MaterialTheme.colorScheme.errorContainer
@@ -297,6 +300,9 @@ fun ChatBubble(
                         )
                     }
 
+                    if (stage != null && transferProgress != null) {
+                        TransferProgressLine(stage, transferProgress, contentColor)
+                    }
                     // Compact Metadata Row: Timestamp, Delivery Status, and Seen Receipts
                     if (mine) {
                         Row(
@@ -305,12 +311,14 @@ fun ChatBubble(
                                 .padding(top = 2.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text(
-                                text = deliveryLabel(message),
-                                style = MaterialTheme.typography.labelSmall,
-                                color = contentColor.copy(alpha = 0.72f)
-                            )
-                            Spacer(Modifier.width(4.dp))
+                            if (stage == null) {
+                                Text(
+                                    text = deliveryLabel(message),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = contentColor.copy(alpha = 0.72f)
+                                )
+                                Spacer(Modifier.width(4.dp))
+                            }
                             Text(
                                 text = messageTime(message.timestamp),
                                 style = MaterialTheme.typography.labelSmall,

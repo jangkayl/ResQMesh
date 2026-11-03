@@ -47,6 +47,9 @@ import edu.cit.resqmesh.core.model.ChatMessage
 import edu.cit.resqmesh.core.ui.theme.Spacing
 import edu.cit.resqmesh.core.audio.MediaHelper
 import edu.cit.resqmesh.feature.comms.ui.components.FullscreenImageViewer
+import edu.cit.resqmesh.feature.comms.ui.components.TransferProgressLine
+import edu.cit.resqmesh.feature.comms.ui.components.transferStage
+import edu.cit.resqmesh.core.network.SendProgress
 import edu.cit.resqmesh.feature.comms.ui.components.ModernVoicePlayer
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -57,9 +60,11 @@ internal fun PrivateMessageBubble(
     message: ChatMessage,
     mediaHelper: MediaHelper,
     onViewMap: (Double, Double) -> Unit,
-    onReplyClick: ((ChatMessage) -> Unit)? = null
+    onReplyClick: ((ChatMessage) -> Unit)? = null,
+    transferProgress: SendProgress? = null
 ) {
     val mine = message.isMine
+    val stage = transferStage(message, transferProgress)
     val bubbleColor = if (mine) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface
     val contentColor = if (mine) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
     val shape = if (mine) {
@@ -180,12 +185,15 @@ internal fun PrivateMessageBubble(
                         Text(text = actualText, style = MaterialTheme.typography.bodyLarge)
                     }
 
+                    if (stage != null && transferProgress != null) {
+                        TransferProgressLine(stage, transferProgress, contentColor)
+                    }
                     Spacer(Modifier.height(Spacing.ExtraSmall))
                     Row(
                         modifier = Modifier.align(Alignment.End),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        if (mine) {
+                        if (mine && stage == null) {
                             Text(
                                 text = deliveryLabel(message),
                                 style = MaterialTheme.typography.labelMedium,
