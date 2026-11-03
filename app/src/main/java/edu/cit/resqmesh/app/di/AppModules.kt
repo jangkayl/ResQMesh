@@ -65,6 +65,7 @@ import edu.cit.resqmesh.feature.profile.viewmodel.OfflineMapViewModel
 import edu.cit.resqmesh.feature.radar.viewmodel.RadarViewModel
 import edu.cit.resqmesh.feature.setup.viewmodel.SetupViewModel
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import org.koin.android.ext.koin.androidContext
@@ -165,7 +166,11 @@ val repositoryModule = module {
             scope = get<AppCoroutineScope>().scope,
             sink = get(),
             originGate = get<InboundGuards>().origins
-        )
+        ).also { repository ->
+            val ble = get<NativeBleManager>()
+            val scope = get<AppCoroutineScope>().scope
+            scope.launch { repository.ownActive.collect { ble.localSosActive = it != null } }
+        }
     }
     single(createdAtStart = true) {
         val repository = get<MeshRepository>()
@@ -292,7 +297,7 @@ val viewModelModule = module {
     }
     viewModel { WalkieTalkieViewModel(useCases = get(), mediaHelper = get()) }
     viewModel { OfflineMapViewModel(storageGuard = get(), downloader = get(), connectivityProvider = get()) }
-    viewModel { AboutViewModel() }
+    viewModel { AboutViewModel(androidContext()) }
     viewModel { edu.cit.resqmesh.feature.devtools.viewmodel.DevToolsViewModel(get()) }
     viewModel { IncidentViewModel(incidentRepository = get(), identityManager = get(), incidentBudget = get()) }
 }

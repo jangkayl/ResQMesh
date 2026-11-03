@@ -169,6 +169,17 @@ fun AboutScreenContent(
                         )
                     }
 
+                    Text(
+                        text = "Bluetooth long range: ${uiState.longRangeStatus} · 2M PHY: ${uiState.phy2MStatus}",
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 10.sp
+                        ),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.padding(top = 6.dp)
+                    )
+
                     Spacer(Modifier.height(Spacing.Small))
 
                     Text(
