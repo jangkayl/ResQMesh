@@ -42,6 +42,8 @@ class SetupViewModel(
 
     private val _isLongRangeProfile = MutableStateFlow(true)
     val isLongRangeProfile: StateFlow<Boolean> = _isLongRangeProfile.asStateFlow()
+    private val _isBleRangeBoost = MutableStateFlow(true)
+    val isBleRangeBoost: StateFlow<Boolean> = _isBleRangeBoost.asStateFlow()
     val isBackgroundMeshEnabled: StateFlow<Boolean> = meshSessionController.backgroundMeshEnabled
     val isAutoDetectLocationEnabled: StateFlow<Boolean> = locationPreferences.autoDetectEnabled
     val isIncidentAlertsEnabled: StateFlow<Boolean> = notificationPreferences.incidentAlertsEnabled
@@ -70,7 +72,16 @@ class SetupViewModel(
             prefs.getString("developer_mode_hash", null)
         )
         _isLongRangeProfile.value = prefs.getBoolean("mesh_profile_long_range", true)
+        _isBleRangeBoost.value = prefs.getBoolean("ble_range_boost_enabled", true)
         TraceGate.set(_isDeveloperModeEnabled.value)
+    }
+
+    fun setBleRangeBoost(context: Context, enabled: Boolean) {
+        context.getSharedPreferences("resqmesh_prefs", Context.MODE_PRIVATE)
+            .edit()
+            .putBoolean("ble_range_boost_enabled", enabled)
+            .apply()
+        _isBleRangeBoost.value = enabled
     }
 
     fun setMeshProfile(context: Context, longRange: Boolean) {

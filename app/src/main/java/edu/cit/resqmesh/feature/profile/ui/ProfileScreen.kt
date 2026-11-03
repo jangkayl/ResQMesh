@@ -65,6 +65,7 @@ fun ProfileScreen(
     val state by viewModel.uiState.collectAsState()
     val isDeveloperMode by viewModel.isDeveloperModeEnabled.collectAsState()
     val isLongRangeProfile by viewModel.isLongRangeProfile.collectAsState()
+    val isBleRangeBoost by viewModel.isBleRangeBoost.collectAsState()
     val isBackgroundMeshEnabled by viewModel.isBackgroundMeshEnabled.collectAsState()
     val isAutoDetectLocation by viewModel.isAutoDetectLocationEnabled.collectAsState()
     val isIncidentAlerts by viewModel.isIncidentAlertsEnabled.collectAsState()
@@ -363,6 +364,23 @@ fun ProfileScreen(
                             checked = isLongRangeProfile,
                             onCheckedChange = { checked ->
                                 viewModel.setMeshProfile(context, checked)
+                            }
+                        )
+                    }
+                )
+                DividerLine()
+                SettingRow(
+                    icon = Icons.Default.BluetoothSearching,
+                    title = "Bluetooth Range Boost",
+                    subtitle = if (isBleRangeBoost) "Scan harder when alone or during SOS" else "Standard scanning",
+                    onClick = {
+                        viewModel.setBleRangeBoost(context, !isBleRangeBoost)
+                    },
+                    trailing = {
+                        Switch(
+                            checked = isBleRangeBoost,
+                            onCheckedChange = { checked ->
+                                viewModel.setBleRangeBoost(context, checked)
                             }
                         )
                     }
