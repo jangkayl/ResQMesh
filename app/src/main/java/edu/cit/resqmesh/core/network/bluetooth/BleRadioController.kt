@@ -32,14 +32,18 @@ data class BleAdvertisement(
 
 /** Owns BLE advertising, scanning, advertisement parsing, and handshake scan suspension. */
 @SuppressLint("MissingPermission")
+@Suppress("LongParameterList") // Scan-mode inputs stay explicit lambdas like the other radio callbacks.
 class BleRadioController(
     context: Context,
     private val serviceUuid: UUID,
     private val isNodeActive: () -> Boolean,
     private val hasReadyConnection: () -> Boolean,
     private val onAdvertisement: (BleAdvertisement) -> Unit,
-    private val onAdvertisingFailure: () -> Unit = {}
+    private val onAdvertisingFailure: () -> Unit = {},
+    private val isRangeBoostEnabled: () -> Boolean = { true },
+    private val isLocalSosActive: () -> Boolean = { false }
 ) {
+    private val appContext = context.applicationContext
     private val adapter =
         (context.getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager).adapter
     private val scanActive = AtomicBoolean(false)
@@ -47,6 +51,7 @@ class BleRadioController(
     private val handler = Handler(Looper.getMainLooper())
     private var lastScanStartAt = 0L
     private var lastValidAdvertisementAt = 0L
+    private var lastScanModeChoice: ScanModeChoice? = null
     private var recoveryAttempts = 0
     private var nextScanAttemptAt = 0L
     private var staleScanThresholdMs = nextStaleScanThreshold()
@@ -81,6 +86,7 @@ class BleRadioController(
         fallbackNodeId: String
     ) {
         if (!isNodeActive()) return
+        logPhyCapabilitiesOnce()
         stopAdvertising()
         val advertiser = try { adapter?.bluetoothLeAdvertiser } catch (_: SecurityException) { null }
             ?: run { onAdvertisingFailure(); return }
@@ -164,7 +170,19 @@ class BleRadioController(
         scannerOwner = scanner
         scanCallback = callback
         val filters = listOf(ScanFilter.Builder().setServiceUuid(ParcelUuid(serviceUuid)).build())
-        val settings = ScanSettings.Builder().setScanMode(ScanSettings.SCAN_MODE_BALANCED).build()
+        val nowMs = System.currentTimeMillis()
+        val choice = ScanModePolicy.choose(
+            rangeBoostEnabled = isRangeBoostEnabled(),
+            hasReadyConnection = hasReadyConnection(),
+            recentlySawPeer = lastValidAdvertisementAt > 0L &&
+                nowMs - lastValidAdvertisementAt < ScanModePolicy.RECENT_PEER_WINDOW_MS,
+            localSosActive = isLocalSosActive()
+        )
+        if (choice != lastScanModeChoice) {
+            lastScanModeChoice = choice
+            AppLogger.d("BLE_MESH", "Scan mode=${choice.label} reason=${choice.reason}")
+        }
+        val settings = ScanSettings.Builder().setScanMode(choice.mode).build()
         try {
             scanBudget.recordStart(android.os.SystemClock.elapsedRealtime())
             scanner.startScan(filters, settings, callback)
@@ -307,7 +325,25 @@ class BleRadioController(
         return ""
     }
 
+    private fun logPhyCapabilitiesOnce() {
+        if (!phyLogged.compareAndSet(false, true)) return
+        val api = android.os.Build.VERSION.SDK_INT
+        if (api < android.os.Build.VERSION_CODES.O) {
+            AppLogger.d("BLE_PHY", "codedPhy=unavailable(api=$api) model=${android.os.Build.MODEL}")
+            return
+        }
+        val caps = BleCapabilities.read(appContext)
+        AppLogger.d(
+            "BLE_PHY",
+            "codedPhy=${caps.codedPhy ?: "unknown"}, phy2M=${caps.phy2M ?: "unknown"}, " +
+                "extAdv=${caps.extendedAdvertising ?: "unknown"}, " +
+                "maxAdvLen=${caps.maxAdvertisingDataLength ?: "unknown"}, " +
+                "api=$api, model=${android.os.Build.MODEL}"
+        )
+    }
+
     private companion object {
+        val phyLogged = AtomicBoolean(false)
         const val MANUFACTURER_ID = 0xFFFF
         const val MAX_ADVERT_PAYLOAD_BYTES = 26
     }
