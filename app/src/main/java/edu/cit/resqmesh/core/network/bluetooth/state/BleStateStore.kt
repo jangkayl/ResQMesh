@@ -60,6 +60,9 @@ class BleStateStore(val guards: InboundGuards = InboundGuards()) {
      */
     val explicitLeTransportPeers = ConcurrentHashMap.newKeySet<String>()
 
+    /** Per-peer connect deadline that grows after consecutive connect timeouts. */
+    val connectTimeouts = ConnectTimeoutPolicy()
+
     var connectingMacAddress: String? = null
 
     /**

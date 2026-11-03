@@ -33,7 +33,6 @@ internal class NativeGattHost(private val manager: NativeBleManager) : GattClien
     override val MAX_TOTAL_CONNECTIONS: Int get() = manager.MAX_TOTAL_CONNECTIONS
     override val transportGeneration: Long get() = manager.transportGeneration
     override val onDeviceScanned: ((ScanEvent) -> Unit)? get() = manager.onDeviceScanned
-    override val CONNECT_TIMEOUT_MS: Long get() = manager.CONNECT_TIMEOUT_MS
     override val HANDSHAKE_WATCHDOG_MS: Long get() = manager.HANDSHAKE_WATCHDOG_MS
     override val DISCOVERY_REQUEST_RETRY_MS: Long get() = manager.DISCOVERY_REQUEST_RETRY_MS
     override val MAX_DISCOVERY_REQUEST_ATTEMPTS: Int get() = manager.MAX_DISCOVERY_REQUEST_ATTEMPTS

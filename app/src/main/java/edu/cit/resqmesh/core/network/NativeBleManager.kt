@@ -152,9 +152,6 @@ class NativeBleManager(
      */
     val NAME_HANDSHAKE_TIMEOUT_MS = 10_000L
 
-    /** How long to wait for the GATT link itself to come up. */
-    val CONNECT_TIMEOUT_MS = 5_000L
-
     /**
      * Absolute ceiling on the post-connect handshake (discovery and descriptor write). Always
      * fires, so a dropped OEM callback can never strand the connect lock.

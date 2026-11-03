@@ -56,6 +56,7 @@ internal class GattClientConnectionEvents(
                     // The connect timeout is swapped for a handshake watchdog that always fires,
                     // so a dropped OEM discovery/descriptor callback cannot strand the lock.
                     timeoutHandler.removeCallbacks(connectTimeoutRunnable)
+                    store.connectTimeouts.onConnected(connectTimeoutKey)
                     timeoutHandler.postDelayed({
                         if (store.links.isCurrent(link) && link.state != BleLinkState.READY) {
                             if (link.state == BleLinkState.DISCOVERING && stablePeerId != null &&
