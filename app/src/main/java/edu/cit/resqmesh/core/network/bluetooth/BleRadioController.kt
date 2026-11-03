@@ -32,6 +32,7 @@ data class BleAdvertisement(
 
 /** Owns BLE advertising, scanning, advertisement parsing, and handshake scan suspension. */
 @SuppressLint("MissingPermission")
+@Suppress("LongParameterList") // Scan-mode inputs stay explicit lambdas like the other radio callbacks.
 class BleRadioController(
     context: Context,
     private val serviceUuid: UUID,
@@ -335,7 +336,8 @@ class BleRadioController(
         AppLogger.d(
             "BLE_PHY",
             "codedPhy=${caps.codedPhy ?: "unknown"}, phy2M=${caps.phy2M ?: "unknown"}, " +
-                "extAdv=${caps.extendedAdvertising ?: "unknown"}, maxAdvLen=${caps.maxAdvertisingDataLength ?: "unknown"}, " +
+                "extAdv=${caps.extendedAdvertising ?: "unknown"}, " +
+                "maxAdvLen=${caps.maxAdvertisingDataLength ?: "unknown"}, " +
                 "api=$api, model=${android.os.Build.MODEL}"
         )
     }

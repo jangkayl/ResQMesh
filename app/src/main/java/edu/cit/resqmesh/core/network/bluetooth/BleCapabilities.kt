@@ -12,22 +12,20 @@ data class BleCapabilities(
     val maxAdvertisingDataLength: Int? = null
 ) {
     companion object {
-        fun read(context: Context): BleCapabilities {
-            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return BleCapabilities()
-            return try {
-                val adapter = (context.getSystemService(Context.BLUETOOTH_SERVICE) as? BluetoothManager)?.adapter
-                    ?: return BleCapabilities()
-                BleCapabilities(
-                    codedPhy = adapter.isLeCodedPhySupported,
-                    phy2M = adapter.isLe2MPhySupported,
-                    extendedAdvertising = adapter.isLeExtendedAdvertisingSupported,
-                    maxAdvertisingDataLength = adapter.leMaximumAdvertisingDataLength
-                )
+        fun read(context: Context): BleCapabilities =
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) BleCapabilities() else try {
+                (context.getSystemService(Context.BLUETOOTH_SERVICE) as? BluetoothManager)?.adapter?.let { adapter ->
+                    BleCapabilities(
+                        codedPhy = adapter.isLeCodedPhySupported,
+                        phy2M = adapter.isLe2MPhySupported,
+                        extendedAdvertising = adapter.isLeExtendedAdvertisingSupported,
+                        maxAdvertisingDataLength = adapter.leMaximumAdvertisingDataLength
+                    )
+                } ?: BleCapabilities()
             } catch (_: SecurityException) {
                 BleCapabilities()
             } catch (_: Exception) {
                 BleCapabilities()
             }
-        }
     }
 }
