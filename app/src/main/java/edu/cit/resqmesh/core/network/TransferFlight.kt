@@ -17,6 +17,8 @@ internal class TransferFlight(
     var queryUntil: Long = 0
     var queryNonce: String = ""
     var queryWireId: String = ""
+    /** Last ACK growth or status reply, or when pieces started waiting with none in flight. */
+    var progressAt: Long = queuedAt
 
     val key get() = "${record.peer}:${record.id}"
     val pieceCount get() = TransferJournal.pieceCount(record.size)
@@ -26,6 +28,10 @@ internal class TransferFlight(
         pending.clear(); pendingWireIds.clear(); queried = false; waitingStatus = false
         queryNonce = ""; queryWireId = ""
     }
+
+    /** Pieces are out but the peer has answered nothing for [stallMs]; a live link needs a fresh status probe. */
+    fun isStalled(at: Long, stallMs: Long) =
+        queried && !waitingStatus && pending.isNotEmpty() && at - progressAt >= stallMs
 
     fun clearProgress() {
         acknowledged.clear(); pending.clear(); pendingWireIds.clear()

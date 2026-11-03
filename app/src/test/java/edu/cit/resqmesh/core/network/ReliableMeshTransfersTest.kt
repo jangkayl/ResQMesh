@@ -407,6 +407,30 @@ class ReliableMeshTransfersTest {
         assertFalse(a.events.last() == OutboundFrameEvent.Stage.COMPLETED)
     }
 
+    @Test fun silentPeerOnReadyLinkIsReprobedWithoutReconnect() {
+        val w = World(); val a = w.Node("A"); val b = w.Node("B")
+        fun isStatus(wire: Wire) = wire.payload.type == ReliableMeshTransfers.PIECE &&
+            ProtoBuf.decodeFromByteArray<TransferPiece>(wire.payload.liveAudioChunk!!).status
+        // Pieces reach B, but every data ACK back to A is lost while the link stays ready.
+        w.drop = { it.payload.type == ReliableMeshTransfers.ACK &&
+            !ProtoBuf.decodeFromByteArray<TransferPiece>(it.payload.liveAudioChunk!!).status }
+        a.engine.offer("B", w.payload(), false); w.pump()
+        repeat(95) { w.advance(100); w.pump() }
+        assertTrue(w.sent.none(::isStatus))
+        repeat(10) { w.advance(100); w.pump() }
+        assertTrue(w.sent.any(::isStatus))
+        assertTrue(a.logs.any { it.startsWith("TRANSFER_REPROBE") })
+        assertEquals(OutboundFrameEvent.Stage.COMPLETED, a.events.last())
+        assertEquals(1, b.arrived.size)
+    }
+
+    @Test fun answeringPeerIsNotReprobed() {
+        val w = World(); val a = w.Node("A"); w.Node("B")
+        a.engine.offer("B", w.payload(size = 64_000), false)
+        repeat(200) { w.advance(100); w.pump() }
+        assertTrue(a.logs.none { it.startsWith("TRANSFER_REPROBE") })
+    }
+
     @Test fun receiverRestartKeepsPiecesAndReconnectSendsOnlyMissingIndices() {
         val w = World(); val a = w.Node("A"); val b = w.Node("B")
         val held = mutableListOf<Wire>()

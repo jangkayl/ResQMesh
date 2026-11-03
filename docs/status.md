@@ -19,7 +19,7 @@ Behavior and source ownership are in [architecture](architecture.md); accepted p
 | ID | State | Outstanding work |
 | --- | --- | --- |
 | UX-01 | User-reported concern; details pending | UI/UX issues not yet described. Record screens, steps and screenshots when supplied. |
-| PERF-01 | User-reported lag on app open; fixes local, device evidence pending | Source review: 3 s splash, keystore on Main, per-scan Home recomposition, logger list copies, BLE parsing on the main looper. The first four are fixed in `3b234bf`; BLE threading is deferred because of mesh risk. The user reported the `3b234bf` debug APK as less laggy on 2026-10-17. Adb on one phone shows 3.3 s debug against 0.8 s release cold start ([validation](validation.md)), so the remaining lag is mostly debug overhead. Demo and beta builds should use the release variant. Release builds keep app Logcat markers debug-only, so capture sessions still need debug builds. The two-phone mesh steps of the [startup lag card](testing/startup-lag-card.md) are pending. |
+| PERF-01 | User-reported lag on app open; fixes local, device evidence pending | Source review: 3 s splash, keystore on Main, per-scan Home recomposition, logger list copies, BLE parsing on the main looper. First four fixed in `3b234bf`; BLE threading deferred (mesh risk). The user reported the `3b234bf` debug APK as less laggy on 2026-10-17. Adb on one phone shows 3.3 s debug against 0.8 s release cold start ([validation](validation.md)), so the remaining lag is mostly debug overhead. Demo and beta builds should use the release variant. Release builds keep app Logcat markers debug-only, so capture sessions still need debug builds. Two-phone [startup lag card](testing/startup-lag-card.md) steps pending. |
 | MESH-02 | User-reported concern; details pending | Mesh issues beyond DELIVERY-01 not yet described. Record topology, APK, times and focused captures when supplied. |
 | DELIVERY-01 | User-reported failure; relay fix local, device evidence pending | On A→B→C→D, public/private text or voice sometimes fails to reach D; public images sometimes miss across a hop. Cause unproven. |
 | UI-02 | Local failures; acceptance blocked | Four emulator navigation assertions fail on both the pre-refactor baseline and the current candidate. |
@@ -58,6 +58,8 @@ Basic block, incident, SOS and recovery checks have user-reported successes; the
 **Relay image delivery** (`feat/image-quality`): late public media forwarding and sender-free completion; [card](testing/relay-image-delivery-card.md) pending.
 
 **Image quality** (`feat/image-quality`): user-rated quality good; [card](testing/image-quality-card.md) pending.
+
+**Transfer-stall** (`fix/transfer-stall-reprobe`): [card](testing/transfer-stall-reprobe-card.md) pending.
 
 **Map download** (`fix/map-download-reliability`): user-reported slowness; speed unmeasured; [card](testing/map-download-reliability-card.md) pending.
 

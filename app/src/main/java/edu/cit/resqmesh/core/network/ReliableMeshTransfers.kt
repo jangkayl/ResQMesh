@@ -285,6 +285,7 @@ internal class ReliableMeshTransfers(
     private fun handleAck(peer: String, packet: TransferPiece) {
         val flight = flights["$peer:${packet.transferId}"] ?: return
         if (packet.digest != flight.record.digest || packet.size != flight.record.size) return
+        flight.progressAt = now()
         if (packet.reset) {
             flight.queried = true; flight.waitingStatus = false
             flight.clearProgress(); runTransferCycle()
@@ -511,12 +512,24 @@ internal class ReliableMeshTransfers(
     private fun dispatchTurn(flight: TransferFlight, perPeer: MutableMap<String, Int>, at: Long) {
         val peer = flight.record.peer
         if (!ready(peer) || yieldsToLive(flight)) return
+        if (flight.isStalled(at, STALL_REPROBE_MS)) reprobe(flight, perPeer, at)
         if (!flight.queried || (flight.waitingStatus && flight.queryUntil <= at)) {
             sendStatusQuery(flight, perPeer, at)
             return
         }
         if (flight.waitingStatus || (perPeer[peer] ?: 0) >= WINDOW) return
         sendNextPiece(flight, perPeer, at)
+    }
+
+    /**
+     * A silent peer on a still-ready link gets the same custody re-check a reconnect gives, instead of
+     * waiting out backed-off piece retries; only missing pieces are resent after its bitmap.
+     */
+    private fun reprobe(flight: TransferFlight, perPeer: MutableMap<String, Int>, at: Long) {
+        val peer = flight.record.peer
+        perPeer[peer] = ((perPeer[peer] ?: 0) - flight.pending.size).coerceAtLeast(0)
+        log("TRANSFER_REPROBE transfer=${flight.record.id.take(12)} peer=$peer acked=${flight.acknowledged.size}/${flight.pieceCount}")
+        flight.resetProbe(); flight.attempts.clear(); flight.progressAt = at
     }
 
     private fun yieldsToLive(flight: TransferFlight) = flight.record.lateRelay &&
@@ -545,6 +558,7 @@ internal class ReliableMeshTransfers(
         val peer = flight.record.peer
         val index = flight.nextPieceIndex() ?: return
         flight.cursor = (index + 1) % flight.pieceCount
+        if (flight.pending.isEmpty()) flight.progressAt = at
         flight.pending[index] = at + PIECE_RETRY_MS
         flight.attempts[index] = (flight.attempts[index] ?: 0) + 1
         perPeer[peer] = (perPeer[peer] ?: 0) + 1
@@ -629,6 +643,7 @@ internal class ReliableMeshTransfers(
         private const val TICK_IDLE_MS = 60_000L
         private const val STATUS_QUERY_MS = 30_000L
         private const val PIECE_RETRY_MS = 30_000L
+        const val STALL_REPROBE_MS = 10_000L
         private const val TICK_ACTIVE_MS = 100L
         private const val TICK_RETAINED_MS = 1_000L
         private const val TICK_RELAY_HOLD_MS = 5_000L
