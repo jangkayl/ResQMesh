@@ -29,7 +29,7 @@ Behavior and source ownership are in [architecture](architecture.md); accepted p
 | TRUST-01 | Work/evidence pending | First-contact verification and defined identity/security guarantees. |
 | SEC-01 | Phase A user-reported PASS; Phase B on `feat/security-phase-b` (2026-10-18), gate passes, no device evidence; user-reported spam loss and SOS re-raise drop (2026-10-29) fixed by sender budgets | Run the [Phase B card](testing/security-phase-b-card.md) after the freeze, then merge. Phases C–E wait ([plan](plans/security-hardening.md)). SOS raises budgeted; sync-delivered active SOS alarm. |
 
-Basic block, incident, SOS and recovery checks have user-reported successes; their adversarial, load and repeated cases remain pending. See the [physical checklist](testing/physical-reliability-tests.md).
+Block, incident, SOS and recovery: basic user-reported successes; adversarial, load and repeated cases pending ([checklist](testing/physical-reliability-tests.md)).
 
 **Layer boundaries / P2 subset** (`refactor/layer-boundaries`, [plan](plans/layer-boundaries.md)): The user reported the [smoke card](testing/layer-boundaries-smoke-card.md) passing on three phones (2026-10-17); merged.
 
@@ -60,6 +60,8 @@ Basic block, incident, SOS and recovery checks have user-reported successes; the
 **Image quality** (`feat/image-quality`): user-rated quality good; [card](testing/image-quality-card.md) pending.
 
 **Transfer-stall/progress** (`feat/transfer-progress`): [card](testing/transfer-stall-reprobe-card.md) pending.
+
+**L2CAP header write** (`fix/l2cap-single-write-header`): [card](testing/l2cap-single-write-header-card.md) pending.
 
 **BLE range** (`fix/ble-range-probe-scan`, D1): [card](testing/ble-range-probe-test-card.md) pending.
 

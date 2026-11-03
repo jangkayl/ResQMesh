@@ -11,7 +11,6 @@ import edu.cit.resqmesh.core.network.bluetooth.state.BleStateStore
 import edu.cit.resqmesh.core.network.bluetooth.state.MeshFrameCodec
 import edu.cit.resqmesh.core.network.bluetooth.state.OutboundQueuePolicy
 import edu.cit.resqmesh.core.logging.AppLogger
-import java.io.DataOutputStream
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicInteger
 
@@ -71,17 +70,15 @@ class L2capTransport(
         val writer = BoundedPayloadWriter(
             isOwned = ::isOwned,
             write = { payload ->
-                val output = DataOutputStream(socket.outputStream)
-                output.writeInt(payload.size)
-                var offset = 0
-                while (offset < payload.size) {
-                    check(isOwned())
-                    val count = minOf(IO_CHUNK_BYTES, payload.size - offset)
-                    output.write(payload, offset, count)
-                    offset += count
-                    handler.post { if (isOwned()) store.l2capOutboundProgressTimes[endpoint] = System.currentTimeMillis() }
-                }
-                output.flush()
+                L2capFrameWriter.write(
+                    output = socket.outputStream,
+                    payload = payload,
+                    chunkBytes = IO_CHUNK_BYTES,
+                    beforeChunk = { check(isOwned()) },
+                    afterChunk = {
+                        handler.post { if (isOwned()) store.l2capOutboundProgressTimes[endpoint] = System.currentTimeMillis() }
+                    }
+                )
                 AppLogger.d("BLE_MESH", "L2CAP Sent ${payload.size} bytes directly to $endpoint")
             },
             onFailure = { abandoned ->
