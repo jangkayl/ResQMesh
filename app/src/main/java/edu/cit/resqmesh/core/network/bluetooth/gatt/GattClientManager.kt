@@ -104,7 +104,7 @@ class GattClientManager(
         try {
             val callback = GattClientCallback(attempt)
 
-            attempt.timeoutHandler.postDelayed(attempt.connectTimeoutRunnable, CONNECT_TIMEOUT_MS)
+            attempt.timeoutHandler.postDelayed(attempt.connectTimeoutRunnable, attempt.connectTimeoutMs)
 
             // AUTO remains the compatibility default because explicit LE caused immediate
             // disconnects on older OEM pairs. A peer-specific retry switches to LE only after

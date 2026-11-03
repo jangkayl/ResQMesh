@@ -58,9 +58,18 @@ internal class GattClientAttempt(
         }
     }
 
+    /** Stable identity for the per-peer deadline; private addresses rotate between attempts. */
+    val connectTimeoutKey: String get() = stablePeerId ?: peerName
+    val connectTimeoutMs: Long = store.connectTimeouts.timeoutMs(connectTimeoutKey)
+
     val connectTimeoutRunnable = Runnable {
         if (!store.links.isCurrent(link)) return@Runnable
-        AppLogger.d("BLE_MESH", "GATT Connection timed out after 15s. Forcing lock release for long-distance retry.")
+        store.connectTimeouts.onTimedOut(connectTimeoutKey)
+        AppLogger.d(
+            "BLE_MESH",
+            "GATT connection to $peerName timed out after ${connectTimeoutMs}ms; " +
+                "next deadline ${store.connectTimeouts.timeoutMs(connectTimeoutKey)}ms"
+        )
         finishConnectPhase("connect timeout")
         store.links.transition(link, BleLinkState.DISCONNECTING)
         try { retireTimedOutGatt() } catch (e: Exception) {}

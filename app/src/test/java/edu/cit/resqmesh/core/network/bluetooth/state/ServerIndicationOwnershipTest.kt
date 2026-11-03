@@ -43,6 +43,32 @@ class ServerIndicationOwnershipTest {
         assertNull(ledger.take("same-address", 1))
         assertSame(ticket, ledger.take("same-address", 2))
     }
+    @Test fun tombstoneBlocksSameAddressUntilItExpires() {
+        var now = 0L
+        val ledger = ServerIndicationLedger { now }; ledger.reset(1)
+        val old = flight()
+        ledger.begin(old, 1)!!
+        assertTrue(store.retireServerOwnership(old.link) {})
+        now = ServerIndicationLedger.TOMBSTONE_TTL_MS - 1
+        assertTrue(ledger.unresolved("same-address"))
+        now = ServerIndicationLedger.TOMBSTONE_TTL_MS
+        assertFalse(ledger.unresolved("same-address"))
+        assertFalse(ledger.hasUnresolved())
+        // A callback that never arrived cannot complete anything after expiry.
+        assertNull(ledger.take("same-address", 1))
+        assertNotNull(ledger.begin(flight(), 1))
+    }
+    @Test fun expiryOnlyRemovesStaleTickets() {
+        var now = 0L
+        val ledger = ServerIndicationLedger { now }; ledger.reset(1)
+        ledger.begin(flight(), 1)!!
+        now = 6_000L
+        val fresh = ledger.begin(flight("other-peer"), 1)!!
+        now = ServerIndicationLedger.TOMBSTONE_TTL_MS
+        assertFalse(ledger.unresolved("same-address"))
+        assertTrue(ledger.unresolved("other-peer"))
+        assertSame(fresh, ledger.take("other-peer", 1))
+    }
     @Test fun rejectedInitiationLeavesNoUnresolvedCallback() {
         val ledger = store.serverIndications; ledger.reset(1)
         ledger.rejected(ledger.begin(flight(), 1)!!)

@@ -17,6 +17,7 @@ internal interface GattClientAttemptContext : GattClientHost {
     val radioOwner get() = attempt.radioOwner
     val timeoutHandler get() = attempt.timeoutHandler
     val connectTimeoutRunnable get() = attempt.connectTimeoutRunnable
+    val connectTimeoutKey get() = attempt.connectTimeoutKey
     fun owns(gatt: BluetoothGatt, event: String) = attempt.owns(gatt, event)
     fun requestServicesOnce(gatt: BluetoothGatt) = attempt.requestServicesOnce(gatt)
     fun finishConnectPhase(reason: String) = attempt.finishConnectPhase(reason)
