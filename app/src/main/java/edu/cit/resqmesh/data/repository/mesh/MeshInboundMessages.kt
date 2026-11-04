@@ -33,6 +33,7 @@ private const val MAX_MESSAGE_ID_LENGTH = 100
 private const val MAX_SENDER_NAME_LENGTH = 160
 private const val MAX_CONVERSATION_TEXT_LENGTH = 8192
 private val RADIO_CHANNEL_IDS = (1..5).map { it.toString() }
+private val PUBLIC_CONVERSATION_KINDS = setOf("COMMUNITY", "RADIO", "SOS")
 
 private const val MESSAGE_UNAVAILABLE = "[Message unavailable]"
 
@@ -234,15 +235,36 @@ internal class MeshInboundMessages(
         networkManager.markPayloadStored(p.id)
     }
 
-    private suspend fun isAcceptableConversation(p: MeshPayload): Boolean {
-        if (p.senderNodeId.isBlank() || p.senderNodeId == networkManager.myNodeId || p.id.length !in 1..MAX_MESSAGE_ID_LENGTH ||
-            p.senderName.length !in 1..MAX_SENDER_NAME_LENGTH || p.text.length > MAX_CONVERSATION_TEXT_LENGTH || p.isPrivate || p.isEncrypted ||
-            p.conversationKind !in setOf("COMMUNITY", "RADIO", "SOS") || p.ttl !in 1..MAX_TTL || p.relayHopCount !in 0..MAX_TTL) return false
-        if (p.conversationKind == "RADIO" && p.channelId !in RADIO_CHANNEL_IDS) return false
-        if (p.conversationKind == "SOS" && sosRepository?.canReply(p.sosId) != true) return false
-        val maxMedia = BinaryCompressor.MAX_MEDIA_BYTES
-        return (p.audioBytes?.size ?: 0) <= maxMedia && (p.imageBytes?.size ?: 0) <= maxMedia
+    private suspend fun isAcceptableConversation(payload: MeshPayload): Boolean {
+        if (!hasForeignSender(payload) || !hasBoundedContent(payload) || !hasPublicConversationRouting(payload)) {
+            return false
+        }
+        return isOpenConversationScope(payload) && hasBoundedMedia(payload)
     }
+
+    /** Radio needs a known channel; an SOS thread must still accept replies. */
+    private suspend fun isOpenConversationScope(payload: MeshPayload): Boolean = when (payload.conversationKind) {
+        "RADIO" -> payload.channelId in RADIO_CHANNEL_IDS
+        "SOS" -> sosRepository?.canReply(payload.sosId) == true
+        else -> true
+    }
+
+    private fun hasBoundedMedia(payload: MeshPayload): Boolean {
+        val maxMedia = BinaryCompressor.MAX_MEDIA_BYTES
+        return (payload.audioBytes?.size ?: 0) <= maxMedia && (payload.imageBytes?.size ?: 0) <= maxMedia
+    }
+
+    /** A named sender with a stable node id that is not this phone. */
+    private fun hasForeignSender(payload: MeshPayload): Boolean =
+        payload.senderNodeId.isNotBlank() && payload.senderNodeId != networkManager.myNodeId &&
+            payload.id.length in 1..MAX_MESSAGE_ID_LENGTH && payload.senderName.length in 1..MAX_SENDER_NAME_LENGTH
+
+    private fun hasBoundedContent(payload: MeshPayload): Boolean =
+        payload.text.length <= MAX_CONVERSATION_TEXT_LENGTH && !payload.isPrivate && !payload.isEncrypted
+
+    private fun hasPublicConversationRouting(payload: MeshPayload): Boolean =
+        payload.conversationKind in PUBLIC_CONVERSATION_KINDS && payload.ttl in 1..MAX_TTL &&
+            payload.relayHopCount in 0..MAX_TTL
 
     /** The stored message, or null when this conversation message was already known. */
     private suspend fun storeIfNew(p: MeshPayload, audioBase64: String?, imageBase64: String?): ChatMessage? =

@@ -22,7 +22,6 @@
     <ID>ComplexCondition:MainActivity.kt$MainActivity$setupState.isOnline &amp;&amp; (!guidePending || hasDeepLink) &amp;&amp; currentStage != AppState.Main</ID>
     <ID>ComplexCondition:MainApplicationOverlays.kt$isDeveloperMode &amp;&amp; !hasIncomingSos &amp;&amp; !hasMapAlert &amp;&amp; !hasOwnSos &amp;&amp; !isSOSActive</ID>
     <ID>ComplexCondition:MediaHelper.kt$MediaHelper$isSirenPlaying || !radioMonitoring || manualAudio != null || mediaPlayer != null</ID>
-    <ID>ComplexCondition:MeshInboundMessages.kt$MeshInboundMessages$p.senderNodeId.isBlank() || p.senderNodeId == networkManager.myNodeId || p.id.length !in 1..MAX_MESSAGE_ID_LENGTH || p.senderName.length !in 1..MAX_SENDER_NAME_LENGTH || p.text.length &gt; MAX_CONVERSATION_TEXT_LENGTH || p.isPrivate || p.isEncrypted || p.conversationKind !in setOf("COMMUNITY", "RADIO", "SOS") || p.ttl !in 1..MAX_TTL || p.relayHopCount !in 0..MAX_TTL</ID>
     <ID>ComplexCondition:MeshPeerCoordinator.kt$MeshPeerCoordinator$existingById == null &amp;&amp; !NodeIdentity.isPlaceholder(device.name) &amp;&amp; (existingByIdentity == null || !networkManager.hasLiveSocket(existingByIdentity.endpointId))</ID>
     <ID>ComplexCondition:MeshPeerCoordinator.kt$MeshPeerCoordinator$state == edu.cit.resqmesh.core.network.bluetooth.MeshTransportState.OFFLINE || state == edu.cit.resqmesh.core.network.bluetooth.MeshTransportState.BLUETOOTH_OFF || state == edu.cit.resqmesh.core.network.bluetooth.MeshTransportState.PERMISSION_REQUIRED || state == edu.cit.resqmesh.core.network.bluetooth.MeshTransportState.ERROR</ID>
     <ID>ComplexCondition:NativeBleManager.kt$NativeBleManager$!force &amp;&amp; macAddress != null &amp;&amp; holder != null &amp;&amp; holder != macAddress</ID>
@@ -31,7 +30,6 @@
     <ID>ComplexCondition:ReadyPayloadSetup.kt$ReadyPayloadSetup$stalled || !isCurrentReady() || hasL2cap() || connecting || waiting || readWanted || operation != null</ID>
     <ID>ComplexCondition:ReadyPayloadSetup.kt$ReadyPayloadSetup$stalled || !isCurrentReady() || operation != null || !isGattIdle()</ID>
     <ID>ComplexCondition:ReadyPayloadSetup.kt$ReadyPayloadSetup$waiting || connecting || readWanted || operation != null || !isCurrentReady()</ID>
-    <ID>ComplexCondition:RecipientReceiptPolicy.kt$RecipientReceiptPolicy$!isMine || reader.isBlank() || reader.length &gt; 256 || reader != reader.trim() || reader.any { it == ',' || it.isISOControl() } || reader.uppercase() in setOf("PENDING", "FAILED", "ME") || (targetName != null) != isPrivate</ID>
     <ID>ComplexCondition:ReliableMeshTransfers.kt$ReliableMeshTransfers$record.applicationStored &amp;&amp; (!record.requiresRelayRoster || record.relayTargetsSet) &amp;&amp; relayFailures.none { it.second == record.payloadId } &amp;&amp; (!record.relayTargetsSet || record.relayTargets.all { it in record.forwardedPeers })</ID>
     <ID>ComplexCondition:SetupViewModel.kt$SetupViewModel$Build.VERSION.SDK_INT &gt;= Build.VERSION_CODES.S &amp;&amp; !(hasPermission(Manifest.permission.BLUETOOTH_SCAN) &amp;&amp; hasPermission(Manifest.permission.BLUETOOTH_CONNECT) &amp;&amp; hasPermission(Manifest.permission.BLUETOOTH_ADVERTISE))</ID>
     <ID>ConstructorParameterNaming:BleHeartbeatDriver.kt$BleHeartbeatDriver$private val HEARTBEAT_ACK_TIMEOUT_MS: Long</ID>
@@ -87,7 +85,6 @@
     <ID>CyclomaticComplexMethod:MainActivity.kt$MainActivity$override fun onCreate(savedInstanceState: Bundle?)</ID>
     <ID>CyclomaticComplexMethod:MainContainerScreen.kt$@Composable fun MainContainerScreen( setupViewModel: SetupViewModel, radarViewModel: RadarViewModel, commsViewModel: CommunicationViewModel, walkieTalkieViewModel: edu.cit.resqmesh.feature.comms.viewmodel.WalkieTalkieViewModel, mediaHelper: MediaHelper, appearance: AppAppearance, onAppearanceSelected: (AppAppearance) -&gt; Unit, initialChatNode: String? = null, onClearInitialChatNode: (() -&gt; Unit)? = null, initialIncidentId: String? = null, onClearInitialIncident: (() -&gt; Unit)? = null, initialViewMap: Boolean = false, initialSosSender: String? = null, initialSosText: String? = null, initialSosId: String? = null, onClearInitialViewMap: (() -&gt; Unit)? = null )</ID>
     <ID>CyclomaticComplexMethod:MapLibreMapCanvas.kt$@Composable internal fun MapLibreLocalMapContainer( alertMessage: ChatMessage, state: SosMapViewState.MapReady, onBack: () -&gt; Unit, modifier: Modifier = Modifier )</ID>
-    <ID>CyclomaticComplexMethod:MeshInboundMessages.kt$MeshInboundMessages$private suspend fun isAcceptableConversation(p: MeshPayload): Boolean</ID>
     <ID>CyclomaticComplexMethod:MeshPeerCoordinator.kt$MeshPeerCoordinator$fun onNetworkDeviceConnected(device: ConnectedDevice): Unit</ID>
     <ID>CyclomaticComplexMethod:MeshRouter.kt$MeshRouter$@Synchronized fun updateTopology( senderName: String, senderNodeId: String, connectedNodes: List&lt;String&gt;, connectedNodeIds: List&lt;String&gt;, myNodeName: String, topologySequence: Long = 0L ): Boolean</ID>
     <ID>CyclomaticComplexMethod:MeshRouter.kt$MeshRouter$fun recalculateKnownNodes(myNodeName: String, connectedDevices: List&lt;ConnectedDevice&gt;)</ID>
@@ -350,7 +347,6 @@
     <ID>LongMethod:CoordinationStatusBanners.kt$@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class) @Composable internal fun CoordinationStatusBanners( incident: Incident, isReporter: Boolean, isSelectedHelper: Boolean, selectedOffer: IncidentOffer?, actionMessage: String?, wasRevoked: Boolean )</ID>
     <ID>LongMethod:CreateIncidentSheet.kt$@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class, ExperimentalFoundationApi::class) @Composable fun CreateIncidentSheet( onDismiss: () -&gt; Unit, onSubmit: (title: String, type: String, severity: String, desc: String, area: String, lat: Double?, lng: Double?, time: Long?, acc: Float?) -&gt; Unit, submissionError: String? = null, isSubmitting: Boolean = false, reportWaitSeconds: Int = 0 )</ID>
     <ID>LongMethod:DebugTerminal.kt$@Composable fun DebugTerminal()</ID>
-    <ID>LongMethod:DeliveryHandlers.kt$StandardMessageHandler$override fun handle(endpointId: String, payload: MeshPayload, payloadBytes: ByteArray, callback: PayloadDispatcherCallback)</ID>
     <ID>LongMethod:EmergencySummaryCard.kt$@Composable internal fun MinimalistEmergencyCard( profile: EmergencyProfile, isSelected: Boolean, isLight: Boolean, modifier: Modifier = Modifier, onClick: () -&gt; Unit )</ID>
     <ID>LongMethod:FirstLaunchGuideScreen.kt$@Composable fun FirstLaunchGuideScreen(isReplay: Boolean, onDone: () -&gt; Unit, onClose: () -&gt; Unit)</ID>
     <ID>LongMethod:FirstLaunchGuideScreen.kt$@Composable private fun GuideCanvas( index: Int, accent: Color, outline: Color, surface: Color, bubble: Color, foreground: Color, phase: Float )</ID>
@@ -998,7 +994,6 @@
     <ID>MagicNumber:ReadyPayloadSetup.kt$ReadyPayloadSetup$3</ID>
     <ID>MagicNumber:ReadyPayloadSetup.kt$ReadyPayloadSetup$30_000L</ID>
     <ID>MagicNumber:ReadyPayloadSetup.kt$ReadyPayloadSetup$5_000L</ID>
-    <ID>MagicNumber:RecipientReceiptPolicy.kt$RecipientReceiptPolicy$256</ID>
     <ID>MagicNumber:ReliableMeshTransfers.kt$ReliableMeshTransfers$12</ID>
     <ID>MagicNumber:ResQGlass.kt$0.03f</ID>
     <ID>MagicNumber:ResQGlass.kt$0.08f</ID>
@@ -1363,10 +1358,7 @@
     <ID>MaxLineLength:DefaultLocationClient.kt$DefaultLocationClient$val hasCoarse = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED</ID>
     <ID>MaxLineLength:DefaultLocationClient.kt$DefaultLocationClient$val hasFine = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED</ID>
     <ID>MaxLineLength:DeliveryHandlers.kt$ReceiptHandler$override</ID>
-    <ID>MaxLineLength:DeliveryHandlers.kt$StandardMessageHandler$callback.onMessageReceived(endpointId, msgId, sender, text, isPrivate, false, imageBase64, audioBase64, locationLat, locationLng, medium, routePath, payload.channelId)</ID>
-    <ID>MaxLineLength:DeliveryHandlers.kt$StandardMessageHandler$callback.onMessageReceived(endpointId, msgId, sender, text, isPrivate, false, imageBase64, audioBase64, payload.locationLat, payload.locationLng, medium, routePath, payload.channelId)</ID>
     <ID>MaxLineLength:DeliveryHandlers.kt$StandardMessageHandler$override</ID>
-    <ID>MaxLineLength:DeliveryHandlers.kt$StandardMessageHandler$val</ID>
     <ID>MaxLineLength:DeviceCard.kt$color = if (isConnecting) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onPrimary</ID>
     <ID>MaxLineLength:DeviceCard.kt$color = if (isConnecting) MaterialTheme.colorScheme.primary.copy(alpha = 0.2f) else MaterialTheme.colorScheme.primary</ID>
     <ID>MaxLineLength:DeviceCard.kt$containerColor = if (isConnecting) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.surface</ID>
@@ -1674,11 +1666,7 @@
     <ID>MaxLineLength:MeshConversationMedia.kt$MeshConversationMedia$val payloadBytes = kotlinx.serialization.protobuf.ProtoBuf.encodeToByteArray(edu.cit.resqmesh.core.network.MeshPayload.serializer(), payload)</ID>
     <ID>MaxLineLength:MeshForegroundService.kt$MeshForegroundService$combine</ID>
     <ID>MaxLineLength:MeshFrameCodecTest.kt$MeshFrameCodecTest$assertTrue(MeshFrameCodec.append(ByteArray(0), ByteBuffer.allocate(4).putInt(-1).array()) is MeshFrameCodec.AppendResult.Rejected)</ID>
-    <ID>MaxLineLength:MeshInboundMessages.kt$MeshInboundMessages$if</ID>
     <ID>MaxLineLength:MeshInboundMessages.kt$MeshInboundMessages$message?.takeIf { it.conversationKind == "RADIO" &amp;&amp; it.audioBase64 != null }?.let { incomingVoiceMessage.tryEmit(it) }</ID>
-    <ID>MaxLineLength:MeshInboundMessages.kt$MeshInboundMessages$p.conversationKind !in setOf("COMMUNITY", "RADIO", "SOS")</ID>
-    <ID>MaxLineLength:MeshInboundMessages.kt$MeshInboundMessages$p.senderName.length !in 1..MAX_SENDER_NAME_LENGTH</ID>
-    <ID>MaxLineLength:MeshInboundMessages.kt$MeshInboundMessages$val</ID>
     <ID>MaxLineLength:MeshInboundMessages.kt$MeshInboundMessages$val message = inbound.toChatMessage(isDirect = _connectedDevices.value.any { NodeIdentity.matches(it.name, sender) })</ID>
     <ID>MaxLineLength:MeshNetworkEventBinder.kt$MeshNetworkCallbacks$val onMessageReceived: (String, String, String, String, Boolean, Boolean, String?, String?, Double?, Double?, String, List&lt;String&gt;, String) -&gt; Unit</ID>
     <ID>MaxLineLength:MeshOutboundDelivery.kt$MeshOutboundDelivery$AppLogger.d("MeshNetwork_E2EE", "PRIVATE_DELIVERED message=$msgId elapsedMs=${android.os.SystemClock.elapsedRealtime()}")</ID>
@@ -2032,7 +2020,6 @@
     <ID>MaxLineLength:WireFormatGoldenTest.kt$WireFormatGoldenTest.Companion$"0a056d73672d311a05416c6963652203426f622a0568656c6c6fca01066e6f64652d61d201066e6f64652d62f80105980280d095ffbc31"</ID>
     <ID>MaxLineLength:WireFormatGoldenTest.kt$WireFormatGoldenTest.Companion$"0a0644494745535412026464180120022a610a0465762d311207534f532d6162631a066e6f64652d312205416c6963652a036b657932074d45444943414c380240004880d095ffbc3150e8d795ffbc31590000000000002d40610000000000405e406d0000a04070f4d395ffbc317a037369673001"</ID>
     <ID>MaxLineLength:WireFormatGoldenTest.kt$WireFormatGoldenTest.Companion$"{\"eventId\":\"ev-1\",\"sosId\":\"SOS-abc\",\"originNodeId\":\"node-1\",\"originName\":\"Alice\",\"signingKey\":\"key\",\"emergencyType\":\"MEDICAL\",\"revision\":2,\"ended\":false,\"createdAt\":1700000000000,\"updatedAt\":1700000001000,\"latitude\":14.5,\"longitude\":121.0,\"accuracyMeters\":5.0,\"locationCapturedAt\":1700000000500,\"signature\":\"sig\"}"</ID>
-    <ID>NestedBlockDepth:DeliveryHandlers.kt$StandardMessageHandler$override fun handle(endpointId: String, payload: MeshPayload, payloadBytes: ByteArray, callback: PayloadDispatcherCallback)</ID>
     <ID>NestedBlockDepth:MapPackageDownloader.kt$DefaultHttpTransport$override suspend fun downloadToFile( urlString: String, destinationFile: File, resumeOffset: Long, onProgress: (bytesDownloaded: Long, totalBytes: Long) -&gt; Unit ): Boolean</ID>
     <ID>NestedBlockDepth:MapStorageGuard.kt$MapStorageGuard$private fun unpackZip(zipInputStream: InputStream, destinationDir: File)</ID>
     <ID>NestedBlockDepth:MeshPeerCoordinator.kt$MeshPeerCoordinator$fun onNetworkDeviceScanned(event: ScanEvent): Unit</ID>
@@ -2111,7 +2098,6 @@
     <ID>ReturnCount:MapStyleValidator.kt$MapStyleValidator$private fun validateSprite(packageDir: File, root: JSONObject): ValidationResult.Invalid?</ID>
     <ID>ReturnCount:MeshForegroundService.kt$MeshForegroundService$override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int</ID>
     <ID>ReturnCount:MeshInboundMessages.kt$MeshInboundMessages$fun onNetworkMessageReceived(inbound: InboundChatPayload)</ID>
-    <ID>ReturnCount:MeshInboundMessages.kt$MeshInboundMessages$private suspend fun isAcceptableConversation(p: MeshPayload): Boolean</ID>
     <ID>ReturnCount:MeshInboundMessages.kt$MeshInboundMessages$private suspend fun receiveConversation(endpoint: String, p: MeshPayload)</ID>
     <ID>ReturnCount:MeshOutboundDelivery.kt$MeshOutboundDelivery$fun sendPrivateMessage(targetName: String, content: OutgoingContent): Boolean</ID>
     <ID>ReturnCount:MeshOutboundDelivery.kt$MeshOutboundDelivery$private suspend fun retryPrivate(message: ChatMessage, targetName: String, readyDevices: List&lt;ConnectedDevice&gt;, pass: OutboxPass)</ID>

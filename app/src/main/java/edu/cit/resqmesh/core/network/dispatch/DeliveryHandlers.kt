@@ -68,10 +68,6 @@ class ReceiptHandler : PayloadHandler {
 
 @OptIn(ExperimentalSerializationApi::class)
 class StandardMessageHandler : PayloadHandler {
-    private companion object {
-        const val ATTACHMENT_UNAVAILABLE = "[Attachment unavailable]"
-    }
-
     /** Only audio rejects go to the Voice ring; an image reject is not a voice event. */
     private fun rejectTrace(reason: TraceDropReason, endpointId: String, msgId: String, isAudio: Boolean) {
         if (isAudio) {
@@ -96,39 +92,11 @@ class StandardMessageHandler : PayloadHandler {
         val isPrivate = payload.isPrivate
         val isEncrypted = payload.isEncrypted
 
-        var text = payload.text
-        var mediaRejected = false
-        fun inflateMedia(raw: ByteArray?, isAudio: Boolean): String? {
-            if (isPrivate || raw == null) return null
-            return when (val r = BinaryCompressor.decompressBounded(raw)) {
-                is BinaryCompressor.BoundedResult.Ok -> Base64.encodeToString(r.bytes, Base64.DEFAULT)
-                is BinaryCompressor.BoundedResult.TooLarge -> {
-                    mediaRejected = true
-                    AppLogger.d("PayloadDispatcher", "MEDIA_REJECT reason=too_large bytes=${r.bytes}")
-                    rejectTrace(TraceDropReason.MEDIA_REJECT_TOO_LARGE, endpointId, msgId, isAudio)
-                    null
-                }
-                is BinaryCompressor.BoundedResult.Corrupt -> {
-                    mediaRejected = true
-                    AppLogger.d(
-                        "PayloadDispatcher",
-                        "MEDIA_REJECT reason=corrupt bytes=${r.bytes} cause=${r.cause}"
-                    )
-                    rejectTrace(TraceDropReason.MEDIA_REJECT_CORRUPT, endpointId, msgId, isAudio)
-                    null
-                }
-            }
-        }
-        var imageBase64 = inflateMedia(payload.imageBytes, isAudio = false)
-        var audioBase64 = inflateMedia(payload.audioBytes, isAudio = true)
+        val media = inflatePublicMedia(payload, endpointId, msgId)
+        var imageBase64 = media.imageBase64
+        var audioBase64 = media.audioBase64
         if (audioBase64 != null) voiceNote(msgId, TraceScope.PUBLIC, endpointId)
-        if (mediaRejected) {
-            // Clamp the sender's text first so the local inbound clamp can never cut the marker off.
-            val room = edu.cit.resqmesh.core.security.input.TextField.MESSAGE.maxLength -
-                ATTACHMENT_UNAVAILABLE.length - 1
-            val kept = edu.cit.resqmesh.core.security.input.TextPolicy.clampLength(text, room)
-            text = if (kept.isBlank()) ATTACHMENT_UNAVAILABLE else "$kept\n$ATTACHMENT_UNAVAILABLE"
-        }
+        var text = if (media.rejected) withAttachmentUnavailableMarker(payload.text) else payload.text
         var locationLat = if (isPrivate) null else payload.locationLat
         var locationLng = if (isPrivate) null else payload.locationLng
 
@@ -136,44 +104,16 @@ class StandardMessageHandler : PayloadHandler {
             AppLogger.d("MeshNetwork_E2EE", "Rejected unencrypted private payload from ${AppLogger.redactName(sender)}")
             return
         }
+        logInboundProtection(isEncrypted, sender)
 
-        if (isEncrypted) {
-            AppLogger.d("MeshNetwork_E2EE", "INBOUND ENCRYPTED PAYLOAD DETECTED from ${AppLogger.redactName(sender)}")
-        } else {
-            AppLogger.d(
-                "MeshNetwork_E2EE",
-                "INBOUND PUBLIC PAYLOAD DETECTED from ${AppLogger.redactName(sender)}. No encryption applied."
-            )
-        }
-
-        val isTarget = payload.targetNodeId.isNotBlank() && payload.targetNodeId.equals(callback.getMyNodeId(), ignoreCase = true) ||
-            (payload.targetNodeId.isBlank() && NodeIdentity.matches(targetName, callback.getMyDeviceName()))
+        val isTarget = isAddressedToMe(payload, callback)
         if (isEncrypted && isTarget) {
-            val encryptedData = payload.encryptedData
-            val encryptedKey = payload.encryptedKey
-
-            AppLogger.d("MeshNetwork_E2EE", "Message is addressed to ME. Attempting RSA+AES Hybrid Decryption...")
-            if (encryptedData.isNullOrBlank() || encryptedKey.isNullOrBlank()) {
-                AppLogger.d("MeshNetwork_E2EE", "E2EE FAILED: Missing encrypted envelope")
-                return
-            }
-            val decryptedJsonString = CryptoManager.decryptHybrid(encryptedData, encryptedKey)
-            if (decryptedJsonString == null) {
-                AppLogger.d("MeshNetwork_E2EE", "E2EE FAILED: Could not decrypt payload")
-                return
-            }
-            try {
-                val innerPayload = org.json.JSONObject(decryptedJsonString)
-                text = innerPayload.getString("text")
-                if (innerPayload.has("image")) imageBase64 = innerPayload.getString("image")
-                if (innerPayload.has("audio")) audioBase64 = innerPayload.getString("audio")
-                if (innerPayload.has("locationLat")) locationLat = innerPayload.getDouble("locationLat")
-                if (innerPayload.has("locationLng")) locationLng = innerPayload.getDouble("locationLng")
-                AppLogger.d("MeshNetwork_E2EE", "E2EE SUCCESS: Decrypted private payload")
-            } catch (e: Exception) {
-                AppLogger.d("MeshNetwork_E2EE", "E2EE FAILED: Invalid encrypted content")
-                return
-            }
+            val content = decryptPrivateContent(payload) ?: return
+            text = content.text
+            imageBase64 = content.imageBase64 ?: imageBase64
+            audioBase64 = content.audioBase64 ?: audioBase64
+            locationLat = content.locationLat ?: locationLat
+            locationLng = content.locationLng ?: locationLng
         } else if (isEncrypted) {
             text = "[ENCRYPTED CONTENT: Routing...]"
             imageBase64 = null
@@ -192,46 +132,152 @@ class StandardMessageHandler : PayloadHandler {
         )
 
         val routePath = payload.routePath.toMutableList()
-        val directedRoute = payload.directedRoute
-
-        if (isPrivate) {
-            if (isTarget) {
+        when {
+            isPrivate && isTarget -> {
                 if (audioBase64 != null) voiceNote(msgId, TraceScope.PRIVATE, endpointId)
-                callback.onMessageReceived(endpointId, msgId, sender, text, isPrivate, false, imageBase64, audioBase64, locationLat, locationLng, medium, routePath, payload.channelId)
-            } else {
-                AppLogger.d(
-                    "PayloadDispatcher",
-                    "ROUTE (Relay): Forwarding Private message meant for " +
-                        "[${AppLogger.redactName(targetName)}] securely across the mesh."
-                )
-                routePath.add(callback.getMyDeviceName())
-                val updatedPayload = payload.copy(routePath = routePath)
-                val updatedBytes = ProtoBuf.encodeToByteArray(updatedPayload)
-
-                val routeIds = payload.directedRouteNodeIds
-                if (routeIds.isNotEmpty()) {
-                    val myIndex = routeIds.indexOf(callback.getMyNodeId())
-                    if (myIndex >= 0) {
-                        val nextNode = routeIds.getOrNull(myIndex + 1)
-                        if (nextNode != null) {
-                            val result = callback.forwardPrivatePayload(nextNode, updatedBytes)
-                            AppLogger.d("PayloadDispatcher", "Private relay next-hop dispatch: $result")
-                            return
-                        }
-                    }
-                }
-                AppLogger.d("PayloadDispatcher", "Private relay route unavailable; dropping without broadcast")
+                callback.onMessageReceived(endpointId, msgId, sender, text, isPrivate, false, imageBase64, audioBase64,
+                    locationLat, locationLng, medium, routePath, payload.channelId)
             }
-        } else {
+            isPrivate -> relayPrivate(payload, routePath, callback)
             // Legacy unscoped SOS cancellation cannot mutate upgraded alerts.
-            if (payload.isSOSCancel || payload.isSOS) return
-
-            routePath.add(callback.getMyDeviceName())
-            val updatedPayload = payload.copy(routePath = routePath)
-            val updatedBytes = ProtoBuf.encodeToByteArray(updatedPayload)
-
-            callback.onMessageReceived(endpointId, msgId, sender, text, isPrivate, false, imageBase64, audioBase64, payload.locationLat, payload.locationLng, medium, routePath, payload.channelId)
-            callback.broadcastPayload(updatedBytes, endpointId)
+            payload.isSOSCancel || payload.isSOS -> return
+            else -> {
+                routePath.add(callback.getMyDeviceName())
+                val updatedBytes = ProtoBuf.encodeToByteArray(payload.copy(routePath = routePath))
+                callback.onMessageReceived(endpointId, msgId, sender, text, isPrivate, false, imageBase64, audioBase64,
+                    payload.locationLat, payload.locationLng, medium, routePath, payload.channelId)
+                callback.broadcastPayload(updatedBytes, endpointId)
+            }
         }
     }
+
+    /** Public media after bounded inflation; private media only travels inside the encrypted envelope. */
+    private class InboundMedia(val imageBase64: String?, val audioBase64: String?, val rejected: Boolean)
+
+    private fun inflatePublicMedia(payload: MeshPayload, endpointId: String, msgId: String): InboundMedia {
+        var rejected = false
+        fun inflate(raw: ByteArray?, isAudio: Boolean): String? {
+            if (payload.isPrivate || raw == null) return null
+            return when (val r = BinaryCompressor.decompressBounded(raw)) {
+                is BinaryCompressor.BoundedResult.Ok -> Base64.encodeToString(r.bytes, Base64.DEFAULT)
+                is BinaryCompressor.BoundedResult.TooLarge -> {
+                    rejected = true
+                    AppLogger.d("PayloadDispatcher", "MEDIA_REJECT reason=too_large bytes=${r.bytes}")
+                    rejectTrace(TraceDropReason.MEDIA_REJECT_TOO_LARGE, endpointId, msgId, isAudio)
+                    null
+                }
+                is BinaryCompressor.BoundedResult.Corrupt -> {
+                    rejected = true
+                    AppLogger.d(
+                        "PayloadDispatcher",
+                        "MEDIA_REJECT reason=corrupt bytes=${r.bytes} cause=${r.cause}"
+                    )
+                    rejectTrace(TraceDropReason.MEDIA_REJECT_CORRUPT, endpointId, msgId, isAudio)
+                    null
+                }
+            }
+        }
+        val image = inflate(payload.imageBytes, isAudio = false)
+        val audio = inflate(payload.audioBytes, isAudio = true)
+        return InboundMedia(image, audio, rejected)
+    }
+
+    /** Forwards a private message to the next hop on its directed route; never floods. */
+    private fun relayPrivate(
+        payload: MeshPayload,
+        routePath: MutableList<String>,
+        callback: PayloadDispatcherCallback
+    ) {
+        AppLogger.d(
+            "PayloadDispatcher",
+            "ROUTE (Relay): Forwarding Private message meant for " +
+                "[${AppLogger.redactName(payload.targetName)}] securely across the mesh."
+        )
+        routePath.add(callback.getMyDeviceName())
+        val updatedBytes = ProtoBuf.encodeToByteArray(payload.copy(routePath = routePath))
+        val nextNode = nextHopOnDirectedRoute(payload.directedRouteNodeIds, callback.getMyNodeId())
+        if (nextNode != null) {
+            val result = callback.forwardPrivatePayload(nextNode, updatedBytes)
+            AppLogger.d("PayloadDispatcher", "Private relay next-hop dispatch: $result")
+            return
+        }
+        AppLogger.d("PayloadDispatcher", "Private relay route unavailable; dropping without broadcast")
+    }
+
+    /** Fields absent from the decrypted envelope are null and keep the caller's current values. */
+    private class PrivateContent(
+        val text: String,
+        val imageBase64: String?,
+        val audioBase64: String?,
+        val locationLat: Double?,
+        val locationLng: Double?
+    )
+
+    /** Null after logging the reason when the envelope is missing, cannot be decrypted or is malformed. */
+    private fun decryptPrivateContent(payload: MeshPayload): PrivateContent? {
+        AppLogger.d("MeshNetwork_E2EE", "Message is addressed to ME. Attempting RSA+AES Hybrid Decryption...")
+        return decryptEnvelope(payload)?.let(::parsePrivateContent)
+    }
+
+    private fun decryptEnvelope(payload: MeshPayload): String? {
+        val encryptedData = payload.encryptedData
+        val encryptedKey = payload.encryptedKey
+        if (encryptedData.isNullOrBlank() || encryptedKey.isNullOrBlank()) {
+            AppLogger.d("MeshNetwork_E2EE", "E2EE FAILED: Missing encrypted envelope")
+            return null
+        }
+        return CryptoManager.decryptHybrid(encryptedData, encryptedKey).also { decrypted ->
+            if (decrypted == null) AppLogger.d("MeshNetwork_E2EE", "E2EE FAILED: Could not decrypt payload")
+        }
+    }
+
+    private fun parsePrivateContent(decryptedJsonString: String): PrivateContent? = try {
+        val innerPayload = org.json.JSONObject(decryptedJsonString)
+        val content = PrivateContent(
+            text = innerPayload.getString("text"),
+            imageBase64 = if (innerPayload.has("image")) innerPayload.getString("image") else null,
+            audioBase64 = if (innerPayload.has("audio")) innerPayload.getString("audio") else null,
+            locationLat = if (innerPayload.has("locationLat")) innerPayload.getDouble("locationLat") else null,
+            locationLng = if (innerPayload.has("locationLng")) innerPayload.getDouble("locationLng") else null
+        )
+        AppLogger.d("MeshNetwork_E2EE", "E2EE SUCCESS: Decrypted private payload")
+        content
+    } catch (e: Exception) {
+        AppLogger.d("MeshNetwork_E2EE", "E2EE FAILED: Invalid encrypted content")
+        null
+    }
+}
+
+private const val ATTACHMENT_UNAVAILABLE = "[Attachment unavailable]"
+
+/** Clamps the sender's text first so the local inbound clamp can never cut the marker off. */
+private fun withAttachmentUnavailableMarker(text: String): String {
+    val room = edu.cit.resqmesh.core.security.input.TextField.MESSAGE.maxLength -
+        ATTACHMENT_UNAVAILABLE.length - 1
+    val kept = edu.cit.resqmesh.core.security.input.TextPolicy.clampLength(text, room)
+    return if (kept.isBlank()) ATTACHMENT_UNAVAILABLE else "$kept\n$ATTACHMENT_UNAVAILABLE"
+}
+
+private fun logInboundProtection(isEncrypted: Boolean, sender: String) {
+    if (isEncrypted) {
+        AppLogger.d("MeshNetwork_E2EE", "INBOUND ENCRYPTED PAYLOAD DETECTED from ${AppLogger.redactName(sender)}")
+    } else {
+        AppLogger.d(
+            "MeshNetwork_E2EE",
+            "INBOUND PUBLIC PAYLOAD DETECTED from ${AppLogger.redactName(sender)}. No encryption applied."
+        )
+    }
+}
+
+/** A stable node-id target wins; legacy payloads without one fall back to the device name. */
+private fun isAddressedToMe(payload: MeshPayload, callback: PayloadDispatcherCallback): Boolean {
+    val targetNodeId = payload.targetNodeId
+    return targetNodeId.isNotBlank() && targetNodeId.equals(callback.getMyNodeId(), ignoreCase = true) ||
+        (targetNodeId.isBlank() && NodeIdentity.matches(payload.targetName, callback.getMyDeviceName()))
+}
+
+/** The node after [myNodeId] on [routeIds], or null when this node is absent or last. */
+private fun nextHopOnDirectedRoute(routeIds: List<String>, myNodeId: String): String? {
+    val myIndex = routeIds.indexOf(myNodeId)
+    return if (myIndex >= 0) routeIds.getOrNull(myIndex + 1) else null
 }
