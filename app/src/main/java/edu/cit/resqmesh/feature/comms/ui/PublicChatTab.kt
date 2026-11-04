@@ -1,7 +1,5 @@
 package edu.cit.resqmesh.feature.comms.ui
 
-import android.Manifest
-import android.content.pm.PackageManager
 import edu.cit.resqmesh.core.model.ChatMessage
 import edu.cit.resqmesh.core.model.NodeIdentity
 import androidx.compose.foundation.BorderStroke
@@ -50,7 +48,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.core.content.ContextCompat
+import edu.cit.resqmesh.core.location.hasLocationPermission
 import edu.cit.resqmesh.R
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -217,9 +215,7 @@ fun PublicChatTab(
                         }
                     },
                     onSendLocation = {
-                        if (ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
-                            ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
-                        ) {
+                        if (hasLocationPermission(context)) {
                             viewModel.broadcastLocation(
                                 isPrivate = false
                             )

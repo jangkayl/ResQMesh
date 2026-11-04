@@ -781,7 +781,6 @@
     <ID>MagicNumber:PrivateTransferProgress.kt$PrivateTransferProgress$60_000L</ID>
     <ID>MagicNumber:PublicChatTab.kt$5</ID>
     <ID>MagicNumber:PublicChatTab.kt$50</ID>
-    <ID>MagicNumber:PublicChatTab.kt$60</ID>
     <ID>MagicNumber:PublicConversationScreen.kt$0.5f</ID>
     <ID>MagicNumber:PublicConversationScreen.kt$1.3f</ID>
     <ID>MagicNumber:RadarViewModel.kt$RadarViewModel$1_000</ID>
@@ -1024,10 +1023,6 @@
     <ID>MaxLineLength:AboutViewModel.kt$AboutUiState$val missionStatement: String = "ResQMesh is an Android prototype for nearby text, private messaging, SOS, and voice notes. Phones use native Bluetooth Low Energy links and may relay messages through other phones without cellular data or Wi-Fi. Delivery depends on available links and routes."</ID>
     <ID>MaxLineLength:ActiveChatHeader.kt$Text("Private conversation", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)</ID>
     <ID>MaxLineLength:ActiveChatHeader.kt$Text(displayName, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Black, maxLines = 1)</ID>
-    <ID>MaxLineLength:ActiveChatScreen.kt$ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED</ID>
-    <ID>MaxLineLength:ActiveChatScreen.kt$NodeIdentity.displayNameOf(NodeIdentity.currentName(conversationName, uiState.peerNames)).ifBlank { conversationName }</ID>
-    <ID>MaxLineLength:ActiveChatScreen.kt$if</ID>
-    <ID>MaxLineLength:ActiveChatScreen.kt$text = { Text("This could be a new phone, or someone else. Check with them in another way first. Then send your message again.") }</ID>
     <ID>MaxLineLength:ActiveSosReminder.kt$Box(Modifier.weight(1f).fillMaxWidth().then(if (showReminder) Modifier.consumeWindowInsets(WindowInsets.statusBars) else Modifier)) { content() }</ID>
     <ID>MaxLineLength:ActiveSosReminder.kt$val borderColor = if (isLight) ResQTheme.colors.sos.copy(alpha = 0.55f) else ResQTheme.colors.sos.copy(alpha = 0.85f)</ID>
     <ID>MaxLineLength:AppDatabase.kt$AppDatabase.Companion$MIGRATION_4_5</ID>
@@ -1675,7 +1670,6 @@
     <ID>MaxLineLength:PublicBroadcastOutboxTest.kt$PublicBroadcastOutboxTest.Store$override suspend fun markSent(messageId: String)</ID>
     <ID>MaxLineLength:PublicBroadcastOutboxTest.kt$PublicBroadcastOutboxTest.Store$private fun update(id: String, marker: String)</ID>
     <ID>MaxLineLength:PublicChatTab.kt$"📍 Shared Location (%.4f, %.4f)".format(Locale.US, currentReply.locationLat, currentReply.locationLng)</ID>
-    <ID>MaxLineLength:PublicChatTab.kt$ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED</ID>
     <ID>MaxLineLength:PublicChatTab.kt$if</ID>
     <ID>MaxLineLength:PublicChatTab.kt$val isLatestInBlock = (index == 0 || displayedMessages[index - 1].senderName != message.senderName)</ID>
     <ID>MaxLineLength:PublicChatTab.kt$val quoteSender = NodeIdentity.displayNameOf(currentReply.senderName).ifBlank { currentReply.senderName }</ID>

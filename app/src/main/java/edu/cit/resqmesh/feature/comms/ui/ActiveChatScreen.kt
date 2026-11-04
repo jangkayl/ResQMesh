@@ -6,8 +6,6 @@ import edu.cit.resqmesh.feature.comms.ui.privatechat.deliveryFeedback as deliver
 import edu.cit.resqmesh.feature.comms.ui.privatechat.deliveryLabel as deliveryLabelSection
 import edu.cit.resqmesh.feature.comms.ui.privatechat.messageTime as messageTimeSection
 import edu.cit.resqmesh.feature.comms.ui.privatechat.DeleteConversationDialog
-import android.Manifest
-import android.content.pm.PackageManager
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
@@ -35,7 +33,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
-import androidx.core.content.ContextCompat
+import edu.cit.resqmesh.core.location.hasLocationPermission
 import edu.cit.resqmesh.R
 import edu.cit.resqmesh.core.model.ChatMessage
 import edu.cit.resqmesh.core.model.NodeIdentity
@@ -72,8 +70,9 @@ fun ActiveChatScreen(
         recipientCandidates(uiState).firstOrNull { NodeIdentity.matches(it.name, name) }
     }
     val displayName = remember(conversationName, uiState.peerNames) {
+        val currentName = NodeIdentity.currentName(conversationName, uiState.peerNames)
         edu.cit.resqmesh.core.security.input.TextSanitizer.inboundPeerName(
-            NodeIdentity.displayNameOf(NodeIdentity.currentName(conversationName, uiState.peerNames)).ifBlank { conversationName }
+            NodeIdentity.displayNameOf(currentName).ifBlank { conversationName }
         )
     }
     val context = LocalContext.current
@@ -124,24 +123,14 @@ fun ActiveChatScreen(
         )
     }
     if (showKeyChangeDialog) {
-        AlertDialog(
-            onDismissRequest = {
-                viewModel.rejectPendingPublicKeyChange(conversationName)
+        KeyChangeDialog(
+            onTrust = {
+                viewModel.acceptPendingPublicKeyChange(conversationName)
                 showKeyChangeDialog = false
             },
-            title = { Text("This person's security code changed") },
-            text = { Text("This could be a new phone, or someone else. Check with them in another way first. Then send your message again.") },
-            confirmButton = {
-                TextButton(onClick = {
-                    viewModel.acceptPendingPublicKeyChange(conversationName)
-                    showKeyChangeDialog = false
-                }) { Text("Yes, trust it") }
-            },
-            dismissButton = {
-                TextButton(onClick = {
-                    viewModel.rejectPendingPublicKeyChange(conversationName)
-                    showKeyChangeDialog = false
-                }) { Text("No, keep old code") }
+            onReject = {
+                viewModel.rejectPendingPublicKeyChange(conversationName)
+                showKeyChangeDialog = false
             }
         )
     }
@@ -188,11 +177,7 @@ fun ActiveChatScreen(
                             else -> ""
                         }
                         if (rawMessage.isBlank() && pendingImage == null && pendingAudio == null) return@ChatInput
-                        val finalMessage = if (replyQuotePrefix.isNotEmpty() && rawMessage.isNotBlank()) {
-                            replyQuotePrefix + rawMessage
-                        } else {
-                            rawMessage
-                        }
+                        val finalMessage = withReplyQuote(replyQuotePrefix, rawMessage)
                         val sent = viewModel.sendPrivateMessage(
                             targetName = conversationName,
                             text = finalMessage,
@@ -209,9 +194,7 @@ fun ActiveChatScreen(
                         }
                     },
                     onSendLocation = {
-                        if (ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
-                            ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
-                        ) {
+                        if (hasLocationPermission(context)) {
                             viewModel.broadcastLocation(
                                 isPrivate = true,
                                 targetName = conversationName
@@ -299,6 +282,31 @@ private fun PrivateChatEmptyPreview() {
     }
 }
 
+
+/** Asks whether to trust a peer whose public key changed; dismissing keeps the old key. */
+@Composable
+private fun KeyChangeDialog(onTrust: () -> Unit, onReject: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onReject,
+        title = { Text("This person's security code changed") },
+        text = {
+            Text(
+                "This could be a new phone, or someone else. Check with them in another way first. " +
+                    "Then send your message again."
+            )
+        },
+        confirmButton = {
+            TextButton(onClick = onTrust) { Text("Yes, trust it") }
+        },
+        dismissButton = {
+            TextButton(onClick = onReject) { Text("No, keep old code") }
+        }
+    )
+}
+
+/** Prepends the reply quote only when there is a quote and a non-blank message to attach it to. */
+private fun withReplyQuote(replyQuotePrefix: String, rawMessage: String): String =
+    if (replyQuotePrefix.isNotEmpty() && rawMessage.isNotBlank()) replyQuotePrefix + rawMessage else rawMessage
 
 /** Bounded "> sender: snippet" quote line (with trailing newline) prepended to a private reply. */
 private fun quotePrefix(replyTo: ChatMessage, peerName: String, photoText: String, voiceNoteText: String): String {
