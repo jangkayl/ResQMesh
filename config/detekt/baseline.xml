@@ -412,10 +412,6 @@
     <ID>MagicNumber:BroadcastSlider.kt$1.6f</ID>
     <ID>MagicNumber:BroadcastSlider.kt$1000</ID>
     <ID>MagicNumber:BroadcastSlider.kt$80</ID>
-    <ID>MagicNumber:ChatBubble.kt$0.6f</ID>
-    <ID>MagicNumber:ChatBubble.kt$0.8f</ID>
-    <ID>MagicNumber:ChatBubble.kt$3</ID>
-    <ID>MagicNumber:ChatBubble.kt$360</ID>
     <ID>MagicNumber:ChatInput.kt$140</ID>
     <ID>MagicNumber:ChatInput.kt$180</ID>
     <ID>MagicNumber:ChatInput.kt$38</ID>
@@ -1115,11 +1111,6 @@
     <ID>MaxLineLength:BroadcastSlider.kt$val trackBorderColor = if (isLight) (if (dragProgress &gt; 0.1f) accentColor.copy(alpha = 0.6f) else Color(0xFFDCD5CE)) else Color(0xFF303036)</ID>
     <ID>MaxLineLength:ChannelHistoryControl.kt$border = BorderStroke(1.dp, if (isLight) MaterialTheme.colorScheme.outlineVariant else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f))</ID>
     <ID>MaxLineLength:ChannelHistoryControl.kt$color = if (isLight) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)</ID>
-    <ID>MaxLineLength:ChatBubble.kt$.</ID>
-    <ID>MaxLineLength:ChatBubble.kt$modifier = Modifier.widthIn(max = if (message.locationLat != null || message.imageBase64 != null) 300.dp else 260.dp)</ID>
-    <ID>MaxLineLength:ChatBubble.kt$tint = if (mine) Color.White.copy(alpha = 0.85f) else MaterialTheme.colorScheme.primary</ID>
-    <ID>MaxLineLength:ChatBubble.kt$val isDefaultLocation = message.locationLat != null &amp;&amp; (actualText.isBlank() || actualText.contains("I am sharing my location"))</ID>
-    <ID>MaxLineLength:ChatBubble.kt$val sender = remember(message.senderName) { NodeIdentity.displayNameOf(message.senderName).ifBlank { message.senderName } }</ID>
     <ID>MaxLineLength:ChatContainerScreen.kt$communityUnread = uiState.publicMessages.count { !it.isMine &amp;&amp; it.timestamp &gt; (savedConversationStates.firstOrNull { state -&gt; state.conversationId == "COMMUNITY" }?.lastReadAt ?: 0L) }</ID>
     <ID>MaxLineLength:ChatInput.kt$"📍 Shared Location (%.4f, %.4f)".format(java.util.Locale.US, replyingTo.locationLat, replyingTo.locationLng)</ID>
     <ID>MaxLineLength:ChatInput.kt$color = if (canSend) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)</ID>
