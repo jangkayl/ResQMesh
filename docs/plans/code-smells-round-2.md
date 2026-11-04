@@ -1,6 +1,6 @@
 # Code smells round 2
 
-Last reviewed: 2026-11-04. Status: active plan; steps 1–8 and part of 9 done on `final-code-smells`, no device evidence. It follows the merged first round (`8632799`, [card](../testing/code-smells-refactor-card.md)). Targets come from `config/detekt/baseline.xml`: 687 MagicNumber, 207 FunctionNaming, 104 LongMethod, 95 LongParameterList, 80 CyclomaticComplexMethod, 47 ComplexCondition, 38 TooManyFunctions, 27 VariableNaming and 5 NestedBlockDepth entries. No class is currently flagged LargeClass; class size shows up as TooManyFunctions.
+Last reviewed: 2026-11-04. Status: active plan; steps 1–12 committed on `final-code-smells` with local checks green; device validation pending. It follows the merged first round (`8632799`, [card](../testing/code-smells-refactor-card.md)). Targets come from `config/detekt/baseline.xml`: 687 MagicNumber, 207 FunctionNaming, 104 LongMethod, 95 LongParameterList, 80 CyclomaticComplexMethod, 47 ComplexCondition, 38 TooManyFunctions, 27 VariableNaming and 5 NestedBlockDepth entries. No class is currently flagged LargeClass; class size shows up as TooManyFunctions.
 
 ## Rules for every commit
 
@@ -74,7 +74,7 @@ Work from lowest to highest risk. Steps 1–7 touch no radio code.
 
 ### Step 9: Compose screens (long parameter list, long method)
 - **Files:** `IncidentDetailSheet.kt` (26 parameters), `IncidentCoordinationHub.kt`, `HelpWorkflowPanel.kt`, `CreateIncidentSheet.kt` (`onSubmit` with 9 arguments), `ChatBubble.kt`, `ActiveChatScreen.kt`.
-- **Changes:** split long composables into private children, keeping text and test tags. `IncidentDetailSheet` and `CreateIncidentSheet` keep their signatures (`IncidentUiTest` calls them). Done: detail sheet body and confirmation sheets. Left: `CreateIncidentSheet`, `ChatBubble`, `ActiveChatScreen`; hub and panel are unused.
+- **Changes:** split long composables into private children, keeping text and test tags. `IncidentDetailSheet` and `CreateIncidentSheet` keep their signatures (`IncidentUiTest` calls them). Done: detail sheet body, confirmation sheets, `CreateIncidentSheet`, `ChatBubble` and `ActiveChatScreen`. Hub and panel have no callers and were left alone.
 - **Proof:** `IncidentUiTest` compile. UI-02's four existing failures are expected, so compare results before and after.
 - **Magic numbers:** `Color.kt` and `Theme.kt` hex colors are design tokens, so leave them as they are. In screens, name only the repeated `dp` and duration values.
 
@@ -88,7 +88,7 @@ Work from lowest to highest risk. Steps 1–7 touch no radio code.
 
 ### Step 12: GATT callbacks (long method; strongest model tier, last)
 - **Files:** `GattClientCallback`, `GattClientConnectionEvents`, `GattServerLinkEvents`, `GattServerAttributeRequests`, `GattTransferExecutor.sendChunk` and `GattClientManager.connectToPersistentGatt`.
-- **Changes:** split `handleCallback` per status branch. Do one file per commit, with a phone run between commits.
+- **Changes:** split `handleCallback` per status branch. Done in `d7ed43a`, `803787e` and `d3fbc77` (`GattServerAttributeRequests`), plus lint fix `6ef0a65` for the helpers that `803787e` split. The planned phone run between commits did not happen, so the card below covers steps 10–12 together, and a failure is bisected over those commits.
 
 ## Device validation
 
