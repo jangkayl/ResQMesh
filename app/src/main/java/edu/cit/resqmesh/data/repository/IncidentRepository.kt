@@ -5,6 +5,8 @@ import edu.cit.resqmesh.core.model.HELP_WORKFLOW_VERSION
 import edu.cit.resqmesh.data.repository.incident.IncidentCommands
 import edu.cit.resqmesh.data.repository.incident.IncidentDraft
 import edu.cit.resqmesh.data.repository.incident.IncidentEventIngestor
+import edu.cit.resqmesh.data.repository.incident.IncidentIngestHooks
+import edu.cit.resqmesh.data.repository.incident.IncidentStores
 import edu.cit.resqmesh.data.repository.incident.LegacyIncidentProjection
 import edu.cit.resqmesh.data.repository.incident.LegacyIncidentSync
 import edu.cit.resqmesh.data.repository.incident.LiveIncidentPacer
@@ -279,11 +281,13 @@ class IncidentRepository(
 
     private suspend fun rebuildProjection(incidentId: String) = ingestor.rebuildProjection(incidentId)
 
+    // Built per call rather than as a property: ingestor is created during construction,
+    // before later property initializers would have run.
+    private fun incidentStores() = IncidentStores(incidentDao, domainEventDao, offerDao, database)
+
     private fun createCommands() = IncidentCommands(
-        incidentDao,
-        domainEventDao,
+        incidentStores(),
         identityManager,
-        database,
         eventSigning,
         { helpWorkflow },
         ::broadcastDomainEvent
@@ -300,16 +304,15 @@ class IncidentRepository(
     }
 
     private fun createEventIngestor() = IncidentEventIngestor(
-        incidentDao,
-        domainEventDao,
-        offerDao,
-        database,
+        incidentStores(),
         { helpWorkflow },
         { syncCoordinator },
-        ::broadcastDomainEvent,
-        ::applyLegacyProjection,
-        ::rejectIncoming,
-        ::notifyIncidentApplied
+        IncidentIngestHooks(
+            broadcast = ::broadcastDomainEvent,
+            legacyProjection = ::applyLegacyProjection,
+            rejectEvent = ::rejectIncoming,
+            notifyApplied = ::notifyIncidentApplied
+        )
     )
 
     private fun createLegacyIncidentProjection() = LegacyIncidentProjection(
