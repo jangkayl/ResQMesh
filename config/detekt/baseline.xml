@@ -11,14 +11,10 @@
     <ID>ComplexCondition:GattClientAttempt.kt$GattClientAttempt$!isTransportGenerationCurrent(epoch) || !store.links.isCurrent(link) || (link.gatt != null &amp;&amp; link.gatt !== gatt)</ID>
     <ID>ComplexCondition:GattServerAttributeRequests.kt$GattServerAttributeRequests$link?.serverDevice?.address == device.address &amp;&amp; descriptor.uuid == CCC_DESCRIPTOR_UUID &amp;&amp; value?.contentEquals(BluetoothGattDescriptor.ENABLE_INDICATION_VALUE) == true &amp;&amp; store.links.transition(link, BleLinkState.READY)</ID>
     <ID>ComplexCondition:GattTransferExecutor.kt$GattTransferExecutor$store.gattFlights[ticket.endpoint] !== flight || !coordinator.owns(flight) || flight.operationId != ticket.operation || flight.link.generation != ticket.generation</ID>
-    <ID>ComplexCondition:HelpWorkflowPanel.kt$!isReporter &amp;&amp; !terminal &amp;&amp; !(isSelectedHelper &amp;&amp; incident.selectionId != null)</ID>
-    <ID>ComplexCondition:HelpWorkflowPanel.kt$!isReporter &amp;&amp; !terminal &amp;&amp; isSelectedHelper &amp;&amp; myOffer?.withdrawn == false</ID>
-    <ID>ComplexCondition:HelpWorkflowPanel.kt$incident.status == "AWAITING_HELPER" &amp;&amp; isSelectedHelper &amp;&amp; selectedOffer?.withdrawn == false &amp;&amp; selectedOffer.revision == incident.selectionOfferRevision</ID>
     <ID>ComplexCondition:IncidentAutomaticSyncTest.kt$IncidentAutomaticSyncTest$!injected &amp;&amp; from == "A" &amp;&amp; p.type == "EVENT_SYNC_RESP" &amp;&amp; radio.op(p) == "CATALOG"</ID>
     <ID>ComplexCondition:IncidentDetailSheet.kt$presentation.helpers.any { it.isMe &amp;&amp; !it.canEditOffer &amp;&amp; it.offer.offerId == incident.selectionOfferId } &amp;&amp; !presentation.terminal</ID>
     <ID>ComplexCondition:IncidentHelpWorkflow.kt$IncidentHelpWorkflow$!isLocalReporter(incident) || incident.status in TERMINAL || (type == EventType.INCIDENT_RESOLVED &amp;&amp; incident.status != IncidentState.RESPONDING.name)</ID>
     <ID>ComplexCondition:IncidentHelpWorkflow.kt$IncidentHelpWorkflow$existing != null &amp;&amp; !existing.withdrawn &amp;&amp; incident.selectionOfferId == existing.offerId &amp;&amp; incident.selectedHelperKey == key</ID>
-    <ID>ComplexCondition:IncidentPresentation.kt$incident.workflowVersion == HELP_WORKFLOW_VERSION &amp;&amp; incident.status !in setOf("RESOLVED", "CANCELLED") &amp;&amp; offers.any { it.offerId == incident.selectionOfferId &amp;&amp; (it.withdrawn || it.revision &gt; (incident.selectionOfferRevision ?: Long.MAX_VALUE)) }</ID>
     <ID>ComplexCondition:LinkControlHandlers.kt$!payload.isPrivate || !payload.isEncrypted || payload.encryptedData.isNullOrBlank() || payload.encryptedKey.isNullOrBlank()</ID>
     <ID>ComplexCondition:LinkControlHandlers.kt$BlockAckHandler$envelope.kind != BlockControlKind.ACK || envelope.operationId != payload.targetMessageId || !NodeIdentity.matches(envelope.targetName, callback.getMyDeviceName()) || !NodeIdentity.matches(envelope.initiatorName, payload.senderName)</ID>
     <ID>ComplexCondition:LinkControlHandlers.kt$BlockRequestHandler$envelope.kind != BlockControlKind.REQUEST || envelope.operationId != payload.targetMessageId || !NodeIdentity.matches(envelope.targetName, callback.getMyDeviceName()) || !NodeIdentity.matches(envelope.initiatorName, payload.senderName)</ID>
@@ -1571,12 +1567,8 @@
     <ID>MaxLineLength:IncidentListScreen.kt$onToggleNeedsHelp = { selected -&gt; viewModel.applyFilters(filters.copy(assistance = if (selected) AssistanceFilter.ANY else AssistanceFilter.LOOKING_FOR_HELP)) }</ID>
     <ID>MaxLineLength:IncidentListScreen.kt$val isAssignedToMe = localUser?.userId != null &amp;&amp; localUser!!.userId == incident.primaryResponderId</ID>
     <ID>MaxLineLength:IncidentOfferDao.kt$IncidentOfferDao$@Query("INSERT OR REPLACE INTO incident_offers (offerId, incidentId, helperKey, helperNodeId, helperName, note, revision, withdrawn, updatedAt) VALUES (:offerId, :incidentId, :helperKey, :helperNodeId, :helperName, :note, :revision, :withdrawn, :updatedAt)")</ID>
-    <ID>MaxLineLength:IncidentPresentation.kt$HelperPresentation</ID>
     <ID>MaxLineLength:IncidentPresentation.kt$allowed(EventType.INCIDENT_RESPONSE_STARTED) -&gt; { secondary += IncidentAction.RESOLVE; IncidentAction.START }</ID>
-    <ID>MaxLineLength:IncidentPresentation.kt$incident.workflowVersion == HELP_WORKFLOW_VERSION &amp;&amp; key == null -&gt; "Your signing identity is unavailable. Retry or reopen the app."</ID>
-    <ID>MaxLineLength:IncidentPresentation.kt$primaryResponderId = null</ID>
     <ID>MaxLineLength:IncidentPresentation.kt$terminal -&gt; if (incident.selectionConfirmedAt != null) "Previously confirmed helper" else "Previously selected helper"</ID>
-    <ID>MaxLineLength:IncidentPresentation.kt$val</ID>
     <ID>MaxLineLength:IncidentPresentationTest.kt$IncidentPresentationTest$assertEquals("Help moving an injured person", incident.copy(title = "Help moving an injured person").displayTitle())</ID>
     <ID>MaxLineLength:IncidentPresentationTest.kt$IncidentPresentationTest$assertEquals(listOf("d", "c"), incidentPresentation(incident, listOf(d, c, b.copy(withdrawn = true)), "r", "rk").helpers.map { it.offer.offerId })</ID>
     <ID>MaxLineLength:IncidentPresentationTest.kt$IncidentPresentationTest$assertNull(incidentPresentation(incident, listOf(b), "b", "bk", listOf(selected, revoked.copy(applied = false))).warning)</ID>
