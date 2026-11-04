@@ -63,6 +63,34 @@ internal class BleBootstrapQueue(
     internal fun drainCandidates() {
         if (!isNodeActive()) return
         val now = clock()
+        evictStaleCandidates(now)
+
+        val candidate = nextDueCandidate(now)
+        if (candidate == null) {
+            candidates.values.minOfOrNull { it.nextAttemptAt }?.let { nextAt ->
+                scheduleDrain((nextAt - now).coerceAtLeast(1L))
+            }
+            return
+        }
+        if (hasLinkToIdentity(candidate.peerName)) {
+            candidate.nextAttemptAt = now + BleBootstrapRetryPolicy.ACTIVE_SETUP_RECHECK_MS
+            recordCandidateDecision(candidate, candidate.endpoint, BleAdmissionReason.ACTIVE_SETUP,
+                BleConnectStartResult.DEFERRED, now)
+            scheduleDrain(BleBootstrapRetryPolicy.ACTIVE_SETUP_RECHECK_MS)
+            return
+        }
+        val directLinks = directLinkCount()
+        if (directLinks >= maxDirectLinks()) {
+            candidates.remove(candidate.identity)
+            recordCandidateDecision(candidate, candidate.endpoint, BleAdmissionReason.CAPACITY_LIMIT,
+                BleConnectStartResult.REJECTED, now)
+            return
+        }
+        startCandidateSetup(candidate, now)
+    }
+
+    /** Drops candidates that went quiet, got blocked, already connected, or are reachable another way. */
+    private fun evictStaleCandidates(now: Long) {
         val staleCandidates = candidates.values.filter { candidate ->
             now - (store.endpointLastSeen[candidate.endpoint] ?: 0L) > CANDIDATE_FRESH_MS ||
                 isBlocked(candidate.peerName) ||
@@ -76,64 +104,16 @@ internal class BleBootstrapQueue(
                 hasReadyLinkToIdentity(stale.peerName) -> BleAdmissionReason.ALREADY_CONNECTED
                 else -> BleAdmissionReason.ROUTE_PRESERVED
             }
-            recordDecision(
-                peerName = stale.peerName,
-                endpoint = stale.endpoint,
-                peerConnections = stale.peerConnections,
-                peerScore = store.endpointLastScore[stale.endpoint].orEmpty(),
-                hasIndirectRoute = hasIndirectRoute(stale.peerName),
-                reason = staleReason,
-                result = BleConnectStartResult.REJECTED,
-                attempts = stale.attempts,
-                candidateAgeMs = (now - stale.enqueuedAt).coerceAtLeast(0L),
-                now = now
-            )
+            recordCandidateDecision(stale, stale.endpoint, staleReason, BleConnectStartResult.REJECTED, now)
         }
+    }
 
-        val candidate = candidates.values
-            .filter { it.nextAttemptAt <= now }
-            .minWithOrNull(compareBy<BootstrapCandidate> { it.nextAttemptAt }.thenBy { it.attempts })
-        if (candidate == null) {
-            candidates.values.minOfOrNull { it.nextAttemptAt }?.let { nextAt ->
-                scheduleDrain((nextAt - now).coerceAtLeast(1L))
-            }
-            return
-        }
-        if (hasLinkToIdentity(candidate.peerName)) {
-            candidate.nextAttemptAt = now + BleBootstrapRetryPolicy.ACTIVE_SETUP_RECHECK_MS
-            recordDecision(
-                peerName = candidate.peerName,
-                endpoint = candidate.endpoint,
-                peerConnections = candidate.peerConnections,
-                peerScore = store.endpointLastScore[candidate.endpoint].orEmpty(),
-                hasIndirectRoute = hasIndirectRoute(candidate.peerName),
-                reason = BleAdmissionReason.ACTIVE_SETUP,
-                result = BleConnectStartResult.DEFERRED,
-                attempts = candidate.attempts,
-                candidateAgeMs = (now - candidate.enqueuedAt).coerceAtLeast(0L),
-                now = now
-            )
-            scheduleDrain(BleBootstrapRetryPolicy.ACTIVE_SETUP_RECHECK_MS)
-            return
-        }
-        val directLinks = directLinkCount()
-        if (directLinks >= maxDirectLinks()) {
-            candidates.remove(candidate.identity)
-            val limitReason = BleAdmissionReason.CAPACITY_LIMIT
-            recordDecision(
-                peerName = candidate.peerName,
-                endpoint = candidate.endpoint,
-                peerConnections = candidate.peerConnections,
-                peerScore = store.endpointLastScore[candidate.endpoint].orEmpty(),
-                hasIndirectRoute = hasIndirectRoute(candidate.peerName),
-                reason = limitReason,
-                result = BleConnectStartResult.REJECTED,
-                attempts = candidate.attempts,
-                candidateAgeMs = (now - candidate.enqueuedAt).coerceAtLeast(0L),
-                now = now
-            )
-            return
-        }
+    /** The due candidate with the earliest attempt time, fewest attempts breaking ties. */
+    private fun nextDueCandidate(now: Long): BootstrapCandidate? = candidates.values
+        .filter { it.nextAttemptAt <= now }
+        .minWithOrNull(compareBy<BootstrapCandidate> { it.nextAttemptAt }.thenBy { it.attempts })
+
+    private fun startCandidateSetup(candidate: BootstrapCandidate, now: Long) {
         val endpoint = latestEndpointForIdentity(candidate.peerName, candidate.endpoint)
         if (endpoint != candidate.endpoint) {
             AppLogger.d("BLE_MESH", "Resolved queued endpoint for ${candidate.peerName}: ${candidate.endpoint} -> $endpoint")
@@ -144,35 +124,15 @@ internal class BleBootstrapQueue(
                 candidate.attempts += 1
                 candidate.nextAttemptAt = now + BleBootstrapRetryPolicy.SETUP_PROGRESS_WINDOW_MS
                 AppLogger.d("BLE_MESH", "Bootstrap setup started for ${candidate.peerName}; attempt ${candidate.attempts}")
-                recordDecision(
-                    peerName = candidate.peerName,
-                    endpoint = endpoint,
-                    peerConnections = candidate.peerConnections,
-                    peerScore = store.endpointLastScore[endpoint].orEmpty(),
-                    hasIndirectRoute = hasIndirectRoute(candidate.peerName),
-                    reason = BleAdmissionReason.DRAIN_STARTED,
-                    result = BleConnectStartResult.STARTED,
-                    attempts = candidate.attempts,
-                    candidateAgeMs = (now - candidate.enqueuedAt).coerceAtLeast(0L),
-                    now = now
-                )
+                recordCandidateDecision(candidate, endpoint, BleAdmissionReason.DRAIN_STARTED,
+                    BleConnectStartResult.STARTED, now)
                 scheduleDrain(BleBootstrapRetryPolicy.SETUP_PROGRESS_WINDOW_MS)
             }
             BleConnectStartResult.DEFERRED -> {
                 candidate.nextAttemptAt = now + BleBootstrapRetryPolicy.BUSY_RETRY_MS
                 AppLogger.d("BLE_MESH", "Bootstrap setup queued for ${candidate.peerName}; radio is busy")
-                recordDecision(
-                    peerName = candidate.peerName,
-                    endpoint = endpoint,
-                    peerConnections = candidate.peerConnections,
-                    peerScore = store.endpointLastScore[endpoint].orEmpty(),
-                    hasIndirectRoute = hasIndirectRoute(candidate.peerName),
-                    reason = BleAdmissionReason.DRAIN_DEFERRED,
-                    result = BleConnectStartResult.DEFERRED,
-                    attempts = candidate.attempts,
-                    candidateAgeMs = (now - candidate.enqueuedAt).coerceAtLeast(0L),
-                    now = now
-                )
+                recordCandidateDecision(candidate, endpoint, BleAdmissionReason.DRAIN_DEFERRED,
+                    BleConnectStartResult.DEFERRED, now)
                 scheduleDrain(BleBootstrapRetryPolicy.BUSY_RETRY_MS)
             }
             BleConnectStartResult.REJECTED -> {
@@ -180,18 +140,8 @@ internal class BleBootstrapQueue(
                 val delay = BleBootstrapRetryPolicy.retryDelay(candidate.attempts)
                 candidate.nextAttemptAt = now + delay
                 AppLogger.d("BLE_MESH", "Bootstrap setup rejected for ${candidate.peerName}; retry in ${delay}ms")
-                recordDecision(
-                    peerName = candidate.peerName,
-                    endpoint = endpoint,
-                    peerConnections = candidate.peerConnections,
-                    peerScore = store.endpointLastScore[endpoint].orEmpty(),
-                    hasIndirectRoute = hasIndirectRoute(candidate.peerName),
-                    reason = BleAdmissionReason.DRAIN_REJECTED,
-                    result = BleConnectStartResult.REJECTED,
-                    attempts = candidate.attempts,
-                    candidateAgeMs = (now - candidate.enqueuedAt).coerceAtLeast(0L),
-                    now = now
-                )
+                recordCandidateDecision(candidate, endpoint, BleAdmissionReason.DRAIN_REJECTED,
+                    BleConnectStartResult.REJECTED, now)
                 scheduleDrain(delay)
             }
         }
@@ -202,8 +152,7 @@ internal class BleBootstrapQueue(
     }
 
     fun rescueOrphan(endpoint: String, peerName: String, peerConnections: Int, directLinks: Int, now: Long) {
-        if (!isNodeActive() || isBlocked(peerName) || hasIndirectRoute(peerName) || directLinks < maxDirectLinks() ||
-            now - (store.endpointLastSeen[endpoint] ?: 0L) > CANDIDATE_FRESH_MS) {
+        if (!isOrphanRescueCandidate(endpoint, peerName, directLinks, now)) {
             store.orphanDetectionTime.remove(endpoint)
             return
         }
@@ -239,12 +188,7 @@ internal class BleBootstrapQueue(
             return
         }
         if (lastBridgeAt != Long.MIN_VALUE && now - lastBridgeAt < BRIDGE_COOLDOWN_MS) return
-        val redundantEndpoint = store.connectionInteractionTimes
-            .filterKeys { store.links.isReady(it) && store.pendingQueues[it]?.isEmpty() != false }
-            .filterKeys { store.gattFlights[it]?.writing?.get() != true && store.isWriting[it]?.get() != true }
-            .filterKeys { isTransportIdle(it) }
-            .filterKeys { canRetireForBridge(it) }
-            .minByOrNull { it.value }?.key ?: return
+        val redundantEndpoint = idleRetirableEndpoint() ?: return
         lastBridgeAt = now
         AppLogger.d("BLE_ADMISSION", "Reclaiming a redundant GATT link for an unreachable peer")
         disconnectEndpoint(redundantEndpoint)
@@ -254,4 +198,20 @@ internal class BleBootstrapQueue(
             later { admitOrElect(endpoint, peerName, ad, clock()) }
         }
     }
+
+    /**
+     * An orphan is worth rescuing only while the node is active, the peer is unblocked and has no
+     * routed path, this phone is at its link limit, and the peer was seen recently.
+     */
+    private fun isOrphanRescueCandidate(endpoint: String, peerName: String, directLinks: Int, now: Long): Boolean =
+        isNodeActive() && !isBlocked(peerName) && !hasIndirectRoute(peerName) && directLinks >= maxDirectLinks() &&
+            now - (store.endpointLastSeen[endpoint] ?: 0L) <= CANDIDATE_FRESH_MS
+
+    /** The least recently used READY link that is idle on every transport and may be retired. */
+    private fun idleRetirableEndpoint(): String? = store.connectionInteractionTimes
+        .filterKeys { store.links.isReady(it) && store.pendingQueues[it]?.isEmpty() != false }
+        .filterKeys { store.gattFlights[it]?.writing?.get() != true && store.isWriting[it]?.get() != true }
+        .filterKeys { isTransportIdle(it) }
+        .filterKeys { canRetireForBridge(it) }
+        .minByOrNull { it.value }?.key
 }

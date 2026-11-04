@@ -2,8 +2,6 @@
 <SmellBaseline>
   <ManuallySuppressedIssues/>
   <CurrentIssues>
-    <ID>ComplexCondition:BleBootstrapQueue.kt$BleBootstrapQueue$!isNodeActive() || isBlocked(peerName) || hasIndirectRoute(peerName) || directLinks &lt; maxDirectLinks() || now - (store.endpointLastSeen[endpoint] ?: 0L) &gt; CANDIDATE_FRESH_MS</ID>
-    <ID>ComplexCondition:BleLifecycleSupervisor.kt$BleLifecycleSupervisor$probe != null &amp;&amp; now - probe.createdAt &lt; MAX_PROBE_AGE_MS &amp;&amp; (probe.sentAt == 0L || !probe.expired(now, heartbeatAckTimeoutMs))</ID>
     <ID>ComplexCondition:BlePresencePublisher.kt$BlePresencePublisher$!hasReadyEndpoint(endpoint) || name.isNullOrBlank() || NodeIdentity.isPlaceholder(name) || nodeId.isNullOrBlank() || isDeviceBlocked(name)</ID>
     <ID>ComplexCondition:BleTransportSessionController.kt$BleTransportSessionController$Build.VERSION.SDK_INT &gt;= Build.VERSION_CODES.S &amp;&amp; (!allowed(Manifest.permission.BLUETOOTH_CONNECT) || !allowed(Manifest.permission.BLUETOOTH_SCAN) || !allowed(Manifest.permission.BLUETOOTH_ADVERTISE))</ID>
     <ID>ComplexCondition:BoundedPayloadWriter.kt$BoundedPayloadWriter$payload.isEmpty() || closed || !isOwned() || !OutboundQueuePolicy.canAccept(retainedCount, retainedBytes, frameBytes, priority)</ID>
@@ -25,9 +23,6 @@
     <ID>ComplexCondition:NativeBleManager.kt$NativeBleManager$!force &amp;&amp; macAddress != null &amp;&amp; holder != null &amp;&amp; holder != macAddress</ID>
     <ID>ComplexCondition:NativeInboundPipeline.kt$NativeInboundPipeline$!hasReadyEndpoint(endpointId) || !store.links.isIdentityAdmitted(endpointId) || isDeviceBlocked(store.connectedEndpointNames[endpointId].orEmpty()) || peerTransferVersions[peer] != ReliableMeshTransfers.VERSION || payload.targetNodeId.isNotBlank() &amp;&amp; !payload.targetNodeId.equals(myNodeId, true)</ID>
     <ID>ComplexCondition:NativeOutboundDispatcher.kt$NativeOutboundDispatcher$!id.equals(nodeId, true) || !hasReadyEndpoint(endpoint) || NodeIdentity.isPlaceholder(name) || isDeviceBlocked(name)</ID>
-    <ID>ComplexCondition:ReadyPayloadSetup.kt$ReadyPayloadSetup$stalled || !isCurrentReady() || hasL2cap() || connecting || waiting || readWanted || operation != null</ID>
-    <ID>ComplexCondition:ReadyPayloadSetup.kt$ReadyPayloadSetup$stalled || !isCurrentReady() || operation != null || !isGattIdle()</ID>
-    <ID>ComplexCondition:ReadyPayloadSetup.kt$ReadyPayloadSetup$waiting || connecting || readWanted || operation != null || !isCurrentReady()</ID>
     <ID>ComplexCondition:ReliableMeshTransfers.kt$ReliableMeshTransfers$record.applicationStored &amp;&amp; (!record.requiresRelayRoster || record.relayTargetsSet) &amp;&amp; relayFailures.none { it.second == record.payloadId } &amp;&amp; (!record.relayTargetsSet || record.relayTargets.all { it in record.forwardedPeers })</ID>
     <ID>ComplexCondition:SetupViewModel.kt$SetupViewModel$Build.VERSION.SDK_INT &gt;= Build.VERSION_CODES.S &amp;&amp; !(hasPermission(Manifest.permission.BLUETOOTH_SCAN) &amp;&amp; hasPermission(Manifest.permission.BLUETOOTH_CONNECT) &amp;&amp; hasPermission(Manifest.permission.BLUETOOTH_ADVERTISE))</ID>
     <ID>ConstructorParameterNaming:MeshConversationMedia.kt$MeshConversationMedia$private val _connectedDevices: MutableStateFlow&lt;List&lt;ConnectedDevice&gt;&gt;</ID>
@@ -44,11 +39,6 @@
     <ID>ConstructorParameterNaming:MeshPeerCoordinator.kt$MeshPeerCoordinator$private val _scannedDevices: MutableStateFlow&lt;List&lt;ScannedDevice&gt;&gt;</ID>
     <ID>ConstructorParameterNaming:MeshPeerCoordinator.kt$MeshPeerCoordinator$private val _transportState: MutableStateFlow&lt;MeshTransportState&gt;</ID>
     <ID>CyclomaticComplexMethod:ActiveChatScreen.kt$@Composable fun ActiveChatScreen( name: String, viewModel: CommunicationViewModel, mediaHelper: MediaHelper, onBack: () -&gt; Unit, onViewMap: (Double, Double, String, String) -&gt; Unit = { _, _, _, _ -&gt; } )</ID>
-    <ID>CyclomaticComplexMethod:BleAdmissionDiagnostics.kt$BleAdmissionDiagnostics$fun recordDecision( peerName: String, endpoint: String, peerConnections: Int, peerScore: String, hasIndirectRoute: Boolean, reason: BleAdmissionReason, result: BleConnectStartResult, attempts: Int, candidateAgeMs: Long, now: Long )</ID>
-    <ID>CyclomaticComplexMethod:BleAdvertisementAdmission.kt$BleAdvertisementAdmission$fun handle(advertisement: BleAdvertisement, observed: Boolean)</ID>
-    <ID>CyclomaticComplexMethod:BleBootstrapQueue.kt$BleBootstrapQueue$fun rescueOrphan(endpoint: String, peerName: String, peerConnections: Int, directLinks: Int, now: Long)</ID>
-    <ID>CyclomaticComplexMethod:BleBootstrapQueue.kt$BleBootstrapQueue$internal fun drainCandidates()</ID>
-    <ID>CyclomaticComplexMethod:BleLifecycleSupervisor.kt$BleLifecycleSupervisor$fun checkNow()</ID>
     <ID>CyclomaticComplexMethod:BroadcastSlider.kt$@Composable internal fun SlideToBroadcastSlider( accentColor: Color, emergencyTitle: String, isLight: Boolean, onConfirm: () -&gt; Unit )</ID>
     <ID>CyclomaticComplexMethod:ChatBubble.kt$@Composable fun ChatBubble( message: ChatMessage, mediaHelper: MediaHelper, showAvatar: Boolean = true, showSenderName: Boolean = true, onUserClick: ((String) -&gt; Unit)? = null, onShowSeenBy: ((List&lt;String&gt;) -&gt; Unit)? = null, onReplyClick: ((ChatMessage) -&gt; Unit)? = null, onViewMap: ((Double, Double, String, String) -&gt; Unit)? = null, transferProgress: SendProgress? = null )</ID>
     <ID>CyclomaticComplexMethod:CoordinationStatusBanners.kt$@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class) @Composable internal fun CoordinationStatusBanners( incident: Incident, isReporter: Boolean, isSelectedHelper: Boolean, selectedOffer: IncidentOffer?, actionMessage: String?, wasRevoked: Boolean )</ID>
@@ -143,9 +133,6 @@
     <ID>LongMethod:AboutScreen.kt$@Composable fun AboutScreenContent( uiState: AboutUiState, onBack: () -&gt; Unit )</ID>
     <ID>LongMethod:ActiveChatScreen.kt$@Composable fun ActiveChatScreen( name: String, viewModel: CommunicationViewModel, mediaHelper: MediaHelper, onBack: () -&gt; Unit, onViewMap: (Double, Double, String, String) -&gt; Unit = { _, _, _, _ -&gt; } )</ID>
     <ID>LongMethod:ActiveSosReminder.kt$@Composable fun ActiveSosReminder( onClick: () -&gt; Unit, modifier: Modifier = Modifier )</ID>
-    <ID>LongMethod:BleAdvertisementAdmission.kt$BleAdvertisementAdmission$fun admitOrElect(endpoint: String, peerName: String, advertisement: BleAdvertisement, now: Long)</ID>
-    <ID>LongMethod:BleAdvertisementAdmission.kt$BleAdvertisementAdmission$fun handle(advertisement: BleAdvertisement, observed: Boolean)</ID>
-    <ID>LongMethod:BleBootstrapQueue.kt$BleBootstrapQueue$internal fun drainCandidates()</ID>
     <ID>LongMethod:BleTransportSessionController.kt$BleTransportSessionController$fun stopTransport()</ID>
     <ID>LongMethod:BroadcastIllumination.kt$@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class) @Composable internal fun BroadcastIllumination( currentProfile: EmergencyProfile, isLight: Boolean, pulseGlow: Float, lightHaloScale: Float, animatedAccentColor: Color )</ID>
     <ID>LongMethod:BroadcastSlider.kt$@Composable internal fun SlideToBroadcastSlider( accentColor: Color, emergencyTitle: String, isLight: Boolean, onConfirm: () -&gt; Unit )</ID>
@@ -353,11 +340,9 @@
     <ID>MagicNumber:BinaryCompressor.kt$BinaryCompressor$8192</ID>
     <ID>MagicNumber:BleAdmissionDiagnostics.kt$BleAdmissionDiagnostics$16</ID>
     <ID>MagicNumber:BleAdmissionDiagnostics.kt$BleAdmissionDiagnostics$4</ID>
-    <ID>MagicNumber:BleAdvertisementAdmission.kt$BleAdvertisementAdmission$15_000L</ID>
     <ID>MagicNumber:BleBootstrapQueue.kt$BleBootstrapQueue$1_000L</ID>
     <ID>MagicNumber:BleBootstrapQueue.kt$BleBootstrapQueue$4_000L</ID>
     <ID>MagicNumber:BleBootstrapRetryPolicy.kt$BleBootstrapRetryPolicy$4</ID>
-    <ID>MagicNumber:BleLifecycleSupervisor.kt$BleLifecycleSupervisor$10_000L</ID>
     <ID>MagicNumber:BleLinkRegistry.kt$BleLink$20</ID>
     <ID>MagicNumber:BleScanRecoveryPolicy.kt$BleScanRecoveryPolicy$10_000L</ID>
     <ID>MagicNumber:BleScanRecoveryPolicy.kt$BleScanRecoveryPolicy$2_000L</ID>
@@ -781,10 +766,6 @@
     <ID>MagicNumber:RadioVoiceQueue.kt$RadioVoiceQueue$32</ID>
     <ID>MagicNumber:ReadyIdentityExchange.kt$ReadyIdentityExchange$3</ID>
     <ID>MagicNumber:ReadyIdentityExchange.kt$ReadyIdentityExchange$5_000L</ID>
-    <ID>MagicNumber:ReadyPayloadSetup.kt$ReadyPayloadSetup$1_000L</ID>
-    <ID>MagicNumber:ReadyPayloadSetup.kt$ReadyPayloadSetup$3</ID>
-    <ID>MagicNumber:ReadyPayloadSetup.kt$ReadyPayloadSetup$30_000L</ID>
-    <ID>MagicNumber:ReadyPayloadSetup.kt$ReadyPayloadSetup$5_000L</ID>
     <ID>MagicNumber:ReliableMeshTransfers.kt$ReliableMeshTransfers$12</ID>
     <ID>MagicNumber:ResQGlass.kt$0.03f</ID>
     <ID>MagicNumber:ResQGlass.kt$0.08f</ID>
@@ -1045,19 +1026,13 @@
     <ID>MaxLineLength:BleAdvertisementAdmission.kt$BleAdvertisementAdmission$AppLogger.d("BLE_MESH", "Battery Master Election: $localScore &lt;= ${advertisement.electionScore}. Yielding.")</ID>
     <ID>MaxLineLength:BleAdvertisementAdmission.kt$BleAdvertisementAdmission$AppLogger.d("BLE_MESH", "Battery Master Election: $localScore &gt; ${advertisement.electionScore}. Queuing bootstrap connection.")</ID>
     <ID>MaxLineLength:BleAdvertisementAdmission.kt$BleAdvertisementAdmission$AppLogger.d("BLE_MESH", "Legacy Alphabetical Rule: ${localName()} &gt; $peerName. Queuing bootstrap connection.")</ID>
-    <ID>MaxLineLength:BleAdvertisementAdmission.kt$BleAdvertisementAdmission$AppLogger.d("BLE_MESH", "Purging zombie link $existingEndpoint for rebooted peer $peerName (new endpoint $endpoint)")</ID>
-    <ID>MaxLineLength:BleAdvertisementAdmission.kt$BleAdvertisementAdmission$initialDelayMs: Long? = null</ID>
-    <ID>MaxLineLength:BleAdvertisementAdmission.kt$BleAdvertisementAdmission$val candidate = enqueueCandidate(endpoint, peerName, advertisement.directConnections, now, initialDelayMs = FALLBACK_INITIATOR_DELAY_MS)</ID>
-    <ID>MaxLineLength:BleAdvertisementAdmission.kt$BleAdvertisementAdmission$val hasLiveRole = store.activeConnections.containsKey(existingEndpoint) || store.activeServerConnections.containsKey(existingEndpoint)</ID>
     <ID>MaxLineLength:BleAdvertisementAdmission.kt$BleAdvertisementAdmission$val hasLiveRole = store.activeConnections.containsKey(oldEndpoint) || store.activeServerConnections.containsKey(oldEndpoint)</ID>
     <ID>MaxLineLength:BleBootstrapQueue.kt$BleBootstrapQueue$AppLogger.d("BLE_MESH", "Bootstrap setup started for ${candidate.peerName}; attempt ${candidate.attempts}")</ID>
     <ID>MaxLineLength:BleBootstrapQueue.kt$BleBootstrapQueue$AppLogger.d("BLE_MESH", "Partition/Orphan resolution: $peerName is now reachable via mesh. Aborting preemption.")</ID>
     <ID>MaxLineLength:BleBootstrapQueue.kt$BleBootstrapQueue$AppLogger.d("BLE_MESH", "Resolved queued endpoint for ${candidate.peerName}: ${candidate.endpoint} -&gt; $endpoint")</ID>
     <ID>MaxLineLength:BleHeartbeatDriver.kt$BleHeartbeatDriver$AppLogger.d("BLE_MESH", "Link ${sent.generation} $endpoint: GATT heartbeat ACK timed out; retiring silent roles")</ID>
     <ID>MaxLineLength:BleLifecycleSupervisor.kt$BleLifecycleSupervisor$AppLogger.d("BLE_MESH", "Connect lock stuck for ${lockAge}ms on ${store.connectingMacAddress}. Force-releasing.")</ID>
-    <ID>MaxLineLength:BleLifecycleSupervisor.kt$BleLifecycleSupervisor$AppLogger.d("BLE_MESH", "Deferring silent-link retirement on $endpoint while owned writes are progressing")</ID>
     <ID>MaxLineLength:BleLifecycleSupervisor.kt$BleLifecycleSupervisor$AppLogger.d("BLE_MESH", "No inbound progress from $endpoint for ${now - lastInbound}ms. Retiring stale GATT roles.")</ID>
-    <ID>MaxLineLength:BleLifecycleSupervisor.kt$BleLifecycleSupervisor$}</ID>
     <ID>MaxLineLength:BleLifecycleSupervisorTest.kt$BleLifecycleSupervisorTest.Fixture$fun link()</ID>
     <ID>MaxLineLength:BleLifecycleSupervisorTest.kt$BleLifecycleSupervisorTest.Fixture$val device = (field.get(null) as sun.misc.Unsafe).allocateInstance(BluetoothDevice::class.java) as BluetoothDevice</ID>
     <ID>MaxLineLength:BleLinkRegistry.kt$BleLinkRegistry$(it.state == BleLinkState.CONNECTING || it.state == BleLinkState.DISCOVERING || it.state == BleLinkState.CONFIGURING)</ID>
@@ -1668,7 +1643,6 @@
     <ID>MaxLineLength:RadioPlaybackStatus.kt$if (speaker != null &amp;&amp; receiverOn) ResQTheme.colors.success.copy(alpha = 0.35f) else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)</ID>
     <ID>MaxLineLength:RadioPlaybackStatus.kt$text = if (receiverOn) "Monitoring CH $channel · New notes autoplay" else "Monitor muted · Channel $channel"</ID>
     <ID>MaxLineLength:ReadyIdentityExchangeTest.kt$ReadyIdentityExchangeTest$ReadyIdentityExchange({ true }, { sends++; TransportDispatchResult.ACCEPTED }, { _, _ -&gt; fail("Accepted identity must not retry") }).start(link)</ID>
-    <ID>MaxLineLength:ReadyPayloadSetup.kt$ReadyPayloadSetup$if (stalled || !isCurrentReady() || hasL2cap() || connecting || waiting || readWanted || operation != null) return</ID>
     <ID>MaxLineLength:RelayForwarder.kt$RelayForwarder$@Synchronized</ID>
     <ID>MaxLineLength:RelayForwarder.kt$RelayForwarder$else</ID>
     <ID>MaxLineLength:RelayForwarder.kt$RelayForwarder$log("RELAY_RETRY transmission=${key.transmission} nextHop=${key.node} attempt=${work.attempts} result=$result")</ID>
