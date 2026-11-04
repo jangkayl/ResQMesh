@@ -1,6 +1,6 @@
 # Code smells round 2
 
-Last reviewed: 2026-11-04. Status: active plan; steps 1–3 done on `final-code-smells`, no device evidence. It follows the merged first round (`8632799`, [card](../testing/code-smells-refactor-card.md)). Targets come from `config/detekt/baseline.xml`: 687 MagicNumber, 207 FunctionNaming, 104 LongMethod, 95 LongParameterList, 80 CyclomaticComplexMethod, 47 ComplexCondition, 38 TooManyFunctions, 27 VariableNaming and 5 NestedBlockDepth entries. No class is currently flagged LargeClass; class size shows up as TooManyFunctions.
+Last reviewed: 2026-11-04. Status: active plan; steps 1–6 done on `final-code-smells`, no device evidence. It follows the merged first round (`8632799`, [card](../testing/code-smells-refactor-card.md)). Targets come from `config/detekt/baseline.xml`: 687 MagicNumber, 207 FunctionNaming, 104 LongMethod, 95 LongParameterList, 80 CyclomaticComplexMethod, 47 ComplexCondition, 38 TooManyFunctions, 27 VariableNaming and 5 NestedBlockDepth entries. No class is currently flagged LargeClass; class size shows up as TooManyFunctions.
 
 ## Rules for every commit
 
@@ -50,11 +50,11 @@ Work from lowest to highest risk. Steps 1–7 touch no radio code.
 
 ### Step 4: Incident commands and ingest (long parameter list, large class)
 - **Files:** `IncidentCommands.kt`, `IncidentEventIngestor.kt`, `IncidentHelpWorkflow.kt` constructors.
-- **Changes:** group the DAO parameters into an `IncidentStores` parameter object built in the Koin repository module. `Module.verify` must pass. Do this as a separate commit for each class.
+- **Changes:** group the DAO parameters into an `IncidentStores` parameter object built by `IncidentRepository` (these classes are not Koin-wired). `IncidentHelpWorkflow` keeps its constructor because tests build it directly.
 
 ### Step 5: SOS location validation (complex condition)
 - **File:** `data/repository/SosRepository.kt`.
-- **Changes:** extract `isValidFix(lat, lng, accuracy, captured)` and `isWorseThan(old, …)`. Replace the `"SOS_EVENT"` literal with the existing `InboundOriginGate` constant, or with a shared payload-type object that keeps the same strings.
+- **Changes:** fix validation was already extracted on `main`; name the envelope and relay checks, reuse `owns()` and rename single-letter variables. Payload type literals move in step 6.
 - **Proof:** `SosLifecycleAndSyncTest`.
 
 ### Step 6: Payload type names (type conditional)
