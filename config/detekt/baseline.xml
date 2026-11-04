@@ -12,7 +12,6 @@
     <ID>ComplexCondition:GattServerAttributeRequests.kt$GattServerAttributeRequests$link?.serverDevice?.address == device.address &amp;&amp; descriptor.uuid == CCC_DESCRIPTOR_UUID &amp;&amp; value?.contentEquals(BluetoothGattDescriptor.ENABLE_INDICATION_VALUE) == true &amp;&amp; store.links.transition(link, BleLinkState.READY)</ID>
     <ID>ComplexCondition:GattTransferExecutor.kt$GattTransferExecutor$store.gattFlights[ticket.endpoint] !== flight || !coordinator.owns(flight) || flight.operationId != ticket.operation || flight.link.generation != ticket.generation</ID>
     <ID>ComplexCondition:IncidentAutomaticSyncTest.kt$IncidentAutomaticSyncTest$!injected &amp;&amp; from == "A" &amp;&amp; p.type == "EVENT_SYNC_RESP" &amp;&amp; radio.op(p) == "CATALOG"</ID>
-    <ID>ComplexCondition:IncidentDetailSheet.kt$presentation.helpers.any { it.isMe &amp;&amp; !it.canEditOffer &amp;&amp; it.offer.offerId == incident.selectionOfferId } &amp;&amp; !presentation.terminal</ID>
     <ID>ComplexCondition:IncidentHelpWorkflow.kt$IncidentHelpWorkflow$!isLocalReporter(incident) || incident.status in TERMINAL || (type == EventType.INCIDENT_RESOLVED &amp;&amp; incident.status != IncidentState.RESPONDING.name)</ID>
     <ID>ComplexCondition:IncidentHelpWorkflow.kt$IncidentHelpWorkflow$existing != null &amp;&amp; !existing.withdrawn &amp;&amp; incident.selectionOfferId == existing.offerId &amp;&amp; incident.selectedHelperKey == key</ID>
     <ID>ComplexCondition:LinkControlHandlers.kt$!payload.isPrivate || !payload.isEncrypted || payload.encryptedData.isNullOrBlank() || payload.encryptedKey.isNullOrBlank()</ID>
@@ -615,7 +614,6 @@
     <ID>MagicNumber:IncidentConfirmationDialogs.kt$3</ID>
     <ID>MagicNumber:IncidentDetailSheet.kt$0xFF1E293B</ID>
     <ID>MagicNumber:IncidentDetailSheet.kt$0xFF2C5282</ID>
-    <ID>MagicNumber:IncidentDetailSheet.kt$3</ID>
     <ID>MagicNumber:IncidentPrimaryActions.kt$2.4f</ID>
     <ID>MagicNumber:IncidentPrimaryActions.kt$2.5f</ID>
     <ID>MagicNumber:IncidentQuickFilters.kt$0xFFFF9500</ID>
@@ -1328,9 +1326,7 @@
     <ID>MaxLineLength:IncidentDestinations.kt$val isNight = MaterialTheme.colorScheme.background == TacticalBlack || MaterialTheme.colorScheme.surface == TacticalCarbon</ID>
     <ID>MaxLineLength:IncidentDetailSheet.kt$IncidentConfirmationDialogs(confirmDialogAction, onSelectLead, onRevokeLead, onWithdrawOffer, onDeclineLead, onResolve, onCancel, { confirmDialogAction = null })</ID>
     <ID>MaxLineLength:IncidentDetailSheet.kt$SelectedIncidentHelper(incident, presentation, localSigningKey, formattedReachability, onDirectChat, { confirmDialogAction = "revoke" })</ID>
-    <ID>MaxLineLength:IncidentDetailSheet.kt$confirmDialogAction = "choose:${helper.offer.offerId}:${helper.offer.helperName}:${helper.offer.note}"</ID>
     <ID>MaxLineLength:IncidentDetailSheet.kt$if</ID>
-    <ID>MaxLineLength:IncidentDetailSheet.kt$leadReachability.equals("Local Device", ignoreCase = true) || leadReachability.equals("This phone", ignoreCase = true) -&gt; "This phone"</ID>
     <ID>MaxLineLength:IncidentDetailSheet.kt$text = if (showAllOffers) "Show fewer offers" else "Show all ${presentation.helpers.size} offers"</ID>
     <ID>MaxLineLength:IncidentDetailSheet.kt$val</ID>
     <ID>MaxLineLength:IncidentDetailSheet.kt$val isNight = MaterialTheme.colorScheme.background == TacticalBlack || MaterialTheme.colorScheme.surface == TacticalCarbon</ID>
