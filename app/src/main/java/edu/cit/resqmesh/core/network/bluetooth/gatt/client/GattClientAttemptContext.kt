@@ -1,6 +1,12 @@
 package edu.cit.resqmesh.core.network.bluetooth.gatt.client
 
 import android.bluetooth.*
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
+import androidx.core.content.ContextCompat
+import edu.cit.resqmesh.core.logging.AppLogger
+import edu.cit.resqmesh.core.network.bluetooth.state.BleLinkState
 import edu.cit.resqmesh.core.network.bluetooth.gatt.GattClientHost
 
 /** Live host capabilities and one captured attempt; never owns another resource. */
@@ -21,4 +27,21 @@ internal interface GattClientAttemptContext : GattClientHost {
     fun owns(gatt: BluetoothGatt, event: String) = attempt.owns(gatt, event)
     fun requestServicesOnce(gatt: BluetoothGatt) = attempt.requestServicesOnce(gatt)
     fun finishConnectPhase(reason: String) = attempt.finishConnectPhase(reason)
+}
+
+/** Payload bytes per chunk on the default 23-byte ATT MTU, used until a larger MTU is negotiated. */
+internal const val DEFAULT_ATT_PAYLOAD_BYTES = 20
+
+/** Android 12+ needs BLUETOOTH_CONNECT for every GATT call; it can be revoked mid-connection. */
+internal fun GattClientAttemptContext.isConnectPermissionRevoked(): Boolean =
+    Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
+        ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) !=
+        PackageManager.PERMISSION_GRANTED
+
+/** Logs [message], ends the connect phase and retires this attempt's link. */
+internal fun GattClientAttemptContext.abortForRevokedPermission(message: String) {
+    AppLogger.d("BLE_MESH", message)
+    finishConnectPhase("Bluetooth permission revoked")
+    store.links.transition(link, BleLinkState.DISCONNECTING)
+    store.links.forget(link)
 }

@@ -47,8 +47,6 @@
     <ID>CyclomaticComplexMethod:DeliveryHandlers.kt$StandardMessageHandler$override fun handle(endpointId: String, payload: MeshPayload, payloadBytes: ByteArray, callback: PayloadDispatcherCallback)</ID>
     <ID>CyclomaticComplexMethod:DirectIdentityPolicy.kt$DirectIdentityPolicy$fun validate(payload: MeshPayload, decode: (String) -&gt; ByteArray): String?</ID>
     <ID>CyclomaticComplexMethod:EmergencySummaryCard.kt$@Composable internal fun MinimalistEmergencyCard( profile: EmergencyProfile, isSelected: Boolean, isLight: Boolean, modifier: Modifier = Modifier, onClick: () -&gt; Unit )</ID>
-    <ID>CyclomaticComplexMethod:GattClientCallback.kt$GattClientCallback$override fun onServicesDiscovered(gatt: BluetoothGatt, status: Int)</ID>
-    <ID>CyclomaticComplexMethod:GattClientConnectionEvents.kt$GattClientConnectionEvents$fun onConnectionStateChange(gatt: BluetoothGatt, status: Int, newState: Int)</ID>
     <ID>CyclomaticComplexMethod:GattClientManager.kt$GattClientManager$fun connectToPersistentGatt(macAddress: String, peerName: String): BleConnectStartResult</ID>
     <ID>CyclomaticComplexMethod:GattClientPayloadSetup.kt$internal fun createGattClientPayloadSetup( manager: GattClientHost, epoch: Long, link: BleLink, macAddress: String, readPort: (BluetoothGattCharacteristic) -&gt; Boolean, requestMtu: () -&gt; Boolean ): ReadyPayloadSetup</ID>
     <ID>CyclomaticComplexMethod:GattL2capAcceptor.kt$GattL2capAcceptor$fun startL2capServer()</ID>
@@ -150,8 +148,6 @@
     <ID>LongMethod:FullScreenSosAlarm.kt$@Composable fun FullScreenSosAlarm(alertMessage: ChatMessage, onDismiss: () -&gt; Unit, onViewMap: () -&gt; Unit = {})</ID>
     <ID>LongMethod:FullScreenSosAlarm.kt$@Composable private fun AcknowledgeSlideSlider( onAcknowledge: () -&gt; Unit, modifier: Modifier = Modifier )</ID>
     <ID>LongMethod:FullscreenImageViewer.kt$@Composable fun FullscreenImageViewer( imageBase64: String, mediaHelper: MediaHelper, onDismiss: () -&gt; Unit )</ID>
-    <ID>LongMethod:GattClientCallback.kt$GattClientCallback$fun handleCallback()</ID>
-    <ID>LongMethod:GattClientConnectionEvents.kt$GattClientConnectionEvents$fun handleCallback()</ID>
     <ID>LongMethod:GattClientManager.kt$GattClientManager$fun connectToPersistentGatt(macAddress: String, peerName: String): BleConnectStartResult</ID>
     <ID>LongMethod:GattServerLinkEvents.kt$GattServerLinkEvents$fun handleCallback()</ID>
     <ID>LongMethod:GattTransferExecutor.kt$GattTransferExecutor$private fun sendChunk(flight: GattTransferFlight)</ID>
@@ -573,10 +569,6 @@
     <ID>MagicNumber:FullscreenImageViewer.kt$1.2f</ID>
     <ID>MagicNumber:FullscreenImageViewer.kt$250f</ID>
     <ID>MagicNumber:FullscreenImageViewer.kt$5f</ID>
-    <ID>MagicNumber:GattClientCallback.kt$GattClientCallback$20</ID>
-    <ID>MagicNumber:GattClientCallback.kt$GattClientCallback$4</ID>
-    <ID>MagicNumber:GattClientCallback.kt$GattClientCallback$5000</ID>
-    <ID>MagicNumber:GattClientConnectionEvents.kt$GattClientConnectionEvents$20</ID>
     <ID>MagicNumber:GattClientManager.kt$GattClientManager$247</ID>
     <ID>MagicNumber:GattServerAttributeRequests.kt$GattServerAttributeRequests$4</ID>
     <ID>MagicNumber:GattServerAttributeRequests.kt$GattServerAttributeRequests$5000</ID>
@@ -1147,22 +1139,8 @@
     <ID>MaxLineLength:FullScreenSosAlarm.kt$if (hasLocation) Color(0xFF00E676).copy(alpha = 0.6f) else Color.White.copy(alpha = 0.15f)</ID>
     <ID>MaxLineLength:GattClientAttempt.kt$GattClientAttempt$AppLogger.d("BLE_MESH", "Service discovery request for $peerName accepted=$accepted attempt=$discoveryRequestAttempts")</ID>
     <ID>MaxLineLength:GattClientAttempt.kt$GattClientAttempt$if</ID>
-    <ID>MaxLineLength:GattClientCallback.kt$GattClientCallback$AppLogger.d("BLE_MESH", "CLIENT descriptor setup skipped: BLUETOOTH_CONNECT was revoked")</ID>
     <ID>MaxLineLength:GattClientCallback.kt$GattClientCallback$AppLogger.d("BLE_MESH", "Failed to setup TX Char/Descriptor (GATT Cache issue). Clearing Cache &amp; Disconnecting.")</ID>
-    <ID>MaxLineLength:GattClientCallback.kt$GattClientCallback$AppLogger.d("BLE_MESH", "GATT descriptor write failed for ${macAddress}. Status: ${status}. Forcing UI disconnect.")</ID>
-    <ID>MaxLineLength:GattClientCallback.kt$GattClientCallback$AppLogger.d("BLE_MESH", "GATT services discovery failed for ${macAddress}. Status: ${status}. Forcing UI disconnect.")</ID>
-    <ID>MaxLineLength:GattClientCallback.kt$GattClientCallback$AppLogger.d("BLE_MESH", "Ignoring CLIENT descriptor callback for $peerName: BLUETOOTH_CONNECT was revoked")</ID>
-    <ID>MaxLineLength:GattClientCallback.kt$GattClientCallback$AppLogger.d("BLE_MESH", "Ignoring CLIENT service callback for $peerName: BLUETOOTH_CONNECT was revoked")</ID>
-    <ID>MaxLineLength:GattClientCallback.kt$GattClientCallback$AppLogger.d("BLE_MESH", "Link ${link.generation} CLIENT $macAddress: CONFIGURING serviceStatus=$status")</ID>
-    <ID>MaxLineLength:GattClientCallback.kt$GattClientCallback$AppLogger.d("BLE_MESH", "Link ${link.generation} CLIENT $macAddress: READY descriptorStatus=$status")</ID>
-    <ID>MaxLineLength:GattClientCallback.kt$GattClientCallback$ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED</ID>
-    <ID>MaxLineLength:GattClientCallback.kt$GattClientCallback$}</ID>
-    <ID>MaxLineLength:GattClientConnectionEvents.kt$GattClientConnectionEvents$"AUTO transport received no ATT discovery response from $peerName; next attempt will force LE"</ID>
-    <ID>MaxLineLength:GattClientConnectionEvents.kt$GattClientConnectionEvents$AppLogger.d("BLE_MESH", "GATT Socket locked with ${peerName}. Starting service discovery with default MTU.")</ID>
     <ID>MaxLineLength:GattClientConnectionEvents.kt$GattClientConnectionEvents$AppLogger.d("BLE_MESH", "Handshake watchdog fired for CLIENT link ${link.generation} $peerName in ${link.state}. Disconnecting.")</ID>
-    <ID>MaxLineLength:GattClientConnectionEvents.kt$GattClientConnectionEvents$AppLogger.d("BLE_MESH", "Ignoring CLIENT connection callback for $peerName: BLUETOOTH_CONNECT was revoked")</ID>
-    <ID>MaxLineLength:GattClientConnectionEvents.kt$GattClientConnectionEvents$AppLogger.d("BLE_MESH", "Link ${link.generation} CLIENT $macAddress: DISCOVERING radioStatus=$status")</ID>
-    <ID>MaxLineLength:GattClientConnectionEvents.kt$GattClientConnectionEvents$ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED</ID>
     <ID>MaxLineLength:GattClientHost.kt$GattClientHost$fun completeGattChunk(endpoint: String, role: BleLinkRole, status: Int, gatt: BluetoothGatt? = null, device: BluetoothDevice? = null): Unit</ID>
     <ID>MaxLineLength:GattClientManager.kt$GattClientManager$AppLogger.d("BLE_MESH", "Connecting to $peerName with explicit LE transport after AUTO discovery timeout")</ID>
     <ID>MaxLineLength:GattClientManager.kt$GattClientManager$AppLogger.d("BLE_MESH", "Link ${link.generation} CLIENT $macAddress ${link.peerNodeId ?: "unknown"}: CONNECTING")</ID>
@@ -1778,8 +1756,6 @@
     <ID>ReturnCount:DeliveryHandlers.kt$StandardMessageHandler$override fun handle(endpointId: String, payload: MeshPayload, payloadBytes: ByteArray, callback: PayloadDispatcherCallback)</ID>
     <ID>ReturnCount:DirectIdentityPolicy.kt$DirectIdentityPolicy$fun allowsFrame(payload: MeshPayload, admitted: Boolean, blocked: Boolean): Boolean</ID>
     <ID>ReturnCount:FirstLaunchGuideStore.kt$FirstLaunchGuideStore$fun load(context: Context): GuideState</ID>
-    <ID>ReturnCount:GattClientCallback.kt$GattClientCallback$fun handleCallback()</ID>
-    <ID>ReturnCount:GattClientConnectionEvents.kt$GattClientConnectionEvents$fun handleCallback()</ID>
     <ID>ReturnCount:GattClientManager.kt$GattClientManager$fun connectToPersistentGatt(macAddress: String, peerName: String): BleConnectStartResult</ID>
     <ID>ReturnCount:GattL2capAcceptor.kt$GattL2capAcceptor$fun startL2capServer()</ID>
     <ID>ReturnCount:GattServerLinkEvents.kt$GattServerLinkEvents$fun handleCallback()</ID>
