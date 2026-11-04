@@ -4,13 +4,13 @@ import edu.cit.resqmesh.core.security.input.TextPolicy
 import edu.cit.resqmesh.core.ui.components.inputs.InputCounter
 import edu.cit.resqmesh.core.security.input.TextField
 import edu.cit.resqmesh.core.location.LocationClientFactory
+import edu.cit.resqmesh.core.location.hasLocationPermission
 import org.koin.java.KoinJavaComponent
 import edu.cit.resqmesh.feature.incident.ui.form.IncidentCategoryField
 import edu.cit.resqmesh.feature.incident.ui.form.IncidentUrgencyField
 import edu.cit.resqmesh.feature.incident.ui.form.IncidentTitleField
 import edu.cit.resqmesh.feature.incident.ui.form.IncidentDescriptionField
 import android.Manifest
-import android.content.pm.PackageManager
 import android.location.Location
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -45,12 +45,19 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.ui.graphics.Color
-import androidx.core.content.ContextCompat
 import edu.cit.resqmesh.core.ui.theme.ResQTheme
 import edu.cit.resqmesh.core.ui.theme.SafetyOrange
 import edu.cit.resqmesh.core.ui.theme.Spacing
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+
+/** Longest accepted incident title, after trimming. */
+private const val MAX_TITLE_LENGTH = 80
+
+/** Lets the keyboard finish opening before a focused field scrolls into view. */
+private const val BRING_INTO_VIEW_DELAY_MS = 200L
+
+private val INCIDENT_CATEGORIES = listOf("Medical", "Fire", "Search & Rescue", "Infrastructure", "Security", "Other")
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class, ExperimentalFoundationApi::class)
 @Composable
@@ -90,7 +97,7 @@ fun CreateIncidentSheet(
     val descBringIntoView = remember { BringIntoViewRequester() }
     val areaBringIntoView = remember { BringIntoViewRequester() }
 
-    val categories = listOf("Medical", "Fire", "Search & Rescue", "Infrastructure", "Security", "Other")
+    val categories = INCIDENT_CATEGORIES
 
     fun acquireLocationSnapshot() {
         isAcquiringLocation = true
@@ -130,7 +137,7 @@ fun CreateIncidentSheet(
 
     fun validateAndSubmit() {
         val cleanTitle = title.trim()
-        val titleValid = cleanTitle.isNotEmpty() && cleanTitle.length <= 80
+        val titleValid = cleanTitle.isNotEmpty() && cleanTitle.length <= MAX_TITLE_LENGTH
         val typeValid = selectedType != null
         val urgencyValid = selectedUrgency != null
 
@@ -155,6 +162,15 @@ fun CreateIncidentSheet(
             attachedLocation?.time,
             attachedLocation?.takeIf { it.hasAccuracy() }?.accuracy
         )
+    }
+
+    fun bringIntoViewWhenFocused(focused: Boolean, requester: BringIntoViewRequester) {
+        if (focused) {
+            coroutineScope.launch {
+                delay(BRING_INTO_VIEW_DELAY_MS)
+                requester.bringIntoView()
+            }
+        }
     }
 
     BackHandler(onBack = ::handleBack)
@@ -186,50 +202,7 @@ fun CreateIncidentSheet(
         },
         bottomBar = {
             if (!isImeVisible) {
-                Surface(
-                    color = MaterialTheme.colorScheme.background,
-                    border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f))
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .navigationBarsPadding()
-                            .padding(horizontal = Spacing.Large, vertical = 8.dp)
-                            .wrapContentWidth(Alignment.CenterHorizontally)
-                            .widthIn(max = 680.dp)
-                    ) {
-                        Button(
-                            onClick = ::validateAndSubmit,
-                            enabled = !isSubmitting && reportWaitSeconds == 0,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(50.dp),
-                            shape = RoundedCornerShape(12.dp),
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = SafetyOrange,
-                                contentColor = Color.White
-                            )
-                        ) {
-                            if (isSubmitting) {
-                                CircularProgressIndicator(
-                                    modifier = Modifier.size(20.dp),
-                                    strokeWidth = 2.dp,
-                                    color = Color.White
-                                )
-                                Spacer(Modifier.width(10.dp))
-                                Text("Sending…", fontSize = 15.sp, fontWeight = FontWeight.Bold)
-                            } else if (reportWaitSeconds > 0) {
-                                Text(
-                                    "Next report available in $reportWaitSeconds s",
-                                    fontSize = 15.sp,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            } else {
-                                Text("Send Request to People Nearby", fontSize = 15.sp, fontWeight = FontWeight.Bold)
-                            }
-                        }
-                    }
-                }
+                SubmitReportBar(isSubmitting, reportWaitSeconds, onSubmit = ::validateAndSubmit)
             }
         }
     ) { paddingValues ->
@@ -251,32 +224,23 @@ fun CreateIncidentSheet(
                 ) {
                     // Submission error banner if failed
                     if (submissionError != null) {
-                        Surface(
-                            shape = RoundedCornerShape(8.dp),
-                            color = MaterialTheme.colorScheme.errorContainer,
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text(
-                                text = submissionError,
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onErrorContainer,
-                                modifier = Modifier.padding(Spacing.Medium)
-                            )
-                        }
+                        SubmissionErrorBanner(submissionError)
                     }
 
-                    IncidentCategoryField(categories, selectedType, showErrors, typeFocusRequester, { selectedType = it })
+                    IncidentCategoryField(categories, selectedType, showErrors, typeFocusRequester) {
+                        selectedType = it
+                    }
 
                     IncidentUrgencyField(selectedUrgency, showErrors, urgencyFocusRequester, { selectedUrgency = it })
 
                     IncidentTitleField(title, showErrors, titleBringIntoView, titleFocusRequester,
                         onTitleChanged = { title = it }, onTitleFocusChanged = { focus ->
-                            if (focus.isFocused) { coroutineScope.launch { delay(200); titleBringIntoView.bringIntoView() } }
+                            bringIntoViewWhenFocused(focus.isFocused, titleBringIntoView)
                         })
 
                     IncidentDescriptionField(description, descBringIntoView,
                         onDescriptionChanged = { description = it }, onDescriptionFocusChanged = { focus ->
-                            if (focus.isFocused) { coroutineScope.launch { delay(200); descBringIntoView.bringIntoView() } }
+                            bringIntoViewWhenFocused(focus.isFocused, descBringIntoView)
                         }, onAppendNeed = { tag ->
                             val addition = "[Need: $tag] "
                             if (!description.contains(addition)) {
@@ -297,92 +261,28 @@ fun CreateIncidentSheet(
                             modifier = Modifier.padding(12.dp),
                             verticalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
-                            OutlinedTextField(
-                                value = areaDescription,
-                                onValueChange = {
+                            IncidentAreaField(
+                                areaDescription = areaDescription,
+                                locationAttached = attachedLocation != null,
+                                onAreaChanged = {
                                     areaDescription = TextPolicy.clampLength(it, TextField.INCIDENT_AREA)
                                 },
-                                label = { Text("Place or landmark (optional)") },
-                                placeholder = { Text("e.g. 2nd Floor, Room 204, North Gate") },
-                                leadingIcon = {
-                                    Icon(
-                                        imageVector = Icons.Outlined.LocationOn,
-                                        contentDescription = null,
-                                        tint = if (attachedLocation != null) ResQTheme.colors.sos else MaterialTheme.colorScheme.primary,
-                                        modifier = Modifier.size(20.dp)
-                                    )
-                                },
-                                singleLine = true,
-                                supportingText = if (
-                                    TextPolicy.showCounter(areaDescription.length, TextField.INCIDENT_AREA)
-                                ) {
-                                    { InputCounter(areaDescription.length, TextField.INCIDENT_AREA) }
-                                } else null,
-                                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-                                keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() }),
-                                colors = incidentTextFieldColors(),
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .onFocusChanged {
-                                        if (it.isFocused) {
-                                            coroutineScope.launch {
-                                                delay(200)
-                                                areaBringIntoView.bringIntoView()
-                                            }
-                                        }
-                                    }
+                                onDone = { focusManager.clearFocus() },
+                                onFocused = { focused -> bringIntoViewWhenFocused(focused, areaBringIntoView) }
                             )
 
                             val location = attachedLocation
                             if (location == null) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Row(
-                                        modifier = Modifier.weight(1f),
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Outlined.LocationOn,
-                                            contentDescription = null,
-                                            modifier = Modifier.size(16.dp),
-                                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                LocationNotAttachedRow(isAcquiringLocation) {
+                                    if (hasLocationPermission(context)) {
+                                        acquireLocationSnapshot()
+                                    } else {
+                                        permissionLauncher.launch(
+                                            arrayOf(
+                                                Manifest.permission.ACCESS_FINE_LOCATION,
+                                                Manifest.permission.ACCESS_COARSE_LOCATION
+                                            )
                                         )
-                                        Text(
-                                            text = if (isAcquiringLocation) "Acquiring GPS snapshot…" else "GPS not attached",
-                                            style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp),
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
-                                    }
-
-                                    Button(
-                                        onClick = {
-                                            val fine = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
-                                            val coarse = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
-                                            if (fine || coarse) {
-                                                acquireLocationSnapshot()
-                                            } else {
-                                                permissionLauncher.launch(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION))
-                                            }
-                                        },
-                                        enabled = !isAcquiringLocation,
-                                        shape = RoundedCornerShape(8.dp),
-                                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
-                                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
-                                        modifier = Modifier.defaultMinSize(minHeight = 34.dp)
-                                    ) {
-                                        if (isAcquiringLocation) {
-                                            CircularProgressIndicator(modifier = Modifier.size(14.dp), strokeWidth = 2.dp, color = Color.White)
-                                            Spacer(Modifier.width(6.dp))
-                                            Text("Locating…", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-                                        } else {
-                                            Icon(Icons.Outlined.LocationOn, null, modifier = Modifier.size(14.dp))
-                                            Spacer(Modifier.width(6.dp))
-                                            Text("Add my location", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-                                        }
                                     }
                                 }
 
@@ -394,56 +294,11 @@ fun CreateIncidentSheet(
                                     )
                                 }
                             } else {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Column(modifier = Modifier.weight(1f)) {
-                                        Row(
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.spacedBy(6.dp)
-                                        ) {
-                                            Icon(
-                                                Icons.Default.Check,
-                                                contentDescription = null,
-                                                tint = ResQTheme.colors.success,
-                                                modifier = Modifier.size(14.dp)
-                                            )
-                                            Text(
-                                                text = "Location added",
-                                                style = MaterialTheme.typography.labelMedium.copy(
-                                                    fontSize = 12.5.sp,
-                                                    fontWeight = FontWeight.Bold
-                                                ),
-                                                color = ResQTheme.colors.success
-                                            )
-                                        }
-                                        Text(
-                                            text = "%.5f, %.5f (±%dm)".format(location.latitude, location.longitude, location.accuracy.toInt()),
-                                            style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
-                                    }
-
-                                    Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
-                                        TextButton(
-                                            onClick = ::acquireLocationSnapshot,
-                                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
-                                            modifier = Modifier.defaultMinSize(minHeight = 32.dp)
-                                        ) {
-                                            Text("Retry", fontSize = 12.sp)
-                                        }
-                                        TextButton(
-                                            onClick = { attachedLocation = null },
-                                            colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
-                                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
-                                            modifier = Modifier.defaultMinSize(minHeight = 32.dp)
-                                        ) {
-                                            Text("Remove", fontSize = 12.sp)
-                                        }
-                                    }
-                                }
+                                LocationAttachedRow(
+                                    location = location,
+                                    onRetry = ::acquireLocationSnapshot,
+                                    onRemove = { attachedLocation = null }
+                                )
                             }
                         }
                     }
@@ -453,26 +308,234 @@ fun CreateIncidentSheet(
 
         // Unsaved Back confirmation dialog
         if (showDiscardDialog) {
-            AlertDialog(
-                onDismissRequest = { showDiscardDialog = false },
-                title = { Text("Discard draft?") },
-                text = { Text("Your entered incident details will be lost.") },
-                confirmButton = {
-                    TextButton(
-                        onClick = {
-                            showDiscardDialog = false
-                            onDismiss()
-                        },
-                        colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
-                    ) {
-                        Text("Discard draft")
-                    }
-                },
-                dismissButton = {
-                    TextButton(onClick = { showDiscardDialog = false }) {
-                        Text("Keep editing")
-                    }
+            DiscardDraftDialog(
+                onKeepEditing = { showDiscardDialog = false },
+                onDiscard = {
+                    showDiscardDialog = false
+                    onDismiss()
                 }
             )
         }
+}
+
+@Composable
+private fun SubmitReportBar(isSubmitting: Boolean, reportWaitSeconds: Int, onSubmit: () -> Unit) {
+    Surface(
+        color = MaterialTheme.colorScheme.background,
+        border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f))
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .navigationBarsPadding()
+                .padding(horizontal = Spacing.Large, vertical = 8.dp)
+                .wrapContentWidth(Alignment.CenterHorizontally)
+                .widthIn(max = 680.dp)
+        ) {
+            Button(
+                onClick = onSubmit,
+                enabled = !isSubmitting && reportWaitSeconds == 0,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(50.dp),
+                shape = RoundedCornerShape(12.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = SafetyOrange,
+                    contentColor = Color.White
+                )
+            ) {
+                if (isSubmitting) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(20.dp),
+                        strokeWidth = 2.dp,
+                        color = Color.White
+                    )
+                    Spacer(Modifier.width(10.dp))
+                    Text("Sending…", fontSize = 15.sp, fontWeight = FontWeight.Bold)
+                } else if (reportWaitSeconds > 0) {
+                    Text(
+                        "Next report available in $reportWaitSeconds s",
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                } else {
+                    Text("Send Request to People Nearby", fontSize = 15.sp, fontWeight = FontWeight.Bold)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SubmissionErrorBanner(message: String) {
+    Surface(
+        shape = RoundedCornerShape(8.dp),
+        color = MaterialTheme.colorScheme.errorContainer,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Text(
+            text = message,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onErrorContainer,
+            modifier = Modifier.padding(Spacing.Medium)
+        )
+    }
+}
+
+@Composable
+private fun IncidentAreaField(
+    areaDescription: String,
+    locationAttached: Boolean,
+    onAreaChanged: (String) -> Unit,
+    onDone: () -> Unit,
+    onFocused: (Boolean) -> Unit
+) {
+    OutlinedTextField(
+        value = areaDescription,
+        onValueChange = onAreaChanged,
+        label = { Text("Place or landmark (optional)") },
+        placeholder = { Text("e.g. 2nd Floor, Room 204, North Gate") },
+        leadingIcon = {
+            Icon(
+                imageVector = Icons.Outlined.LocationOn,
+                contentDescription = null,
+                tint = if (locationAttached) ResQTheme.colors.sos else MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(20.dp)
+            )
+        },
+        singleLine = true,
+        supportingText = if (
+            TextPolicy.showCounter(areaDescription.length, TextField.INCIDENT_AREA)
+        ) {
+            { InputCounter(areaDescription.length, TextField.INCIDENT_AREA) }
+        } else null,
+        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+        keyboardActions = KeyboardActions(onDone = { onDone() }),
+        colors = incidentTextFieldColors(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .onFocusChanged { onFocused(it.isFocused) }
+    )
+}
+
+@Composable
+private fun LocationNotAttachedRow(isAcquiringLocation: Boolean, onAddLocation: () -> Unit) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Row(
+            modifier = Modifier.weight(1f),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Outlined.LocationOn,
+                contentDescription = null,
+                modifier = Modifier.size(16.dp),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Text(
+                text = if (isAcquiringLocation) "Acquiring GPS snapshot…" else "GPS not attached",
+                style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp),
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+
+        Button(
+            onClick = onAddLocation,
+            enabled = !isAcquiringLocation,
+            shape = RoundedCornerShape(8.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+            modifier = Modifier.defaultMinSize(minHeight = 34.dp)
+        ) {
+            if (isAcquiringLocation) {
+                CircularProgressIndicator(modifier = Modifier.size(14.dp), strokeWidth = 2.dp, color = Color.White)
+                Spacer(Modifier.width(6.dp))
+                Text("Locating…", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+            } else {
+                Icon(Icons.Outlined.LocationOn, null, modifier = Modifier.size(14.dp))
+                Spacer(Modifier.width(6.dp))
+                Text("Add my location", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+            }
+        }
+    }
+}
+
+@Composable
+private fun LocationAttachedRow(location: Location, onRetry: () -> Unit, onRemove: () -> Unit) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Icon(
+                    Icons.Default.Check,
+                    contentDescription = null,
+                    tint = ResQTheme.colors.success,
+                    modifier = Modifier.size(14.dp)
+                )
+                Text(
+                    text = "Location added",
+                    style = MaterialTheme.typography.labelMedium.copy(
+                        fontSize = 12.5.sp,
+                        fontWeight = FontWeight.Bold
+                    ),
+                    color = ResQTheme.colors.success
+                )
+            }
+            Text(
+                text = "%.5f, %.5f (±%dm)".format(location.latitude, location.longitude, location.accuracy.toInt()),
+                style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+
+        Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+            TextButton(
+                onClick = onRetry,
+                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                modifier = Modifier.defaultMinSize(minHeight = 32.dp)
+            ) {
+                Text("Retry", fontSize = 12.sp)
+            }
+            TextButton(
+                onClick = onRemove,
+                colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
+                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                modifier = Modifier.defaultMinSize(minHeight = 32.dp)
+            ) {
+                Text("Remove", fontSize = 12.sp)
+            }
+        }
+    }
+}
+
+@Composable
+private fun DiscardDraftDialog(onKeepEditing: () -> Unit, onDiscard: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onKeepEditing,
+        title = { Text("Discard draft?") },
+        text = { Text("Your entered incident details will be lost.") },
+        confirmButton = {
+            TextButton(
+                onClick = onDiscard,
+                colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
+            ) {
+                Text("Discard draft")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onKeepEditing) {
+                Text("Keep editing")
+            }
+        }
+    )
 }

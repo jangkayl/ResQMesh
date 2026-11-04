@@ -489,8 +489,6 @@
     <ID>MagicNumber:ConversationPresentation.kt$60</ID>
     <ID>MagicNumber:ConversationPresentation.kt$60L</ID>
     <ID>MagicNumber:ConversationPresentation.kt$60_000L</ID>
-    <ID>MagicNumber:CreateIncidentSheet.kt$200</ID>
-    <ID>MagicNumber:CreateIncidentSheet.kt$80</ID>
     <ID>MagicNumber:CryptoManager.kt$CryptoManager$16</ID>
     <ID>MagicNumber:CryptoManager.kt$CryptoManager$2048</ID>
     <ID>MagicNumber:CryptoManager.kt$CryptoManager$256</ID>
@@ -1146,20 +1144,7 @@
     <ID>MaxLineLength:CoordinationStatusBanners.kt$"OPEN" -&gt; if (isReporter) "Review volunteer offers below and select a lead helper." else "Submit your skills or ETA below to offer assistance."</ID>
     <ID>MaxLineLength:CoordinationStatusBanners.kt$isReporter -&gt; "Waiting for ${selectedOffer?.helperName ?: "lead helper"} to confirm readiness."</ID>
     <ID>MaxLineLength:CoordinationStatusBanners.kt$text = "Your previous lead helper selection was revoked by the reporter. You may submit an updated offer if available."</ID>
-    <ID>MaxLineLength:CreateIncidentSheet.kt$CircularProgressIndicator(modifier = Modifier.size(14.dp), strokeWidth = 2.dp, color = Color.White)</ID>
-    <ID>MaxLineLength:CreateIncidentSheet.kt$IncidentCategoryField(categories, selectedType, showErrors, typeFocusRequester, { selectedType = it })</ID>
-    <ID>MaxLineLength:CreateIncidentSheet.kt$Text("Broadcast Request to Mesh Network", fontSize = 15.sp, fontWeight = FontWeight.Bold)</ID>
-    <ID>MaxLineLength:CreateIncidentSheet.kt$colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)</ID>
-    <ID>MaxLineLength:CreateIncidentSheet.kt$colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)</ID>
-    <ID>MaxLineLength:CreateIncidentSheet.kt$if (focus.isFocused) { coroutineScope.launch { delay(200); descBringIntoView.bringIntoView() } }</ID>
-    <ID>MaxLineLength:CreateIncidentSheet.kt$if (focus.isFocused) { coroutineScope.launch { delay(200); titleBringIntoView.bringIntoView() } }</ID>
     <ID>MaxLineLength:CreateIncidentSheet.kt$onSubmit: (title: String, type: String, severity: String, desc: String, area: String, lat: Double?, lng: Double?, time: Long?, acc: Float?) -&gt; Unit</ID>
-    <ID>MaxLineLength:CreateIncidentSheet.kt$permissionLauncher.launch(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION))</ID>
-    <ID>MaxLineLength:CreateIncidentSheet.kt$text = "%.5f, %.5f (±%dm)".format(location.latitude, location.longitude, location.accuracy.toInt())</ID>
-    <ID>MaxLineLength:CreateIncidentSheet.kt$text = if (isAcquiringLocation) "Acquiring GPS snapshot…" else "GPS not attached"</ID>
-    <ID>MaxLineLength:CreateIncidentSheet.kt$tint = if (attachedLocation != null) ResQTheme.colors.sos else MaterialTheme.colorScheme.primary</ID>
-    <ID>MaxLineLength:CreateIncidentSheet.kt$val coarse = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED</ID>
-    <ID>MaxLineLength:CreateIncidentSheet.kt$val fine = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED</ID>
     <ID>MaxLineLength:DebugTerminal.kt$"• ${link.peerName} ${link.state} ${link.role}#${link.generation} ${link.transport} ${TerminalLogEntry.shortEndpoint(link.endpoint)}"</ID>
     <ID>MaxLineLength:DebugTerminal.kt$Text(filter.label, fontFamily = FontFamily.Monospace, fontSize = 11.sp, fontWeight = FontWeight.Bold)</ID>
     <ID>MaxLineLength:DebugTerminal.kt$if (showVerbose) "Details: heartbeat and SYSTEM relay traffic shown" else "Details: heartbeat and SYSTEM relay traffic hidden"</ID>
