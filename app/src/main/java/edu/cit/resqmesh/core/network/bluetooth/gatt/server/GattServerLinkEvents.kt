@@ -1,5 +1,6 @@
 package edu.cit.resqmesh.core.network.bluetooth.gatt.server
 
+import edu.cit.resqmesh.core.network.bluetooth.BleConfig
 import android.bluetooth.*
 import android.Manifest
 import android.content.pm.PackageManager
@@ -69,7 +70,7 @@ internal class GattServerLinkEvents(
                         val existingEndpoint = peerName?.let { findLinkEndpointByIdentity(it) }
                         if (existingEndpoint != null && existingEndpoint != macAddress) {
                             val existingAge = System.currentTimeMillis() - linkEstablishedAt(existingEndpoint)
-                            if (existingAge < DUPLICATE_LINK_GRACE_MS) {
+                            if (existingAge < BleConfig.DUPLICATE_LINK_GRACE_MS) {
                                 // Simultaneous connect. Break the tie deterministically so exactly one
                                 // side yields: the node with the lower ID keeps its outbound link.
                                 val myId = NodeIdentity.idOf(myDeviceName) ?: myNodeId
@@ -100,7 +101,7 @@ internal class GattServerLinkEvents(
                         }
 
                         val totalConnections = distinctLinkCount()
-                        if (totalConnections >= MAX_TOTAL_CONNECTIONS) {
+                        if (totalConnections >= BleConfig.MAX_TOTAL_CONNECTIONS) {
                             AppLogger.d("BLE_MESH", "Server: Rejected connection from ${device.address}. Mesh node is full.")
                             try {
                                 gattServer?.cancelConnection(device)

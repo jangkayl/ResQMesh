@@ -1,5 +1,6 @@
 package edu.cit.resqmesh.core.network.bluetooth.gatt
 
+import edu.cit.resqmesh.core.network.bluetooth.BleConfig
 import edu.cit.resqmesh.core.network.bluetooth.gatt.client.GattClientAttempt
 import edu.cit.resqmesh.core.network.bluetooth.gatt.client.GattClientCallback
 import edu.cit.resqmesh.core.network.bluetooth.gatt.client.createGattClientPayloadSetup
@@ -47,7 +48,7 @@ class GattClientManager(
         with(manager) {
         if (!store.isNodeActive.get()) return BleConnectStartResult.REJECTED
         val epoch = transportGeneration
-        if (distinctLinkCount() >= MAX_TOTAL_CONNECTIONS) return BleConnectStartResult.REJECTED
+        if (distinctLinkCount() >= BleConfig.MAX_TOTAL_CONNECTIONS) return BleConnectStartResult.REJECTED
         if (isDeviceBlocked(peerName)) {
             AppLogger.d("BLE_MESH", "Skipping GATT connect to blocked peer $peerName")
             return BleConnectStartResult.REJECTED

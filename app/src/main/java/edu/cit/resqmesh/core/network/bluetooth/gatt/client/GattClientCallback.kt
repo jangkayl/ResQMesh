@@ -1,5 +1,6 @@
 package edu.cit.resqmesh.core.network.bluetooth.gatt.client
 
+import edu.cit.resqmesh.core.network.bluetooth.BleConfig
 import android.bluetooth.*
 import android.Manifest
 import android.content.pm.PackageManager
@@ -65,8 +66,8 @@ internal class GattClientCallback(
                     AppLogger.d("BLE_MESH", "Link ${link.generation} CLIENT $macAddress: CONFIGURING serviceStatus=$status")
                     AppLogger.d("BLE_MESH", "GATT Services discovered for ${macAddress}. Ready to transmit.")
 
-                    val service = gatt.getService(SERVICE_UUID)
-                    val txChar = service?.getCharacteristic(TX_CHARACTERISTIC_UUID)
+                    val service = gatt.getService(BleConfig.SERVICE_UUID)
+                    val txChar = service?.getCharacteristic(BleConfig.TX_CHARACTERISTIC_UUID)
                     var descriptorWritePending = false
                     if (txChar != null) {
                         try {
@@ -78,7 +79,7 @@ internal class GattClientCallback(
                             store.links.forget(link)
                             return
                         }
-                        val descriptor = txChar.getDescriptor(CCC_DESCRIPTOR_UUID)
+                        val descriptor = txChar.getDescriptor(BleConfig.CCC_DESCRIPTOR_UUID)
                         if (descriptor != null) {
                             descriptorWritePending = true
                             link.currentOperation = "WRITE_CCCD"
@@ -176,7 +177,7 @@ internal class GattClientCallback(
             if (!isTransportGenerationCurrent(epoch)) return@post
             fun handleCallback() {
                 if (!owns(gatt, "characteristic read $status")) return
-                if (characteristic.uuid == L2CAP_PSM_CHARACTERISTIC_UUID) {
+                if (characteristic.uuid == BleConfig.L2CAP_PSM_CHARACTERISTIC_UUID) {
                     val port = if (status == BluetoothGatt.GATT_SUCCESS && capturedValue?.size == 4)
                         java.nio.ByteBuffer.wrap(capturedValue).int else null
                     payloadSetup.onPort(port)

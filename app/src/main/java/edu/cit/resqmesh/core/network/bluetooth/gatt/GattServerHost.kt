@@ -13,13 +13,10 @@ interface GattServerHost : GattHost {
     val myDeviceName: String
     val myNodeId: String
     val bluetoothManager: BluetoothManager
-    val RX_CHARACTERISTIC_UUID: UUID
     var gattServer: BluetoothGattServer?
     var l2capServerSocket: BluetoothServerSocket?
     var myL2capPsm: Int
     var l2capAcceptThread: Thread?
-    val NAME_HANDSHAKE_TIMEOUT_MS: Long
-    val DUPLICATE_LINK_GRACE_MS: Long
 
     fun beginServerRegistration(): Long
     fun ownsServerRegistration(generation: Long): Boolean

@@ -1,5 +1,6 @@
 package edu.cit.resqmesh.core.network.bluetooth.gatt.client
 
+import edu.cit.resqmesh.core.network.bluetooth.BleConfig
 import android.bluetooth.*
 import android.Manifest
 import android.content.pm.PackageManager
@@ -70,7 +71,7 @@ internal class GattClientConnectionEvents(
                             finishConnectPhase("handshake watchdog")
                             forceGattDisconnect(macAddress, gatt)
                         }
-                    }, HANDSHAKE_WATCHDOG_MS)
+                    }, BleConfig.HANDSHAKE_WATCHDOG_MS)
 
                     handler.post {
                         if (!isTransportGenerationCurrent(epoch)) return@post

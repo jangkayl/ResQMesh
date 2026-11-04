@@ -1,5 +1,6 @@
 package edu.cit.resqmesh.core.network.bluetooth.gatt.client
 
+import edu.cit.resqmesh.core.network.bluetooth.BleConfig
 import android.bluetooth.*
 import android.os.Build
 import edu.cit.resqmesh.core.network.bluetooth.ReadyPayloadSetup
@@ -24,7 +25,8 @@ internal fun createGattClientPayloadSetup(
         isGattIdle = { !store.gattFlights.containsKey(macAddress) && !store.serverIndications.unresolved(macAddress) && link.currentOperation == null },
         hasL2cap = { store.activeL2capSockets[macAddress]?.isConnected == true },
         requestPort = {
-            val characteristic = link.gatt?.getService(SERVICE_UUID)?.getCharacteristic(L2CAP_PSM_CHARACTERISTIC_UUID)
+            val characteristic = link.gatt?.getService(BleConfig.SERVICE_UUID)
+                ?.getCharacteristic(BleConfig.L2CAP_PSM_CHARACTERISTIC_UUID)
             characteristic != null && runCatching { readPort(characteristic) }.getOrDefault(false)
         },
         requestMtu = { runCatching { requestMtu() }.getOrDefault(false) },

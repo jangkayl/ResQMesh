@@ -1,5 +1,6 @@
 package edu.cit.resqmesh.core.network.bluetooth.gatt.server
 
+import edu.cit.resqmesh.core.network.bluetooth.BleConfig
 import android.bluetooth.*
 import edu.cit.resqmesh.core.network.bluetooth.gatt.GattServerHost
 
@@ -17,26 +18,27 @@ internal class GattServerRegistration(
     fun start(serverCallback: GattServerCallback) {
         gattServer = openServer(serverCallback)
 
-        val service = BluetoothGattService(SERVICE_UUID, BluetoothGattService.SERVICE_TYPE_PRIMARY)
+        val service = BluetoothGattService(BleConfig.SERVICE_UUID, BluetoothGattService.SERVICE_TYPE_PRIMARY)
 
         val rxChar = BluetoothGattCharacteristic(
-            RX_CHARACTERISTIC_UUID,
+            BleConfig.RX_CHARACTERISTIC_UUID,
             BluetoothGattCharacteristic.PROPERTY_WRITE or BluetoothGattCharacteristic.PROPERTY_WRITE_NO_RESPONSE,
             BluetoothGattCharacteristic.PERMISSION_WRITE
         )
         service.addCharacteristic(rxChar)
 
         val txChar = BluetoothGattCharacteristic(
-            TX_CHARACTERISTIC_UUID,
+            BleConfig.TX_CHARACTERISTIC_UUID,
             BluetoothGattCharacteristic.PROPERTY_INDICATE,
             BluetoothGattCharacteristic.PERMISSION_READ
         )
-        val cccDescriptor = BluetoothGattDescriptor(CCC_DESCRIPTOR_UUID, BluetoothGattDescriptor.PERMISSION_WRITE)
+        val cccDescriptor =
+            BluetoothGattDescriptor(BleConfig.CCC_DESCRIPTOR_UUID, BluetoothGattDescriptor.PERMISSION_WRITE)
         txChar.addDescriptor(cccDescriptor)
         service.addCharacteristic(txChar)
 
         val psmChar = BluetoothGattCharacteristic(
-            L2CAP_PSM_CHARACTERISTIC_UUID,
+            BleConfig.L2CAP_PSM_CHARACTERISTIC_UUID,
             BluetoothGattCharacteristic.PROPERTY_READ,
             BluetoothGattCharacteristic.PERMISSION_READ
         )

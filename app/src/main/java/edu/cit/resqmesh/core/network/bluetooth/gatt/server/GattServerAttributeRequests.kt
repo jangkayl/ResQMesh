@@ -1,5 +1,6 @@
 package edu.cit.resqmesh.core.network.bluetooth.gatt.server
 
+import edu.cit.resqmesh.core.network.bluetooth.BleConfig
 import android.bluetooth.*
 import android.Manifest
 import android.content.pm.PackageManager
@@ -39,8 +40,7 @@ internal class GattServerAttributeRequests(
                         }
                     }
                     val link = store.links.current(device.address, BleLinkRole.SERVER)
-                    if (link?.serverDevice?.address == device.address && descriptor.uuid == CCC_DESCRIPTOR_UUID &&
-                        value?.contentEquals(BluetoothGattDescriptor.ENABLE_INDICATION_VALUE) == true &&
+                    if (link?.serverDevice?.address == device.address && enablesIndications(descriptor, value) &&
                         store.links.transition(link, BleLinkState.READY)) {
                         finishRadioHandshake("server:${link.endpoint}:${link.generation}", "server ready")
                         AppLogger.d("BLE_MESH", "Link ${link.generation} SERVER ${device.address}: READY CCCD indications enabled")
@@ -76,7 +76,7 @@ internal class GattServerAttributeRequests(
                                         AppLogger.d("BLE_MESH", "SERVER identity timeout disconnect skipped: BLUETOOTH_CONNECT was revoked")
                                     }
                                 }
-                            }, NAME_HANDSHAKE_TIMEOUT_MS)
+                            }, BleConfig.NAME_HANDSHAKE_TIMEOUT_MS)
                         }
                     }
 
@@ -121,7 +121,7 @@ internal class GattServerAttributeRequests(
                         AppLogger.d("BLE_MESH", "Ignoring SERVER read request: BLUETOOTH_CONNECT was revoked")
                         return
                     }
-                    if (characteristic.uuid == L2CAP_PSM_CHARACTERISTIC_UUID) {
+                    if (characteristic.uuid == BleConfig.L2CAP_PSM_CHARACTERISTIC_UUID) {
                         val psmBytes = java.nio.ByteBuffer.allocate(4).putInt(myL2capPsm).array()
                         try {
                             gattServer?.sendResponse(device, requestId, BluetoothGatt.GATT_SUCCESS, offset, psmBytes)
@@ -172,7 +172,8 @@ internal class GattServerAttributeRequests(
         device: BluetoothDevice, characteristic: BluetoothGattCharacteristic,
         preparedWrite: Boolean, offset: Int, value: ByteArray?
     ): Int {
-        var status = GattWritePolicy.checkWrite(characteristic.uuid == RX_CHARACTERISTIC_UUID, preparedWrite, offset)
+        val isReceiveCharacteristic = characteristic.uuid == BleConfig.RX_CHARACTERISTIC_UUID
+        var status = GattWritePolicy.checkWrite(isReceiveCharacteristic, preparedWrite, offset)
         if (status == BluetoothGatt.GATT_SUCCESS && preparedWrite) {
             status = preparedWrites.add(device.address, offset, value)
         }
@@ -246,3 +247,8 @@ internal class GattServerAttributeRequests(
         }
     }
 }
+
+/** A write of ENABLE_INDICATION_VALUE to the CCC descriptor: the client is ready for indications. */
+private fun enablesIndications(descriptor: BluetoothGattDescriptor, value: ByteArray?): Boolean =
+    descriptor.uuid == BleConfig.CCC_DESCRIPTOR_UUID &&
+        value?.contentEquals(BluetoothGattDescriptor.ENABLE_INDICATION_VALUE) == true
