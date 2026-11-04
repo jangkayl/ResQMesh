@@ -2,6 +2,7 @@ package edu.cit.resqmesh.feature.incident.model
 
 import edu.cit.resqmesh.core.model.Incident
 import edu.cit.resqmesh.core.model.IncidentOffer
+import edu.cit.resqmesh.core.model.IncidentState
 import edu.cit.resqmesh.core.model.MeshUser
 import edu.cit.resqmesh.feature.incident.model.IncidentIdentityState
 import edu.cit.resqmesh.feature.incident.model.IncidentMetrics
@@ -12,8 +13,8 @@ import edu.cit.resqmesh.feature.incident.model.isInvolved
 import edu.cit.resqmesh.feature.incident.model.displayTitle
 
 internal fun incidentMetrics(incidents: List<Incident>, identity: IncidentIdentityState, offersMap: Map<String, List<IncidentOffer>>): IncidentMetrics = run {
-        val active = incidents.filter { it.status !in setOf("RESOLVED", "CANCELLED") }
-        val history = incidents.filter { it.status in setOf("RESOLVED", "CANCELLED") }
+        val active = incidents.filter { !it.isTerminal() }
+        val history = incidents.filter { it.isTerminal() }
         val localKey = identity.signingKey
         val myActivity = active.filter { inc ->
             isInvolved(inc, offersMap[inc.incidentId].orEmpty(), identity.user?.userId, localKey)
@@ -30,12 +31,12 @@ internal fun selectIncidents(incidents: List<Incident>, user: MeshUser?, offersM
         incidents.filter { incident ->
             // 1. Destination filter
             val matchesDest = when (currentDest) {
-                IncidentDestination.ACTIVE -> incident.status !in setOf("RESOLVED", "CANCELLED")
+                IncidentDestination.ACTIVE -> !incident.isTerminal()
                 IncidentDestination.MY_ACTIVITY -> {
-                    incident.status !in setOf("RESOLVED", "CANCELLED") &&
+                    !incident.isTerminal() &&
                         isInvolved(incident, offersMap[incident.incidentId].orEmpty(), user?.userId, localKey)
                 }
-                IncidentDestination.HISTORY -> incident.status in setOf("RESOLVED", "CANCELLED")
+                IncidentDestination.HISTORY -> incident.isTerminal()
             }
             if (!matchesDest) return@filter false
 
@@ -59,10 +60,10 @@ internal fun selectIncidents(incidents: List<Incident>, user: MeshUser?, offersM
                 when (currentFilters.assistance) {
                     AssistanceFilter.ANY -> Unit
                     AssistanceFilter.LOOKING_FOR_HELP -> {
-                        if (incident.status != "OPEN") return@filter false
+                        if (!incident.hasStatus(IncidentState.OPEN)) return@filter false
                     }
                     AssistanceFilter.NO_OFFERS_YET -> {
-                        if (incident.status != "OPEN" || activeOffers.isNotEmpty()) return@filter false
+                        if (!incident.hasStatus(IncidentState.OPEN) || activeOffers.isNotEmpty()) return@filter false
                     }
                 }
             }
