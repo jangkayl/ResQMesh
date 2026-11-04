@@ -1,5 +1,6 @@
 package edu.cit.resqmesh.core.network.dispatch
 
+import edu.cit.resqmesh.core.network.PayloadTypes
 import edu.cit.resqmesh.core.network.MeshPayload
 import edu.cit.resqmesh.core.network.PayloadDispatcherCallback
 import edu.cit.resqmesh.core.network.CryptoManager
@@ -18,7 +19,8 @@ import kotlinx.serialization.ExperimentalSerializationApi
 
 @OptIn(ExperimentalSerializationApi::class)
 class ReceiptHandler : PayloadHandler {
-    override fun canHandle(payloadType: String) = payloadType == "SEEN" || payloadType == "DELIVERED"
+    override fun canHandle(payloadType: String) =
+        payloadType == PayloadTypes.SEEN || payloadType == PayloadTypes.DELIVERED
 
     override fun handle(endpointId: String, payload: MeshPayload, payloadBytes: ByteArray, callback: PayloadDispatcherCallback) {
         val targetMessageId = payload.targetMessageId
@@ -27,9 +29,9 @@ class ReceiptHandler : PayloadHandler {
         val returnRoute = payload.returnRoute.toMutableList()
         val directedRoute = payload.directedRoute.toMutableList()
 
-        if (payload.type == "SEEN") {
+        if (payload.type == PayloadTypes.SEEN) {
             callback.onMessageSeen(targetMessageId, reader)
-        } else if (payload.type == "DELIVERED") {
+        } else if (payload.type == PayloadTypes.DELIVERED) {
             callback.onMessageDelivered(targetMessageId, reader, returnRoute)
         }
 
@@ -82,7 +84,10 @@ class StandardMessageHandler : PayloadHandler {
         TransferTraceEmitter.voice(TraceDir.IN, TraceStage.RECEIVED, scope, msgId, TraceDropReason.NONE, endpointId)
 
     // LIVE_AUDIO stays excluded so packets from older builds drop instead of landing as messages.
-    override fun canHandle(payloadType: String) = !listOf("SYSTEM", "SEEN", "DELIVERED", "GOODBYE", "BLOCK", "UNBLOCK", "LIVE_AUDIO").contains(payloadType)
+    override fun canHandle(payloadType: String) = !listOf(
+        PayloadTypes.SYSTEM, PayloadTypes.SEEN, PayloadTypes.DELIVERED, PayloadTypes.GOODBYE,
+        PayloadTypes.BLOCK, PayloadTypes.UNBLOCK, PayloadTypes.LIVE_AUDIO
+    ).contains(payloadType)
 
     override fun handle(endpointId: String, payload: MeshPayload, payloadBytes: ByteArray, callback: PayloadDispatcherCallback) {
         val sender = payload.senderName

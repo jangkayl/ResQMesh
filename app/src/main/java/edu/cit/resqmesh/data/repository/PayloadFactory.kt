@@ -1,5 +1,6 @@
 package edu.cit.resqmesh.data.repository
 
+import edu.cit.resqmesh.core.network.PayloadTypes
 import edu.cit.resqmesh.core.network.MeshPayload
 import edu.cit.resqmesh.core.network.CryptoManager
 import edu.cit.resqmesh.core.model.NodeIdentity
@@ -32,7 +33,7 @@ object PayloadFactory {
     ): ByteArray {
         val payload = MeshPayload(
             id = msgId,
-            type = "CONVERSATION",
+            type = PayloadTypes.CONVERSATION,
             chatSync = chatSync,
             conversationKind = conversationKind,
             sosId = sosId,
@@ -86,7 +87,7 @@ object PayloadFactory {
         val payload = MeshPayload(
             id = transmissionId,
             targetMessageId = msgId,
-            type = "MESSAGE",
+            type = PayloadTypes.MESSAGE,
             senderName = senderName,
             targetName = targetName,
             senderNodeId = NodeIdentity.idOf(senderName).orEmpty(),
@@ -143,7 +144,7 @@ object PayloadFactory {
     ): ByteArray {
         val payload = MeshPayload(
             id = msgId,
-            type = "SYSTEM",
+            type = PayloadTypes.SYSTEM,
             senderName = senderName,
             senderNodeId = NodeIdentity.idOf(senderName).orEmpty(),
             publicKey = publicKey,

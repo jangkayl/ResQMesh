@@ -1,5 +1,6 @@
 package edu.cit.resqmesh.data.repository
 
+import edu.cit.resqmesh.core.network.PayloadTypes
 import edu.cit.resqmesh.core.logging.AppLogger
 import edu.cit.resqmesh.core.model.ChatMessage
 import edu.cit.resqmesh.core.model.ConnectedDevice
@@ -237,7 +238,7 @@ internal class ChatSyncCoordinator(
         senderNodeId = gateway.myNodeId))
 
     fun receive(endpoint: String, payload: MeshPayload) {
-        if (payload.type == "CONVERSATION") {
+        if (payload.type == PayloadTypes.CONVERSATION) {
             scope.launch { media.receive(endpoint, payload) }
             return
         }
@@ -257,8 +258,8 @@ internal class ChatSyncCoordinator(
         const val INDEX = "INDEX"
         const val ROWS = "ROWS"
         const val MEDIA = "MEDIA"
-        const val REQUEST = "CHAT_SYNC_REQ"
-        const val RESPONSE = "CHAT_SYNC_RES"
+        const val REQUEST = PayloadTypes.CHAT_SYNC_REQ
+        const val RESPONSE = PayloadTypes.CHAT_SYNC_RES
         const val MAX_MESSAGES_PER_CONVERSATION = 50
         const val MAX_SOS_THREADS = 8
         const val MAX_ROWS_PER_PAGE = 8

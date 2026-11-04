@@ -87,16 +87,16 @@ class PayloadDispatcher(
             }
             // SOS validates signatures before dedup/relay. Conversation storage owns durable
             // dedup so duplicate retries can still receive receipts after a lost acknowledgement.
-            if (payload.type in setOf("SOS_EVENT", "SOS_SYNC_REQ", "SOS_SYNC_RES")) {
+            if (payload.type in setOf(PayloadTypes.SOS_EVENT, PayloadTypes.SOS_SYNC_REQ, PayloadTypes.SOS_SYNC_RES)) {
                 // SOS_EVENT is rate limited by SosRepository once its signature verified.
-                if (payload.type != "SOS_EVENT" && !admit(endpointId, payload)) {
+                if (payload.type != PayloadTypes.SOS_EVENT && !admit(endpointId, payload)) {
                     drop(payload, TraceDropReason.ORIGIN_LIMIT, endpointId, payloadBytes)
                     return
                 }
                 callback.onSosPacket(endpointId, payload)
                 return
             }
-            if (payload.type in setOf("CHAT_SYNC_REQ", "CHAT_SYNC_RES")) {
+            if (payload.type in setOf(PayloadTypes.CHAT_SYNC_REQ, PayloadTypes.CHAT_SYNC_RES)) {
                 if (!admit(endpointId, payload)) {
                     drop(payload, TraceDropReason.ORIGIN_LIMIT, endpointId, payloadBytes)
                     return
@@ -104,7 +104,7 @@ class PayloadDispatcher(
                 callback.onChatSyncPacket(endpointId, payload)
                 return
             }
-            if (payload.type == "CONVERSATION") {
+            if (payload.type == PayloadTypes.CONVERSATION) {
                 // Not charged to the origin: the copy is accepted only if this phone asked for its id.
                 if (payload.chatSync) {
                     callback.onChatSyncPacket(endpointId, payload)
@@ -119,7 +119,7 @@ class PayloadDispatcher(
             }
             val msgId = payload.id
 
-            val localPrivate = payload.type == "MESSAGE" && payload.isPrivate && payload.isEncrypted &&
+            val localPrivate = payload.type == PayloadTypes.MESSAGE && payload.isPrivate && payload.isEncrypted &&
                 (payload.targetNodeId.equals(callback.getMyNodeId(), ignoreCase = true) && payload.targetNodeId.isNotBlank() ||
                     payload.targetNodeId.isBlank() && edu.cit.resqmesh.core.model.NodeIdentity.matches(payload.targetName, callback.getMyDeviceName()))
             // The recipient store deduplicates private rows, then replays lost receipts.

@@ -39,7 +39,7 @@ class SosRepository(
 
     init {
         gateway.onSosPacket = { endpoint, payload ->
-            if (payload.type == "SOS_EVENT") {
+            if (payload.type == PayloadTypes.SOS_EVENT) {
                 if (!inbound.trySend(endpoint to payload).isSuccess) log("SOS_QUEUE", "inbound-full")
             } else sync.receive(endpoint, payload)
         }
@@ -255,7 +255,8 @@ class SosRepository(
     fun owns(alert: SosAlertEntity) = alert.originNodeId == identity.getDeviceId() && alert.signingKey == signing.publicKey
 
     private suspend fun dispatch(event: SosEvent) {
-        val payload = MeshPayload(id = event.eventId, type = "SOS_EVENT", text = SosProtocol.json.encodeToString(event),
+        val payload = MeshPayload(id = event.eventId, type = PayloadTypes.SOS_EVENT,
+            text = SosProtocol.json.encodeToString(event),
             senderName = event.originName, senderNodeId = event.originNodeId, sosId = event.sosId,
             conversationKind = "SOS", ttl = gateway.currentMeshTtl().coerceIn(1, MAX_TTL))
         val result = gateway.broadcastPriorityPayload(ProtoBuf.encodeToByteArray(payload))

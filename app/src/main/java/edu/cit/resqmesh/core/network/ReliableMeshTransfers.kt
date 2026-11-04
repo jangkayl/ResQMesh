@@ -372,12 +372,14 @@ internal class ReliableMeshTransfers(
             return null
         }
         val payload = ProtoBuf.decodeFromByteArray<MeshPayload>(bytes)
-        if (payload.type !in setOf("MESSAGE", "CONVERSATION")) { journal.delete(assembled); return null }
+        if (payload.type !in setOf(PayloadTypes.MESSAGE, PayloadTypes.CONVERSATION)) {
+            journal.delete(assembled); return null
+        }
         // Persist application IDs before acknowledging complete custody.
         val record = journal.complete(assembled.copy(payloadId = payload.id,
             messageId = payload.targetMessageId.ifBlank { payload.id },
             requiresRelayRoster = !payload.isPrivate &&
-                (payload.type == "MESSAGE" || payload.ttl > 1 && payload.relayHopCount < MAX_RELAY_HOPS)))
+                (payload.type == PayloadTypes.MESSAGE || payload.ttl > 1 && payload.relayHopCount < MAX_RELAY_HOPS)))
         pendingInbound.add(record.payloadId)
         deliver(record)
         log("TRANSFER_REASSEMBLED transfer=${record.id.take(12)} transmission=${record.payloadId} peer=$peer bytes=${record.size}")

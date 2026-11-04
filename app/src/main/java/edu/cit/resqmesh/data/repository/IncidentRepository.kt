@@ -16,6 +16,7 @@ import edu.cit.resqmesh.core.notification.IncidentEventNotice
 import edu.cit.resqmesh.core.notification.IncidentLocalIdentity
 import edu.cit.resqmesh.core.notification.IncidentNotifier
 import edu.cit.resqmesh.core.network.MeshPayload
+import edu.cit.resqmesh.core.network.PayloadTypes
 import edu.cit.resqmesh.core.network.ratelimit.SingleFlightGate
 import edu.cit.resqmesh.core.logging.AppLogger
 import edu.cit.resqmesh.data.local.dao.DomainEventDao
@@ -217,7 +218,7 @@ class IncidentRepository(
 
             val payload = MeshPayload(
                 id = UUID.randomUUID().toString(),
-                type = "DOMAIN_EVENT",
+                type = PayloadTypes.DOMAIN_EVENT,
                 senderName = networkGateway.myDeviceName,
                 senderNodeId = networkGateway.myNodeId,
                 text = eventJson,
