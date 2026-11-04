@@ -97,8 +97,7 @@ private object OfferWithdrawnRule : HelpEventRule() {
         val event = context.event
         val incident = context.incident
         val offer = context.offer
-        if (offer == null || offer.incidentId != event.entityId || offer.withdrawn ||
-            context.payload.optLong("revision") != event.logicalVersion) return HelpEventOutcome.Rejected
+        if (offer == null || !isWithdrawableOffer(offer, context)) return HelpEventOutcome.Rejected
         if (event.logicalVersion > offer.revision + 1) return HelpEventOutcome.Deferred()
         if (event.logicalVersion != offer.revision + 1) return HelpEventOutcome.Rejected
         val updatedOffer = offer.copy(revision = event.logicalVersion, withdrawn = true, updatedAt = event.timestamp)
@@ -108,6 +107,11 @@ private object OfferWithdrawnRule : HelpEventRule() {
         return HelpEventOutcome.Accepted(clearedAt(incident, event.timestamp), updatedOffer,
             "WITHDRAWAL_CLEARED_SELECTION incident=${event.entityId} version=${incident.version}")
     }
+
+    /** The offer belongs to this incident, is still active and the payload revision matches the event. */
+    private fun isWithdrawableOffer(offer: IncidentOfferEntity, context: HelpEventContext): Boolean =
+        offer.incidentId == context.event.entityId && !offer.withdrawn &&
+            context.payload.optLong("revision") == context.event.logicalVersion
 }
 
 private class LeadSelectedRule(private val history: IncidentSelectionHistory) : HelpEventRule() {
@@ -121,14 +125,9 @@ private class LeadSelectedRule(private val history: IncidentSelectionHistory) : 
         val offerRevision = payload.optLong("offerRevision")
         if (event.actorId != incident.creatorId || payload.optString("selectionId").isBlank())
             return HelpEventOutcome.Rejected
-        if (event.logicalVersion > incident.version + 1 ||
-            (event.logicalVersion > incident.version && incident.status != IncidentState.OPEN.name) ||
-            (event.logicalVersion == incident.version + 1 && (offer == null || offer.revision < offerRevision)))
-            return HelpEventOutcome.Deferred()
-        if (incident.status != IncidentState.OPEN.name ||
-            event.logicalVersion != incident.version + 1 || offer == null ||
-            offer.incidentId != event.entityId || offerRevision < 1 ||
-            offer.helperKey != context.helperKey) return HelpEventOutcome.Rejected
+        if (isAheadOfReplica(event, incident, offer, offerRevision)) return HelpEventOutcome.Deferred()
+        if (!isOpenForNextVersion(event, incident) || offer == null ||
+            !isSelectableOffer(offer, context, offerRevision)) return HelpEventOutcome.Rejected
         val superseded = history.supersedingOfferEvent(incident,
             OfferSelection(offer.offerId, offer.helperKey, offerRevision)) != null
         if (superseded) {
@@ -146,6 +145,21 @@ private class LeadSelectedRule(private val history: IncidentSelectionHistory) : 
             primaryResponderId = null, primaryResponderName = offer.helperName,
             selectionConfirmedAt = null))
     }
+
+    /** A version gap, a pending state change, or the selected offer revision has not arrived yet. */
+    private fun isAheadOfReplica(event: DomainEventEntity, incident: IncidentEntity,
+        offer: IncidentOfferEntity?, offerRevision: Long): Boolean {
+        val nextVersion = incident.version + 1
+        return event.logicalVersion > nextVersion ||
+            (event.logicalVersion > incident.version && incident.status != IncidentState.OPEN.name) ||
+            (event.logicalVersion == nextVersion && (offer == null || offer.revision < offerRevision))
+    }
+
+    private fun isOpenForNextVersion(event: DomainEventEntity, incident: IncidentEntity): Boolean =
+        incident.status == IncidentState.OPEN.name && event.logicalVersion == incident.version + 1
+
+    private fun isSelectableOffer(offer: IncidentOfferEntity, context: HelpEventContext, offerRevision: Long): Boolean =
+        offer.incidentId == context.event.entityId && offerRevision >= 1 && offer.helperKey == context.helperKey
 }
 
 private abstract class HelperDecisionRule(private val history: IncidentSelectionHistory) : HelpEventRule() {
@@ -154,12 +168,17 @@ private abstract class HelperDecisionRule(private val history: IncidentSelection
     override fun signerKey(context: HelpEventContext) = context.incident.selectedHelperKey
 
     override suspend fun evaluate(context: HelpEventContext): HelpEventOutcome {
-        val incident = context.incident
-        if (incident.status != IncidentState.AWAITING_HELPER.name ||
-            incident.selectionId != context.payload.optString("selectionId") ||
-            context.event.logicalVersion != incident.version ||
-            history.selectedOfferIsWithdrawn(incident)) return HelpEventOutcome.Rejected
+        if (!isDecidingCurrentSelection(context)) return HelpEventOutcome.Rejected
         return HelpEventOutcome.Accepted(decide(context))
+    }
+
+    /** Checked in order; the history lookup runs only when the cheap checks pass. */
+    private suspend fun isDecidingCurrentSelection(context: HelpEventContext): Boolean {
+        val incident = context.incident
+        return incident.status == IncidentState.AWAITING_HELPER.name &&
+            incident.selectionId == context.payload.optString("selectionId") &&
+            context.event.logicalVersion == incident.version &&
+            !history.selectedOfferIsWithdrawn(incident)
     }
 }
 
@@ -233,15 +252,19 @@ private abstract class IncidentClosureRule(
             val id = dependencies.opt(i) as? String ?: return HelpEventOutcome.Rejected
             if (id.isBlank() || id == event.eventId) return HelpEventOutcome.Rejected
             val prerequisite = events.getEventById(id)
-            if (prerequisite != null && (prerequisite.entityId != event.entityId ||
-                    prerequisite.entityType != EntityType.INCIDENT.name ||
-                    prerequisite.eventType !in IncidentHelpWorkflow.TYPES)) return HelpEventOutcome.Rejected
+            if (prerequisite != null && !isHelpEventOfSameIncident(prerequisite, event)) {
+                return HelpEventOutcome.Rejected
+            }
             if (prerequisite?.applied != true) {
                 return HelpEventOutcome.Deferred("CLOSURE_WAITING_DEPENDENCIES incident=${event.entityId}")
             }
         }
         return null
     }
+
+    private fun isHelpEventOfSameIncident(prerequisite: DomainEventEntity, event: DomainEventEntity): Boolean =
+        prerequisite.entityId == event.entityId && prerequisite.entityType == EntityType.INCIDENT.name &&
+            prerequisite.eventType in IncidentHelpWorkflow.TYPES
 }
 
 private class IncidentResolvedRule(events: DomainEventDao, history: IncidentSelectionHistory) :
