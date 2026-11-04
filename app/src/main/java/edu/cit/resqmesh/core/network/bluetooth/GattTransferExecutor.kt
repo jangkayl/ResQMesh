@@ -1,5 +1,6 @@
 package edu.cit.resqmesh.core.network.bluetooth
 
+import android.annotation.SuppressLint
 import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothGatt
 import android.bluetooth.BluetoothGattServer
@@ -146,6 +147,7 @@ class GattTransferExecutor(
     }
 
     /** Client role: write the chunk to the peer's receive characteristic. May throw SecurityException. */
+    @SuppressLint("MissingPermission") // sendChunk catches the SecurityException.
     private fun writeClientChunk(flight: GattTransferFlight, chunk: ByteArray): Boolean {
         val gatt = flight.gatt
         val characteristic = gatt?.getService(serviceUuid)?.getCharacteristic(receiveCharacteristicUuid)
@@ -165,6 +167,7 @@ class GattTransferExecutor(
     }
 
     /** Server role: indicate the chunk on the local transmit characteristic. May throw SecurityException. */
+    @SuppressLint("MissingPermission") // sendChunk catches the SecurityException.
     private fun notifyServerChunk(flight: GattTransferFlight, chunk: ByteArray): Boolean {
         val device = flight.serverDevice
         val characteristic = gattServer()?.getService(serviceUuid)?.getCharacteristic(transmitCharacteristicUuid)

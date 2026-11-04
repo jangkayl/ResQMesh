@@ -7,6 +7,7 @@ import edu.cit.resqmesh.core.network.bluetooth.gatt.client.createGattClientPaylo
 import edu.cit.resqmesh.core.network.bluetooth.gatt.client.notifyScanState
 import android.bluetooth.*
 import android.Manifest
+import android.annotation.SuppressLint
 import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Build
@@ -92,6 +93,8 @@ class GattClientManager(
         return true
     }
 
+    // BLUETOOTH_CONNECT is checked by cannotConnect() in connectToPersistentGatt before this runs.
+    @SuppressLint("MissingPermission")
     private fun startConnect(macAddress: String, peerName: String, epoch: Long): BleConnectStartResult = with(manager) {
         handler.post {
             if (!isTransportGenerationCurrent(epoch)) return@post
@@ -129,6 +132,8 @@ class GattClientManager(
     }
 
     /** Arms the connect timeout and calls connectGatt; a throw or null handle retires the link. */
+    // Reached only through startConnect, after the same permission check.
+    @SuppressLint("MissingPermission")
     private fun openGatt(device: BluetoothDevice, attempt: GattClientAttempt): BleConnectStartResult {
         val link = attempt.link
         val peerName = attempt.peerName
