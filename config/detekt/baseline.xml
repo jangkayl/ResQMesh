@@ -26,7 +26,6 @@
     <ID>ComplexCondition:IncidentHelpWorkflow.kt$IncidentHelpWorkflow$existing != null &amp;&amp; !existing.withdrawn &amp;&amp; incident.selectionOfferId == existing.offerId &amp;&amp; incident.selectedHelperKey == key</ID>
     <ID>ComplexCondition:IncidentHelpWorkflow.kt$IncidentHelpWorkflow$prior != null &amp;&amp; (IncidentSyncSnapshot.eventHash(prior) != IncidentSyncSnapshot.eventHash(event) || prior.validationStatus == EventValidationStatus.REJECTED || prior.applied)</ID>
     <ID>ComplexCondition:IncidentPresentation.kt$incident.workflowVersion == HELP_WORKFLOW_VERSION &amp;&amp; incident.status !in setOf("RESOLVED", "CANCELLED") &amp;&amp; offers.any { it.offerId == incident.selectionOfferId &amp;&amp; (it.withdrawn || it.revision &gt; (incident.selectionOfferRevision ?: Long.MAX_VALUE)) }</ID>
-    <ID>ComplexCondition:IncidentSelectors.kt$!matchesTitle &amp;&amp; !matchesDesc &amp;&amp; !matchesLandmark &amp;&amp; !matchesReporter &amp;&amp; !matchesHelper &amp;&amp; !matchesId</ID>
     <ID>ComplexCondition:LinkControlHandlers.kt$!payload.isPrivate || !payload.isEncrypted || payload.encryptedData.isNullOrBlank() || payload.encryptedKey.isNullOrBlank()</ID>
     <ID>ComplexCondition:LinkControlHandlers.kt$BlockAckHandler$envelope.kind != BlockControlKind.ACK || envelope.operationId != payload.targetMessageId || !NodeIdentity.matches(envelope.targetName, callback.getMyDeviceName()) || !NodeIdentity.matches(envelope.initiatorName, payload.senderName)</ID>
     <ID>ComplexCondition:LinkControlHandlers.kt$BlockRequestHandler$envelope.kind != BlockControlKind.REQUEST || envelope.operationId != payload.targetMessageId || !NodeIdentity.matches(envelope.targetName, callback.getMyDeviceName()) || !NodeIdentity.matches(envelope.initiatorName, payload.senderName)</ID>
@@ -98,7 +97,6 @@
     <ID>CyclomaticComplexMethod:IncidentLocationGuidance.kt$@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class) @Composable internal fun IncidentLocationGuidance( incident: Incident, presentation: IncidentPresentation, isNight: Boolean, onViewLocation: (Double, Double, String, String) -&gt; Unit )</ID>
     <ID>CyclomaticComplexMethod:IncidentPresentation.kt$fun incidentPresentation(incident: Incident, offers: List&lt;IncidentOffer&gt;, userId: String?, key: String?, events: List&lt;DomainEvent&gt; = emptyList(), identityLoading: Boolean = userId == null, identityError: String? = null): IncidentPresentation</ID>
     <ID>CyclomaticComplexMethod:IncidentPrimaryActions.kt$@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class) @Composable internal fun IncidentPrimaryActions( incident: Incident, presentation: IncidentPresentation, actionBusy: Boolean, localSigningKey: String?, onEditOffer: (String) -&gt; Unit, onConfirmAction: (String) -&gt; Unit, onReviewHelpers: () -&gt; Unit, onConfirmLead: () -&gt; Unit, onAcknowledge: () -&gt; Unit, onAssign: () -&gt; Unit, onStartResponse: () -&gt; Unit )</ID>
-    <ID>CyclomaticComplexMethod:IncidentSelectors.kt$internal fun selectIncidents(incidents: List&lt;Incident&gt;, user: MeshUser?, offersMap: Map&lt;String, List&lt;IncidentOffer&gt;&gt;, currentDest: IncidentDestination, currentFilters: IncidentFilterState, query: String, localKey: String?): List&lt;Incident&gt;</ID>
     <ID>CyclomaticComplexMethod:IncidentTypeFields.kt$@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class) @Composable internal fun IncidentCategoryField( categories: List&lt;String&gt;, selectedType: String?, showErrors: Boolean, typeFocusRequester: FocusRequester, onSelectType: (String) -&gt; Unit )</ID>
     <ID>CyclomaticComplexMethod:L2capTransport.kt$L2capTransport$@Synchronized fun attach(endpoint: String, socket: BluetoothSocket)</ID>
     <ID>CyclomaticComplexMethod:LegacyIncidentProjection.kt$LegacyIncidentProjection$suspend fun applyLegacyProjection(event: DomainEventEntity): Boolean</ID>
@@ -401,7 +399,6 @@
     <ID>LongMethod:IncidentPresentation.kt$fun incidentPresentation(incident: Incident, offers: List&lt;IncidentOffer&gt;, userId: String?, key: String?, events: List&lt;DomainEvent&gt; = emptyList(), identityLoading: Boolean = userId == null, identityError: String? = null): IncidentPresentation</ID>
     <ID>LongMethod:IncidentPrimaryActions.kt$@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class) @Composable internal fun IncidentPrimaryActions( incident: Incident, presentation: IncidentPresentation, actionBusy: Boolean, localSigningKey: String?, onEditOffer: (String) -&gt; Unit, onConfirmAction: (String) -&gt; Unit, onReviewHelpers: () -&gt; Unit, onConfirmLead: () -&gt; Unit, onAcknowledge: () -&gt; Unit, onAssign: () -&gt; Unit, onStartResponse: () -&gt; Unit )</ID>
     <ID>LongMethod:IncidentSearchField.kt$@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class) @Composable internal fun IncidentSearchField( isSearchVisible: Boolean, searchQuery: String, onSearchChanged: (String) -&gt; Unit )</ID>
-    <ID>LongMethod:IncidentSelectors.kt$internal fun selectIncidents(incidents: List&lt;Incident&gt;, user: MeshUser?, offersMap: Map&lt;String, List&lt;IncidentOffer&gt;&gt;, currentDest: IncidentDestination, currentFilters: IncidentFilterState, query: String, localKey: String?): List&lt;Incident&gt;</ID>
     <ID>LongMethod:IncidentTypeFields.kt$@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class) @Composable internal fun IncidentCategoryField( categories: List&lt;String&gt;, selectedType: String?, showErrors: Boolean, typeFocusRequester: FocusRequester, onSelectType: (String) -&gt; Unit )</ID>
     <ID>LongMethod:IncidentTypeFields.kt$@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class) @Composable internal fun IncidentUrgencyField( selectedUrgency: String?, showErrors: Boolean, urgencyFocusRequester: FocusRequester, onSelectUrgency: (String) -&gt; Unit )</ID>
     <ID>LongMethod:L2capTransport.kt$L2capTransport$@Synchronized fun attach(endpoint: String, socket: BluetoothSocket)</ID>
@@ -503,7 +500,6 @@
     <ID>LongParameterList:IncidentQuickFilters.kt$( filters: IncidentFilterState, searchQuery: String, currentDestination: IncidentDestination, appliedFilterCount: Int, showFilterSheet: Boolean, onClearFilters: () -&gt; Unit, onOpenFilters: () -&gt; Unit, onToggleCritical: (Boolean) -&gt; Unit, onToggleMedical: (Boolean) -&gt; Unit, onToggleNeedsHelp: (Boolean) -&gt; Unit )</ID>
     <ID>LongParameterList:IncidentRepository.kt$IncidentRepository$( incidentType: String, severity: String, description: String, areaDescription: String, latitude: Double? = null, longitude: Double? = null, locationCapturedAt: Long? = null, locationAccuracyMeters: Float? = null, title: String = "" )</ID>
     <ID>LongParameterList:IncidentRepository.kt$IncidentRepository$( private val incidentDao: IncidentDao, private val domainEventDao: DomainEventDao, private val identityManager: IdentityProvider, private val networkGateway: MeshNetworkGateway, private val repositoryScope: CoroutineScope, private val readyPeerEvents: MeshReadyPeerEvents? = null, private val offerDao: IncidentOfferDao? = null, private val database: AppDatabase? = null, private val eventSigning: IncidentEventSigning? = null, private val incidentNotifier: IncidentNotifier? = null )</ID>
-    <ID>LongParameterList:IncidentSelectors.kt$(incidents: List&lt;Incident&gt;, user: MeshUser?, offersMap: Map&lt;String, List&lt;IncidentOffer&gt;&gt;, currentDest: IncidentDestination, currentFilters: IncidentFilterState, query: String, localKey: String?)</ID>
     <ID>LongParameterList:IncidentSyncCoordinator.kt$IncidentSyncCoordinator$( private val gateway: MeshNetworkGateway, private val peers: MeshReadyPeerEvents, private val store: IncidentSyncStore, private val scope: CoroutineScope, private val legacyFallback: (String) -&gt; Unit, private val jitter: () -&gt; Long = { Random.nextLong(-RESYNC_JITTER_MS, RESYNC_JITTER_MS + 1) }, private val log: (String) -&gt; Unit = { AppLogger.d("INCIDENT_SYNC", it) }, )</ID>
     <ID>LongParameterList:IncidentTextFields.kt$( title: String, showErrors: Boolean, titleBringIntoView: BringIntoViewRequester, titleFocusRequester: FocusRequester, onTitleChanged: (String) -&gt; Unit, onTitleFocusChanged: (FocusState) -&gt; Unit )</ID>
     <ID>LongParameterList:IncidentUiTest.kt$IncidentUiTest$( value: Incident = incident, user: String = "h", key: String = "hk", offers: List&lt;IncidentOffer&gt; = emptyList(), message: String? = null, onOffer: (String) -&gt; Unit = {}, onSelectLead: (String) -&gt; Unit = {}, onDirectChat: (String) -&gt; Unit = {} )</ID>
@@ -836,12 +832,8 @@
     <ID>MagicNumber:IncidentPrimaryActions.kt$2.5f</ID>
     <ID>MagicNumber:IncidentQuickFilters.kt$0xFFFF9500</ID>
     <ID>MagicNumber:IncidentRepository.kt$IncidentRepository$6</ID>
-    <ID>MagicNumber:IncidentSelectors.kt$3</ID>
     <ID>MagicNumber:IncidentSyncCoordinator.kt$IncidentSyncCoordinator$12</ID>
     <ID>MagicNumber:IncidentTypeFields.kt$3</ID>
-    <ID>MagicNumber:IncidentViewModel.kt$IncidentViewModel$3</ID>
-    <ID>MagicNumber:IncidentViewModel.kt$IncidentViewModel$4</ID>
-    <ID>MagicNumber:IncidentViewModel.kt$IncidentViewModel$5</ID>
     <ID>MagicNumber:IncidentViewModel.kt$IncidentViewModel$5000</ID>
     <ID>MagicNumber:LegacyIncidentSync.kt$LegacyIncidentSync$2_000</ID>
     <ID>MagicNumber:LegacyIncidentSync.kt$LegacyIncidentSync$3</ID>
@@ -1614,8 +1606,6 @@
     <ID>MaxLineLength:IncidentRules.kt$IncidentRules$(workflowVersion != HELP_WORKFLOW_VERSION || !signingKey.isNullOrBlank() &amp;&amp; signingKey == reporterSigningKey)</ID>
     <ID>MaxLineLength:IncidentSelectionHistory.kt$IncidentSelectionHistory$return</ID>
     <ID>MaxLineLength:IncidentSelectionHistory.kt$IncidentSelectionHistory$runCatching { JSONObject(event.payloadJson).optString("selectionId") == selectionId }.getOrDefault(false)</ID>
-    <ID>MaxLineLength:IncidentSelectors.kt$if</ID>
-    <ID>MaxLineLength:IncidentSelectors.kt$internal</ID>
     <ID>MaxLineLength:IncidentStateMachineAndDeduplicationTest.kt$IncidentStateMachineAndDeduplicationTest$"broadcastPriorityPayload", "broadcastPayload" -&gt; edu.cit.resqmesh.core.network.BroadcastDispatchResult(emptyMap())</ID>
     <ID>MaxLineLength:IncidentStateMachineAndDeduplicationTest.kt$IncidentStateMachineAndDeduplicationTest$payloadJson = JSONObject().put("incidentType", "Fire").put("title", "Warehouse fire on 2nd floor").toString()</ID>
     <ID>MaxLineLength:IncidentStateMachineAndDeduplicationTest.kt$IncidentStateMachineAndDeduplicationTest$val ack = DomainEventEntity("EVT-ACK-B", id, EntityType.INCIDENT.name, EventType.INCIDENT_ACKNOWLEDGED.name, "USR-BOB", "Bob", 2L, 2000L, "{}")</ID>

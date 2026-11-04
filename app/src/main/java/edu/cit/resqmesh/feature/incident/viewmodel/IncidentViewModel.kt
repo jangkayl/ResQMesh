@@ -8,6 +8,7 @@ import edu.cit.resqmesh.feature.incident.model.IncidentMetrics
 
 import edu.cit.resqmesh.feature.incident.model.incidentMetrics
 import edu.cit.resqmesh.feature.incident.model.selectIncidents
+import edu.cit.resqmesh.feature.incident.model.IncidentListQuery
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import edu.cit.resqmesh.core.model.DomainEvent
@@ -117,15 +118,15 @@ class IncidentViewModel(
         @Suppress("UNCHECKED_CAST")
         val incidents = args[0] as List<Incident>
         val identity = args[1] as IncidentIdentityState
-        val user = identity.user
         @Suppress("UNCHECKED_CAST")
         val offersMap = args[2] as Map<String, List<IncidentOffer>>
-        val currentDest = args[3] as IncidentDestination
-        val currentFilters = args[4] as IncidentFilterState
-        val query = (args[5] as? String).orEmpty().trim().lowercase()
-        val localKey = identity.signingKey
+        val listQuery = IncidentListQuery(
+            destination = args[3] as IncidentDestination,
+            filters = args[4] as IncidentFilterState,
+            text = (args[5] as? String).orEmpty().trim().lowercase()
+        )
 
-        selectIncidents(incidents, user, offersMap, currentDest, currentFilters, query, localKey)
+        selectIncidents(incidents, identity, offersMap, listQuery)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     fun setDestination(dest: IncidentDestination) {
