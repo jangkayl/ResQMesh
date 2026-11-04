@@ -1,6 +1,6 @@
 # Code smells round 2
 
-Last reviewed: 2026-11-04. Status: active plan; steps 1–6 done on `final-code-smells`, no device evidence. It follows the merged first round (`8632799`, [card](../testing/code-smells-refactor-card.md)). Targets come from `config/detekt/baseline.xml`: 687 MagicNumber, 207 FunctionNaming, 104 LongMethod, 95 LongParameterList, 80 CyclomaticComplexMethod, 47 ComplexCondition, 38 TooManyFunctions, 27 VariableNaming and 5 NestedBlockDepth entries. No class is currently flagged LargeClass; class size shows up as TooManyFunctions.
+Last reviewed: 2026-11-04. Status: active plan; steps 1–8 and part of 9 done on `final-code-smells`, no device evidence. It follows the merged first round (`8632799`, [card](../testing/code-smells-refactor-card.md)). Targets come from `config/detekt/baseline.xml`: 687 MagicNumber, 207 FunctionNaming, 104 LongMethod, 95 LongParameterList, 80 CyclomaticComplexMethod, 47 ComplexCondition, 38 TooManyFunctions, 27 VariableNaming and 5 NestedBlockDepth entries. No class is currently flagged LargeClass; class size shows up as TooManyFunctions.
 
 ## Rules for every commit
 
@@ -74,7 +74,7 @@ Work from lowest to highest risk. Steps 1–7 touch no radio code.
 
 ### Step 9: Compose screens (long parameter list, long method)
 - **Files:** `IncidentDetailSheet.kt` (26 parameters), `IncidentCoordinationHub.kt`, `HelpWorkflowPanel.kt`, `CreateIncidentSheet.kt` (`onSubmit` with 9 arguments), `ChatBubble.kt`, `ActiveChatScreen.kt`.
-- **Changes:** add an `IncidentActions` data class of callbacks, then an `IncidentDraft` for `onSubmit`. Split long composables into private child composables in the same file. Keep modifiers, test tags and string text identical. Do one screen per commit.
+- **Changes:** split long composables into private children, keeping text and test tags. `IncidentDetailSheet` and `CreateIncidentSheet` keep their signatures (`IncidentUiTest` calls them). Done: detail sheet body and confirmation sheets. Left: `CreateIncidentSheet`, `ChatBubble`, `ActiveChatScreen`; hub and panel are unused.
 - **Proof:** `IncidentUiTest` compile. UI-02's four existing failures are expected, so compare results before and after.
 - **Magic numbers:** `Color.kt` and `Theme.kt` hex colors are design tokens, so leave them as they are. In screens, name only the repeated `dp` and duration values.
 
