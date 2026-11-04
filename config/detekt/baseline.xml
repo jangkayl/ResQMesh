@@ -2020,8 +2020,6 @@
     <ID>MaxLineLength:WireFormatGoldenTest.kt$WireFormatGoldenTest.Companion$"0a056d73672d311a05416c6963652203426f622a0568656c6c6fca01066e6f64652d61d201066e6f64652d62f80105980280d095ffbc31"</ID>
     <ID>MaxLineLength:WireFormatGoldenTest.kt$WireFormatGoldenTest.Companion$"0a0644494745535412026464180120022a610a0465762d311207534f532d6162631a066e6f64652d312205416c6963652a036b657932074d45444943414c380240004880d095ffbc3150e8d795ffbc31590000000000002d40610000000000405e406d0000a04070f4d395ffbc317a037369673001"</ID>
     <ID>MaxLineLength:WireFormatGoldenTest.kt$WireFormatGoldenTest.Companion$"{\"eventId\":\"ev-1\",\"sosId\":\"SOS-abc\",\"originNodeId\":\"node-1\",\"originName\":\"Alice\",\"signingKey\":\"key\",\"emergencyType\":\"MEDICAL\",\"revision\":2,\"ended\":false,\"createdAt\":1700000000000,\"updatedAt\":1700000001000,\"latitude\":14.5,\"longitude\":121.0,\"accuracyMeters\":5.0,\"locationCapturedAt\":1700000000500,\"signature\":\"sig\"}"</ID>
-    <ID>NestedBlockDepth:MapPackageDownloader.kt$DefaultHttpTransport$override suspend fun downloadToFile( urlString: String, destinationFile: File, resumeOffset: Long, onProgress: (bytesDownloaded: Long, totalBytes: Long) -&gt; Unit ): Boolean</ID>
-    <ID>NestedBlockDepth:MapStorageGuard.kt$MapStorageGuard$private fun unpackZip(zipInputStream: InputStream, destinationDir: File)</ID>
     <ID>NestedBlockDepth:MeshPeerCoordinator.kt$MeshPeerCoordinator$fun onNetworkDeviceScanned(event: ScanEvent): Unit</ID>
     <ID>NestedBlockDepth:NativeInboundPipeline.kt$NativeInboundPipeline$fun processBinaryPayload(endpointId: String, payloadBytes: ByteArray, transport: String? = null)</ID>
     <ID>NewLineAtEndOfFile:ExampleInstrumentedTest.kt$edu.cit.resqmesh.ExampleInstrumentedTest.kt</ID>
@@ -2086,7 +2084,6 @@
     <ID>ReturnCount:LinkControlHandlers.kt$BlockRequestHandler$override fun handle(endpointId: String, payload: MeshPayload, payloadBytes: ByteArray, callback: PayloadDispatcherCallback)</ID>
     <ID>ReturnCount:ManifestVerifier.kt$ManifestVerifier$fun verifyPackageHash(packageFile: File, expectedSha256Hex: String): Boolean</ID>
     <ID>ReturnCount:MapPackageDownloader.kt$AndroidConnectivityProvider$override fun isWifiConnected(): Boolean</ID>
-    <ID>ReturnCount:MapPackageDownloader.kt$DefaultHttpTransport$override suspend fun downloadToFile( urlString: String, destinationFile: File, resumeOffset: Long, onProgress: (bytesDownloaded: Long, totalBytes: Long) -&gt; Unit ): Boolean</ID>
     <ID>ReturnCount:MapPackageDownloader.kt$MapPackageDownloader$private suspend fun ProducerScope&lt;MapPackageStatus&gt;.downloadVerifiedPackage( manifest: MapPackageManifest, currentStatus: MapPackageStatus ): File?</ID>
     <ID>ReturnCount:MapPackageDownloader.kt$MapPackageDownloader$private suspend fun ProducerScope&lt;MapPackageStatus&gt;.fetchVerifiedManifest( manifestUrl: String, signatureUrl: String, maintainerPublicKey: ByteArray, currentStatus: MapPackageStatus ): MapPackageManifest?</ID>
     <ID>ReturnCount:MapStorageGuard.kt$MapStorageGuard$fun extractPackageZip(zipInputStream: InputStream, version: Int): File?</ID>

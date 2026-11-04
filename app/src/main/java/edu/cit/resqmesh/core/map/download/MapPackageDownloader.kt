@@ -21,6 +21,8 @@ import kotlinx.coroutines.flow.flowOn
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
+import java.io.InputStream
+import java.io.OutputStream
 import java.net.HttpURLConnection
 import java.net.URL
 
@@ -145,38 +147,53 @@ class DefaultHttpTransport : HttpTransport {
 
             destinationFile.parentFile?.mkdirs()
             val append = isPartial && resumeOffset > 0
-            var bytesReadTotal = if (append) resumeOffset else 0L
+            val startBytes = if (append) resumeOffset else 0L
 
-            FileOutputStream(destinationFile, append).use { fos ->
+            val bytesReadTotal = FileOutputStream(destinationFile, append).use { fos ->
                 connection.inputStream.use { input ->
-                    val buffer = ByteArray(COPY_BUFFER_BYTES)
-                    var read: Int
-                    while (input.read(buffer).also { read = it } != -1) {
-                        // Blocking reads never suspend, so a cancelled download must stop itself here.
-                        currentCoroutineContext().ensureActive()
-                        fos.write(buffer, 0, read)
-                        bytesReadTotal += read
-                        onProgress(bytesReadTotal, totalBytes)
-                    }
+                    copyWithProgress(input, fos, startBytes, totalBytes, onProgress)
                 }
             }
-
-            // Guard against premature stream termination
-            if (totalBytes > 0 && bytesReadTotal < totalBytes) {
-                AppLogger.d(
-                    "DefaultHttpTransport",
-                    "Download truncated prematurely: read $bytesReadTotal of $totalBytes bytes"
-                )
-                return false
-            }
-
-            true
+            isComplete(bytesReadTotal, totalBytes)
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
             AppLogger.d("DefaultHttpTransport", "Error downloading to file: ${e.javaClass.simpleName}")
             false
         }
+    }
+
+    /** Copies [input] to [output], reporting the running total; returns the final byte count. */
+    private suspend fun copyWithProgress(
+        input: InputStream,
+        output: OutputStream,
+        startBytes: Long,
+        totalBytes: Long,
+        onProgress: (bytesDownloaded: Long, totalBytes: Long) -> Unit
+    ): Long {
+        var bytesReadTotal = startBytes
+        val buffer = ByteArray(COPY_BUFFER_BYTES)
+        var read: Int
+        while (input.read(buffer).also { read = it } != -1) {
+            // Blocking reads never suspend, so a cancelled download must stop itself here.
+            currentCoroutineContext().ensureActive()
+            output.write(buffer, 0, read)
+            bytesReadTotal += read
+            onProgress(bytesReadTotal, totalBytes)
+        }
+        return bytesReadTotal
+    }
+
+    /** Guards against premature stream termination when the server announced a length. */
+    private fun isComplete(bytesReadTotal: Long, totalBytes: Long): Boolean {
+        val truncated = totalBytes > 0 && bytesReadTotal < totalBytes
+        if (truncated) {
+            AppLogger.d(
+                "DefaultHttpTransport",
+                "Download truncated prematurely: read $bytesReadTotal of $totalBytes bytes"
+            )
+        }
+        return !truncated
     }
 }
 
