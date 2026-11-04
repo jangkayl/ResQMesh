@@ -6,6 +6,7 @@ import edu.cit.resqmesh.feature.incident.ui.detail.SelectedIncidentHelper
 import edu.cit.resqmesh.feature.incident.ui.detail.IncidentActivity
 import edu.cit.resqmesh.feature.incident.ui.detail.IncidentPrimaryActions
 import edu.cit.resqmesh.feature.incident.ui.detail.IncidentConfirmationDialogs
+import edu.cit.resqmesh.feature.incident.ui.detail.IncidentDecisionCallbacks
 import edu.cit.resqmesh.feature.incident.ui.detail.helperChatTarget
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.*
@@ -250,7 +251,11 @@ fun IncidentDetailSheet(
             )
         }
 
-        IncidentConfirmationDialogs(confirmDialogAction, onSelectLead, onRevokeLead, onWithdrawOffer, onDeclineLead, onResolve, onCancel, { confirmDialogAction = null })
+        IncidentConfirmationDialogs(
+            confirmDialogAction,
+            IncidentDecisionCallbacks(onSelectLead, onRevokeLead, onWithdrawOffer, onDeclineLead, onResolve, onCancel),
+            onDismissConfirm = { confirmDialogAction = null }
+        )
 }
 
 /** Offers listed before "Show all" expands the section. */
