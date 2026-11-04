@@ -16,7 +16,6 @@
     <ID>ComplexCondition:LinkControlHandlers.kt$BlockRequestHandler$envelope.kind != BlockControlKind.REQUEST || envelope.operationId != payload.targetMessageId || !NodeIdentity.matches(envelope.targetName, callback.getMyDeviceName()) || !NodeIdentity.matches(envelope.initiatorName, payload.senderName)</ID>
     <ID>ComplexCondition:LinkIdentityAdmission.kt$LinkIdentityAdmission$!session.written || !session.peerIdentity || (session.requiresAck &amp;&amp; !session.acknowledged)</ID>
     <ID>ComplexCondition:MainActivity.kt$MainActivity$setupState.isOnline &amp;&amp; (!guidePending || hasDeepLink) &amp;&amp; currentStage != AppState.Main</ID>
-    <ID>ComplexCondition:MainApplicationOverlays.kt$isDeveloperMode &amp;&amp; !hasIncomingSos &amp;&amp; !hasMapAlert &amp;&amp; !hasOwnSos &amp;&amp; !isSOSActive</ID>
     <ID>ComplexCondition:MediaHelper.kt$MediaHelper$isSirenPlaying || !radioMonitoring || manualAudio != null || mediaPlayer != null</ID>
     <ID>ComplexCondition:MeshPeerCoordinator.kt$MeshPeerCoordinator$existingById == null &amp;&amp; !NodeIdentity.isPlaceholder(device.name) &amp;&amp; (existingByIdentity == null || !networkManager.hasLiveSocket(existingByIdentity.endpointId))</ID>
     <ID>ComplexCondition:MeshPeerCoordinator.kt$MeshPeerCoordinator$state == edu.cit.resqmesh.core.network.bluetooth.MeshTransportState.OFFLINE || state == edu.cit.resqmesh.core.network.bluetooth.MeshTransportState.BLUETOOTH_OFF || state == edu.cit.resqmesh.core.network.bluetooth.MeshTransportState.PERMISSION_REQUIRED || state == edu.cit.resqmesh.core.network.bluetooth.MeshTransportState.ERROR</ID>
@@ -25,7 +24,6 @@
     <ID>ComplexCondition:NativeOutboundDispatcher.kt$NativeOutboundDispatcher$!id.equals(nodeId, true) || !hasReadyEndpoint(endpoint) || NodeIdentity.isPlaceholder(name) || isDeviceBlocked(name)</ID>
     <ID>ComplexCondition:ReliableMeshTransfers.kt$ReliableMeshTransfers$record.applicationStored &amp;&amp; (!record.requiresRelayRoster || record.relayTargetsSet) &amp;&amp; relayFailures.none { it.second == record.payloadId } &amp;&amp; (!record.relayTargetsSet || record.relayTargets.all { it in record.forwardedPeers })</ID>
     <ID>ComplexCondition:SetupViewModel.kt$SetupViewModel$Build.VERSION.SDK_INT &gt;= Build.VERSION_CODES.S &amp;&amp; !(hasPermission(Manifest.permission.BLUETOOTH_SCAN) &amp;&amp; hasPermission(Manifest.permission.BLUETOOTH_CONNECT) &amp;&amp; hasPermission(Manifest.permission.BLUETOOTH_ADVERTISE))</ID>
-    <ID>ConstructorParameterNaming:MeshConversationMedia.kt$MeshConversationMedia$private val _connectedDevices: MutableStateFlow&lt;List&lt;ConnectedDevice&gt;&gt;</ID>
     <ID>ConstructorParameterNaming:MeshConversationMedia.kt$MeshConversationMedia$private val _currentChannelId: MutableStateFlow&lt;String&gt;</ID>
     <ID>ConstructorParameterNaming:MeshConversationMedia.kt$MeshConversationMedia$private val _incomingSosAlert: MutableStateFlow&lt;ChatMessage?&gt;</ID>
     <ID>ConstructorParameterNaming:MeshInboundMessages.kt$MeshInboundMessages$private val _connectedDevices: MutableStateFlow&lt;List&lt;ConnectedDevice&gt;&gt;</ID>
@@ -43,16 +41,11 @@
     <ID>CyclomaticComplexMethod:ChatBubble.kt$@Composable fun ChatBubble( message: ChatMessage, mediaHelper: MediaHelper, showAvatar: Boolean = true, showSenderName: Boolean = true, onUserClick: ((String) -&gt; Unit)? = null, onShowSeenBy: ((List&lt;String&gt;) -&gt; Unit)? = null, onReplyClick: ((ChatMessage) -&gt; Unit)? = null, onViewMap: ((Double, Double, String, String) -&gt; Unit)? = null, transferProgress: SendProgress? = null )</ID>
     <ID>CyclomaticComplexMethod:CoordinationStatusBanners.kt$@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class) @Composable internal fun CoordinationStatusBanners( incident: Incident, isReporter: Boolean, isSelectedHelper: Boolean, selectedOffer: IncidentOffer?, actionMessage: String?, wasRevoked: Boolean )</ID>
     <ID>CyclomaticComplexMethod:CreateIncidentSheet.kt$@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class, ExperimentalFoundationApi::class) @Composable fun CreateIncidentSheet( onDismiss: () -&gt; Unit, onSubmit: (title: String, type: String, severity: String, desc: String, area: String, lat: Double?, lng: Double?, time: Long?, acc: Float?) -&gt; Unit, submissionError: String? = null, isSubmitting: Boolean = false, reportWaitSeconds: Int = 0 )</ID>
-    <ID>CyclomaticComplexMethod:DebugTerminal.kt$@Composable fun DebugTerminal()</ID>
     <ID>CyclomaticComplexMethod:DeliveryHandlers.kt$StandardMessageHandler$override fun handle(endpointId: String, payload: MeshPayload, payloadBytes: ByteArray, callback: PayloadDispatcherCallback)</ID>
     <ID>CyclomaticComplexMethod:DirectIdentityPolicy.kt$DirectIdentityPolicy$fun validate(payload: MeshPayload, decode: (String) -&gt; ByteArray): String?</ID>
     <ID>CyclomaticComplexMethod:EmergencySummaryCard.kt$@Composable internal fun MinimalistEmergencyCard( profile: EmergencyProfile, isSelected: Boolean, isLight: Boolean, modifier: Modifier = Modifier, onClick: () -&gt; Unit )</ID>
-    <ID>CyclomaticComplexMethod:GattClientManager.kt$GattClientManager$fun connectToPersistentGatt(macAddress: String, peerName: String): BleConnectStartResult</ID>
     <ID>CyclomaticComplexMethod:GattClientPayloadSetup.kt$internal fun createGattClientPayloadSetup( manager: GattClientHost, epoch: Long, link: BleLink, macAddress: String, readPort: (BluetoothGattCharacteristic) -&gt; Boolean, requestMtu: () -&gt; Boolean ): ReadyPayloadSetup</ID>
     <ID>CyclomaticComplexMethod:GattL2capAcceptor.kt$GattL2capAcceptor$fun startL2capServer()</ID>
-    <ID>CyclomaticComplexMethod:GattServerAttributeRequests.kt$GattServerAttributeRequests$fun onDescriptorWriteRequest(device: BluetoothDevice, requestId: Int, descriptor: BluetoothGattDescriptor, preparedWrite: Boolean, responseNeeded: Boolean, offset: Int, value: ByteArray?)</ID>
-    <ID>CyclomaticComplexMethod:GattServerLinkEvents.kt$GattServerLinkEvents$fun onConnectionStateChange(device: BluetoothDevice, status: Int, newState: Int)</ID>
-    <ID>CyclomaticComplexMethod:GattTransferExecutor.kt$GattTransferExecutor$private fun sendChunk(flight: GattTransferFlight)</ID>
     <ID>CyclomaticComplexMethod:HelpWorkflowPanel.kt$@Composable fun HelpWorkflowPanel( incident: Incident, offers: List&lt;IncidentOffer&gt;, events: List&lt;DomainEvent&gt;, localUserId: String?, localSigningKey: String?, leadReachability: String, busy: Boolean, actionMessage: String?, onOffer: (String) -&gt; Unit, onWithdraw: () -&gt; Unit, onSelect: (String) -&gt; Unit, onConfirm: () -&gt; Unit, onDecline: () -&gt; Unit, onRevoke: () -&gt; Unit, onResolve: () -&gt; Unit, onCancel: () -&gt; Unit )</ID>
     <ID>CyclomaticComplexMethod:IdentitySetupScreen.kt$@Composable fun IdentitySetupContent( customName: String, onCustomNameChange: (String) -&gt; Unit, onIdentityGenerated: () -&gt; Unit, isSaving: Boolean = false, errorMessage: String? = null )</ID>
     <ID>CyclomaticComplexMethod:IncidentActivity.kt$@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class) @Composable internal fun IncidentActivity( appliedEvents: List&lt;DomainEvent&gt;, showActivitySection: Boolean, onToggle: () -&gt; Unit )</ID>
@@ -97,7 +90,6 @@
     <ID>CyclomaticComplexMethod:SosProtocol.kt$SosProtocol$fun valid(e: SosEvent): Boolean</ID>
     <ID>CyclomaticComplexMethod:SosSyncCoordinator.kt$SosSyncCoordinator$fun receive(endpoint: String, payload: MeshPayload)</ID>
     <ID>CyclomaticComplexMethod:SosSyncCoordinator.kt$SosSyncCoordinator$private suspend fun reconcile(l: Link)</ID>
-    <ID>CyclomaticComplexMethod:SosThreadHeader.kt$@Composable internal fun CompactSosHeader( alert: SosAlert, categoryColor: Color, categoryIcon: ImageVector, onMap: () -&gt; Unit, onEnd: () -&gt; Unit, onSilence: () -&gt; Unit, onActivity: () -&gt; Unit, isOwner: Boolean, /** Own SOS sent with "Include my location" off. */ locationWithheld: Boolean = false )</ID>
     <ID>CyclomaticComplexMethod:SosThreadScreen.kt$@Composable @OptIn(ExperimentalLayoutApi::class) fun SosThreadScreen( vm: CommunicationViewModel, media: MediaHelper, id: String, onBack: () -&gt; Unit, onMap: (edu.cit.resqmesh.core.model.ChatMessage) -&gt; Unit )</ID>
     <ID>CyclomaticComplexMethod:TacticalHelpOfferSheet.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun TacticalHelpOfferSheet( incidentTitle: String, incidentType: String, initialNote: String, isEditing: Boolean, actionBusy: Boolean, onDismiss: () -&gt; Unit, onSubmit: (String) -&gt; Unit, onWithdraw: (() -&gt; Unit)? = null, waitSeconds: Int = 0 )</ID>
     <ID>CyclomaticComplexMethod:TacticalHelperOfferCard.kt$@Composable fun TacticalHelperOfferCard( helper: HelperPresentation, onChoose: (() -&gt; Unit)? = null, onEdit: (() -&gt; Unit)? = null, onWithdraw: (() -&gt; Unit)? = null, onDirectChat: (() -&gt; Unit)? = null, modifier: Modifier = Modifier )</ID>
@@ -138,19 +130,14 @@
     <ID>LongMethod:ChatBubble.kt$@Composable fun ChatBubble( message: ChatMessage, mediaHelper: MediaHelper, showAvatar: Boolean = true, showSenderName: Boolean = true, onUserClick: ((String) -&gt; Unit)? = null, onShowSeenBy: ((List&lt;String&gt;) -&gt; Unit)? = null, onReplyClick: ((ChatMessage) -&gt; Unit)? = null, onViewMap: ((Double, Double, String, String) -&gt; Unit)? = null, transferProgress: SendProgress? = null )</ID>
     <ID>LongMethod:ChatContainerScreen.kt$@Composable internal fun MessagesInboxContent( channelId: String, communityPreview: ChatMessage?, conversations: List&lt;ConversationPreview&gt;, modifier: Modifier = Modifier, onNewMessageClick: () -&gt; Unit, onCommunityClick: () -&gt; Unit, onChannelSelected: (String) -&gt; Unit, onConversationClick: (String) -&gt; Unit, communityUnread: Int = 0 )</ID>
     <ID>LongMethod:CommunityIncidentsBanner.kt$@Composable internal fun CommunityIncidentsBanner( activeIncidentCount: Int, criticalIncidentCount: Int, onIncidentsClick: () -&gt; Unit )</ID>
-    <ID>LongMethod:ComposerActionPopup.kt$@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class) @Composable internal fun ComposerActionPopup( isTyping: Boolean, isPopupExpanded: Boolean, isAcquiringLocation: Boolean, onPickImage: () -&gt; Unit, onPickLocation: () -&gt; Unit, onRecord: () -&gt; Unit )</ID>
     <ID>LongMethod:CoordinationStatusBanners.kt$@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class) @Composable internal fun CoordinationStatusBanners( incident: Incident, isReporter: Boolean, isSelectedHelper: Boolean, selectedOffer: IncidentOffer?, actionMessage: String?, wasRevoked: Boolean )</ID>
     <ID>LongMethod:CreateIncidentSheet.kt$@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class, ExperimentalFoundationApi::class) @Composable fun CreateIncidentSheet( onDismiss: () -&gt; Unit, onSubmit: (title: String, type: String, severity: String, desc: String, area: String, lat: Double?, lng: Double?, time: Long?, acc: Float?) -&gt; Unit, submissionError: String? = null, isSubmitting: Boolean = false, reportWaitSeconds: Int = 0 )</ID>
-    <ID>LongMethod:DebugTerminal.kt$@Composable fun DebugTerminal()</ID>
     <ID>LongMethod:EmergencySummaryCard.kt$@Composable internal fun MinimalistEmergencyCard( profile: EmergencyProfile, isSelected: Boolean, isLight: Boolean, modifier: Modifier = Modifier, onClick: () -&gt; Unit )</ID>
     <ID>LongMethod:FirstLaunchGuideScreen.kt$@Composable fun FirstLaunchGuideScreen(isReplay: Boolean, onDone: () -&gt; Unit, onClose: () -&gt; Unit)</ID>
     <ID>LongMethod:FirstLaunchGuideScreen.kt$@Composable private fun GuideCanvas( index: Int, accent: Color, outline: Color, surface: Color, bubble: Color, foreground: Color, phase: Float )</ID>
     <ID>LongMethod:FullScreenSosAlarm.kt$@Composable fun FullScreenSosAlarm(alertMessage: ChatMessage, onDismiss: () -&gt; Unit, onViewMap: () -&gt; Unit = {})</ID>
     <ID>LongMethod:FullScreenSosAlarm.kt$@Composable private fun AcknowledgeSlideSlider( onAcknowledge: () -&gt; Unit, modifier: Modifier = Modifier )</ID>
     <ID>LongMethod:FullscreenImageViewer.kt$@Composable fun FullscreenImageViewer( imageBase64: String, mediaHelper: MediaHelper, onDismiss: () -&gt; Unit )</ID>
-    <ID>LongMethod:GattClientManager.kt$GattClientManager$fun connectToPersistentGatt(macAddress: String, peerName: String): BleConnectStartResult</ID>
-    <ID>LongMethod:GattServerLinkEvents.kt$GattServerLinkEvents$fun handleCallback()</ID>
-    <ID>LongMethod:GattTransferExecutor.kt$GattTransferExecutor$private fun sendChunk(flight: GattTransferFlight)</ID>
     <ID>LongMethod:HelpWorkflowPanel.kt$@Composable fun HelpWorkflowPanel( incident: Incident, offers: List&lt;IncidentOffer&gt;, events: List&lt;DomainEvent&gt;, localUserId: String?, localSigningKey: String?, leadReachability: String, busy: Boolean, actionMessage: String?, onOffer: (String) -&gt; Unit, onWithdraw: () -&gt; Unit, onSelect: (String) -&gt; Unit, onConfirm: () -&gt; Unit, onDecline: () -&gt; Unit, onRevoke: () -&gt; Unit, onResolve: () -&gt; Unit, onCancel: () -&gt; Unit )</ID>
     <ID>LongMethod:IdentitySetupScreen.kt$@Composable fun IdentitySetupContent( customName: String, onCustomNameChange: (String) -&gt; Unit, onIdentityGenerated: () -&gt; Unit, isSaving: Boolean = false, errorMessage: String? = null )</ID>
     <ID>LongMethod:InboxConversationRow.kt$@Composable internal fun ModernConversationInboxRow( conversation: ConversationPreview, onClick: () -&gt; Unit )</ID>
@@ -183,7 +170,6 @@
     <ID>LongMethod:ModernMeshTopologyCard.kt$@Composable internal fun ModernMeshTopologyCard( summary: HomeNetworkSummary, radarState: RadarUiState, myDeviceName: String, directNodeNames: List&lt;String&gt;, onNetworkClick: () -&gt; Unit, onPeerClick: (String) -&gt; Unit )</ID>
     <ID>LongMethod:ModernUserHeader.kt$@Composable internal fun ModernUserHeader( myDeviceName: String, isNodeActive: Boolean, summary: HomeNetworkSummary, connectionStatus: String, onProfileClick: () -&gt; Unit )</ID>
     <ID>LongMethod:ModernVoicePlayer.kt$@Composable fun ModernVoicePlayer( audioBase64: String, mediaHelper: MediaHelper, modifier: Modifier = Modifier )</ID>
-    <ID>LongMethod:PayloadDispatcher.kt$PayloadDispatcher$fun dispatch(endpointId: String, payloadBytes: ByteArray)</ID>
     <ID>LongMethod:NativeInboundPipeline.kt$NativeInboundPipeline$fun processBinaryPayload(endpointId: String, payloadBytes: ByteArray, transport: String? = null)</ID>
     <ID>LongMethod:NearbyMeshStoriesBar.kt$@Composable internal fun NearbyMeshStoriesBar( nodes: List&lt;NodeItemData&gt;, directNodeNames: List&lt;String&gt; = emptyList(), isNodeActive: Boolean, connectionStatus: String, onPeerClick: (String) -&gt; Unit, onNetworkClick: () -&gt; Unit )</ID>
     <ID>LongMethod:NetworkGraphVisualizer.kt$@Composable fun NetworkGraphVisualizer( nodes: List&lt;NodeItemData&gt;, myDeviceName: String, modifier: Modifier = Modifier, showEmptyScanPrompt: Boolean = true )</ID>
@@ -194,6 +180,7 @@
     <ID>LongMethod:NewMessageModal.kt$@Composable private fun RecipientRow( candidate: RecipientCandidate, onClick: () -&gt; Unit )</ID>
     <ID>LongMethod:NotificationHelper.kt$NotificationHelper$fun showSosEmergencyNotification(senderName: String, messageText: String, sosId: String = "legacy")</ID>
     <ID>LongMethod:OfflineMapSettingsScreen.kt$@Composable fun OfflineMapSettingsScreen( onBack: () -&gt; Unit, returnToSosAlert: Boolean = false, viewModel: OfflineMapViewModel = koinViewModel() )</ID>
+    <ID>LongMethod:PayloadDispatcher.kt$PayloadDispatcher$fun dispatch(endpointId: String, payloadBytes: ByteArray)</ID>
     <ID>LongMethod:PeerClassification.kt$internal fun classifyRadarNodes(state: RadarUiState): List&lt;NodeItemData&gt;</ID>
     <ID>LongMethod:PermissionsScreen.kt$@Composable private fun PermissionRequirementCard( icon: ImageVector, title: String, description: String, accentColor: androidx.compose.ui.graphics.Color, isGranted: Boolean = false )</ID>
     <ID>LongMethod:PermissionsScreen.kt$@Composable private fun PermissionsContent( state: SetupAccessState, onPrimaryAction: () -&gt; Unit )</ID>
@@ -224,7 +211,6 @@
     <ID>LongMethod:VisualHolographicPathMap.kt$@Composable internal fun VisualHolographicPathMap( path: List&lt;String&gt;, targetLabel: String, accentColor: Color )</ID>
     <ID>LongMethod:WalkieTalkieScreen.kt$@Composable fun WalkieTalkieScreen( commsViewModel: CommunicationViewModel, walkieTalkieViewModel: WalkieTalkieViewModel, mediaHelper: MediaHelper, onHistory: () -&gt; Unit = {} )</ID>
     <ID>LongParameterList:AppLogger.kt$AppLogger$( category: TerminalLogCategory, event: String, message: String, level: TerminalLogLevel = TerminalLogLevel.INFO, tag: String = "RESQMESH", peerName: String? = null, endpoint: String? = null, linkGeneration: Long? = null, role: String? = null, isVerbose: Boolean = false )</ID>
-    <ID>LongParameterList:AppLogger.kt$AppLogger$( endpoint: String, peerName: String?, role: String, generation: Long, state: String, transport: String = "GATT" )</ID>
     <ID>LongParameterList:BleAdmissionCapabilities.kt$BleAdmissionCapabilities$( val store: BleStateStore, val scheduler: BleAdmissionScheduler, val localName: () -&gt; String, val isBlocked: (String) -&gt; Boolean, val hasLinkToIdentity: (String) -&gt; Boolean, val hasIndirectRoute: (String) -&gt; Boolean, val hasPayloadReadyDirectLink: () -&gt; Boolean, val hasReadyLinkToIdentity: (String) -&gt; Boolean, val directLinkCount: () -&gt; Int, val maxDirectLinks: () -&gt; Int, val electionScore: () -&gt; String, val latestEndpointForIdentity: (String, String) -&gt; String, val connect: (String, String) -&gt; BleConnectStartResult, val onScanned: (ScanEvent) -&gt; Unit, val onDisconnected: (String) -&gt; Unit, val onPulse: () -&gt; Unit, val handshakeInfo: () -&gt; Pair&lt;String?, Long&gt;, val distinctReadyPeerCount: () -&gt; Int, val clock: () -&gt; Long, val jitterMs: (Long, Long) -&gt; Long, val onDecision: ((BleAdmissionDecision) -&gt; Unit)?, val disconnectEndpoint: (String) -&gt; Unit, val isNodeActive: () -&gt; Boolean, val canRetireForBridge: (String) -&gt; Boolean, val isTransportIdle: (String) -&gt; Boolean )</ID>
     <ID>LongParameterList:BleAdmissionContext.kt$BleAdmissionContext$(peerName: String, endpoint: String, peerConnections: Int, peerScore: String, hasIndirectRoute: Boolean, reason: BleAdmissionReason, result: BleConnectStartResult, attempts: Int, candidateAgeMs: Long, now: Long)</ID>
     <ID>LongParameterList:BleAdmissionDiagnostics.kt$BleAdmissionDiagnostics$( peerName: String, endpoint: String, peerConnections: Int, peerScore: String, hasIndirectRoute: Boolean, reason: BleAdmissionReason, result: BleConnectStartResult, attempts: Int, candidateAgeMs: Long, now: Long )</ID>
@@ -243,9 +229,7 @@
     <ID>LongParameterList:ChatBubble.kt$( message: ChatMessage, mediaHelper: MediaHelper, showAvatar: Boolean = true, showSenderName: Boolean = true, onUserClick: ((String) -&gt; Unit)? = null, onShowSeenBy: ((List&lt;String&gt;) -&gt; Unit)? = null, onReplyClick: ((ChatMessage) -&gt; Unit)? = null, onViewMap: ((Double, Double, String, String) -&gt; Unit)? = null, transferProgress: SendProgress? = null )</ID>
     <ID>LongParameterList:ChatContainerScreen.kt$( channelId: String, communityPreview: ChatMessage?, conversations: List&lt;ConversationPreview&gt;, modifier: Modifier = Modifier, onNewMessageClick: () -&gt; Unit, onCommunityClick: () -&gt; Unit, onChannelSelected: (String) -&gt; Unit, onConversationClick: (String) -&gt; Unit, communityUnread: Int = 0 )</ID>
     <ID>LongParameterList:ChatContainerScreen.kt$( viewModel: CommunicationViewModel, mediaHelper: MediaHelper, onChatSelected: (String) -&gt; Unit, onCommunityClick: () -&gt; Unit = {}, onCommunityConversationChanged: (Boolean) -&gt; Unit = {}, onViewMap: (Double, Double, String, String) -&gt; Unit = { _, _, _, _ -&gt; }, initialOpenCommunity: Boolean = false )</ID>
-    <ID>LongParameterList:ComposerActionPopup.kt$( isTyping: Boolean, isPopupExpanded: Boolean, isAcquiringLocation: Boolean, onPickImage: () -&gt; Unit, onPickLocation: () -&gt; Unit, onRecord: () -&gt; Unit )</ID>
     <ID>LongParameterList:CoordinationStatusBanners.kt$( incident: Incident, isReporter: Boolean, isSelectedHelper: Boolean, selectedOffer: IncidentOffer?, actionMessage: String?, wasRevoked: Boolean )</ID>
-    <ID>LongParameterList:DebugTerminal.kt$( eventCount: Int, linkCount: Int, showVerbose: Boolean, onVerboseToggle: () -&gt; Unit, onClear: () -&gt; Unit, onClose: () -&gt; Unit )</ID>
     <ID>LongParameterList:FirstLaunchGuideScreen.kt$( index: Int, accent: Color, outline: Color, surface: Color, bubble: Color, foreground: Color )</ID>
     <ID>LongParameterList:FirstLaunchGuideScreen.kt$( index: Int, accent: Color, outline: Color, surface: Color, bubble: Color, foreground: Color, phase: Float )</ID>
     <ID>LongParameterList:GattClientAttempt.kt$GattClientAttempt$( val manager: GattClientHost, val macAddress: String, val peerName: String, val epoch: Long, val link: BleLink, val payloadSetup: ReadyPayloadSetup, val stablePeerId: String?, val useExplicitLeTransport: Boolean, val radioOwner: String, private val discoverServices: (BluetoothGatt) -&gt; Boolean, private val retireTimedOutGatt: () -&gt; Unit )</ID>
@@ -273,7 +257,6 @@
     <ID>LongParameterList:IncidentViewModel.kt$IncidentViewModel$( type: String, severity: String, description: String, areaDescription: String, latitude: Double? = null, longitude: Double? = null, locationCapturedAt: Long? = null, locationAccuracyMeters: Float? = null, title: String = "", onSuccess: (Incident) -&gt; Unit = {}, onFailure: () -&gt; Unit = {} )</ID>
     <ID>LongParameterList:L2capTransport.kt$L2capTransport$( private val store: BleStateStore, private val handler: Handler, private val hasLiveGattRole: (String) -&gt; Boolean, private val onPayload: (String, ByteArray, String) -&gt; Unit, private val onPromoteGattWork: (String) -&gt; Unit, private val onSocketLost: (String) -&gt; Unit, private val onWriteFailure: (String, ByteArray) -&gt; Unit, private val onConnected: () -&gt; Unit, private val onFrame: (String, ByteArray, OutboundFrameEvent.Stage) -&gt; Unit = { _, _, _ -&gt; }, private val priorityForPayload: (ByteArray) -&gt; Boolean = { false } )</ID>
     <ID>LongParameterList:LegacyIncidentSync.kt$LegacyIncidentSync$( private val incidentDao: IncidentDao, private val domainEventDao: DomainEventDao, private val networkGateway: MeshNetworkGateway, private val repositoryScope: CoroutineScope, private val applyJson: suspend (String) -&gt; Boolean, private val replay: suspend (String) -&gt; Unit, private val reconcile: (String) -&gt; Unit )</ID>
-    <ID>LongParameterList:MainApplicationOverlays.kt$( isDeveloperMode: Boolean, hasIncomingSos: Boolean, hasMapAlert: Boolean, hasOwnSos: Boolean, isSOSActive: Boolean, publicSendSnackbar: androidx.compose.material3.SnackbarHostState, onToggleTerminal: () -&gt; Unit )</ID>
     <ID>LongParameterList:MainContainerScreen.kt$( setupViewModel: SetupViewModel, radarViewModel: RadarViewModel, commsViewModel: CommunicationViewModel, walkieTalkieViewModel: edu.cit.resqmesh.feature.comms.viewmodel.WalkieTalkieViewModel, mediaHelper: MediaHelper, appearance: AppAppearance, onAppearanceSelected: (AppAppearance) -&gt; Unit, initialChatNode: String? = null, onClearInitialChatNode: (() -&gt; Unit)? = null, initialIncidentId: String? = null, onClearInitialIncident: (() -&gt; Unit)? = null, initialViewMap: Boolean = false, initialSosSender: String? = null, initialSosText: String? = null, initialSosId: String? = null, onClearInitialViewMap: (() -&gt; Unit)? = null )</ID>
     <ID>LongParameterList:MainDestinationContent.kt$( targetScreen: ResQDestination, setupViewModel: SetupViewModel, radarViewModel: RadarViewModel, commsViewModel: CommunicationViewModel, walkieTalkieViewModel: edu.cit.resqmesh.feature.comms.viewmodel.WalkieTalkieViewModel, mediaHelper: MediaHelper, locationStatus: edu.cit.resqmesh.core.location.LocationStatus, activeIncidentCount: Int, criticalIncidentCount: Int, onMessages: () -&gt; Unit, onNetwork: () -&gt; Unit, onPeer: (String) -&gt; Unit, onProfile: () -&gt; Unit, onVoice: () -&gt; Unit, onIncidents: () -&gt; Unit, onChat: (String) -&gt; Unit, onCommunity: () -&gt; Unit, onMap: (Double, Double, String, String) -&gt; Unit, onHistory: () -&gt; Unit, onChat1: (String) -&gt; Unit, onCommunity1: () -&gt; Unit )</ID>
     <ID>LongParameterList:MapPackageDetails.kt$( state: OfflineMapUiState, onDownload: () -&gt; Unit, onDownloadCellular: () -&gt; Unit, onCancel: () -&gt; Unit, onDelete: () -&gt; Unit, onRetry: () -&gt; Unit )</ID>
@@ -285,7 +268,6 @@
     <ID>LongParameterList:MeshUseCases.kt$SendPublicMessageUseCase$(text: String, imageBase64: String?, audioBase64: String?, locationLat: Double? = null, locationLng: Double? = null, isSOS: Boolean = false, isSOSCancel: Boolean = false)</ID>
     <ID>LongParameterList:ModernMeshTopologyCard.kt$( summary: HomeNetworkSummary, radarState: RadarUiState, myDeviceName: String, directNodeNames: List&lt;String&gt;, onNetworkClick: () -&gt; Unit, onPeerClick: (String) -&gt; Unit )</ID>
     <ID>LongParameterList:NativeBleManager.kt$NativeBleManager$(endpoint: String, bytes: ByteArray, stage: OutboundFrameEvent.Stage, transport: String, queuedAt: Long = 0L, startedAt: Long = 0L)</ID>
-    <ID>LongParameterList:NativeInboundPipeline.kt$NativeInboundPipeline$( private val store: BleStateStore, private val handler: Handler, private val peerTransferVersions: BoundedLruMap&lt;String, Int&gt;, private val generation: () -&gt; Long, private val nodeIdentity: () -&gt; String, private val isTransportGenerationCurrent: (Long) -&gt; Boolean, private val hasLiveSocket: (String) -&gt; Boolean, private val nodeIdForEndpoint: (String) -&gt; String?, private val hasReadyEndpoint: (String) -&gt; Boolean, private val isDeviceBlocked: (String) -&gt; Boolean, private val transfers: () -&gt; ReliableMeshTransfers, private val removeHeartbeat: (String) -&gt; Unit, private val disconnectFromEndpoint: (String) -&gt; Unit, private val disconnectDirectIdentity: (String, String) -&gt; Unit, private val sendSystemPulse: () -&gt; Unit, private val connectedListener: () -&gt; ((ConnectedDevice) -&gt; Unit)?, private val livenessListener: () -&gt; ((String, Boolean) -&gt; Unit)?, private val dispatch: (String, ByteArray) -&gt; Unit )</ID>
     <ID>LongParameterList:NativeOutboundDispatcher.kt$NativeOutboundDispatcher$( private val store: BleStateStore, private val handler: Handler, private val peerTransferVersions: BoundedLruMap&lt;String, Int&gt;, private val nodeIdForEndpoint: (String) -&gt; String?, private val hasReadyEndpoint: (String) -&gt; Boolean, private val isDeviceBlocked: (String) -&gt; Boolean, private val hasUsableL2cap: (String) -&gt; Boolean, private val transfers: () -&gt; ReliableMeshTransfers, private val coordinator: () -&gt; GattTransferCoordinator, private val sendL2cap: (String, ByteArray, Boolean) -&gt; TransportDispatchResult, private val processNextPayload: (String) -&gt; Unit, private val reportFrame: (String, ByteArray, OutboundFrameEvent.Stage, String) -&gt; Unit, private val removeHeartbeat: (String) -&gt; Unit )</ID>
     <ID>LongParameterList:NearbyMeshStoriesBar.kt$( nodes: List&lt;NodeItemData&gt;, directNodeNames: List&lt;String&gt; = emptyList(), isNodeActive: Boolean, connectionStatus: String, onPeerClick: (String) -&gt; Unit, onNetworkClick: () -&gt; Unit )</ID>
     <ID>LongParameterList:NetworkPeerDetails.kt$( node: NodeItemData, knownPath: List&lt;String&gt;, onBack: () -&gt; Unit, onDisconnect: () -&gt; Unit, onConnect: () -&gt; Unit, onBlock: () -&gt; Unit, onUnblock: () -&gt; Unit, onMessage: () -&gt; Unit )</ID>
@@ -466,13 +448,6 @@
     <ID>MagicNumber:CryptoManager.kt$CryptoManager$16</ID>
     <ID>MagicNumber:CryptoManager.kt$CryptoManager$2048</ID>
     <ID>MagicNumber:CryptoManager.kt$CryptoManager$256</ID>
-    <ID>MagicNumber:DebugTerminal.kt$0xFF00FF00</ID>
-    <ID>MagicNumber:DebugTerminal.kt$0xFFFF5252</ID>
-    <ID>MagicNumber:DebugTerminal.kt$0xFFFFC107</ID>
-    <ID>MagicNumber:DebugTerminal.kt$3</ID>
-    <ID>MagicNumber:DefaultLocationClient.kt$DefaultLocationClient$20f</ID>
-    <ID>MagicNumber:DeveloperBadge.kt$0xEE121814</ID>
-    <ID>MagicNumber:DeveloperBadge.kt$0xFF00FF00</ID>
     <ID>MagicNumber:DirectIdentityPolicy.kt$DirectIdentityPolicy$2048</ID>
     <ID>MagicNumber:DirectIdentityPolicy.kt$DirectIdentityPolicy$4096</ID>
     <ID>MagicNumber:EmergencySummaryCard.kt$0xFF12151E</ID>
@@ -569,11 +544,9 @@
     <ID>MagicNumber:FullscreenImageViewer.kt$1.2f</ID>
     <ID>MagicNumber:FullscreenImageViewer.kt$250f</ID>
     <ID>MagicNumber:FullscreenImageViewer.kt$5f</ID>
-    <ID>MagicNumber:GattClientManager.kt$GattClientManager$247</ID>
     <ID>MagicNumber:GattServerAttributeRequests.kt$GattServerAttributeRequests$4</ID>
     <ID>MagicNumber:GattServerAttributeRequests.kt$GattServerAttributeRequests$5000</ID>
     <ID>MagicNumber:GattServerManager.kt$GattServerManager$20_000L</ID>
-    <ID>MagicNumber:GattTransferExecutor.kt$GattTransferExecutor$20</ID>
     <ID>MagicNumber:IdentitySetupScreen.kt$150</ID>
     <ID>MagicNumber:IdentitySetupScreen.kt$250</ID>
     <ID>MagicNumber:IncidentConfirmationDialogs.kt$3</ID>
@@ -601,14 +574,11 @@
     <ID>MagicNumber:MapDetailRow.kt$75</ID>
     <ID>MagicNumber:MapHeader.kt$600</ID>
     <ID>MagicNumber:MapInstallationActions.kt$1024</ID>
-    <ID>MagicNumber:MapLibreMapCanvas.kt$1000f</ID>
     <ID>MagicNumber:MapLibreMapCanvas.kt$15.0</ID>
     <ID>MagicNumber:MapLibreMapCanvas.kt$16.5</ID>
-    <ID>MagicNumber:MapLibreMapCanvas.kt$180</ID>
     <ID>MagicNumber:MapLibreMapCanvas.kt$20</ID>
     <ID>MagicNumber:MapLibreMapCanvas.kt$3.5f</ID>
     <ID>MagicNumber:MapLibreMapCanvas.kt$360f</ID>
-    <ID>MagicNumber:MapLibreMapCanvas.kt$600</ID>
     <ID>MagicNumber:MapMarkerBitmaps.kt$10</ID>
     <ID>MagicNumber:MapMarkerBitmaps.kt$11</ID>
     <ID>MagicNumber:MapMarkerBitmaps.kt$12</ID>
@@ -625,8 +595,6 @@
     <ID>MagicNumber:MapMarkerBitmaps.kt$9</ID>
     <ID>MagicNumber:MapPackageFormatting.kt$1024</ID>
     <ID>MagicNumber:MediaHelper.kt$MediaHelper$100</ID>
-    <ID>MagicNumber:MediaHelper.kt$MediaHelper$150f</ID>
-    <ID>MagicNumber:MediaHelper.kt$MediaHelper$20</ID>
     <ID>MagicNumber:MediaHelper.kt$MediaHelper$400</ID>
     <ID>MagicNumber:MediaHelper.kt$MediaHelper$450</ID>
     <ID>MagicNumber:MeshInboundMessages.kt$5</ID>
@@ -835,16 +803,10 @@
     <ID>MagicNumber:SosHubScreen.kt$0xFFFCA5A5</ID>
     <ID>MagicNumber:SosHubScreen.kt$0xFFFEE2E2</ID>
     <ID>MagicNumber:SosHubScreen.kt$0xFFFFF8F8</ID>
-    <ID>MagicNumber:SosMapPresentation.kt$100</ID>
-    <ID>MagicNumber:SosMapPresentation.kt$10000</ID>
-    <ID>MagicNumber:SosMapPresentation.kt$100000.0</ID>
-    <ID>MagicNumber:SosMapPresentation.kt$123.0</ID>
     <ID>MagicNumber:SosMapPresentation.kt$22.5</ID>
     <ID>MagicNumber:SosMapPresentation.kt$360</ID>
     <ID>MagicNumber:SosMapPresentation.kt$45</ID>
     <ID>MagicNumber:SosMapPresentation.kt$7</ID>
-    <ID>MagicNumber:SosMapPresentation.kt$9.0</ID>
-    <ID>MagicNumber:SosMapPresentation.kt$99999</ID>
     <ID>MagicNumber:SosProtocol.kt$SosProtocol$180.0</ID>
     <ID>MagicNumber:SosProtocol.kt$SosProtocol$80</ID>
     <ID>MagicNumber:SosProtocol.kt$SosProtocol$90.0</ID>
@@ -856,10 +818,6 @@
     <ID>MagicNumber:SosSyncCoordinator.kt$SosSyncCoordinator$8</ID>
     <ID>MagicNumber:SosThreadHeader.kt$0.5f</ID>
     <ID>MagicNumber:SosThreadHeader.kt$0xFFB42318</ID>
-    <ID>MagicNumber:SosThreadHeader.kt$0xFFB45309</ID>
-    <ID>MagicNumber:SosThreadHeader.kt$0xFFDC2626</ID>
-    <ID>MagicNumber:SosThreadHeader.kt$0xFFFCA5A5</ID>
-    <ID>MagicNumber:SosThreadHeader.kt$0xFFFDE68A</ID>
     <ID>MagicNumber:SosThreadHeader.kt$0xFFFFB300</ID>
     <ID>MagicNumber:SosThreadHeader.kt$1.4f</ID>
     <ID>MagicNumber:SosThreadHeader.kt$1_000_000_000_000L</ID>
@@ -1071,12 +1029,10 @@
     <ID>MaxLineLength:ChatInput.kt$exit = fadeOut(tween(140)) + shrinkHorizontally(animationSpec = spring(stiffness = Spring.StiffnessMedium))</ID>
     <ID>MaxLineLength:ChatInput.kt$if (isPopupExpanded) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline.copy(alpha = 0.15f)</ID>
     <ID>MaxLineLength:ChatInput.kt$tint = if (isPopupExpanded) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant</ID>
-    <ID>MaxLineLength:CommunicationViewModel.kt$CommunicationViewModel$@androidx.annotation.RequiresPermission(anyOf = ["android.permission.ACCESS_FINE_LOCATION", "android.permission.ACCESS_COARSE_LOCATION"])</ID>
     <ID>MaxLineLength:CommunicationViewModel.kt$CommunicationViewModel$_privateSendErrors.tryEmit("Private message not sent. Waiting for a ready connection and current recipient key.")</ID>
     <ID>MaxLineLength:CommunicationViewModel.kt$CommunicationViewModel$fun</ID>
     <ID>MaxLineLength:CommunicationViewModel.kt$CommunicationViewModel$if</ID>
     <ID>MaxLineLength:CommunicationViewModel.kt$CommunicationViewModel$useCases.sendPublicMessage("📍 I am sharing my location.", null, null, location.latitude, location.longitude)</ID>
-    <ID>MaxLineLength:CommunicationViewModel.kt$CommunicationViewModel$val fusedLocationClient = com.google.android.gms.location.LocationServices.getFusedLocationProviderClient(context.applicationContext)</ID>
     <ID>MaxLineLength:CommunityIncidentsBanner.kt$Row</ID>
     <ID>MaxLineLength:CommunityIncidentsBanner.kt$style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp, fontWeight = FontWeight.Black)</ID>
     <ID>MaxLineLength:CommunityIncidentsBanner.kt$text = if (hasActive) "$activeIncidentCount emergency request${if (activeIncidentCount &gt; 1) "s" else ""} nearby. Tap to triage." else "Community Mutual Aid • All clear in your area."</ID>
@@ -1087,9 +1043,6 @@
     <ID>MaxLineLength:CoordinationStatusBanners.kt$isReporter -&gt; "Waiting for ${selectedOffer?.helperName ?: "lead helper"} to confirm readiness."</ID>
     <ID>MaxLineLength:CoordinationStatusBanners.kt$text = "Your previous lead helper selection was revoked by the reporter. You may submit an updated offer if available."</ID>
     <ID>MaxLineLength:CreateIncidentSheet.kt$onSubmit: (title: String, type: String, severity: String, desc: String, area: String, lat: Double?, lng: Double?, time: Long?, acc: Float?) -&gt; Unit</ID>
-    <ID>MaxLineLength:DebugTerminal.kt$"• ${link.peerName} ${link.state} ${link.role}#${link.generation} ${link.transport} ${TerminalLogEntry.shortEndpoint(link.endpoint)}"</ID>
-    <ID>MaxLineLength:DebugTerminal.kt$Text(filter.label, fontFamily = FontFamily.Monospace, fontSize = 11.sp, fontWeight = FontWeight.Bold)</ID>
-    <ID>MaxLineLength:DebugTerminal.kt$if (showVerbose) "Details: heartbeat and SYSTEM relay traffic shown" else "Details: heartbeat and SYSTEM relay traffic hidden"</ID>
     <ID>MaxLineLength:DefaultLocationClient.kt$DefaultLocationClient$private val client: FusedLocationProviderClient = LocationServices.getFusedLocationProviderClient(context.applicationContext)</ID>
     <ID>MaxLineLength:DefaultLocationClient.kt$DefaultLocationClient$val hasCoarse = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED</ID>
     <ID>MaxLineLength:DefaultLocationClient.kt$DefaultLocationClient$val hasFine = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED</ID>
@@ -1144,17 +1097,12 @@
     <ID>MaxLineLength:GattClientHost.kt$GattClientHost$fun completeGattChunk(endpoint: String, role: BleLinkRole, status: Int, gatt: BluetoothGatt? = null, device: BluetoothDevice? = null): Unit</ID>
     <ID>MaxLineLength:GattClientManager.kt$GattClientManager$AppLogger.d("BLE_MESH", "Connecting to $peerName with explicit LE transport after AUTO discovery timeout")</ID>
     <ID>MaxLineLength:GattClientManager.kt$GattClientManager$AppLogger.d("BLE_MESH", "Link ${link.generation} CLIENT $macAddress ${link.peerNodeId ?: "unknown"}: CONNECTING")</ID>
-    <ID>MaxLineLength:GattClientManager.kt$GattClientManager$ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED</ID>
     <ID>MaxLineLength:GattClientManager.kt$GattClientManager$fun onGattIdle(endpoint: String)</ID>
     <ID>MaxLineLength:GattClientManager.kt$GattClientManager$fun onSocketLost(endpoint: String)</ID>
     <ID>MaxLineLength:GattClientPayloadSetup.kt$isCurrentReady = { isTransportGenerationCurrent(epoch) &amp;&amp; store.links.isCurrent(link) &amp;&amp; link.state == BleLinkState.READY }</ID>
     <ID>MaxLineLength:GattClientPayloadSetup.kt$isGattIdle = { !store.gattFlights.containsKey(macAddress) &amp;&amp; !store.serverIndications.unresolved(macAddress) &amp;&amp; link.currentOperation == null }</ID>
     <ID>MaxLineLength:GattL2capAcceptor.kt$GattL2capAcceptor$AppLogger.d("BLE_MESH", "L2CAP CoC not supported on this Android version. Falling back to GATT exclusively.")</ID>
     <ID>MaxLineLength:GattL2capAcceptor.kt$GattL2capAcceptor$ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED</ID>
-    <ID>MaxLineLength:GattServerAttributeRequests.kt$GattServerAttributeRequests$AppLogger.d("BLE_MESH", "Link ${link.generation} SERVER ${device.address}: READY CCCD indications enabled")</ID>
-    <ID>MaxLineLength:GattServerAttributeRequests.kt$GattServerAttributeRequests$AppLogger.d("BLE_MESH", "SERVER identity deadline ended: BLUETOOTH_CONNECT was revoked")</ID>
-    <ID>MaxLineLength:GattServerAttributeRequests.kt$GattServerAttributeRequests$AppLogger.d("BLE_MESH", "SERVER identity timeout disconnect skipped: BLUETOOTH_CONNECT was revoked")</ID>
-    <ID>MaxLineLength:GattServerAttributeRequests.kt$GattServerAttributeRequests$AppLogger.d("BLE_MESH", "Server: READY link received no identity; disconnecting ${device.address}.")</ID>
     <ID>MaxLineLength:GattServerAttributeRequests.kt$GattServerAttributeRequests$ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED</ID>
     <ID>MaxLineLength:GattServerAttributeRequests.kt$GattServerAttributeRequests$fun</ID>
     <ID>MaxLineLength:GattServerAttributeRequests.kt$GattServerAttributeRequests$gattServer?.sendResponse(device, requestId, BluetoothGatt.GATT_READ_NOT_PERMITTED, offset, null)</ID>
@@ -1164,32 +1112,10 @@
     <ID>MaxLineLength:GattServerCallback.kt$GattServerCallback$override</ID>
     <ID>MaxLineLength:GattServerCallback.kt$GattServerCallback$private</ID>
     <ID>MaxLineLength:GattServerCallback.kt$GattServerCallback$super.onCharacteristicWriteRequest(device, requestId, characteristic, preparedWrite, responseNeeded, offset, value)</ID>
-    <ID>MaxLineLength:GattServerLinkEvents.kt$GattServerLinkEvents$"Server view shares outbound CLIENT link ${ownedClient.generation} on $macAddress; no duplicate SERVER setup"</ID>
-    <ID>MaxLineLength:GattServerLinkEvents.kt$GattServerLinkEvents$AppLogger.d("BLE_MESH", "Could not reject blocked device: BLUETOOTH_CONNECT was revoked")</ID>
-    <ID>MaxLineLength:GattServerLinkEvents.kt$GattServerLinkEvents$AppLogger.d("BLE_MESH", "Could not reject duplicate inbound link: BLUETOOTH_CONNECT was revoked")</ID>
-    <ID>MaxLineLength:GattServerLinkEvents.kt$GattServerLinkEvents$AppLogger.d("BLE_MESH", "Could not reject full-mesh connection: BLUETOOTH_CONNECT was revoked")</ID>
-    <ID>MaxLineLength:GattServerLinkEvents.kt$GattServerLinkEvents$AppLogger.d("BLE_MESH", "Could not reject redundant inbound link: BLUETOOTH_CONNECT was revoked")</ID>
-    <ID>MaxLineLength:GattServerLinkEvents.kt$GattServerLinkEvents$AppLogger.d("BLE_MESH", "Dual-Link Collision with $peerName: we keep our link ($myId &lt; $theirId). Rejecting inbound.")</ID>
-    <ID>MaxLineLength:GattServerLinkEvents.kt$GattServerLinkEvents$AppLogger.d("BLE_MESH", "Dual-Link Collision with $peerName: yielding our link ($myId &gt;= $theirId). Accepting inbound.")</ID>
-    <ID>MaxLineLength:GattServerLinkEvents.kt$GattServerLinkEvents$AppLogger.d("BLE_MESH", "Link ${link.generation} SERVER $macAddress ${link.peerNodeId ?: "unknown"}: CONFIGURING radioStatus=$status")</ID>
-    <ID>MaxLineLength:GattServerLinkEvents.kt$GattServerLinkEvents$AppLogger.d("BLE_MESH", "Link ${link.generation} SERVER $macAddress: DISCONNECTING radioStatus=$status")</ID>
-    <ID>MaxLineLength:GattServerLinkEvents.kt$GattServerLinkEvents$AppLogger.d("BLE_MESH", "Rejecting redundant inbound link from $peerName. Healthy link already on $existingEndpoint.")</ID>
-    <ID>MaxLineLength:GattServerLinkEvents.kt$GattServerLinkEvents$AppLogger.d("BLE_MESH", "SERVER_CALLBACK_WAIT rejecting same-address replacement until old indication resolves")</ID>
     <ID>MaxLineLength:GattServerLinkEvents.kt$GattServerLinkEvents$AppLogger.d("BLE_MESH", "Server: Provisional device connected; identity deadline starts only after CCCD is READY.")</ID>
-    <ID>MaxLineLength:GattServerLinkEvents.kt$GattServerLinkEvents$AppLogger.d("BLE_MESH", "Server: Rejected connection from ${device.address}. Mesh node is full.")</ID>
-    <ID>MaxLineLength:GattServerLinkEvents.kt$GattServerLinkEvents$ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED</ID>
-    <ID>MaxLineLength:GattServerLinkEvents.kt$GattServerLinkEvents$val link = store.links.begin(macAddress, BleLinkRole.SERVER, peerName?.let(NodeIdentity::idOf), queue, writing)</ID>
-    <ID>MaxLineLength:GattServerLinkEvents.kt$GattServerLinkEvents$val seededNodeId = NodeIdentity.idOf(safePeerName) ?: store.endpointNodeIds[macAddress].orEmpty()</ID>
-    <ID>MaxLineLength:GattServerLinkEvents.kt$GattServerLinkEvents.&lt;no name provided&gt;$AppLogger.d("BLE_MESH", "Link ${link.generation} SERVER $macAddress: CCCD setup timed out; closing unfinished link")</ID>
-    <ID>MaxLineLength:GattServerLinkEvents.kt$GattServerLinkEvents.&lt;no name provided&gt;$AppLogger.d("BLE_MESH", "Link ${link.generation} SERVER $macAddress: keeping unfinished role while peer has a READY link")</ID>
-    <ID>MaxLineLength:GattServerLinkEvents.kt$GattServerLinkEvents.&lt;no name provided&gt;$AppLogger.d("BLE_MESH", "SERVER setup deadline ended: BLUETOOTH_CONNECT was revoked")</ID>
-    <ID>MaxLineLength:GattServerLinkEvents.kt$GattServerLinkEvents.&lt;no name provided&gt;$ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED</ID>
     <ID>MaxLineLength:GattServerManager.kt$GattServerManager$ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED</ID>
     <ID>MaxLineLength:GattTransferCoordinator.kt$GattTransferCoordinator$GattTransferFlight(transfer, link, queue, writing, gatt, serverDevice).also { store.gattFlights[endpoint] = it }</ID>
-    <ID>MaxLineLength:GattTransferExecutor.kt$GattTransferExecutor$AppLogger.d("BLE_MESH", "Link ${flight.link.generation} $endpoint: GATT initiation skipped because BLUETOOTH_CONNECT was revoked")</ID>
-    <ID>MaxLineLength:GattTransferExecutor.kt$GattTransferExecutor$if</ID>
     <ID>MaxLineLength:GattTransferExecutor.kt$GattTransferExecutor$if (status != BluetoothGatt.GATT_SUCCESS) { fail(flight, "GATT completion failed status=$status"); return@post }</ID>
-    <ID>MaxLineLength:GattTransferExecutor.kt$GattTransferExecutor$val characteristic = gattServer()?.getService(serviceUuid)?.getCharacteristic(transmitCharacteristicUuid)</ID>
     <ID>MaxLineLength:GattTransferExecutor.kt$GattTransferExecutor$val ticket = if (flight.link.role == BleLinkRole.SERVER) store.serverIndications.begin(flight, operationId) else null</ID>
     <ID>MaxLineLength:HelpWorkflowPanel.kt$Text</ID>
     <ID>MaxLineLength:HybridPrivateRoutingTest.kt$HybridPrivateRoutingTest$ReceiptHandler().handle("ep-charlie", payload, ProtoBuf.encodeToByteArray(MeshPayload.serializer(), payload), callback)</ID>
@@ -1206,7 +1132,6 @@
     <ID>MaxLineLength:InboxEmptyState.kt$CommsFilter.RELAYS -&gt; "No relayed conversations" to "Chats with currently reachable relayed peers will appear here."</ID>
     <ID>MaxLineLength:InboxHeader.kt$color = if (isSelected) activeColor.copy(alpha = 0.14f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)</ID>
     <ID>MaxLineLength:InboxHeader.kt$if (isSelected) activeColor.copy(alpha = 0.5f) else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)</ID>
-    <ID>MaxLineLength:IncidentActivity.kt$val target = runCatching { JSONObject(evt.payloadJson).optString("helperName") }.getOrNull()?.takeIf { it.isNotBlank() } ?: "a helper"</ID>
     <ID>MaxLineLength:IncidentAppliedFilters.kt$.</ID>
     <ID>MaxLineLength:IncidentAutomaticSyncTest.kt$IncidentAutomaticSyncTest$radio.drop = { _, _, p -&gt; (p.type == "EVENT_SYNC_RESP" &amp;&amp; radio.op(p) == "GET_EVENTS" &amp;&amp; !dropped).also { if (it) dropped = true } }</ID>
     <ID>MaxLineLength:IncidentAutomaticSyncTest.kt$IncidentAutomaticSyncTest$val assigned = DomainEventEntity("assign", "legacy", "INCIDENT", "INCIDENT_ASSIGNED", "helper", "Helper", 2, 2, "{}")</ID>
@@ -1228,8 +1153,6 @@
     <ID>MaxLineLength:IncidentCoordinationHub.kt$imageVector = if (isAwaiting) Icons.Outlined.HourglassTop else Icons.Outlined.Shield</ID>
     <ID>MaxLineLength:IncidentCoordinationHub.kt$label = { Text(if (myOffer == null || myOffer.withdrawn) "How can you assist? (Equipment, ETA, training)" else "Update offer note") }</ID>
     <ID>MaxLineLength:IncidentCoordinationHub.kt$text</ID>
-    <ID>MaxLineLength:IncidentCoordinationHub.kt$text = "Coordination events are signed with device keys and relayed peer-to-peer. Helpers are civilian volunteers, not verified emergency services."</ID>
-    <ID>MaxLineLength:IncidentCoordinationHub.kt$text = "⚠️ Helper currently unreachable via mesh. They may still be en route; state updates will sync upon reconnect."</ID>
     <ID>MaxLineLength:IncidentCoordinationHub.kt$text = if (myOffer == null || myOffer.withdrawn) "OFFER YOUR ASSISTANCE" else "UPDATE YOUR ACTIVE OFFER"</ID>
     <ID>MaxLineLength:IncidentCoordinationHub.kt$val isLeadLocal = isSelectedHelper || leadReachability in setOf("Local Device", "Local", "This phone")</ID>
     <ID>MaxLineLength:IncidentDestinations.kt$val activeTabTextColor = if (isNight) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onPrimary</ID>
@@ -1349,23 +1272,8 @@
     <ID>MaxLineLength:MainContainerScreen.kt$val incidentViewModel: edu.cit.resqmesh.feature.incident.viewmodel.IncidentViewModel = org.koin.androidx.compose.koinViewModel()</ID>
     <ID>MaxLineLength:MapCatalogConfig.kt$MapPackageCatalogEntry$val description: String = "High-contrast vector road network, waterways, POIs, and emergency infrastructure for Cebu Metropolitan Area and Cebu Province."</ID>
     <ID>MaxLineLength:MapCatalogConfig.kt$MapPackageCatalogEntry.Companion$0x30.toByte()</ID>
-    <ID>MaxLineLength:MapCollapsedPreview.kt$imageVector = if (isSheetExpanded) Icons.Default.KeyboardArrowDown else Icons.Default.KeyboardArrowUp</ID>
-    <ID>MaxLineLength:MapExpandedDetails.kt$border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))</ID>
-    <ID>MaxLineLength:MapFallbackContent.kt$border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.15f))</ID>
-    <ID>MaxLineLength:MapFallbackContent.kt$border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))</ID>
-    <ID>MaxLineLength:MapFallbackContent.kt$border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))</ID>
-    <ID>MaxLineLength:MapFallbackContent.kt$text = "Offline maps must be verified and downloaded prior to deployment. Coordinates transmitted via mesh remain valid and directly usable in navigation equipment or GPS devices."</ID>
-    <ID>MaxLineLength:MapInstallationActions.kt$text = "Available: ${formatBytes(availableBytes)}. Approximately $requiredMb MB required for download and vector extraction safety margins."</ID>
-    <ID>MaxLineLength:MapInstallationActions.kt$text = "Connecting to Wi-Fi prevents large data usage on cellular links. Connect to Wi-Fi to proceed, or download anyway."</ID>
-    <ID>MaxLineLength:MapInstallationActions.kt$text = "No offline map installed. SOS screens will operate in mapless coordinate fallback mode until installed."</ID>
     <ID>MaxLineLength:MapInstallationProgress.kt$Icon(Icons.Default.CheckCircle, contentDescription = null, tint = SignalGreen, modifier = Modifier.size(28.dp))</ID>
-    <ID>MaxLineLength:MapLibreMapCanvas.kt$Toast.makeText(context, "Locking on beacon (${telemetry.second})", Toast.LENGTH_SHORT).show()</ID>
     <ID>MaxLineLength:MapLibreMapCanvas.kt$border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.35f))</ID>
-    <ID>MaxLineLength:MapLibreMapCanvas.kt$val distStr = if (dist &lt; 1000f) "${dist.roundToInt()} m" else String.format(Locale.US, "%.1f km", dist / 1000f)</ID>
-    <ID>MaxLineLength:MapLibreMapCanvas.kt$val sosIcon = IconFactory.getInstance(context).fromBitmap(createSosMarkerBitmap(context, "SOS"))</ID>
-    <ID>MaxLineLength:MapPackageDetails.kt$else -&gt; Triple("NOT INSTALLED", MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.15f), MaterialTheme.colorScheme.onSurfaceVariant)</ID>
-    <ID>MaxLineLength:MapPackageDetails.kt$status is MapPackageStatus.Installed -&gt; Triple("ACTIVE &amp; VERIFIED", SignalGreen.copy(alpha = 0.15f), SignalGreen)</ID>
-    <ID>MaxLineLength:MapPackageDetails.kt$text = "ResQMesh offline vector maps are pre-compiled and signed for zero-trust deployment. Once downloaded over Wi-Fi, map assets remain completely local and never phone home."</ID>
     <ID>MaxLineLength:MapPackageTest.kt$MapPackageTest$assertFalse(fakeVerifier.verifyPackageHash(testFile, "0000000000000000000000000000000000000000000000000000000000000000"))</ID>
     <ID>MaxLineLength:MapPackageTest.kt$MapPackageTest$assertTrue("Resolved PMTiles source must use pmtiles://file://", resolved.contains("\"url\":\"pmtiles://file://$normalizedExpectedPath/cebu.pmtiles\""))</ID>
     <ID>MaxLineLength:MapPackageTest.kt$MapPackageTest$assertTrue("Resolved glyphs must start with file://", resolved.contains("\"glyphs\":\"file://$normalizedExpectedPath/glyphs/{fontstack}/{range}.pbf\""))</ID>
@@ -1381,7 +1289,6 @@
     <ID>MaxLineLength:MeshBlockCoordinator.kt$MeshBlockCoordinator$if (pending?.operationId != relationship.operationId || pending.status != BlockRelationshipStatus.PENDING_ACK) break</ID>
     <ID>MaxLineLength:MeshBlockCoordinator.kt$MeshBlockCoordinator$is PrivateDeliveryPlanner.Target.Endpoint -&gt; networkManager.sendPriorityPayload(target.endpointId, payloadBytes)</ID>
     <ID>MaxLineLength:MeshBlockCoordinator.kt$MeshBlockCoordinator$private</ID>
-    <ID>MaxLineLength:MeshConversationMedia.kt$MeshConversationMedia$val payloadBytes = kotlinx.serialization.protobuf.ProtoBuf.encodeToByteArray(edu.cit.resqmesh.core.network.MeshPayload.serializer(), payload)</ID>
     <ID>MaxLineLength:MeshForegroundService.kt$MeshForegroundService$combine</ID>
     <ID>MaxLineLength:MeshFrameCodecTest.kt$MeshFrameCodecTest$assertTrue(MeshFrameCodec.append(ByteArray(0), ByteBuffer.allocate(4).putInt(-1).array()) is MeshFrameCodec.AppendResult.Rejected)</ID>
     <ID>MaxLineLength:MeshInboundMessages.kt$MeshInboundMessages$message?.takeIf { it.conversationKind == "RADIO" &amp;&amp; it.audioBase64 != null }?.let { incomingVoiceMessage.tryEmit(it) }</ID>
@@ -1463,7 +1370,6 @@
     <ID>MaxLineLength:NativeGattHost.kt$NativeGattHost$override fun processBinaryPayload(endpointId: String, payloadBytes: ByteArray): Unit</ID>
     <ID>MaxLineLength:NativeGattHost.kt$NativeGattHost$override fun releaseConnectLock(macAddress: String?, reason: String, force: Boolean): Unit</ID>
     <ID>MaxLineLength:NativeGattHost.kt$NativeGattHost$override fun trackPendingL2capSocket(socket: BluetoothSocket, generation: Long): Boolean</ID>
-    <ID>MaxLineLength:NativeInboundPipeline.kt$NativeInboundPipeline$AppLogger.d("BLE_MESH", "Identity gate rejected direct blocked peer ${payload.senderName} on $endpointId")</ID>
     <ID>MaxLineLength:NativeInboundPipeline.kt$NativeInboundPipeline$nodeId = NodeIdentity.idOf(payload.senderName) ?: store.endpointNodeIds[endpointId].orEmpty()</ID>
     <ID>MaxLineLength:NativeInboundPipeline.kt$NativeInboundPipeline$val isDirectIdentityPulse = payload.type == "SYSTEM" &amp;&amp; payload.routePath.isEmpty() &amp;&amp; payload.senderName.isNotEmpty()</ID>
     <ID>MaxLineLength:NativeInboundPipeline.kt$NativeInboundPipeline$val isDirectlyConnected = store.activeConnections.containsKey(endpointId) || store.activeServerConnections.containsKey(endpointId)</ID>
@@ -1473,7 +1379,6 @@
     <ID>MaxLineLength:NativeOutboundDispatcher.kt$NativeOutboundDispatcher$(p.type == ReliableMeshTransfers.PIECE &amp;&amp; ProtoBuf.decodeFromByteArray&lt;TransferPiece&gt;(p.liveAudioChunk!!).let { it.priority || it.status })</ID>
     <ID>MaxLineLength:NativeOutboundDispatcher.kt$NativeOutboundDispatcher$.</ID>
     <ID>MaxLineLength:NativeOutboundDispatcher.kt$NativeOutboundDispatcher$if</ID>
-    <ID>MaxLineLength:NativeOutboundDispatcher.kt$NativeOutboundDispatcher$if (!transferCoordinator.enqueue(endpoint, GattTransfer(frame), priority)) return TransportDispatchResult.REJECTED_QUEUE_FULL</ID>
     <ID>MaxLineLength:NativeOutboundDispatcher.kt$NativeOutboundDispatcher$return</ID>
     <ID>MaxLineLength:NativeOutboundDispatcher.kt$NativeOutboundDispatcher$val selected = if (peer != null &amp;&amp; DirectSendPolicy.usesPeerEndpoint(payload.type)) endpointForPeer(peer) ?: endpoint else endpoint</ID>
     <ID>MaxLineLength:NativeOutboundDispatcher.kt$NativeOutboundDispatcher$}</ID>
@@ -1489,11 +1394,9 @@
     <ID>MaxLineLength:NativePayloadCallbacksTest.kt$NativePayloadCallbacksTest$events.onMessageReceived</ID>
     <ID>MaxLineLength:NativePayloadCallbacksTest.kt$NativePayloadCallbacksTest$private</ID>
     <ID>MaxLineLength:NearbyMeshStoriesBar.kt$text = if (isNodeActive) "We will keep trying once Bluetooth is on." else "Tap to check mesh permissions &amp; status."</ID>
-    <ID>MaxLineLength:NearbyMeshStoriesBar.kt$val classified = nodes.filter { !it.isBlocked &amp;&amp; it.kind != NodeKind.OFFLINE &amp;&amp; it.kind != NodeKind.BLOCKED_OFFLINE }</ID>
     <ID>MaxLineLength:NetworkGraphVisualizer.kt$colors = listOf(Color.Transparent, primaryColor.copy(alpha = 0.3f), primaryColor.copy(alpha = 0.8f))</ID>
     <ID>MaxLineLength:NetworkGraphVisualizer.kt$drawCircle(color = primaryColor.copy(alpha = 0.05f + (0.02f * ringPulse)), radius = ring2Radius, center = center, style = Stroke(width = 1f))</ID>
     <ID>MaxLineLength:NetworkGraphVisualizer.kt$drawCircle(color = primaryColor.copy(alpha = 0.1f + (0.05f * ringPulse)), radius = ring1Radius, center = center, style = Stroke(width = 2f))</ID>
-    <ID>MaxLineLength:NetworkGraphVisualizer.kt$drawLine(color = primaryColor.copy(alpha = 0.2f), start = center, end = targetPosition, strokeWidth = 3f)</ID>
     <ID>MaxLineLength:NetworkList.kt$"Direct Links" to nodes.filter { !it.isBlocked &amp;&amp; (it.kind == NodeKind.DIRECT || it.kind == NodeKind.UNRESPONSIVE) }</ID>
     <ID>MaxLineLength:NetworkList.kt$"Keep ResQMesh active. Nearby devices running ResQMesh will automatically interconnect without internet."</ID>
     <ID>MaxLineLength:NetworkList.kt$"Multi-Hop Mesh Relays" to nodes.filter { !it.isBlocked &amp;&amp; (it.kind == NodeKind.RELAY || it.kind == NodeKind.HOPPED) }</ID>
@@ -1506,14 +1409,10 @@
     <ID>MaxLineLength:NetworkPeerDetails.kt$color = if (isLight) MaterialTheme.colorScheme.onSurfaceVariant else Color.White.copy(alpha = 0.8f)</ID>
     <ID>MaxLineLength:NetworkPeerDetails.kt$color = if (isLight) MaterialTheme.colorScheme.surfaceVariant else Color.White.copy(alpha = 0.06f)</ID>
     <ID>MaxLineLength:NetworkPeerDetails.kt$confirmButton = { TextButton(onClick = { confirmBlock = false; onBlock() }) { Text("Block", color = Color(0xFFFF5252)) } }</ID>
-    <ID>MaxLineLength:NetworkPeerDetails.kt$if</ID>
     <ID>MaxLineLength:NetworkPeerDetails.kt$if (isLight) MaterialTheme.colorScheme.onSurfaceVariant else Color.White.copy(alpha = 0.8f)</ID>
-    <ID>MaxLineLength:NetworkPeerDetails.kt$text = { Text("Your phones will stop connecting directly. Each person must unblock to connect again. Messages may still pass through other phones.") }</ID>
-    <ID>MaxLineLength:NetworkPresentation.kt$nodes.any { it.kind == NodeKind.RELAY || it.kind == NodeKind.HOPPED } -&gt; "${nodes.count { it.kind == NodeKind.RELAY || it.kind == NodeKind.HOPPED }} relayed"</ID>
     <ID>MaxLineLength:NetworkTopology.kt$border = BorderStroke(1.dp, if (isLight) MaterialTheme.colorScheme.outlineVariant else Color(0xFF1F283C))</ID>
     <ID>MaxLineLength:NetworkTopology.kt$border = BorderStroke(1.dp, if (isLight) MaterialTheme.colorScheme.outlineVariant else Color(0xFF242E44))</ID>
     <ID>MaxLineLength:NotificationHelper.kt$NotificationHelper$.</ID>
-    <ID>MaxLineLength:OfflineMapSettingsScreen.kt$"Deleting the Cebu offline vector map will revert the SOS map to mapless coordinate fallback until downloaded again."</ID>
     <ID>MaxLineLength:OfflineMapViewModel.kt$OfflineMapViewModel$errorMessage = "Insufficient storage space. Need approximately ${(estimatedBytesNeeded / (1024 * 1024))} MB."</ID>
     <ID>MaxLineLength:OutboundFrameReporter.kt$OutboundFrameReporter$AppLogger.d("BLE_TRANSFER", "FRAME_${stage.name} transmission=${event.transmissionId} message=${event.messageId} transport=$transport bytes=${event.bytes} queueMs=${event.queueMs} transferMs=${event.transferMs}")</ID>
     <ID>MaxLineLength:PayloadDispatcher.kt$PayloadDispatcher$(</ID>
@@ -1536,7 +1435,6 @@
     <ID>MaxLineLength:PermissionsScreen.kt$val fineLocation = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED</ID>
     <ID>MaxLineLength:PermissionsSettingsScreen.kt$border = BorderStroke(1.dp, if (item.isGranted) ResQTheme.colors.success.copy(alpha = 0.35f) else MaterialTheme.colorScheme.error.copy(alpha = 0.35f))</ID>
     <ID>MaxLineLength:PermissionsSettingsScreen.kt$color = if (item.isGranted) ResQTheme.colors.success.copy(alpha = 0.12f) else MaterialTheme.colorScheme.error.copy(alpha = 0.12f)</ID>
-    <ID>MaxLineLength:PermissionsSettingsScreen.kt$description = "Discovers nearby peer nodes, establishes GATT client/server radio links, and advertises presence over BLE without internet."</ID>
     <ID>MaxLineLength:PermissionsSettingsScreen.kt$description = "Required to display persistent background mesh status and alert you immediately when high-priority SOS distress beacons arrive."</ID>
     <ID>MaxLineLength:PermissionsSettingsScreen.kt$description = "Supports BLE discovery on applicable Android versions. SOS may include a location when the phone can provide one; precise location needs its separate grant."</ID>
     <ID>MaxLineLength:PermissionsSettingsScreen.kt$text</ID>
@@ -1578,7 +1476,6 @@
     <ID>MaxLineLength:ProfileIdentityCard.kt$.</ID>
     <ID>MaxLineLength:ProfileIdentityCard.kt$Row</ID>
     <ID>MaxLineLength:ProfileIdentityCard.kt$text = if (isOnline) "Mesh active · Connected to local radio" else "Mesh offline · Tap below to connect"</ID>
-    <ID>MaxLineLength:ProfileScreen.kt$"Enter the 4-digit PIN to enable developer debugging tools and the floating diagnostic overlay."</ID>
     <ID>MaxLineLength:ProfileScreen.kt$AppearanceChoice</ID>
     <ID>MaxLineLength:ProfileScreen.kt$IconButton</ID>
     <ID>MaxLineLength:ProfileScreen.kt$PrivacyBulletPoint("Keystore encryption", "An Android Keystore RSA key protects per-message AES-GCM keys. Hardware backing depends on the phone.")</ID>
@@ -1649,10 +1546,8 @@
     <ID>MaxLineLength:SOSBroadcastScreen.kt$border = BorderStroke(1.dp, if (isLight) MaterialTheme.colorScheme.outlineVariant else Color(0xFF2E3547))</ID>
     <ID>MaxLineLength:SOSBroadcastScreen.kt$border = BorderStroke(1.dp, if (isLight) animatedAccentColor.copy(alpha = 0.4f) else Color(0xFF22283A))</ID>
     <ID>MaxLineLength:SOSBroadcastScreen.kt$color = if (isLight) MaterialTheme.colorScheme.onSurfaceVariant else Color.White.copy(alpha = 0.85f)</ID>
-    <ID>MaxLineLength:SOSBroadcastScreen.kt$text = "Select emergency type, then slide below to broadcast high-priority distress alerts to all mesh nodes within range."</ID>
     <ID>MaxLineLength:SOSBroadcastScreen.kt$tint = if (isLight) MaterialTheme.colorScheme.onSurface else Color.White.copy(alpha = 0.8f)</ID>
     <ID>MaxLineLength:SelectedIncidentHelper.kt$if</ID>
-    <ID>MaxLineLength:ServerIndicationLedger.kt$ServerIndicationLedger$@Synchronized fun rejected(ticket: Ticket)</ID>
     <ID>MaxLineLength:SetupViewModel.kt$SetupViewModel$return startPreflightError("Allow Location access in app settings, then try again.", needsAppPermission = true)</ID>
     <ID>MaxLineLength:SetupViewModel.kt$SetupViewModel$return startPreflightError("Allow Nearby Devices access in app settings, then try again.", needsAppPermission = true)</ID>
     <ID>MaxLineLength:SetupViewModel.kt$SetupViewModel$suspend</ID>
@@ -1699,8 +1594,6 @@
     <ID>MaxLineLength:SosSyncCoordinator.kt$SosSyncCoordinator$scope.launch { while (isActive) { delay(RESYNC_INTERVAL_MS + Random.nextLong(-RESYNC_JITTER_MS, RESYNC_JITTER_MS + 1)); refresh() } }</ID>
     <ID>MaxLineLength:SosSyncCoordinator.kt$SosSyncCoordinator$val packet = runCatching { SosProtocol.json.decodeFromString&lt;SosSyncPacket&gt;(payload.text) }.getOrNull() ?: return</ID>
     <ID>MaxLineLength:SosThreadHeader.kt$alert.latitude != null -&gt; "Pinned (${String.format(java.util.Locale.US, "%.4f, %.4f", alert.latitude, alert.longitude)}) · ±${alert.accuracyMeters?.toInt() ?: "?"}m"</ID>
-    <ID>MaxLineLength:SosThreadHeader.kt$tint = if (alert.latitude != null) ResQTheme.colors.success else MaterialTheme.colorScheme.onSurfaceVariant</ID>
-    <ID>MaxLineLength:SosThreadScreen.kt$text = "Reachable devices on the mesh will be instructed to stop this emergency alert. Disconnected devices will learn it has ended upon reconnecting."</ID>
     <ID>MaxLineLength:SosThreadScreen.kt$text = if (event.ended) "SOS ended" else if (event.revision == 1L) "SOS created" else "Location updated"</ID>
     <ID>MaxLineLength:SosThreadScreen.kt$text = java.text.DateFormat.getDateTimeInstance().format(java.util.Date(event.updatedAt))</ID>
     <ID>MaxLineLength:TacticalHelperOfferCard.kt$helper.label == "Selected · Waiting for confirmation" || helper.label == "Selected · Awaiting confirmation" -&gt; "Selected · Awaiting"</ID>
@@ -1714,7 +1607,6 @@
     <ID>MaxLineLength:TerminalLog.kt$TerminalLogClassifier$text.containsAny("failed", "timeout", "timed out", "reject", "retiring", "stale", "invalid", "ignored") -&gt; TerminalLogLevel.WARN</ID>
     <ID>MaxLineLength:TerminalLog.kt$TerminalLogClassifier$text.containsAny("l2cap", "mtu", "chunk", "payload queue", "payload sent", "payload received") -&gt; TerminalLogCategory.TRANSPORT</ID>
     <ID>MaxLineLength:TerminalLog.kt$TerminalLogClassifier$text.containsAny("system pulse", "heartbeat", "ping", "pong", "identity", "public key", "topology") -&gt; TerminalLogCategory.SYNC</ID>
-    <ID>MaxLineLength:TransferJournal.kt$TransferJournal$records.values.filter { it.stored }.sortedBy { it.expiresAt }.dropLast(MAX_STORED_MARKERS).toList().forEach(::delete)</ID>
     <ID>MaxLineLength:TransferJournal.kt$TransferJournal$require(record.size in 1..MAX_BYTES &amp;&amp; record.id.length &lt;= MAX_KEY_FIELD_LENGTH &amp;&amp; record.peer.length &lt;= MAX_KEY_FIELD_LENGTH)</ID>
     <ID>MaxLineLength:TransferJournal.kt$TransferJournal$val laneFull = if (record.priority) laneBytes &gt; CONTROL_BYTES else ordinary.size &gt;= MAX_ORDINARY_PENDING || laneBytes &gt; MAX_BYTES</ID>
     <ID>MaxLineLength:VisualHolographicPathMap.kt$.</ID>
@@ -1756,10 +1648,7 @@
     <ID>ReturnCount:DeliveryHandlers.kt$StandardMessageHandler$override fun handle(endpointId: String, payload: MeshPayload, payloadBytes: ByteArray, callback: PayloadDispatcherCallback)</ID>
     <ID>ReturnCount:DirectIdentityPolicy.kt$DirectIdentityPolicy$fun allowsFrame(payload: MeshPayload, admitted: Boolean, blocked: Boolean): Boolean</ID>
     <ID>ReturnCount:FirstLaunchGuideStore.kt$FirstLaunchGuideStore$fun load(context: Context): GuideState</ID>
-    <ID>ReturnCount:GattClientManager.kt$GattClientManager$fun connectToPersistentGatt(macAddress: String, peerName: String): BleConnectStartResult</ID>
     <ID>ReturnCount:GattL2capAcceptor.kt$GattL2capAcceptor$fun startL2capServer()</ID>
-    <ID>ReturnCount:GattServerLinkEvents.kt$GattServerLinkEvents$fun handleCallback()</ID>
-    <ID>ReturnCount:GattServerLinkEvents.kt$GattServerLinkEvents.&lt;no name provided&gt;$override fun run()</ID>
     <ID>ReturnCount:GattTransferCoordinator.kt$GattTransferCoordinator$fun claimNext( endpoint: String, link: BleLink, gatt: BluetoothGatt?, serverDevice: BluetoothDevice? ): GattTransferFlight?</ID>
     <ID>ReturnCount:GattTransferCoordinator.kt$GattTransferCoordinator$fun completeChunk(flight: GattTransferFlight, now: Long = System.currentTimeMillis()): Completion</ID>
     <ID>ReturnCount:GattTransferExecutor.kt$GattTransferExecutor$fun processNext(endpoint: String)</ID>
@@ -1844,7 +1733,6 @@
     <ID>ReturnCount:ReliableMeshTransfers.kt$ReliableMeshTransfers$private fun handleAck(peer: String, packet: TransferPiece)</ID>
     <ID>ReturnCount:ReliableMeshTransfers.kt$ReliableMeshTransfers$private fun reassemble(peer: String, packet: TransferPiece, assembled: TransferRecord): TransferRecord?</ID>
     <ID>ReturnCount:ReliableMeshTransfers.kt$ReliableMeshTransfers$private fun storePiece(peer: String, packet: TransferPiece)</ID>
-    <ID>ReturnCount:SetupViewModel.kt$SetupViewModel$fun setDeveloperMode(context: Context, enabled: Boolean, pin: String? = null): Boolean</ID>
     <ID>ReturnCount:SetupViewModel.kt$SetupViewModel$suspend fun checkHardwareAndGoOnline(context: Context, customName: String, nodeTag: String, teamKey: String): MeshStartError?</ID>
     <ID>ReturnCount:SosLifecycleAndSyncTest.kt$SosLifecycleAndSyncTest.Network$fun send(from: Node, to: String, bytes: ByteArray): TransportDispatchResult</ID>
     <ID>ReturnCount:SosProtocol.kt$internal fun sosTransition(current: edu.cit.resqmesh.data.local.entity.SosAlertEntity?, e: SosEvent): SosIngestion</ID>
@@ -1854,7 +1742,6 @@
     <ID>ReturnCount:TransferAwareConnectPolicy.kt$TransferAwareConnectPolicy$@Synchronized fun defer(peer: String, usableNeighbor: Boolean, busy: Boolean, now: Long): Boolean</ID>
     <ID>ReturnCount:TransferJournal.kt$TransferJournal$fun create(record: TransferRecord, payload: ByteArray? = null): Boolean</ID>
     <ID>SwallowedException:BleTransportSessionController.kt$BleTransportSessionController$e: Exception</ID>
-    <ID>SwallowedException:CommunicationViewModel.kt$CommunicationViewModel$e: SecurityException</ID>
     <ID>SwallowedException:DefaultLocationClient.kt$DefaultLocationClient$e: Exception</ID>
     <ID>SwallowedException:DefaultLocationClient.kt$DefaultLocationClient$e: SecurityException</ID>
     <ID>SwallowedException:DeliveryHandlers.kt$StandardMessageHandler$e: Exception</ID>
@@ -1862,6 +1749,7 @@
     <ID>SwallowedException:GattClientCallback.kt$GattClientCallback$e: SecurityException</ID>
     <ID>SwallowedException:GattClientConnectionEvents.kt$GattClientConnectionEvents$e: SecurityException</ID>
     <ID>SwallowedException:GattServerAttributeRequests.kt$GattServerAttributeRequests$e: SecurityException</ID>
+    <ID>SwallowedException:GattServerAttributeRequests.kt$e: SecurityException</ID>
     <ID>SwallowedException:GattServerLinkEvents.kt$GattServerLinkEvents$e: SecurityException</ID>
     <ID>SwallowedException:GattTransferExecutor.kt$GattTransferExecutor$e: SecurityException</ID>
     <ID>SwallowedException:IncidentEventIngestor.kt$IncidentEventIngestor$e: Exception</ID>
@@ -2060,9 +1948,6 @@
     <ID>WildcardImport:CreateIncidentSheet.kt$import androidx.compose.foundation.layout.*</ID>
     <ID>WildcardImport:CreateIncidentSheet.kt$import androidx.compose.material3.*</ID>
     <ID>WildcardImport:CreateIncidentSheet.kt$import androidx.compose.runtime.*</ID>
-    <ID>WildcardImport:DebugTerminal.kt$import androidx.compose.foundation.layout.*</ID>
-    <ID>WildcardImport:DebugTerminal.kt$import androidx.compose.material3.*</ID>
-    <ID>WildcardImport:DebugTerminal.kt$import androidx.compose.runtime.*</ID>
     <ID>WildcardImport:DeveloperBadge.kt$import androidx.compose.animation.*</ID>
     <ID>WildcardImport:DeveloperBadge.kt$import androidx.compose.animation.core.*</ID>
     <ID>WildcardImport:DeveloperBadge.kt$import androidx.compose.foundation.layout.*</ID>
@@ -2205,7 +2090,6 @@
     <ID>WildcardImport:MainDestinationContent.kt$import androidx.compose.animation.core.*</ID>
     <ID>WildcardImport:MainDestinationContent.kt$import androidx.compose.foundation.layout.*</ID>
     <ID>WildcardImport:MainDestinationContent.kt$import androidx.compose.runtime.*</ID>
-    <ID>WildcardImport:MapCollapsedPreview.kt$import androidx.compose.animation.core.*</ID>
     <ID>WildcardImport:MapCollapsedPreview.kt$import androidx.compose.foundation.layout.*</ID>
     <ID>WildcardImport:MapCollapsedPreview.kt$import androidx.compose.material.icons.filled.*</ID>
     <ID>WildcardImport:MapCollapsedPreview.kt$import androidx.compose.material3.*</ID>
@@ -2215,19 +2099,16 @@
     <ID>WildcardImport:MapDetailRow.kt$import androidx.compose.material.icons.filled.*</ID>
     <ID>WildcardImport:MapDetailRow.kt$import androidx.compose.material3.*</ID>
     <ID>WildcardImport:MapDetailRow.kt$import androidx.compose.runtime.*</ID>
-    <ID>WildcardImport:MapExpandedDetails.kt$import androidx.compose.animation.core.*</ID>
     <ID>WildcardImport:MapExpandedDetails.kt$import androidx.compose.foundation.layout.*</ID>
     <ID>WildcardImport:MapExpandedDetails.kt$import androidx.compose.material.icons.filled.*</ID>
     <ID>WildcardImport:MapExpandedDetails.kt$import androidx.compose.material3.*</ID>
     <ID>WildcardImport:MapExpandedDetails.kt$import androidx.compose.runtime.*</ID>
-    <ID>WildcardImport:MapFallbackContent.kt$import androidx.compose.animation.core.*</ID>
     <ID>WildcardImport:MapFallbackContent.kt$import androidx.compose.foundation.layout.*</ID>
     <ID>WildcardImport:MapFallbackContent.kt$import androidx.compose.material.icons.filled.*</ID>
     <ID>WildcardImport:MapFallbackContent.kt$import androidx.compose.material3.*</ID>
     <ID>WildcardImport:MapFallbackContent.kt$import androidx.compose.runtime.*</ID>
     <ID>WildcardImport:MapHeader.kt$import androidx.compose.animation.core.*</ID>
     <ID>WildcardImport:MapHeader.kt$import androidx.compose.foundation.layout.*</ID>
-    <ID>WildcardImport:MapHeader.kt$import androidx.compose.material.icons.filled.*</ID>
     <ID>WildcardImport:MapHeader.kt$import androidx.compose.material3.*</ID>
     <ID>WildcardImport:MapHeader.kt$import androidx.compose.runtime.*</ID>
     <ID>WildcardImport:MapInstallationActions.kt$import androidx.compose.foundation.layout.*</ID>
