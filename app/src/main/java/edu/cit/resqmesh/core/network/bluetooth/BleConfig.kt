@@ -52,4 +52,10 @@ object BleConfig {
 
     const val HEARTBEAT_ACK_TIMEOUT_MS = 8_000L
     const val GATT_CHUNK_TIMEOUT_MS = 4_000L
+
+    /** Payload bytes per write on the default 23-byte ATT MTU, used until a larger MTU is negotiated. */
+    const val DEFAULT_ATT_PAYLOAD_BYTES = 20
+
+    /** MTU asked for once the link is READY and the setup queue is idle. */
+    const val REQUESTED_MTU = 247
 }

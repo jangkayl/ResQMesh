@@ -111,7 +111,7 @@ class GattTransferExecutor(
         if (!coordinator.owns(flight)) return
         val remaining = flight.transfer.frame.size - flight.offset
         if (remaining <= 0) return
-        val mtu = (store.connectionMtu[endpoint] ?: DEFAULT_CHUNK_BYTES).coerceAtLeast(1)
+        val mtu = (store.connectionMtu[endpoint] ?: BleConfig.DEFAULT_ATT_PAYLOAD_BYTES).coerceAtLeast(1)
         val chunk = flight.transfer.frame.copyOfRange(flight.offset, flight.offset + minOf(mtu, remaining))
         val operationId = coordinator.beginChunk(flight, chunk.size)
         val ticket = if (flight.link.role == BleLinkRole.SERVER) store.serverIndications.begin(flight, operationId) else null
@@ -222,7 +222,5 @@ class GattTransferExecutor(
     private companion object {
         const val RETRY_DELAY_MS = 200L
         const val MAX_INITIATION_ATTEMPTS = 5
-        /** Chunk size before an MTU is known: the default ATT payload. */
-        const val DEFAULT_CHUNK_BYTES = 20
     }
 }

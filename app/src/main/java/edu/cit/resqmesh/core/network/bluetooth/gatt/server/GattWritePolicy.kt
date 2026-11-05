@@ -1,12 +1,13 @@
 package edu.cit.resqmesh.core.network.bluetooth.gatt.server
 
 import android.bluetooth.BluetoothGatt
+import edu.cit.resqmesh.core.network.bluetooth.BleConfig
 
 /** Framework-free decisions for inbound GATT server writes so they can be unit tested on the JVM. */
 internal object GattWritePolicy {
     const val MAX_PREPARED_BYTES = 4 * 1024
     const val MAX_PREPARED_DEVICES = 8
-    const val MIN_PAYLOAD_BYTES = 20
+    const val MIN_PAYLOAD_BYTES = BleConfig.DEFAULT_ATT_PAYLOAD_BYTES
     const val MAX_PAYLOAD_BYTES = 512
     private const val ATT_OVERHEAD_BYTES = 3
 

@@ -29,9 +29,6 @@ internal interface GattClientAttemptContext : GattClientHost {
     fun finishConnectPhase(reason: String) = attempt.finishConnectPhase(reason)
 }
 
-/** Payload bytes per chunk on the default 23-byte ATT MTU, used until a larger MTU is negotiated. */
-internal const val DEFAULT_ATT_PAYLOAD_BYTES = 20
-
 /** Android 12+ needs BLUETOOTH_CONNECT for every GATT call; it can be revoked mid-connection. */
 internal fun GattClientAttemptContext.isConnectPermissionRevoked(): Boolean =
     Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&

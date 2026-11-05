@@ -67,8 +67,8 @@ internal class GattClientConnectionEvents(
         }
         // Default ATT payload size is reliable on every supported Android version.
         // Negotiate no larger MTU until the link is READY and the setup queue is idle.
-        store.connectionMtu[macAddress] = DEFAULT_ATT_PAYLOAD_BYTES
-        link.mtu = DEFAULT_ATT_PAYLOAD_BYTES
+        store.connectionMtu[macAddress] = BleConfig.DEFAULT_ATT_PAYLOAD_BYTES
+        link.mtu = BleConfig.DEFAULT_ATT_PAYLOAD_BYTES
         requestServicesOnce(gatt)
     }
 

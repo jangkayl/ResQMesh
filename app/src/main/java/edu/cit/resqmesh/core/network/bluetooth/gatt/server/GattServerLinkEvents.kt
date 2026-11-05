@@ -254,12 +254,12 @@ private fun GattServerLinkEvents.rejectsDuplicateLink(
         System.currentTimeMillis() - linkEstablishedAt(existingEndpoint) < BleConfig.DUPLICATE_LINK_GRACE_MS ->
             resolveSimultaneousConnect(device, existingEndpoint, peerName)
         else -> {
-    // The existing link is established and healthy. A redundant inbound
-    // connection must not be allowed to tear it down: that self-inflicted
-    // teardown was the connect/disconnect loop.
-    AppLogger.d("BLE_MESH",
-        "Rejecting redundant inbound link from $peerName. Healthy link already on $existingEndpoint.")
-    cancelInbound(device, "Could not reject redundant inbound link: BLUETOOTH_CONNECT was revoked")
+            // The existing link is established and healthy. A redundant inbound
+            // connection must not be allowed to tear it down: that self-inflicted
+            // teardown was the connect/disconnect loop.
+            AppLogger.d("BLE_MESH",
+                "Rejecting redundant inbound link from $peerName. Healthy link already on $existingEndpoint.")
+            cancelInbound(device, "Could not reject redundant inbound link: BLUETOOTH_CONNECT was revoked")
             true
         }
     }
