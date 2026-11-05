@@ -2,6 +2,8 @@ package edu.cit.resqmesh.core.network.bluetooth.state
 
 import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothGatt
+import edu.cit.resqmesh.BuildConfig
+import edu.cit.resqmesh.core.logging.AppLogger
 import edu.cit.resqmesh.core.network.bluetooth.BleConfig
 import java.util.concurrent.ConcurrentLinkedDeque
 import java.util.concurrent.atomic.AtomicBoolean
@@ -38,6 +40,24 @@ class BleLink(
     @Volatile var gattQuarantined: Boolean = false
     val receiveBuffer = MeshFrameCodec.Reassembler()
     var lastGattChunkAt: Long = 0L
+    private var rxChunks = 0L
+    private var rxBytes = 0L
+
+    /** Debug-only receive counters for GATT_RX_STATS; BLE handler thread. */
+    fun countRxChunk(bytes: Int) {
+        if (!BuildConfig.DEBUG) return
+        rxChunks++
+        rxBytes += bytes
+    }
+
+    internal fun logRxStats() {
+        if (BuildConfig.DEBUG && rxChunks > 0) {
+            AppLogger.d(
+                "BLE_MESH",
+                "GATT_RX_STATS link=$generation role=${role.name} endpoint=$endpoint chunks=$rxChunks bytes=$rxBytes"
+            )
+        }
+    }
 
     val handshakeOwner: String get() = "${role.name.lowercase(java.util.Locale.ROOT)}:$endpoint:$generation"
 }
@@ -127,6 +147,7 @@ class BleLinkRegistry {
     fun forget(link: BleLink): Boolean {
         if (!isCurrent(link)) return false
         link.state = BleLinkState.DISCONNECTED
+        link.logRxStats()
         links.remove(link.endpoint to link.role)
         return true
     }

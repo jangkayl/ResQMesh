@@ -209,6 +209,9 @@ class NativeBleManager(
     )
 
     fun hasPendingTransfer(messageId: String) = reliableTransfers.hasOutbound(messageId)
+    fun releaseStrandedTransfer(messageId: String, minAwayMs: Long) =
+        reliableTransfers.releaseStranded(messageId, minAwayMs)
+    fun cancelOutboundTransfer(messageId: String) = reliableTransfers.cancelOutbound(messageId)
     fun sendSyncCopy(nodeId: String, payload: ByteArray) = outboundDispatcher.sendSyncCopy(nodeId, payload)
     fun hasPendingCustody(payloadId: String) = reliableTransfers.hasPendingCustody(payloadId)
     fun markPayloadStored(messageId: String) = reliableTransfers.stored(messageId)

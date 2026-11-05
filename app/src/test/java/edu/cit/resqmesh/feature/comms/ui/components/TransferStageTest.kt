@@ -49,6 +49,14 @@ class TransferStageTest {
         assertEquals(SendProgress.State.FAILED, allFailed.state)
     }
 
+    @Test
+    fun freshTransmissionAfterARestartSaysResending() {
+        val resend = progress(SendProgress.State.SENDING).copy(restarted = true)
+        assertEquals(TransferStage.Resending, transferStage(message(), resend))
+        val queued = progress(SendProgress.State.QUEUED).copy(restarted = true, heldBehind = true)
+        assertEquals(TransferStage.Waiting, transferStage(message(), queued))
+    }
+
     private fun progress(state: SendProgress.State) = SendProgress(12, 32, state)
 
     private fun message(

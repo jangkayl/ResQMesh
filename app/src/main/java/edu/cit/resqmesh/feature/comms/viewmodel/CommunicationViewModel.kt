@@ -395,6 +395,11 @@ class CommunicationViewModel(
         useCases.deleteConversationWith(peerName)
     }
 
+    /** Local only: stops our upload and removes the bubble; a relay that already holds it may still deliver. */
+    fun cancelPrivateSend(messageId: String) = useCases.managePrivateSend.cancel(messageId)
+
+    fun retryPrivateSend(messageId: String) = useCases.managePrivateSend.retry(messageId)
+
     /**
      * Returns true only when the message was sent. A duplicate tap inside the debounce window returns false
      * without feedback (the caller keeps its draft; the first tap's send is already in flight or done).

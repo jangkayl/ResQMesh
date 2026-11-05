@@ -22,7 +22,9 @@ import edu.cit.resqmesh.feature.comms.ui.DeliveryFeedback
 import edu.cit.resqmesh.feature.comms.ui.privatechat.deliveryFeedback
 
 /** What the sender's bubble says about pieces in flight. Hop stages never claim recipient delivery. */
-internal enum class TransferStage { Waiting, Sending, Stalled, ReachedPhone, ReachedNextPhone, ReachedNearby, Failed }
+internal enum class TransferStage {
+    Waiting, Sending, Resending, Stalled, ReachedPhone, ReachedNextPhone, ReachedNearby, Failed
+}
 
 /** Null when there is nothing to show: not mine, no live progress, or a receipt already says more. */
 internal fun transferStage(message: ChatMessage, progress: SendProgress?): TransferStage? {
@@ -30,7 +32,8 @@ internal fun transferStage(message: ChatMessage, progress: SendProgress?): Trans
     val receipted = feedback == DeliveryFeedback.Delivered || feedback == DeliveryFeedback.Read
     return if (!message.isMine || progress == null || receipted) null else when (progress.state) {
         SendProgress.State.QUEUED -> TransferStage.Waiting
-        SendProgress.State.SENDING -> TransferStage.Sending
+        // A fresh transmission after hop custody or a receiver reset says so, rather than silently restarting.
+        SendProgress.State.SENDING -> if (progress.restarted) TransferStage.Resending else TransferStage.Sending
         SendProgress.State.STALLED -> TransferStage.Stalled
         SendProgress.State.HOP_COMPLETE -> when {
             !message.isPrivate -> TransferStage.ReachedNearby
@@ -42,7 +45,8 @@ internal fun transferStage(message: ChatMessage, progress: SendProgress?): Trans
 }
 
 private val TransferStage.inFlight get() =
-    this == TransferStage.Waiting || this == TransferStage.Sending || this == TransferStage.Stalled
+    this == TransferStage.Waiting || this == TransferStage.Sending || this == TransferStage.Resending ||
+        this == TransferStage.Stalled
 
 /** Piece bar and stage label shown above the bubble's time row while a piece transfer is live. */
 @Suppress("FunctionNaming")
@@ -75,8 +79,10 @@ internal fun TransferProgressLine(stage: TransferStage, progress: SendProgress, 
 
 @Composable
 private fun transferLabel(stage: TransferStage, p: SendProgress): String = when (stage) {
-    TransferStage.Waiting -> stringResource(R.string.transfer_waiting, p.acked, p.total)
+    TransferStage.Waiting -> if (p.heldBehind) stringResource(R.string.transfer_queued_behind)
+        else stringResource(R.string.transfer_waiting, p.acked, p.total)
     TransferStage.Sending -> stringResource(R.string.transfer_sending, p.acked, p.total, p.percent)
+    TransferStage.Resending -> stringResource(R.string.transfer_resending, p.acked, p.total, p.percent)
     TransferStage.Stalled -> stringResource(R.string.transfer_stalled, p.acked, p.total)
     TransferStage.ReachedPhone -> stringResource(R.string.transfer_reached_phone)
     TransferStage.ReachedNextPhone -> stringResource(R.string.transfer_reached_next_phone)

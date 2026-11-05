@@ -63,6 +63,32 @@ class MeshFrameCodecTest {
         assertArrayEquals(byteArrayOf(9), accepted.payloads.single())
     }
 
+    /**
+     * Documents the splice: a lost chunk leaves frame A short, so the reassembler keeps waiting and swallows the
+     * head of frame B as A's tail. The result has A's claimed length, so size-only checks cannot tell it from A.
+     */
+    @Test fun lostChunkSplicesNextFrameIntoCurrentOneAndClearResyncs() {
+        val a = ByteArray(40) { 1 }
+        // B's tail looks like a plausible 256-byte length prefix, so the leftover stalls instead of rejecting.
+        val b = ByteArray(40) { 2 }.also { byteArrayOf(0, 0, 1, 0).copyInto(it, 20) }
+        val frameA = MeshFrameCodec.encode(a)!!
+        val frameB = MeshFrameCodec.encode(b)!!
+        val reassembler = MeshFrameCodec.Reassembler()
+        val chunksA = frameA.toList().chunked(20).map { it.toByteArray() }
+        assertTrue((reassembler.append(chunksA[0]) as MeshFrameCodec.AppendResult.Accepted).payloads.isEmpty())
+        // The rest of A is lost, then frame B follows.
+        val spliced = (reassembler.append(frameB) as MeshFrameCodec.AppendResult.Accepted).payloads
+        assertEquals(1, spliced.size)
+        assertEquals(a.size, spliced.single().size)
+        assertTrue(spliced.single().any { it == 2.toByte() } && spliced.single().any { it == 1.toByte() })
+        // B's tail is now buffered as a bogus incomplete frame that would swallow the next real one.
+        assertEquals(20, reassembler.size)
+        reassembler.clear()
+        assertTrue(reassembler.isEmpty())
+        val next = reassembler.append(MeshFrameCodec.encode(byteArrayOf(7))!!) as MeshFrameCodec.AppendResult.Accepted
+        assertArrayEquals(byteArrayOf(7), next.payloads.single())
+    }
+
     @Test fun maxSizedPayloadRoundTripsAndOneMoreByteIsRefused() {
         assertEquals(2 * 1024 * 1024 + 64 * 1024, MeshFrameCodec.MAX_PAYLOAD_BYTES)
         val frame = MeshFrameCodec.encode(ByteArray(MeshFrameCodec.MAX_PAYLOAD_BYTES))!!

@@ -237,6 +237,7 @@ val domainModule = module {
             acceptPendingPublicKeyChange = AcceptPendingPublicKeyChangeUseCase(get()),
             rejectPendingPublicKeyChange = RejectPendingPublicKeyChangeUseCase(get()),
             deleteConversationWith = DeleteConversationWithUseCase(get()),
+            managePrivateSend = ManagePrivateSendUseCase(get()),
             broadcastSeenReceipt = BroadcastSeenReceiptUseCase(get()),
             clearSosAlert = ClearSosAlertUseCase(get()),
             observeConnectionStatus = ObserveConnectionStatusUseCase(get()),

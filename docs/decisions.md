@@ -28,7 +28,7 @@ Builds, tests, executed instrumentation, qualitative user reports and analyzed c
 
 ## D7: Conservative feature scope
 
-Origin outboxes and transfer journals exist; disconnected-cluster delivery is not guaranteed. Stronger transactional outbox capacity/route repair, bounded replication, resource requests, safety check-ins and unfinished location-confidence policies remain proposals. Battery-aware routing needs measurements. RSSI supports cautious trends, not distance/triangulation. Data mules, virtual private mesh, large media expansion and new protocols are inactive research ideas.
+Origin outboxes and transfer journals exist; disconnected-cluster delivery is not guaranteed. Stronger transactional outbox capacity/route repair, bounded replication, resource requests, safety check-ins and unfinished location-confidence policies remain proposals. Battery-aware routing needs measurements. RSSI supports cautious trends, not distance/triangulation. Data mules, virtual private mesh, large media expansion and new protocols are inactive ideas.
 
 ## D8: Lightweight context engineering
 
@@ -80,7 +80,7 @@ Stable identity/signing key owns reporter authority and historical names. Report
 
 ## D20: Bounded resumable recorded transfers
 
-Recorded notes survive disconnects in bounded memory: protocol-1 envelopes are journaled in resumable pieces with fixed per-neighbor and per-transport bounds, and legacy peers keep whole frames. Custody never proves recipient delivery. Limits: [architecture](architecture.md).
+Recorded notes survive disconnects in bounded memory: protocol-1 envelopes are journaled in resumable pieces with fixed per-neighbor and per-transport bounds, and legacy peers keep whole frames. Custody never proves delivery; senders trust it. Limits: [architecture](architecture.md).
 
 ## D21: Incident history and projection digests
 

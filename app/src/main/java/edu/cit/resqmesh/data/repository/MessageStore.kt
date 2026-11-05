@@ -20,6 +20,10 @@ interface MessageStore {
     suspend fun incomingPrivateWasSeen(messageId: String): Boolean = false
     suspend fun recoverUnacknowledgedPrivateSends() {}
     suspend fun isUnacknowledgedPrivateSend(messageId: String): Boolean = false
+    /** The stored recipient of one of our private messages, or null. */
+    suspend fun privateTargetOf(messageId: String): String? = null
+    /** Removes one of our own unreceipted private messages; true if a row was deleted. */
+    suspend fun deleteOwnUnreceiptedPrivate(messageId: String): Boolean = false
     suspend fun isOutstandingPrivateSend(messageId: String): Boolean = isUnacknowledgedPrivateSend(messageId) ||
         getPendingOutbox().any { (message, target) -> message.id == messageId && target != null }
     suspend fun saveIncomingPrivateIfAbsent(message: ChatMessage): PrivateMessageInsert {
@@ -56,6 +60,14 @@ class RoomMessageStore(private val dao: MessageDao) : MessageStore {
     override suspend fun recoverUnacknowledgedPrivateSends() { dao.recoverUnacknowledgedPrivateSends() }
     override suspend fun isUnacknowledgedPrivateSend(messageId: String): Boolean =
         dao.getMessageById(messageId)?.let { it.isMine && it.targetName != null && it.deliveredTo.isEmpty() && it.seenBy.isEmpty() } == true
+    override suspend fun privateTargetOf(messageId: String): String? =
+        dao.getMessageById(messageId)?.takeIf { it.isMine }?.targetName
+    override suspend fun deleteOwnUnreceiptedPrivate(messageId: String): Boolean {
+        val row = dao.getMessageById(messageId)
+        val unreceipted = row != null && row.seenBy.isEmpty() && row.deliveredTo in setOf("", "PENDING", "FAILED")
+        val ours = unreceipted && row?.isMine == true && row.targetName != null
+        return ours && dao.deleteMessagesByIds(listOf(messageId)) > 0
+    }
     override suspend fun saveIncomingPrivateIfAbsent(message: ChatMessage): PrivateMessageInsert =
         when (dao.insertIncomingPrivateIfAbsent(message.toMessageEntity(message.senderName))) {
             1 -> PrivateMessageInsert.INSERTED

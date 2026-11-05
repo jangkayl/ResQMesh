@@ -99,6 +99,15 @@
     <string name="transfer_reached_next_phone">Reached next phone</string>
     <string name="transfer_reached_nearby">Sent to nearby phones</string>
     <string name="transfer_failed">Transfer failed</string>
+    <string name="transfer_resending">Resending %1$d/%2$d · %3$d%%</string>
+    <string name="transfer_queued_behind">Queued behind earlier image</string>
+    <string name="transfer_cancel_action">Cancel</string>
+    <string name="transfer_retry_action">Retry</string>
+    <string name="transfer_cancel_title">Cancel sending?</string>
+    <string name="transfer_cancel_description">This message will be removed from this chat.</string>
+    <string name="transfer_cancel_custody_note">It may still be delivered because the next phone already has it.</string>
+    <string name="transfer_cancel_confirm">Cancel sending</string>
+    <string name="transfer_cancel_keep">Keep sending</string>
     <string name="transfer_dev_detail">resent %1$d · re-checked %2$d</string>
     <string name="community_title">Community</string>
     <string name="community_empty_title">No community messages</string>

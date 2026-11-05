@@ -8,6 +8,7 @@ import edu.cit.resqmesh.core.network.bluetooth.state.BleLinkState
 import edu.cit.resqmesh.core.network.bluetooth.state.MeshFrameCodec
 import edu.cit.resqmesh.core.logging.AppLogger
 import edu.cit.resqmesh.core.network.bluetooth.gatt.GattClientHost
+import edu.cit.resqmesh.core.network.bluetooth.gatt.GattFrameResync
 import edu.cit.resqmesh.core.network.bluetooth.gatt.server.GattWritePolicy
 
 /** A partially received frame older than this is discarded as corrupt. */
@@ -239,12 +240,15 @@ private fun GattClientAttemptContext.appendNotificationChunk(value: ByteArray) {
         link.receiveBuffer.clear()
     }
     link.lastGattChunkAt = now
+    link.countRxChunk(value.size)
     store.connectionInteractionTimes[macAddress] = now
     link.lastInteractionAt = now
 
     when (val result = link.receiveBuffer.append(value)) {
         is MeshFrameCodec.AppendResult.Accepted -> {
-            result.payloads.forEach { processBinaryPayload(macAddress, it) }
+            result.payloads.forEach { frame ->
+                GattFrameResync.deliver(link, frame) { processBinaryPayload(macAddress, it) }
+            }
         }
         is MeshFrameCodec.AppendResult.Rejected -> {
             AppLogger.d("BLE_MESH", "Rejected malformed CLIENT frame from $macAddress: ${result.reason}")

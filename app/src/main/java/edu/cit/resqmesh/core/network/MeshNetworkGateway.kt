@@ -15,6 +15,10 @@ interface MeshNetworkGateway {
         get() = null
         set(@Suppress("UNUSED_PARAMETER") value) {}
     fun hasPendingTransfer(messageId: String): Boolean = false
+    /** Retires our own first-hop transfer of [messageId] once its peer has been gone [minAwayMs]; true if released. */
+    fun releaseStrandedTransfer(messageId: String, minAwayMs: Long): Boolean = false
+    /** Retires our own first-hop transfers of [messageId] (relay custody is untouched); true if any existed. */
+    fun cancelOutboundTransfer(messageId: String): Boolean = false
     fun hasPendingCustody(payloadId: String): Boolean = false
     fun markPayloadStored(messageId: String) {}
     fun preferredEndpointForPeer(nodeId: String): String? = null

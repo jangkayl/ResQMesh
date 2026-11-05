@@ -5,7 +5,9 @@ internal class TransferFlight(
     val record: TransferRecord,
     val bytes: ByteArray,
     var queuedAt: Long = 0,
-    var queried: Boolean = false
+    var queried: Boolean = false,
+    /** Persisted creation order; per-peer media is served oldest first by it. */
+    val createdAt: Long = queuedAt
 ) {
     val acknowledged: MutableSet<Int> = mutableSetOf()
     val pending: MutableMap<Int, Long> = mutableMapOf()
@@ -17,6 +19,8 @@ internal class TransferFlight(
     var queryUntil: Long = 0
     var queryNonce: String = ""
     var queryWireId: String = ""
+    /** When the outstanding status query was first sent; resends of the same query keep it. */
+    var queryStartedAt: Long = 0
     /** Last ACK growth or status reply, or when pieces started waiting with none in flight. */
     var progressAt: Long = queuedAt
     /** Pieces sent more than once and silent-peer re-probes, for the sender's progress display. */
@@ -24,6 +28,11 @@ internal class TransferFlight(
     var reprobes: Int = 0
     val everSent: MutableSet<Int> = mutableSetOf()
     var reported: SendProgress? = null
+    /** Highest acknowledged count shown for this flight; only a receiver reset lowers it. */
+    var shownAcked: Int = 0
+    var restarted: Boolean = false
+    /** When the peer was first seen not ready in the current outage; zero while it is ready. */
+    var notReadySince: Long = 0
 
     val key get() = "${record.peer}:${record.id}"
     val pieceCount get() = TransferJournal.pieceCount(record.size)

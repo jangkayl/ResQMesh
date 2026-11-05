@@ -1,6 +1,7 @@
 package edu.cit.resqmesh.data.repository
 
 import edu.cit.resqmesh.core.network.OutboundFrameEvent
+import edu.cit.resqmesh.data.repository.mesh.MeshDeliveryConstants
 import org.junit.Assert.*
 import org.junit.Test
 
@@ -31,5 +32,28 @@ class PrivateTransferProgressTest {
     @Test fun aRejectedCurrentTransferCanRetryWithoutWaitingForRecipientTimeout() {
         val p = PrivateTransferProgress("current", 1).observe(event(OutboundFrameEvent.Stage.FAILED), 2_000)
         assertTrue(p.shouldRetry(2_000, 1_000, false))
+    }
+
+    private val route = listOf("Me#A", "Relay#B", "Peer#C")
+    private fun completedImage(media: Boolean = true) =
+        PrivateTransferProgress("current", 2, route = route, media = media)
+        .observe(event(OutboundFrameEvent.Stage.COMPLETED), 10_000)
+
+    @Test fun unchangedRouteAfterHopCustodyWaitsForTheRelayBeforeResendingMedia() {
+        val p = completedImage()
+        val deadline = 10_000 + MeshDeliveryConstants.PRIVATE_CUSTODY_WAIT_MS
+        assertFalse(p.shouldRetry(deadline - 1, 1_000, false, route))
+        assertFalse(p.shouldRetry(deadline - 1, 1_000, false, emptyList()))
+        assertTrue(p.shouldRetry(deadline, 1_000, false, route))
+    }
+
+    @Test fun changedRouteAfterHopCustodyResendsAtOnce() {
+        assertTrue(completedImage().shouldRetry(10_001, 1_000, false, listOf("Me#A", "Other#D", "Peer#C")))
+    }
+
+    @Test fun textOnAnUnchangedRouteKeepsTheMeasuredReceiptBudget() {
+        val p = completedImage(media = false)
+        assertFalse(p.shouldRetry(24_999, 1_000, false, route))
+        assertTrue(p.shouldRetry(25_000, 1_000, false, route))
     }
 }
