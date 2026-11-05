@@ -88,6 +88,7 @@ val platformModule = module {
     single(createdAtStart = true) { MeshReadyPeerEvents() }
     single { MeshSessionController(androidContext(), get()) }
     single { MediaHelper(androidContext()) }
+    single { edu.cit.resqmesh.core.storage.AppStorageCleaner(androidContext()) }
     single { NotificationHelper(androidContext()) }
     single<LocationClient> { DefaultLocationClient(androidContext()) }
     single { edu.cit.resqmesh.core.location.LocationPreferences(androidContext()) }
@@ -298,6 +299,13 @@ val viewModelModule = module {
     viewModel { WalkieTalkieViewModel(useCases = get(), mediaHelper = get()) }
     viewModel { OfflineMapViewModel(storageGuard = get(), downloader = get(), connectivityProvider = get()) }
     viewModel { AboutViewModel(androidContext()) }
+    viewModel {
+        edu.cit.resqmesh.feature.profile.viewmodel.StorageSettingsViewModel(
+            cleaner = get(),
+            ownSosActive = get<SosAlertRepository>().ownActive.map { it != null },
+            stopMesh = get<MeshSessionController>()::stopNode
+        )
+    }
     viewModel { edu.cit.resqmesh.feature.devtools.viewmodel.DevToolsViewModel(get()) }
     viewModel { IncidentViewModel(incidentRepository = get(), identityManager = get(), incidentBudget = get()) }
 }

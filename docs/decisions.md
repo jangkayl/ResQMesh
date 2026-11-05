@@ -20,11 +20,11 @@ Queues, operations, timers, callbacks, buffers, MTU, sockets and cleanup belong 
 
 ## D5: Private messaging fails closed
 
-Missing/unusable trusted keys or encryption failure cannot produce plaintext, invalid envelopes or successful delivery. Undecryptable traffic cannot be acknowledged as successful private delivery. Authentication and key-lifecycle guarantees remain limited.
+Missing/unusable trusted keys or encryption failure cannot produce plaintext, invalid envelopes or successful delivery. Undecryptable traffic is never acknowledged as delivered. Authentication and key-lifecycle guarantees remain limited.
 
 ## D6: Evidence controls claims
 
-Builds, focused tests, executed instrumentation, qualitative user reports and analyzed captures prove different things. Quantitative range, capacity, latency, battery, delivery and security claims require conditions and measurements. Keep an actual failure open beside successful runs.
+Builds, tests, executed instrumentation, qualitative user reports and analyzed captures prove different things. Quantitative range, capacity, latency, battery, delivery and security claims require conditions and measurements. Keep an actual failure open beside successful runs.
 
 ## D7: Conservative feature scope
 
@@ -32,7 +32,7 @@ Origin outboxes and transfer journals exist; disconnected-cluster delivery is no
 
 ## D8: Lightweight context engineering
 
-One shared router, `AGENTS.md`, plus six owner documents hold current context; each fact lives in one owner. Tool entry files (`CLAUDE.md`, `GEMINI.md`) only import `AGENTS.md` and add tool-specific notes. Avoid extra routers/indexes, ICM stage trees and knowledge graphs.
+One shared router, `AGENTS.md`, plus six owner documents hold current context; each fact lives in one owner. Tool entry files only import `AGENTS.md` and add tool notes. Avoid extra routers/indexes, ICM stage trees and knowledge graphs.
 
 ## D9: Planning lifecycle
 
@@ -40,7 +40,7 @@ Extract lasting decisions/results before archival. Label implemented, superseded
 
 ## D10: Deterministic PR gate
 
-CI repeats debug build, unit tests, Lint, Android-test compilation, detekt (baselined), architecture-boundary and docs checks, and diff hygiene. Failed checks block readiness and cannot be waived by AI explanation.
+CI repeats debug build, unit tests, Lint, Android-test compilation, detekt (baselined), architecture-boundary and docs checks, and diff hygiene. Failed checks block readiness; AI explanation cannot waive them.
 
 ## D11: Mutual direct-link denial, independent local release
 
@@ -48,7 +48,7 @@ Stable-ID block requests/ACKs establish denial before direct teardown. Both phon
 
 ## D12: Conservative recovery and cluster bridging
 
-Recovery must not destroy healthy routes: Bluetooth OFF suspends and ON rebuilds; Go offline cancels recovery; background is opt-in. A spare link may bridge an unreachable cluster, but reclaiming a full-capacity link requires proof that reachability survives. Mechanics and timers: [architecture](architecture.md).
+Recovery must not destroy healthy routes: Bluetooth OFF suspends and ON rebuilds; Go offline cancels recovery; background is opt-in. A spare link may bridge an unreachable cluster, but reclaiming a full-capacity link requires proof that reachability survives. Mechanics: [architecture](architecture.md).
 
 ## D13: MapLibre and local PMTiles
 
@@ -56,7 +56,7 @@ MapLibre Native/local PMTiles replaces osmdroid and bulk public raster downloads
 
 ## D14: Offline manifest signatures
 
-ECDSA P-256 is the default; Ed25519 is the supported fallback where available. This preserves older Android compatibility without an extra cryptography library. Packaging instructions must match the existing generator/verifier.
+ECDSA P-256 is the default; Ed25519 is the supported fallback where available. This preserves older Android compatibility without an extra cryptography library. Packaging must match the existing generator/verifier.
 
 ## D15: Notification setup gates
 
@@ -68,7 +68,7 @@ Show in-map attribution, medical POIs and subtle other-amenity labels at zoom 15
 
 ## D17: Permanent hardware-bound identity
 
-Node IDs derive from the Keystore public-key hash. Identity/peer-key preferences are excluded from cloud backup to avoid restoring metadata without keys. Pending key changes require explicit handling.
+Node IDs derive from the Keystore public-key hash. Identity/peer-key preferences are excluded from cloud backup to avoid restoring metadata without keys. Pending key changes require explicit handling. Settings reset wipes data and keys (new node ID), never during own SOS; selective deletion waits.
 
 ## D18: Leased topology and directed private delivery
 
@@ -76,11 +76,11 @@ Topology is versioned and leased so stale state cannot restore withdrawn routes.
 
 ## D19: Reporter-selected lead helper
 
-Stable identity/signing key owns reporter authority and historical names. Reporters select/revoke/close; helpers confirm/decline/withdraw. Selected offers cannot be edited. Withdrawal/offline revision requires fresh selection, never automatic replacement. Route loss never reassigns. Signed closure dependencies order replay; key continuity is not deployment authority.
+Stable identity/signing key owns reporter authority and historical names. Reporters select/revoke/close; helpers confirm/decline/withdraw. Selected offers cannot be edited. Withdrawal/offline revision requires fresh selection; route loss never reassigns. Signed closure dependencies order replay; key continuity is not deployment authority.
 
 ## D20: Bounded resumable recorded transfers
 
-Large recorded notes must survive disconnects without unbounded memory: protocol-1 envelopes are journaled in resumable pieces with fixed per-neighbor and per-transport bounds, and legacy peers keep whole frames. Custody never proves recipient delivery. Sizes and limits: [architecture](architecture.md).
+Recorded notes survive disconnects in bounded memory: protocol-1 envelopes are journaled in resumable pieces with fixed per-neighbor and per-transport bounds, and legacy peers keep whole frames. Custody never proves recipient delivery. Limits: [architecture](architecture.md).
 
 ## D21: Incident history and projection digests
 
