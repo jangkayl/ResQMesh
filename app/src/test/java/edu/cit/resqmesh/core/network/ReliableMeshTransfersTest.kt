@@ -451,14 +451,16 @@ class ReliableMeshTransfersTest {
                 val p = ProtoBuf.decodeFromByteArray<TransferPiece>(wire.payload.liveAudioChunk!!)
                 if (!p.status && p.index == 0) {
                     corrupted = true
-                    val bad = p.copy(bytes = p.bytes.copyOf().also { it[0] = (it[0].toInt() xor 1).toByte() })
+                    // A legacy sender has no CRC, so only the transfer hash can catch this.
+                    val bad = p.copy(crc = 0L, hasCrc = false,
+                        bytes = p.bytes.copyOf().also { it[0] = (it[0].toInt() xor 1).toByte() })
                     b.engine.receive("A", wire.payload.copy(liveAudioChunk = ProtoBuf.encodeToByteArray(bad)))
                     true
                 } else false
             } else false
         }
         a.engine.offer("B", w.payload(), false); w.pump()
-        assertTrue(b.logs.contains("TRANSFER_HASH_FAILED"))
+        assertTrue(b.logs.any { it.startsWith("TRANSFER_HASH_FAILED") })
         assertEquals(1, b.arrived.size)
         assertTrue(a.events.contains(OutboundFrameEvent.Stage.COMPLETED))
         // Only this explicit reset may lower the shown count, and it is flagged as a restart.

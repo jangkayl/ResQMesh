@@ -7,6 +7,7 @@ import android.content.pm.PackageManager
 import android.os.Build
 import androidx.core.content.ContextCompat
 import edu.cit.resqmesh.core.model.ConnectedDevice
+import edu.cit.resqmesh.core.network.bluetooth.gatt.GattFrameResync
 import edu.cit.resqmesh.core.model.NodeIdentity
 import edu.cit.resqmesh.core.network.bluetooth.state.BleLink
 import edu.cit.resqmesh.core.network.bluetooth.state.BleLinkRole
@@ -195,12 +196,15 @@ internal class GattServerAttributeRequests(
             receivingLink.receiveBuffer.clear()
         }
         receivingLink.lastGattChunkAt = now
+        receivingLink.countRxChunk(value.size)
         store.connectionInteractionTimes[macAddress] = now
         store.links.current(macAddress, BleLinkRole.SERVER)?.takeIf { it.serverDevice?.address == device.address }?.lastInteractionAt = now
 
         when (val result = receivingLink.receiveBuffer.append(value)) {
             is MeshFrameCodec.AppendResult.Accepted -> {
-                result.payloads.forEach { payload -> processBinaryPayload(macAddress, payload) }
+                result.payloads.forEach { payload ->
+                    GattFrameResync.deliver(receivingLink, payload) { processBinaryPayload(macAddress, it) }
+                }
             }
             is MeshFrameCodec.AppendResult.Rejected -> {
                 AppLogger.d("BLE_MESH", "Rejected malformed SERVER frame from $macAddress: ${result.reason}")

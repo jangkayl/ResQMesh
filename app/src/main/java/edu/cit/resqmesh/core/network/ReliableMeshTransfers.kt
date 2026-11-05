@@ -13,13 +13,26 @@ import kotlinx.serialization.decodeFromByteArray
 import kotlinx.serialization.protobuf.ProtoBuf
 import edu.cit.resqmesh.core.utils.collections.BoundedLruMap
 
+/**
+ * [crc] and [hasCrc] are trailing optional fields that are never encoded at their defaults, so a piece without
+ * a checksum is byte-identical to the legacy wire and a legacy piece decodes with [hasCrc] false.
+ */
+@OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
 @Serializable
 internal data class TransferPiece(
     val transferId: String, val digest: String, val size: Int, val index: Int,
     val bytes: ByteArray = byteArrayOf(), val complete: Boolean = false,
     val priority: Boolean = false, val reset: Boolean = false,
-    val status: Boolean = false, val bitmap: ByteArray = byteArrayOf(), val requestId: String = ""
-)
+    val status: Boolean = false, val bitmap: ByteArray = byteArrayOf(), val requestId: String = "",
+    @kotlinx.serialization.EncodeDefault(kotlinx.serialization.EncodeDefault.Mode.NEVER) val crc: Long = 0L,
+    @kotlinx.serialization.EncodeDefault(kotlinx.serialization.EncodeDefault.Mode.NEVER) val hasCrc: Boolean = false
+) {
+    fun withCrc() = copy(crc = crcOf(bytes), hasCrc = true)
+
+    companion object {
+        fun crcOf(bytes: ByteArray): Long = java.util.zip.CRC32().also { it.update(bytes) }.value
+    }
+}
 
 /** Peers a public payload already crossed, as carried by the payload itself. */
 internal fun MeshPayload.relayVisited(): Set<String> =
@@ -56,6 +69,7 @@ internal class ReliableMeshTransfers(
     private val relayRosters = BoundedLruMap<String, Set<String>>(MAX_TRACKED_MESSAGES)
     private val forwardedPeers = BoundedLruMap<String, MutableSet<String>>(MAX_TRACKED_MESSAGES)
     private val relayFailures = mutableSetOf<Pair<String, String>>()
+    private val crcLogAt = BoundedLruMap<String, Long>(MAX_ROSTER_LOGS)
     private val relayHolds = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
     private val rosterLogs = BoundedLruMap<String, String>(MAX_ROSTER_LOGS)
     private val lateRelayPeersSince = mutableMapOf<String, Long>()
@@ -374,7 +388,7 @@ internal class ReliableMeshTransfers(
     }
 
     private fun storePiece(peer: String, packet: TransferPiece) {
-        if (packet.bytes.size != minOf(TransferJournal.PIECE_BYTES, packet.size - packet.index * TransferJournal.PIECE_BYTES)) return
+        if (!isIntactPiece(peer, packet)) return
         var record = journal.find(peer, packet.transferId, false)
         if (record != null && (record.digest != packet.digest || record.size != packet.size)) return
         if (record == null) record = createInboundRecord(peer, packet) ?: return
@@ -385,9 +399,25 @@ internal class ReliableMeshTransfers(
         } else if (record.stored) {
             record.response?.let { response(peer, it) }
         }
-        val ack = packet.copy(bytes = byteArrayOf(), complete = record.complete)
+        val ack = packet.copy(bytes = byteArrayOf(), complete = record.complete, crc = 0L, hasCrc = false)
         send(peer, encodeEnvelope(ACK, ack), true) { }
         runTransferCycle()
+    }
+
+    private fun isIntactPiece(peer: String, packet: TransferPiece): Boolean {
+        val expected = minOf(TransferJournal.PIECE_BYTES, packet.size - packet.index * TransferJournal.PIECE_BYTES)
+        return packet.bytes.size == expected && !rejectsCrc(peer, packet)
+    }
+
+    /** A piece without a CRC is never rejected here. The log is one line per transfer per window. */
+    private fun rejectsCrc(peer: String, packet: TransferPiece): Boolean {
+        val bad = packet.hasCrc && TransferPiece.crcOf(packet.bytes) != packet.crc
+        val last = crcLogAt[packet.transferId]
+        if (bad && (last == null || now() - last >= CRC_LOG_WINDOW_MS)) {
+            crcLogAt[packet.transferId] = now()
+            log("TRANSFER_PIECE_CRC_FAILED transfer=${packet.transferId.take(12)} index=${packet.index} peer=$peer")
+        }
+        return bad
     }
 
     private fun createInboundRecord(peer: String, packet: TransferPiece): TransferRecord? {
@@ -405,7 +435,9 @@ internal class ReliableMeshTransfers(
     private fun reassemble(peer: String, packet: TransferPiece, assembled: TransferRecord): TransferRecord? {
         val bytes = journal.assemble(assembled)
         if (TransferJournal.hash(bytes) != assembled.digest) {
-            journal.delete(assembled); log("TRANSFER_HASH_FAILED")
+            journal.delete(assembled)
+            log("TRANSFER_HASH_FAILED transfer=${packet.transferId.take(12)} peer=$peer size=${assembled.size} " +
+                "pieceCount=${TransferJournal.pieceCount(assembled.size)}")
             traceFailure(peer, packet.transferId, TraceDir.IN, assembled.size, TraceDropReason.TRANSFER_HASH_FAILED)
             send(peer, encodeEnvelope(ACK, packet.copy(bytes = byteArrayOf(), reset = true)), true) { }
             return null
@@ -656,7 +688,7 @@ internal class ReliableMeshTransfers(
         report(flight, SendProgress.State.SENDING)
         perPeer[peer] = (perPeer[peer] ?: 0) + 1
         val piece = TransferPiece(flight.record.id, flight.record.digest, flight.record.size, index,
-            flight.pieceBytes(index), priority = flight.record.priority)
+            flight.pieceBytes(index), priority = flight.record.priority).withCrc()
         val packet = encodeEnvelope(PIECE, piece, peer)
         val wireId = ProtoBuf.decodeFromByteArray<MeshPayload>(packet).id
         flight.pendingWireIds[index] = wireId
@@ -733,6 +765,7 @@ internal class ReliableMeshTransfers(
         const val VERSION = 1
         private const val MAX_TRACKED_MESSAGES = 1024
         private const val MAX_ROSTER_LOGS = 64
+        private const val CRC_LOG_WINDOW_MS = 5_000L
         private const val MAX_ROSTER_LOG_PEERS = 8
         private const val MAX_LOG_ID = 36
         const val WINDOW = 4
