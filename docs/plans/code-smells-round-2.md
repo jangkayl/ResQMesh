@@ -35,8 +35,8 @@ Last reviewed: 2026-11-04. Status: active plan; steps 1–12 committed on `final
 Work from lowest to highest risk. Steps 1–7 touch no radio code.
 
 ### Step 1: Incident status checks (type conditional, naming)
-- **Files:** `feature/incident/model/IncidentPresentation.kt`, `IncidentSelectors.kt`, `feature/incident/ui/components/HelpWorkflowPanel.kt`.
-- **Changes:** replace `status == "RESPONDING"` and similar with `IncidentState.RESPONDING.name`. Add a private extension such as `Incident.isTerminal()` for `setOf("RESOLVED", "CANCELLED")`. Name the three `ComplexCondition` expressions in `HelpWorkflowPanel` (`canOffer`, `canWithdraw`, `awaitingMyConfirmation`).
+- **Files:** `feature/incident/model/IncidentPresentation.kt`, `IncidentSelectors.kt`. (`HelpWorkflowPanel.kt` had no callers and was deleted in the 2026-11-05 pre-demo cleanup.)
+- **Changes:** replace `status == "RESPONDING"` and similar with `IncidentState.RESPONDING.name`. Add a private extension such as `Incident.isTerminal()` for `setOf("RESOLVED", "CANCELLED")`.
 - **Proof:** incident JVM tests and `IncidentUi` androidTest compile.
 
 ### Step 2: Incident list filtering (long method, complex condition)
@@ -73,8 +73,8 @@ Work from lowest to highest risk. Steps 1–7 touch no radio code.
 - **Proof:** `MapPackageTest` and `OfflineMapViewModelTest`.
 
 ### Step 9: Compose screens (long parameter list, long method)
-- **Files:** `IncidentDetailSheet.kt` (26 parameters), `IncidentCoordinationHub.kt`, `HelpWorkflowPanel.kt`, `CreateIncidentSheet.kt` (`onSubmit` with 9 arguments), `ChatBubble.kt`, `ActiveChatScreen.kt`.
-- **Changes:** split long composables into private children, keeping text and test tags. `IncidentDetailSheet` and `CreateIncidentSheet` keep their signatures (`IncidentUiTest` calls them). Done: detail sheet body, confirmation sheets, `CreateIncidentSheet`, `ChatBubble` and `ActiveChatScreen`. Hub and panel have no callers and were left alone.
+- **Files:** `IncidentDetailSheet.kt` (26 parameters), `CreateIncidentSheet.kt` (`onSubmit` with 9 arguments), `ChatBubble.kt`, `ActiveChatScreen.kt`.
+- **Changes:** split long composables into private children, keeping text and test tags. `IncidentDetailSheet` and `CreateIncidentSheet` keep their signatures (`IncidentUiTest` calls them). Done: detail sheet body, confirmation sheets, `CreateIncidentSheet`, `ChatBubble` and `ActiveChatScreen`. The hub and panel had no callers and were deleted in the 2026-11-05 pre-demo cleanup.
 - **Proof:** `IncidentUiTest` compile. UI-02's four existing failures are expected, so compare results before and after.
 - **Magic numbers:** `Color.kt` and `Theme.kt` hex colors are design tokens, so leave them as they are. In screens, name only the repeated `dp` and duration values.
 

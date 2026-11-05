@@ -26,3 +26,7 @@ __pycache__/
 *.jks
 *.keystore
 keystore.properties
+
+# JVM crash dumps
+hs_err_pid*.log
+replay_pid*.log

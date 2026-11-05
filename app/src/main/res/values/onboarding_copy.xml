@@ -9,11 +9,9 @@
     <string name="onboarding_permissions_extra_access_note">Android may also ask for notifications or microphone access.</string>
     <string name="onboarding_permissions_allow_action">Allow access</string>
     <string name="onboarding_permissions_offline_note">Works without cellular service or internet.</string>
-    <string name="guide_header">How ResQMesh works</string>
     <string name="guide_progress">%1$d of %2$d</string>
     <string name="guide_skip">Skip</string>
     <string name="guide_close">Close</string>
-    <string name="guide_back">Back</string>
     <string name="guide_next">Next</string>
     <string name="guide_done">Done</string>
     <string name="guide_start_setup">Start setup</string>

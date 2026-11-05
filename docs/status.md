@@ -1,6 +1,6 @@
 # Current status
 
-Last reviewed: 2026-10-17. Baseline: `a9a27ed` on `main`. Build hashes and test counts live in [validation](validation.md).
+Last reviewed: 2026-11-05. Baseline: `02bad50` on `main`. Build hashes and test counts live in [validation](validation.md).
 
 ## Current objective
 
@@ -31,10 +31,6 @@ Behavior and source ownership are in [architecture](architecture.md); accepted p
 
 Block, incident, SOS and recovery: basic user-reported successes; adversarial, load and repeated cases pending ([checklist](testing/physical-reliability-tests.md)).
 
-**Layer boundaries / P2 subset** (`refactor/layer-boundaries`, [plan](plans/layer-boundaries.md)): user-reported [smoke card](testing/layer-boundaries-smoke-card.md) pass on three phones (2026-10-17); merged.
-
-**Batch C hygiene / Phase 0** (`refactor/batch-c-hygiene`): user-reported [smoke card](testing/batch-c-hygiene-smoke-card.md) pass, 2026-10-17.
-
 **SOS message notifications** (`feat/sos-message-notifications`): [card](testing/sos-message-notifications-card.md) pending.
 
 **SOS banner, developer PIN crash** (`fix/dev-pin-sos-banner`): [card](testing/sos-banner-dev-pin-card.md) pending. **GATT write cap:** SM-A276B crash fix reported good.
@@ -43,7 +39,9 @@ Block, incident, SOS and recovery: basic user-reported successes; adversarial, l
 
 **Reconnect sync fix** (`fix/incident-reconnect-sync`): bounded sync, paced creation (D29); [card](testing/incident-reconnect-sync-card.md) pending.
 
-**Code smells:** two-phone pass; [card](testing/code-smells-refactor-card.md) steps 5/6/8 open.
+**Code smells:** two-phone pass; [card](testing/code-smells-refactor-card.md) steps 5/6/8 open. Round 2 ([plan](plans/code-smells-round-2.md)): steps 1–12 local, device validation pending.
+
+**Pre-demo cleanup** (`refactor/pre-demo-cleanup`): unreferenced code, resources, libraries removed; no BLE, wire or schema change. Release [card](testing/pre-demo-cleanup-card.md) pending. Passed cards [archived](../archive/docs-superseded-2026-11-05/README.md).
 
 **Developer console** (`feat/developer-console`, [plan](plans/developer-mode.md)): Stage 1 and live follow pushed; Stage 2 (traces, timeline): local checks only, awaiting [phone card](testing/developer-mode-card.md). Stage 3 (signal/queue stats) pending.
 

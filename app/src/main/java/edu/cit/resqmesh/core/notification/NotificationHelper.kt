@@ -14,6 +14,7 @@ import androidx.core.app.NotificationManagerCompat
 import androidx.core.app.Person
 import edu.cit.resqmesh.app.navigation.NotificationRouterActivity
 import edu.cit.resqmesh.R
+import edu.cit.resqmesh.core.logging.AppLogger
 import java.util.concurrent.ConcurrentHashMap
 
 class NotificationHelper(private val context: Context) {
@@ -162,7 +163,7 @@ class NotificationHelper(private val context: Context) {
                 notify(notificationId, builder.build())
             }
         } catch (e: SecurityException) {
-            e.printStackTrace()
+            AppLogger.d(LOG_TAG, "showPrivateMessageNotification failed: ${e.javaClass.simpleName}")
         }
     }
 
@@ -235,7 +236,7 @@ class NotificationHelper(private val context: Context) {
                 notify("sos_$sosId", 1, builder.build())
             }
         } catch (e: SecurityException) {
-            e.printStackTrace()
+            AppLogger.d(LOG_TAG, "showSosEmergencyNotification failed: ${e.javaClass.simpleName}")
         }
     }
 
@@ -269,7 +270,7 @@ class NotificationHelper(private val context: Context) {
         try {
             NotificationManagerCompat.from(context).notify("incident_$incidentId", 2, builder.build())
         } catch (e: SecurityException) {
-            e.printStackTrace()
+            AppLogger.d(LOG_TAG, "showIncidentNotification failed: ${e.javaClass.simpleName}")
         }
     }
 
@@ -323,7 +324,7 @@ class NotificationHelper(private val context: Context) {
         try {
             NotificationManagerCompat.from(context).notify("sos_messages_$sosId", SOS_MESSAGE_TAG_ID, builder.build())
         } catch (e: SecurityException) {
-            e.printStackTrace()
+            AppLogger.d(LOG_TAG, "showSosMessageNotification failed: ${e.javaClass.simpleName}")
         }
     }
 
@@ -349,11 +350,12 @@ class NotificationHelper(private val context: Context) {
             val notificationId = ("chat_$senderName").hashCode()
             NotificationManagerCompat.from(context).cancel(notificationId)
         } catch (e: Exception) {
-            e.printStackTrace()
+            AppLogger.d(LOG_TAG, "clearPrivateMessagesFor failed: ${e.javaClass.simpleName}")
         }
     }
 
     private companion object {
         const val SOS_MESSAGE_TAG_ID = 3
+        const val LOG_TAG = "Notification"
     }
 }

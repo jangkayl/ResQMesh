@@ -11,6 +11,7 @@ The Obsidian workspace file is intentionally excluded because it is machine-spec
 - [September 16 legacy documentation](docs-legacy-2026-09-16/README.md): the original context migration, preserved unchanged.
 - [October 4 dispositions and evidence](docs-superseded-2026-10-04/README.md): retired/deferred plans, older test candidates and the validation snapshot.
 - [October 16 completed refactor evidence](docs-superseded-2026-10-16/): maintainability handoffs (size inventory, local evidence ledger), the incident UI repair handoff, the finished network-maintainability plan and the two refactor phone cards. Outcomes stay in `docs/status.md` and `docs/validation.md`; links inside these files point to their original locations and may be stale.
+- [November 5 completed cards](docs-superseded-2026-11-05/README.md): passed smoke/rename/security Phase A cards and the finished layer-boundaries plan, archived during the pre-demo cleanup.
 
 ## Tools
 

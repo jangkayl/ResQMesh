@@ -1,7 +1,5 @@
 package edu.cit.resqmesh.core.logging.trace
 
-enum class TraceStream { DATA, CONTROL, ERRORS, LOGS, VOICE }
-
 enum class TraceStage { QUEUED, STARTED, COMPLETED, FAILED, RECEIVED, DROPPED }
 
 enum class TraceDir { OUT, IN }

@@ -8,8 +8,6 @@ enum class IncidentDestination(val label: String) {
     HISTORY("History")
 }
 
-typealias IncidentScope = IncidentDestination
-
 enum class AssistanceFilter(val label: String) {
     ANY("Any"),
     LOOKING_FOR_HELP("Looking for help"),
@@ -29,16 +27,6 @@ data class IncidentFilterState(
         return count
     }
 }
-
-enum class TriageQuickFilter {
-    ALL,
-    NEEDS_TRIAGE,
-    CRITICAL_ONLY,
-    MY_TASKS,
-    UNASSISTED_ONLY
-}
-
-typealias IncidentTriageTab = IncidentDestination
 
 data class IncidentMetrics(
     val totalActive: Int = 0,
