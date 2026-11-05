@@ -31,7 +31,7 @@ Behavior and source ownership are in [architecture](architecture.md); accepted p
 
 Block, incident, SOS and recovery: basic user-reported successes; adversarial, load and repeated cases pending ([checklist](testing/physical-reliability-tests.md)).
 
-**Layer boundaries / P2 subset** (`refactor/layer-boundaries`, [plan](plans/layer-boundaries.md)): The user reported the [smoke card](testing/layer-boundaries-smoke-card.md) passing on three phones (2026-10-17); merged.
+**Layer boundaries / P2 subset** (`refactor/layer-boundaries`, [plan](plans/layer-boundaries.md)): user-reported [smoke card](testing/layer-boundaries-smoke-card.md) pass on three phones (2026-10-17); merged.
 
 **Batch C hygiene / Phase 0** (`refactor/batch-c-hygiene`): user-reported [smoke card](testing/batch-c-hygiene-smoke-card.md) pass, 2026-10-17.
 
@@ -47,7 +47,7 @@ Block, incident, SOS and recovery: basic user-reported successes; adversarial, l
 
 **Reconnect sync fix** (`fix/incident-reconnect-sync`): bounded sync, paced creation (D29); [card](testing/incident-reconnect-sync-card.md) pending.
 
-**Code smells:** [card](testing/code-smells-refactor-card.md)/[round-2-plan](plans/code-smells-round-2.md) pending.
+**Code smells:** two-phone pass; [card](testing/code-smells-refactor-card.md) steps 5/6/8 open.
 
 **Developer console** (branch `feat/developer-console`, [plan](plans/developer-mode.md)): Stage 1 and live follow are pushed; Stage 2 (traces, timeline) has local checks only and awaits the [phone card](testing/developer-mode-card.md). Stage 3 (signal and queue stats) is pending.
 
