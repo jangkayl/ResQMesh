@@ -126,8 +126,8 @@ private fun GattClientAttemptContext.handleMtuChanged(gatt: BluetoothGatt, mtu: 
         link.mtu = payloadSize
     } else {
         AppLogger.d("BLE_MESH", "MTU Expansion failed. Samsung Fallback to 23 bytes.")
-        store.connectionMtu[mac] = DEFAULT_ATT_PAYLOAD_BYTES
-        link.mtu = DEFAULT_ATT_PAYLOAD_BYTES
+        store.connectionMtu[mac] = BleConfig.DEFAULT_ATT_PAYLOAD_BYTES
+        link.mtu = BleConfig.DEFAULT_ATT_PAYLOAD_BYTES
     }
     requestServicesOnce(gatt)
     payloadSetup.onMtu()

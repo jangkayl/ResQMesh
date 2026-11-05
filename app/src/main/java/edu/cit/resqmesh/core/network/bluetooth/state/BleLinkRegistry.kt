@@ -2,6 +2,7 @@ package edu.cit.resqmesh.core.network.bluetooth.state
 
 import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothGatt
+import edu.cit.resqmesh.core.network.bluetooth.BleConfig
 import java.util.concurrent.ConcurrentLinkedDeque
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -26,7 +27,7 @@ class BleLink(
     @Volatile var state: BleLinkState = BleLinkState.CONNECTING
         internal set
     @Volatile var currentOperation: String? = null
-    @Volatile var mtu: Int = 20
+    @Volatile var mtu: Int = BleConfig.DEFAULT_ATT_PAYLOAD_BYTES
     @Volatile var lastInteractionAt: Long = startedAt
     @Volatile var readyAt: Long = 0L
     @Volatile var retryCount: Int = 0

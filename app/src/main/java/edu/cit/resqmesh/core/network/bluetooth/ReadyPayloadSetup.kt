@@ -91,7 +91,7 @@ class ReadyPayloadSetup(
         if (mtuAttempted) return false
         mtuAttempted = true
         begin(Operation.REQUEST_MTU)
-        log("MTU_REQUEST requested=$REQUESTED_MTU")
+        log("MTU_REQUEST requested=${BleConfig.REQUESTED_MTU}")
         if (!requestMtu()) onMtu()
         return true
     }
@@ -141,7 +141,5 @@ class ReadyPayloadSetup(
         const val QUICK_RETRY_ATTEMPTS = 3
         const val QUICK_RETRY_STEP_MS = 1_000L
         const val SLOW_RETRY_MS = 30_000L
-        /** Only logged; the MTU value itself is requested by the GATT client. */
-        const val REQUESTED_MTU = 247
     }
 }

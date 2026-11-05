@@ -106,7 +106,7 @@ class GattClientManager(
         val link = beginClientLink(macAddress, peerName)
         val payloadSetup = createGattClientPayloadSetup(manager, epoch, link, macAddress,
             readPort = { characteristic -> link.gatt?.readCharacteristic(characteristic) == true },
-            requestMtu = { link.gatt?.requestMtu(REQUESTED_MTU) == true })
+            requestMtu = { link.gatt?.requestMtu(BleConfig.REQUESTED_MTU) == true })
         setups[macAddress] = link to payloadSetup
         val stablePeerId = link.peerNodeId ?: NodeIdentity.idOf(peerName)
         val useExplicitLeTransport = stablePeerId != null &&
@@ -163,10 +163,5 @@ class GattClientManager(
             manager.store.links.forget(link)
             BleConnectStartResult.REJECTED
         }
-    }
-
-    private companion object {
-        /** MTU asked for once the link is READY and the setup queue is idle. */
-        const val REQUESTED_MTU = 247
     }
 }
