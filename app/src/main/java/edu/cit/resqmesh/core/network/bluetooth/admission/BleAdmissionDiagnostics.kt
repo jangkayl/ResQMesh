@@ -37,23 +37,7 @@ internal class BleAdmissionDiagnostics(private val capabilities: BleAdmissionCap
         val lockAge = if (store.connectLockAcquiredAt > 0) (now - store.connectLockAcquiredAt).coerceAtLeast(0L) else 0L
 
         val localScore = electionScore()
-        val electionWinner = when {
-            peerScore.isNotEmpty() && localScore.isNotEmpty() -> when {
-                localScore > peerScore -> "local"
-                localScore < peerScore -> "peer"
-                else -> when {
-                    NodeIdentity.idOf(localName()).orEmpty() > NodeIdentity.idOf(peerName).orEmpty() -> "local"
-                    NodeIdentity.idOf(localName()).orEmpty() < NodeIdentity.idOf(peerName).orEmpty() -> "peer"
-                    else -> "tie"
-                }
-            }
-            peerScore.isEmpty() && localName().isNotEmpty() -> when {
-                localName() > peerName -> "local"
-                localName() < peerName -> "peer"
-                else -> "tie"
-            }
-            else -> "unknown"
-        }
+        val electionWinner = electionWinner(localScore, peerScore, peerName)
 
         val directSockets = store.activeConnections.size + store.activeServerConnections.size
         val distinctDirectPeers = directLinkCount()
@@ -83,6 +67,26 @@ internal class BleAdmissionDiagnostics(private val capabilities: BleAdmissionCap
 
         AppLogger.d("BLE_ADMISSION", decision.toLogString())
         onDecision?.invoke(decision)
+    }
+
+    /**
+     * Which side should initiate: the higher election score, then the higher node ID; peers that
+     * advertise no score fall back to comparing names. Diagnostic only.
+     */
+    private fun electionWinner(localScore: String, peerScore: String, peerName: String): String = when {
+        peerScore.isNotEmpty() && localScore.isNotEmpty() -> when {
+            localScore > peerScore -> "local"
+            localScore < peerScore -> "peer"
+            else -> compareSides(NodeIdentity.idOf(localName()).orEmpty(), NodeIdentity.idOf(peerName).orEmpty())
+        }
+        peerScore.isEmpty() && localName().isNotEmpty() -> compareSides(localName(), peerName)
+        else -> "unknown"
+    }
+
+    private fun compareSides(local: String, peer: String): String = when {
+        local > peer -> "local"
+        local < peer -> "peer"
+        else -> "tie"
     }
 
     private fun safeNodeLabel(peerName: String, endpoint: String): String {

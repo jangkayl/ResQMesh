@@ -14,11 +14,6 @@ interface GattHost {
     val handler: Handler
     val onDeviceConnected: ((ConnectedDevice) -> Unit)?
     val onDeviceDisconnected: ((String) -> Unit)?
-    val SERVICE_UUID: UUID
-    val TX_CHARACTERISTIC_UUID: UUID
-    val L2CAP_PSM_CHARACTERISTIC_UUID: UUID
-    val CCC_DESCRIPTOR_UUID: UUID
-    val MAX_TOTAL_CONNECTIONS: Int
     val transportGeneration: Long
 
     fun isTransportGenerationCurrent(generation: Long): Boolean

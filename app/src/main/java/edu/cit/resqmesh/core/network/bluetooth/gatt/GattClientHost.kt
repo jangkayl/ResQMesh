@@ -10,9 +10,6 @@ import edu.cit.resqmesh.core.network.bluetooth.state.BleLinkRole
 /** Client setup capabilities. No server resources, routing or outbox access. */
 interface GattClientHost : GattHost {
     val onDeviceScanned: ((ScanEvent) -> Unit)?
-    val HANDSHAKE_WATCHDOG_MS: Long
-    val DISCOVERY_REQUEST_RETRY_MS: Long
-    val MAX_DISCOVERY_REQUEST_ATTEMPTS: Int
 
     fun getRemoteDevice(macAddress: String): BluetoothDevice
     fun trackPendingL2capSocket(socket: BluetoothSocket, generation: Long): Boolean

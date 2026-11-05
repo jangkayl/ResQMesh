@@ -2,101 +2,103 @@ package edu.cit.resqmesh.feature.incident.model
 
 import edu.cit.resqmesh.core.model.Incident
 import edu.cit.resqmesh.core.model.IncidentOffer
-import edu.cit.resqmesh.core.model.MeshUser
-import edu.cit.resqmesh.feature.incident.model.IncidentIdentityState
-import edu.cit.resqmesh.feature.incident.model.IncidentMetrics
-import edu.cit.resqmesh.feature.incident.model.IncidentDestination
-import edu.cit.resqmesh.feature.incident.model.IncidentFilterState
-import edu.cit.resqmesh.feature.incident.model.AssistanceFilter
-import edu.cit.resqmesh.feature.incident.model.isInvolved
-import edu.cit.resqmesh.feature.incident.model.displayTitle
+import edu.cit.resqmesh.core.model.IncidentState
 
-internal fun incidentMetrics(incidents: List<Incident>, identity: IncidentIdentityState, offersMap: Map<String, List<IncidentOffer>>): IncidentMetrics = run {
-        val active = incidents.filter { it.status !in setOf("RESOLVED", "CANCELLED") }
-        val history = incidents.filter { it.status in setOf("RESOLVED", "CANCELLED") }
-        val localKey = identity.signingKey
-        val myActivity = active.filter { inc ->
-            isInvolved(inc, offersMap[inc.incidentId].orEmpty(), identity.user?.userId, localKey)
-        }
-        IncidentMetrics(
-            totalActive = active.size,
-            myActivityCount = myActivity.size,
-            historyCount = history.size,
-            criticalCount = active.count { it.severity.equals("Critical", ignoreCase = true) }
-        )
+private const val SEVERITY_RANK_CRITICAL = 3
+private const val SEVERITY_RANK_SERIOUS = 2
+private const val SEVERITY_RANK_OTHER = 1
+
+internal fun incidentMetrics(
+    incidents: List<Incident>,
+    identity: IncidentIdentityState,
+    offersMap: Map<String, List<IncidentOffer>>
+): IncidentMetrics {
+    val active = incidents.filter { !it.isTerminal() }
+    val history = incidents.filter { it.isTerminal() }
+    val myActivity = active.filter { incident ->
+        isInvolved(incident, offersMap[incident.incidentId].orEmpty(), identity.user?.userId, identity.signingKey)
+    }
+    return IncidentMetrics(
+        totalActive = active.size,
+        myActivityCount = myActivity.size,
+        historyCount = history.size,
+        criticalCount = active.count { it.severity.equals("Critical", ignoreCase = true) }
+    )
 }
 
-internal fun selectIncidents(incidents: List<Incident>, user: MeshUser?, offersMap: Map<String, List<IncidentOffer>>, currentDest: IncidentDestination, currentFilters: IncidentFilterState, query: String, localKey: String?): List<Incident> = run {
-        incidents.filter { incident ->
-            // 1. Destination filter
-            val matchesDest = when (currentDest) {
-                IncidentDestination.ACTIVE -> incident.status !in setOf("RESOLVED", "CANCELLED")
-                IncidentDestination.MY_ACTIVITY -> {
-                    incident.status !in setOf("RESOLVED", "CANCELLED") &&
-                        isInvolved(incident, offersMap[incident.incidentId].orEmpty(), user?.userId, localKey)
-                }
-                IncidentDestination.HISTORY -> incident.status in setOf("RESOLVED", "CANCELLED")
-            }
-            if (!matchesDest) return@filter false
+/** What the incident list is showing: the destination tab, its filters and a lower-case search text. */
+internal data class IncidentListQuery(
+    val destination: IncidentDestination,
+    val filters: IncidentFilterState,
+    val text: String
+)
 
-            // 2. Emergency Type filter
-            if (currentFilters.emergencyType != null &&
-                !incident.incidentType.equals(currentFilters.emergencyType, ignoreCase = true)
-            ) {
-                return@filter false
-            }
+internal fun selectIncidents(
+    incidents: List<Incident>,
+    identity: IncidentIdentityState,
+    offersMap: Map<String, List<IncidentOffer>>,
+    listQuery: IncidentListQuery
+): List<Incident> = incidents.filter { incident ->
+    val offers = offersMap[incident.incidentId].orEmpty()
+    val destination = listQuery.destination
+    matchesDestination(incident, destination, offers, identity.user?.userId, identity.signingKey) &&
+        matchesCategoryFilters(incident, listQuery.filters) &&
+        (destination == IncidentDestination.HISTORY ||
+            matchesAssistance(incident, listQuery.filters.assistance, offers)) &&
+        (listQuery.text.isEmpty() || matchesQuery(incident, offers, listQuery.text))
+}.sortedWith(incidentOrder(listQuery.destination))
 
-            // 3. Urgency filter
-            if (currentFilters.urgency != null &&
-                !incident.severity.equals(currentFilters.urgency, ignoreCase = true)
-            ) {
-                return@filter false
-            }
-
-            // 4. Assistance filter (active destinations only)
-            if (currentDest != IncidentDestination.HISTORY) {
-                val activeOffers = offersMap[incident.incidentId].orEmpty().filter { !it.withdrawn }
-                when (currentFilters.assistance) {
-                    AssistanceFilter.ANY -> Unit
-                    AssistanceFilter.LOOKING_FOR_HELP -> {
-                        if (incident.status != "OPEN") return@filter false
-                    }
-                    AssistanceFilter.NO_OFFERS_YET -> {
-                        if (incident.status != "OPEN" || activeOffers.isNotEmpty()) return@filter false
-                    }
-                }
-            }
-
-            // 5. Keyword search query
-            if (query.isNotEmpty()) {
-                val matchesTitle = incident.title.lowercase().contains(query) ||
-                    incident.displayTitle().lowercase().contains(query)
-                val matchesDesc = incident.description.lowercase().contains(query)
-                val matchesLandmark = incident.areaDescription.lowercase().contains(query)
-                val matchesReporter = incident.creatorName.lowercase().contains(query)
-                val matchesHelper = (incident.primaryResponderName?.lowercase()?.contains(query) == true) ||
-                    offersMap[incident.incidentId].orEmpty().any { it.helperName.lowercase().contains(query) }
-                val matchesId = incident.incidentId.lowercase().contains(query)
-
-                if (!matchesTitle && !matchesDesc && !matchesLandmark && !matchesReporter && !matchesHelper && !matchesId) {
-                    return@filter false
-                }
-            }
-
-            true
-        }.sortedWith(
-            if (currentDest == IncidentDestination.HISTORY) {
-                // History: latest update descending, stable ID
-                compareByDescending<Incident> { it.updatedAt }.thenBy { it.incidentId }
-            } else {
-                // Active / My activity: urgency descending, latest update, stable ID
-                compareByDescending<Incident> {
-                    when (it.severity.lowercase()) {
-                        "critical" -> 3
-                        "serious" -> 2
-                        else -> 1
-                    }
-                }.thenByDescending { it.updatedAt }.thenBy { it.incidentId }
-            }
-        )
+private fun matchesDestination(
+    incident: Incident,
+    destination: IncidentDestination,
+    offers: List<IncidentOffer>,
+    userId: String?,
+    localKey: String?
+): Boolean = when (destination) {
+    IncidentDestination.ACTIVE -> !incident.isTerminal()
+    IncidentDestination.MY_ACTIVITY -> !incident.isTerminal() && isInvolved(incident, offers, userId, localKey)
+    IncidentDestination.HISTORY -> incident.isTerminal()
 }
+
+/** Emergency type and urgency filters; a null filter matches everything. */
+private fun matchesCategoryFilters(incident: Incident, filters: IncidentFilterState): Boolean {
+    val typeMatches = filters.emergencyType == null ||
+        incident.incidentType.equals(filters.emergencyType, ignoreCase = true)
+    val urgencyMatches = filters.urgency == null ||
+        incident.severity.equals(filters.urgency, ignoreCase = true)
+    return typeMatches && urgencyMatches
+}
+
+/** Applies to active destinations only; the caller skips it for history. */
+private fun matchesAssistance(incident: Incident, filter: AssistanceFilter, offers: List<IncidentOffer>): Boolean =
+    when (filter) {
+        AssistanceFilter.ANY -> true
+        AssistanceFilter.LOOKING_FOR_HELP -> incident.hasStatus(IncidentState.OPEN)
+        AssistanceFilter.NO_OFFERS_YET -> incident.hasStatus(IncidentState.OPEN) && offers.none { !it.withdrawn }
+    }
+
+/** [query] is expected lower-case; matches title, description, landmark, reporter, helpers or ID. */
+private fun matchesQuery(incident: Incident, offers: List<IncidentOffer>, query: String): Boolean =
+    incident.title.lowercase().contains(query) ||
+        incident.displayTitle().lowercase().contains(query) ||
+        incident.description.lowercase().contains(query) ||
+        incident.areaDescription.lowercase().contains(query) ||
+        incident.creatorName.lowercase().contains(query) ||
+        incident.primaryResponderName?.lowercase()?.contains(query) == true ||
+        offers.any { it.helperName.lowercase().contains(query) } ||
+        incident.incidentId.lowercase().contains(query)
+
+private fun severityRank(severity: String): Int = when (severity.lowercase()) {
+    "critical" -> SEVERITY_RANK_CRITICAL
+    "serious" -> SEVERITY_RANK_SERIOUS
+    else -> SEVERITY_RANK_OTHER
+}
+
+/** History: latest update first. Active and my activity: urgency, then latest update. Ties break by ID. */
+private fun incidentOrder(destination: IncidentDestination): Comparator<Incident> =
+    if (destination == IncidentDestination.HISTORY) {
+        compareByDescending<Incident> { it.updatedAt }.thenBy { it.incidentId }
+    } else {
+        compareByDescending<Incident> { severityRank(it.severity) }
+            .thenByDescending { it.updatedAt }.thenBy { it.incidentId }
+    }

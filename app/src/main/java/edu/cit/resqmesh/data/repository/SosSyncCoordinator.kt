@@ -100,7 +100,7 @@ internal class SosSyncCoordinator(
         try {
             repeat(MAX_REQUEST_ATTEMPTS) { attempt ->
                 check(current(l))
-                val payload = MeshPayload(id = UUID.randomUUID().toString(), type = "SOS_SYNC_REQ",
+                val payload = MeshPayload(id = UUID.randomUUID().toString(), type = PayloadTypes.SOS_SYNC_REQ,
                     text = SosProtocol.json.encodeToString(packet), senderNodeId = gateway.myNodeId)
                 gateway.sendPriorityPayload(l.endpoint, ProtoBuf.encodeToByteArray(payload))
                 val answer = withTimeoutOrNull(1_500L * (attempt + 1)) { response.await() }
@@ -114,8 +114,8 @@ internal class SosSyncCoordinator(
         if (payload.text.toByteArray().size > MAX_PACKET_TEXT_BYTES) return
         val packet = runCatching { SosProtocol.json.decodeFromString<SosSyncPacket>(payload.text) }.getOrNull() ?: return
         if (packet.request.length !in 1..100 || packet.events.size > 8 || packet.cursor < -1) return
-        if (payload.type == "SOS_SYNC_RES" && packet.digest.length != SHA256_HEX_LENGTH) return
-        if (payload.type == "SOS_SYNC_RES") {
+        if (payload.type == PayloadTypes.SOS_SYNC_RES && packet.digest.length != SHA256_HEX_LENGTH) return
+        if (payload.type == PayloadTypes.SOS_SYNC_RES) {
             val w = waiting[packet.request] ?: return
             if (w.link.endpoint == endpoint && current(w.link)) w.result.complete(packet)
             return
@@ -137,8 +137,9 @@ internal class SosSyncCoordinator(
                 }
                 reply = reply.copy(events = events, next = if (index >= rows.size) -1 else index)
             }
-            val bytes = ProtoBuf.encodeToByteArray(MeshPayload(id = UUID.randomUUID().toString(), type = "SOS_SYNC_RES",
-                text = SosProtocol.json.encodeToString(reply), senderNodeId = gateway.myNodeId))
+            val bytes = ProtoBuf.encodeToByteArray(MeshPayload(id = UUID.randomUUID().toString(),
+                type = PayloadTypes.SOS_SYNC_RES, text = SosProtocol.json.encodeToString(reply),
+                senderNodeId = gateway.myNodeId))
             if (current(l)) {
                 if (reply.events.isEmpty()) gateway.sendPriorityPayload(endpoint, bytes)
                 else gateway.sendDirectPayload(endpoint, bytes)

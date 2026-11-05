@@ -20,6 +20,10 @@ import androidx.compose.ui.unit.dp
 import edu.cit.resqmesh.core.model.Incident
 import edu.cit.resqmesh.core.model.IncidentOffer
 import edu.cit.resqmesh.core.model.DomainEvent
+import edu.cit.resqmesh.core.model.EventType
+import edu.cit.resqmesh.core.model.IncidentState
+import edu.cit.resqmesh.feature.incident.model.hasStatus
+import edu.cit.resqmesh.feature.incident.model.isTerminal
 import org.json.JSONObject
 
 @Composable
@@ -45,29 +49,35 @@ fun HelpWorkflowPanel(
     val isSelectedHelper = incident.selectedHelperKey != null && incident.selectedHelperKey == localSigningKey
     val myOffer = offers.firstOrNull { it.helperKey == localSigningKey }
     val selectedOffer = offers.firstOrNull { it.offerId == incident.selectionOfferId }
-    val terminal = incident.status == "RESOLVED" || incident.status == "CANCELLED"
-    val revokedSelections = events.filter { it.applied && it.eventType == "INCIDENT_LEAD_REVOKED" }
+    val terminal = incident.isTerminal()
+    val revokedSelections = events.filter { it.applied && it.eventType == EventType.INCIDENT_LEAD_REVOKED.name }
         .mapNotNull { runCatching { JSONObject(it.payloadJson).optString("selectionId") }.getOrNull() }
         .toSet()
     val wasRevoked = !isSelectedHelper && localSigningKey != null && events.any { event ->
-        if (!event.applied || event.eventType != "INCIDENT_LEAD_SELECTED") false
+        if (!event.applied || event.eventType != EventType.INCIDENT_LEAD_SELECTED.name) false
         else runCatching {
             val payload = JSONObject(event.payloadJson)
             payload.optString("helperKey") == localSigningKey &&
                 payload.optString("selectionId") in revokedSelections
         }.getOrDefault(false)
     }
+    val isOpen = incident.hasStatus(IncidentState.OPEN)
+    val canEditOffer = !isReporter && !terminal && !(isSelectedHelper && incident.selectionId != null)
+    val canWithdrawAsSelectedHelper = !isReporter && !terminal && isSelectedHelper && myOffer?.withdrawn == false
+    val awaitingMyConfirmation = incident.hasStatus(IncidentState.AWAITING_HELPER) && isSelectedHelper &&
+        selectedOffer?.withdrawn == false && selectedOffer.revision == incident.selectionOfferRevision
     var note by rememberSaveable(incident.incidentId) { mutableStateOf("") }
 
     Column(verticalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
         Text("HELP COORDINATION", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
         Text(
             when (incident.status) {
-                "OPEN" -> "Open for offers. No lead helper has been selected."
-                "AWAITING_HELPER" -> "Awaiting helper confirmation. Selection does not mean the helper received it."
-                "RESPONDING" -> "Help in progress, based on the helper's last confirmation."
-                "RESOLVED" -> "Reporter marked this request resolved on this phone."
-                "CANCELLED" -> "Reporter cancelled this request on this phone."
+                IncidentState.OPEN.name -> "Open for offers. No lead helper has been selected."
+                IncidentState.AWAITING_HELPER.name ->
+                    "Awaiting helper confirmation. Selection does not mean the helper received it."
+                IncidentState.RESPONDING.name -> "Help in progress, based on the helper's last confirmation."
+                IncidentState.RESOLVED.name -> "Reporter marked this request resolved on this phone."
+                IncidentState.CANCELLED.name -> "Reporter cancelled this request on this phone."
                 else -> "Current local incident state: ${incident.status}"
             }, style = MaterialTheme.typography.bodyMedium
         )
@@ -102,7 +112,7 @@ fun HelpWorkflowPanel(
                 color = MaterialTheme.colorScheme.primary)
         }
 
-        if (!isReporter && !terminal && !(isSelectedHelper && incident.selectionId != null)) {
+        if (canEditOffer) {
             OutlinedTextField(
                 value = note,
                 onValueChange = { if (it.length <= TextField.HELP_NOTE.maxLength) note = it },
@@ -121,13 +131,12 @@ fun HelpWorkflowPanel(
                     modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text("Withdraw offer") }
             }
         }
-        if (!isReporter && !terminal && isSelectedHelper && myOffer?.withdrawn == false) {
+        if (canWithdrawAsSelectedHelper) {
             OutlinedButton(onClick = onWithdraw, enabled = !busy,
                 modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text("Withdraw offer") }
         }
 
-        if (incident.status == "AWAITING_HELPER" && isSelectedHelper &&
-            selectedOffer?.withdrawn == false && selectedOffer.revision == incident.selectionOfferRevision) {
+        if (awaitingMyConfirmation) {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Button(onClick = onConfirm, enabled = !busy, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) {
                     Text("I'm helping")
@@ -145,7 +154,7 @@ fun HelpWorkflowPanel(
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(offer.helperName, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
                 Text(offer.note, style = MaterialTheme.typography.bodySmall)
-                if (isReporter && incident.status == "OPEN") {
+                if (isReporter && isOpen) {
                     OutlinedButton(onClick = { onSelect(offer.offerId) }, enabled = !busy,
                         modifier = Modifier.heightIn(min = 48.dp)) { Text("Select as lead helper") }
                 }
@@ -160,7 +169,7 @@ fun HelpWorkflowPanel(
                 OutlinedButton(onClick = onRevoke, enabled = !busy,
                     modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text("Revoke lead selection") }
             }
-            if (incident.status == "RESPONDING") {
+            if (incident.hasStatus(IncidentState.RESPONDING)) {
                 Button(onClick = onResolve, enabled = !busy,
                     modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text("Mark request resolved") }
             }

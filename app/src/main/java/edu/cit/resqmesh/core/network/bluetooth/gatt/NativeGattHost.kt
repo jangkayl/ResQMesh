@@ -26,20 +26,11 @@ internal class NativeGattHost(private val manager: NativeBleManager) : GattClien
     override val onDeviceConnected: ((ConnectedDevice) -> Unit)? get() = manager.onDeviceConnected
     override val onDeviceDisconnected: ((String) -> Unit)? get() = manager.onDeviceDisconnected
     override val bluetoothAdapter: BluetoothAdapter? get() = manager.bluetoothAdapter
-    override val SERVICE_UUID: UUID get() = manager.SERVICE_UUID
-    override val TX_CHARACTERISTIC_UUID: UUID get() = manager.TX_CHARACTERISTIC_UUID
-    override val L2CAP_PSM_CHARACTERISTIC_UUID: UUID get() = manager.L2CAP_PSM_CHARACTERISTIC_UUID
-    override val CCC_DESCRIPTOR_UUID: UUID get() = manager.CCC_DESCRIPTOR_UUID
-    override val MAX_TOTAL_CONNECTIONS: Int get() = manager.MAX_TOTAL_CONNECTIONS
     override val transportGeneration: Long get() = manager.transportGeneration
     override val onDeviceScanned: ((ScanEvent) -> Unit)? get() = manager.onDeviceScanned
-    override val HANDSHAKE_WATCHDOG_MS: Long get() = manager.HANDSHAKE_WATCHDOG_MS
-    override val DISCOVERY_REQUEST_RETRY_MS: Long get() = manager.DISCOVERY_REQUEST_RETRY_MS
-    override val MAX_DISCOVERY_REQUEST_ATTEMPTS: Int get() = manager.MAX_DISCOVERY_REQUEST_ATTEMPTS
     override val myDeviceName: String get() = manager.myDeviceName
     override val myNodeId: String get() = manager.myNodeId
     override val bluetoothManager: BluetoothManager get() = manager.bluetoothManager
-    override val RX_CHARACTERISTIC_UUID: UUID get() = manager.RX_CHARACTERISTIC_UUID
     override var gattServer: BluetoothGattServer?
         get() = manager.gattServer
         set(value) { manager.gattServer = value }
@@ -52,8 +43,6 @@ internal class NativeGattHost(private val manager: NativeBleManager) : GattClien
     override var l2capAcceptThread: Thread?
         get() = manager.l2capAcceptThread
         set(value) { manager.l2capAcceptThread = value }
-    override val NAME_HANDSHAKE_TIMEOUT_MS: Long get() = manager.NAME_HANDSHAKE_TIMEOUT_MS
-    override val DUPLICATE_LINK_GRACE_MS: Long get() = manager.DUPLICATE_LINK_GRACE_MS
 
     override fun getRemoteDevice(macAddress: String): BluetoothDevice = manager.bluetoothAdapter.getRemoteDevice(macAddress)
     override fun isTransportGenerationCurrent(generation: Long): Boolean = manager.isTransportGenerationCurrent(generation)

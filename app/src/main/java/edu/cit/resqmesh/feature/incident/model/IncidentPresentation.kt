@@ -1,10 +1,10 @@
 package edu.cit.resqmesh.feature.incident.model
 
-import edu.cit.resqmesh.core.model.HELP_WORKFLOW_VERSION
 import edu.cit.resqmesh.core.model.EventType
 import edu.cit.resqmesh.core.model.DomainEvent
 import edu.cit.resqmesh.core.model.Incident
 import edu.cit.resqmesh.core.model.IncidentOffer
+import edu.cit.resqmesh.core.model.IncidentState
 import edu.cit.resqmesh.core.domain.incident.IncidentRules
 import org.json.JSONObject
 
@@ -59,7 +59,7 @@ fun helperSummary(
 }
 
 fun isInvolved(incident: Incident, offers: List<IncidentOffer>, userId: String?, key: String?): Boolean {
-    val withdrawnSelection = incident.status !in setOf("RESOLVED", "CANCELLED") &&
+    val withdrawnSelection = !incident.isTerminal() &&
         offers.any { it.offerId == incident.selectionOfferId && it.withdrawn }
     return incident.isReporter(userId, key) || (userId != null && (
         !withdrawnSelection && incident.primaryResponderId == userId)) ||
@@ -67,75 +67,99 @@ fun isInvolved(incident: Incident, offers: List<IncidentOffer>, userId: String?,
             offers.any { it.helperKey == key && !it.withdrawn }))
 }
 
+/**
+ * Room's incident and offer flows can emit separately. True when the selected offer was
+ * withdrawn or revised past the selection while the repaired projection is still arriving.
+ */
+private fun hasStaleSelection(incident: Incident, offers: List<IncidentOffer>): Boolean =
+    incident.usesHelpWorkflow() && !incident.isTerminal() &&
+        offers.any { it.offerId == incident.selectionOfferId && (it.withdrawn ||
+            it.revision > (incident.selectionOfferRevision ?: Long.MAX_VALUE)) }
+
+private fun Incident.withoutSelection(): Incident = copy(status = IncidentState.OPEN.name, selectionId = null,
+    selectionOfferId = null, selectionOfferRevision = null, selectedHelperKey = null, selectionConfirmedAt = null,
+    primaryResponderId = null, primaryResponderName = null)
+
+private fun Incident.statusLabel(): String = when (status) {
+    IncidentState.OPEN.name -> "Looking for help"
+    IncidentState.AWAITING_HELPER.name -> "Awaiting confirmation"
+    IncidentState.RESPONDING.name -> if (usesHelpWorkflow()) "Helper confirmed" else "Responding"
+    IncidentState.ACKNOWLEDGED.name -> "Request acknowledged"
+    IncidentState.ASSIGNED.name -> "Responder assigned"
+    IncidentState.RESOLVED.name -> "Resolved"
+    IncidentState.CANCELLED.name -> "Cancelled"
+    else -> "Status unavailable"
+}
+
 /** Affordances mirror existing authority; repositories still validate every mutation. */
 fun incidentPresentation(incident: Incident, offers: List<IncidentOffer>, userId: String?, key: String?,
     events: List<DomainEvent> = emptyList(), identityLoading: Boolean = userId == null,
     identityError: String? = null): IncidentPresentation {
-    // Room's incident and offer flows can emit separately. Never render a withdrawn helper
-    // as selected while the repaired incident projection is reaching the screen.
-    if (incident.workflowVersion == HELP_WORKFLOW_VERSION && incident.status !in setOf("RESOLVED", "CANCELLED") &&
-        offers.any { it.offerId == incident.selectionOfferId && (it.withdrawn ||
-            it.revision > (incident.selectionOfferRevision ?: Long.MAX_VALUE)) }) {
-        return incidentPresentation(incident.copy(status = "OPEN", selectionId = null, selectionOfferId = null,
-            selectionOfferRevision = null, selectedHelperKey = null, selectionConfirmedAt = null,
-            primaryResponderId = null, primaryResponderName = null), offers, userId, key, events, identityLoading, identityError)
+    // Never render a withdrawn helper as selected while the repaired projection is reaching the screen.
+    if (hasStaleSelection(incident, offers)) {
+        return incidentPresentation(
+            incident.withoutSelection(), offers, userId, key, events, identityLoading, identityError
+        )
     }
-    val reporter = incident.isReporter(userId, key)
-    val reporterAuthority = reporter
+    val isLocalReporter = incident.isReporter(userId, key)
+    val usesHelpWorkflow = incident.usesHelpWorkflow()
     val identityProblem = when {
         identityLoading -> "Checking your identity…"
         identityError != null -> identityError
         userId == null -> "Your identity is unavailable. Retry or reopen the app."
-        incident.workflowVersion == HELP_WORKFLOW_VERSION && key == null -> "Your signing identity is unavailable. Retry or reopen the app."
-        incident.workflowVersion == HELP_WORKFLOW_VERSION && userId == incident.creatorId && !reporter ->
+        usesHelpWorkflow && key == null -> "Your signing identity is unavailable. Retry or reopen the app."
+        usesHelpWorkflow && userId == incident.creatorId && !isLocalReporter ->
             "This incident belongs to another signing identity. Renaming cannot restore access."
         else -> null
     }
-    val terminal = incident.status in setOf("RESOLVED", "CANCELLED")
-    val selected = offers.firstOrNull { it.offerId == incident.selectionOfferId }
-    val mine = offers.firstOrNull { key != null && it.helperKey == key && !it.withdrawn }
-    val selectedMe = key != null && incident.selectedHelperKey == key && incident.selectionId != null
-    val validSelection = selected != null && !selected.withdrawn && selected.revision == incident.selectionOfferRevision
-    val isMeConfirmed = selectedMe && (incident.status == "RESPONDING" || incident.selectionConfirmedAt != null)
-    val revoked = events.filter { it.applied && it.eventType == "INCIDENT_LEAD_REVOKED" }
+    val terminal = incident.isTerminal()
+    val isResponding = incident.hasStatus(IncidentState.RESPONDING)
+    val isAwaitingHelper = incident.hasStatus(IncidentState.AWAITING_HELPER)
+    val selectedOffer = offers.firstOrNull { it.offerId == incident.selectionOfferId }
+    val myOffer = offers.firstOrNull { key != null && it.helperKey == key && !it.withdrawn }
+    val isSelectedHelper = key != null && incident.selectedHelperKey == key && incident.selectionId != null
+    val validSelection = selectedOffer != null && !selectedOffer.withdrawn &&
+        selectedOffer.revision == incident.selectionOfferRevision
+    val isMeConfirmed = isSelectedHelper && (isResponding || incident.selectionConfirmedAt != null)
+    val revokedSelectionIds = events.filter { it.applied && it.eventType == EventType.INCIDENT_LEAD_REVOKED.name }
         .mapNotNull { runCatching { JSONObject(it.payloadJson).optString("selectionId") }.getOrNull() }.toSet()
-    val previouslyRevoked = !selectedMe && key != null && events.any {
-        it.applied && it.eventType == "INCIDENT_LEAD_SELECTED" && runCatching {
+    val previouslyRevoked = !isSelectedHelper && key != null && events.any {
+        it.applied && it.eventType == EventType.INCIDENT_LEAD_SELECTED.name && runCatching {
             val payload = JSONObject(it.payloadJson)
-            payload.optString("helperKey") == key && payload.optString("selectionId") in revoked
+            payload.optString("helperKey") == key && payload.optString("selectionId") in revokedSelectionIds
         }.getOrDefault(false)
     }
     val warning = when {
         identityProblem != null -> identityProblem
         terminal -> null
-        previouslyRevoked && !terminal -> "You are no longer the selected helper. The reporter removed that selection."
+        previouslyRevoked -> "You are no longer the selected helper. The reporter removed that selection."
         incident.selectionId == null -> null
-        selected == null -> "Selected offer unavailable on this phone yet."
+        selectedOffer == null -> "Selected offer unavailable on this phone yet."
         !validSelection -> "Helper updated offer · Please review updated details."
         else -> null
     }
     val secondary = mutableListOf<IncidentAction>()
-    val primary = if (terminal || identityProblem != null) null else if (incident.workflowVersion == HELP_WORKFLOW_VERSION) {
+    val primary = if (terminal || identityProblem != null) null else if (usesHelpWorkflow) {
         when {
-            reporterAuthority -> {
+            isLocalReporter -> {
                 if (incident.selectionId != null) secondary += IncidentAction.REVOKE
                 secondary += IncidentAction.CANCEL
                 when {
-                    incident.status == "RESPONDING" && validSelection -> IncidentAction.RESOLVE
+                    isResponding && validSelection -> IncidentAction.RESOLVE
                     incident.selectionId != null -> IncidentAction.REVIEW_SELECTED
                     offers.any { !it.withdrawn } -> IncidentAction.REVIEW
                     else -> null
                 }
             }
-            reporter || userId == null || key == null -> null
-            selectedMe -> {
-                if (mine != null) secondary += IncidentAction.WITHDRAW
-                if (incident.status == "AWAITING_HELPER" && validSelection) {
+            userId == null || key == null -> null
+            isSelectedHelper -> {
+                if (myOffer != null) secondary += IncidentAction.WITHDRAW
+                if (isAwaitingHelper && validSelection) {
                     secondary += IncidentAction.DECLINE
                     IncidentAction.CONFIRM
                 } else null
             }
-            mine != null -> { secondary += IncidentAction.WITHDRAW; IncidentAction.EDIT_OFFER }
+            myOffer != null -> { secondary += IncidentAction.WITHDRAW; IncidentAction.EDIT_OFFER }
             else -> IncidentAction.OFFER
         }
     } else {
@@ -163,56 +187,49 @@ fun incidentPresentation(incident: Incident, offers: List<IncidentOffer>, userId
             !isSelected -> "Wants to help"
             terminal -> if (incident.selectionConfirmedAt != null) "Previously confirmed helper" else "Previously selected helper"
             !validSelection -> "Selection needs review"
-            incident.status == "RESPONDING" || incident.selectionConfirmedAt != null -> "Confirmed helper"
+            isResponding || incident.selectionConfirmedAt != null -> "Confirmed helper"
             else -> "Selected · Waiting for confirmation"
         }
         val isMe = key != null && offer.helperKey == key && userId != null
-        HelperPresentation(offer, label, isMe, !terminal && reporterAuthority && identityProblem == null && incident.status == "OPEN",
+        val canChoose = !terminal && isLocalReporter && identityProblem == null &&
+            incident.hasStatus(IncidentState.OPEN)
+        HelperPresentation(offer, label, isMe, canChoose,
             canEditOffer = isMe && !terminal && !isSelected && identityProblem == null)
     }
 
     val nextStep = when {
         identityProblem != null -> identityProblem
-        incident.status == "RESOLVED" -> "This incident has been marked resolved on this phone."
-        incident.status == "CANCELLED" -> "This incident was cancelled on this phone."
-        reporter -> when {
-            incident.status == "RESPONDING" -> {
-                val name = selected?.helperName ?: incident.primaryResponderName ?: "Helper"
+        incident.hasStatus(IncidentState.RESOLVED) -> "This incident has been marked resolved on this phone."
+        incident.hasStatus(IncidentState.CANCELLED) -> "This incident was cancelled on this phone."
+        isLocalReporter -> when {
+            isResponding -> {
+                val name = selectedOffer?.helperName ?: incident.primaryResponderName ?: "Helper"
                 "$name is confirmed to help. Coordinate directly or mark resolved when assistance is complete."
             }
-            incident.status == "AWAITING_HELPER" -> {
-                val name = selected?.helperName ?: "the selected helper"
+            isAwaitingHelper -> {
+                val name = selectedOffer?.helperName ?: "the selected helper"
                 "Waiting for $name to confirm readiness."
             }
             offers.any { !it.withdrawn } -> "Review helper offers below and choose who to coordinate with."
             else -> "Broadcasting request · Awaiting helper offers."
         }
         isMeConfirmed -> "You are the confirmed helper. Coordinate with the reporter."
-        selectedMe && incident.status == "AWAITING_HELPER" -> "You were selected to help · Please confirm availability."
-        mine != null -> "Offer sent · Awaiting reporter review."
+        isSelectedHelper && isAwaitingHelper -> "You were selected to help · Please confirm availability."
+        myOffer != null -> "Offer sent · Awaiting reporter review."
         else -> "You can offer help if you are nearby and able to assist."
     }
 
     return IncidentPresentation(
         title = incident.displayTitle(),
-        status = when (incident.status) {
-            "OPEN" -> "Looking for help"
-            "AWAITING_HELPER" -> "Awaiting confirmation"
-            "RESPONDING" -> if (incident.workflowVersion == HELP_WORKFLOW_VERSION) "Helper confirmed" else "Responding"
-            "ACKNOWLEDGED" -> "Request acknowledged"
-            "ASSIGNED" -> "Responder assigned"
-            "RESOLVED" -> "Resolved"
-            "CANCELLED" -> "Cancelled"
-            else -> "Status unavailable"
-        },
-        isReporter = reporter,
+        status = incident.statusLabel(),
+        isReporter = isLocalReporter,
         terminal = terminal,
         primary = primary,
         secondary = secondary,
         helpers = helpers,
-        selectedOffer = selected?.takeUnless { it.withdrawn },
+        selectedOffer = selectedOffer?.takeUnless { it.withdrawn },
         warning = warning,
-        myOffer = mine,
+        myOffer = myOffer,
         nextStep = nextStep
     )
 }

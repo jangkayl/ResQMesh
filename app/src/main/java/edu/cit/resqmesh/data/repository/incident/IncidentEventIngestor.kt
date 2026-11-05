@@ -25,17 +25,19 @@ import edu.cit.resqmesh.data.repository.IncidentSyncSnapshot
 
 @OptIn(ExperimentalSerializationApi::class)
 internal class IncidentEventIngestor(
-    private val incidentDao: IncidentDao,
-    private val domainEventDao: DomainEventDao,
-    private val offerDao: IncidentOfferDao?,
-    private val database: AppDatabase?,
+    stores: IncidentStores,
     private val helpWorkflowProvider: () -> IncidentHelpWorkflow?,
     private val syncCoordinatorProvider: () -> IncidentSyncCoordinator?,
-    private val broadcast: (DomainEventEntity, Boolean) -> Unit,
-    private val legacyProjection: suspend (DomainEventEntity) -> Boolean,
-    private val rejectEvent: suspend (DomainEventEntity, String) -> Boolean,
-    private val notifyApplied: suspend (DomainEventEntity, Incident) -> Unit = { _, _ -> }
+    hooks: IncidentIngestHooks
 ) {
+    private val incidentDao: IncidentDao = stores.incidents
+    private val domainEventDao: DomainEventDao = stores.events
+    private val offerDao: IncidentOfferDao? = stores.offers
+    private val database: AppDatabase? = stores.database
+    private val broadcast = hooks.broadcast
+    private val legacyProjection = hooks.legacyProjection
+    private val rejectEvent = hooks.rejectEvent
+    private val notifyApplied = hooks.notifyApplied
     private val helpWorkflow get() = helpWorkflowProvider()
     private val syncCoordinator get() = syncCoordinatorProvider()
     private fun broadcastDomainEvent(event: DomainEventEntity, isP0: Boolean) = broadcast(event, isP0)

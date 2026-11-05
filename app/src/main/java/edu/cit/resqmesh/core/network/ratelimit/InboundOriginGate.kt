@@ -1,5 +1,6 @@
 package edu.cit.resqmesh.core.network.ratelimit
 
+import edu.cit.resqmesh.core.network.PayloadTypes
 import edu.cit.resqmesh.core.logging.AppLogger
 import edu.cit.resqmesh.core.logging.LogFields
 import edu.cit.resqmesh.core.logging.TerminalLogCategory
@@ -133,19 +134,20 @@ class InboundOriginGate(
             .uppercase().ifBlank { "EP:$endpointId" }
 
     private fun classify(payload: MeshPayload): TrafficClass = when (payload.type) {
-        "MESSAGE", "CONVERSATION" -> TrafficClass.CHAT
+        PayloadTypes.MESSAGE, PayloadTypes.CONVERSATION -> TrafficClass.CHAT
         // PING/PONG are per-link liveness probes (link shaping only), not origin presence.
-        "SYSTEM" -> TrafficClass.PRESENCE
+        PayloadTypes.SYSTEM -> TrafficClass.PRESENCE
         // SOS_EVENT is charged after signature verification (admitVerifiedSos).
         else -> TrafficClass.OTHER
     }
 
     private companion object {
-        const val SOS_EVENT = "SOS_EVENT"
+        const val SOS_EVENT = PayloadTypes.SOS_EVENT
         const val SHORT_ID = 8
         const val LOG_INTERVAL_MS = 5_000L
     }
 }
 
 
-private val SYNC_REQUEST_TYPES = setOf("SOS_SYNC_REQ", "EVENT_SYNC_REQ", "CHAT_SYNC_REQ")
+private val SYNC_REQUEST_TYPES =
+    setOf(PayloadTypes.SOS_SYNC_REQ, PayloadTypes.EVENT_SYNC_REQ, PayloadTypes.CHAT_SYNC_REQ)

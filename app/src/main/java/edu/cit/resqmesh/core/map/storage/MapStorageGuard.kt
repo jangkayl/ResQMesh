@@ -8,6 +8,7 @@ import edu.cit.resqmesh.core.logging.AppLogger
 import java.io.File
 import java.io.FileOutputStream
 import java.io.InputStream
+import java.util.zip.ZipEntry
 import java.util.zip.ZipInputStream
 
 /**
@@ -163,24 +164,33 @@ class MapStorageGuard(
         ZipInputStream(zipInputStream.buffered()).use { zis ->
             var entry = zis.nextEntry
             while (entry != null) {
-                val entryFile = File(destinationDir, entry.name)
-                // Guard against Zip Slip vulnerability
-                if (!entryFile.canonicalPath.startsWith(destinationDir.canonicalPath + File.separator)) {
-                    throw SecurityException("Zip entry attempted path traversal: ${entry.name}")
-                }
-
-                if (entry.isDirectory) {
-                    entryFile.mkdirs()
-                } else {
-                    entryFile.parentFile?.mkdirs()
-                    FileOutputStream(entryFile).use { fos ->
-                        zis.copyTo(fos)
-                    }
-                }
+                extractEntry(zis, entry, destinationDir)
                 zis.closeEntry()
                 entry = zis.nextEntry
             }
         }
+    }
+
+    /** Writes one entry below [destinationDir]; the stream is positioned at that entry's data. */
+    private fun extractEntry(zis: ZipInputStream, entry: ZipEntry, destinationDir: File) {
+        val entryFile = resolveInside(destinationDir, entry.name)
+        if (entry.isDirectory) {
+            entryFile.mkdirs()
+            return
+        }
+        entryFile.parentFile?.mkdirs()
+        FileOutputStream(entryFile).use { fos ->
+            zis.copyTo(fos)
+        }
+    }
+
+    /** Guards against Zip Slip: an entry name may never resolve outside [destinationDir]. */
+    private fun resolveInside(destinationDir: File, entryName: String): File {
+        val entryFile = File(destinationDir, entryName)
+        if (!entryFile.canonicalPath.startsWith(destinationDir.canonicalPath + File.separator)) {
+            throw SecurityException("Zip entry attempted path traversal: $entryName")
+        }
+        return entryFile
     }
 
     private fun hasValidAssets(extractedDir: File): Boolean {

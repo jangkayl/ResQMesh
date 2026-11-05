@@ -51,14 +51,15 @@ internal data class IncidentDraft(
 
 @OptIn(ExperimentalSerializationApi::class)
 internal class IncidentCommands(
-    private val incidentDao: IncidentDao,
-    private val domainEventDao: DomainEventDao,
+    stores: IncidentStores,
     private val identityManager: IdentityProvider,
-    private val database: AppDatabase?,
     private val eventSigning: IncidentEventSigning?,
     private val helpWorkflowProvider: () -> IncidentHelpWorkflow?,
     private val broadcast: (DomainEventEntity, Boolean) -> Unit
 ) {
+    private val incidentDao: IncidentDao = stores.incidents
+    private val domainEventDao: DomainEventDao = stores.events
+    private val database: AppDatabase? = stores.database
     private val helpWorkflow get() = helpWorkflowProvider()
     private fun broadcastDomainEvent(event: DomainEventEntity, isP0: Boolean) = broadcast(event, isP0)
 

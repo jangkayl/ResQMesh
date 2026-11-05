@@ -1,5 +1,6 @@
 package edu.cit.resqmesh.core.network.bluetooth.gatt.client
 
+import edu.cit.resqmesh.core.network.bluetooth.BleConfig
 import android.bluetooth.*
 import android.os.Handler
 import android.os.Looper
@@ -41,8 +42,8 @@ internal class GattClientAttempt(
             if (!accepted) {
                 link.currentOperation = null
                 servicesRequested.set(false)
-                if (discoveryRequestAttempts < MAX_DISCOVERY_REQUEST_ATTEMPTS) {
-                    timeoutHandler.postDelayed({ requestServicesOnce(gatt) }, DISCOVERY_REQUEST_RETRY_MS)
+                if (discoveryRequestAttempts < BleConfig.MAX_DISCOVERY_REQUEST_ATTEMPTS) {
+                    timeoutHandler.postDelayed({ requestServicesOnce(gatt) }, BleConfig.DISCOVERY_REQUEST_RETRY_MS)
                 }
             }
         }

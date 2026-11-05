@@ -1,11 +1,13 @@
 package edu.cit.resqmesh.core.network.bluetooth.gatt
 
+import edu.cit.resqmesh.core.network.bluetooth.BleConfig
 import edu.cit.resqmesh.core.network.bluetooth.gatt.client.GattClientAttempt
 import edu.cit.resqmesh.core.network.bluetooth.gatt.client.GattClientCallback
 import edu.cit.resqmesh.core.network.bluetooth.gatt.client.createGattClientPayloadSetup
 import edu.cit.resqmesh.core.network.bluetooth.gatt.client.notifyScanState
 import android.bluetooth.*
 import android.Manifest
+import android.annotation.SuppressLint
 import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Build
@@ -38,40 +40,62 @@ class GattClientManager(
 
 
     fun connectToPersistentGatt(macAddress: String, peerName: String): BleConnectStartResult {
+        if (cannotConnect(peerName)) return BleConnectStartResult.REJECTED
+        val epoch = manager.transportGeneration
+        return preflightRejection(macAddress, peerName) ?: startConnect(macAddress, peerName, epoch)
+    }
+
+    /** Missing BLUETOOTH_CONNECT or an inactive node rejects before any link bookkeeping. */
+    private fun cannotConnect(peerName: String): Boolean {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
-            ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED
+            ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) !=
+            PackageManager.PERMISSION_GRANTED
         ) {
             AppLogger.d("BLE_MESH", "GATT connect skipped for $peerName: BLUETOOTH_CONNECT is not granted")
-            return BleConnectStartResult.REJECTED
+            return true
         }
-        with(manager) {
-        if (!store.isNodeActive.get()) return BleConnectStartResult.REJECTED
-        val epoch = transportGeneration
-        if (distinctLinkCount() >= MAX_TOTAL_CONNECTIONS) return BleConnectStartResult.REJECTED
-        if (isDeviceBlocked(peerName)) {
-            AppLogger.d("BLE_MESH", "Skipping GATT connect to blocked peer $peerName")
-            return BleConnectStartResult.REJECTED
-        }
-        // DUPLICATE LINK GUARD: resolve by identity, not by MAC. A peer already connected inbound
-        // on its Central MAC used to look absent here, so we would open a second redundant link.
-        val existingEndpoint = findLinkEndpointByIdentity(peerName)
-        if (existingEndpoint != null) {
-            AppLogger.d("BLE_MESH", "Skipping connect to $peerName: already linked on $existingEndpoint.")
-            return BleConnectStartResult.REJECTED
-        }
+        return !manager.store.isNodeActive.get()
+    }
 
-        // A delayed election/reversal may fire after an inbound setup has already started on a
-        // different private address. Do not create a second ACL while that handshake is alive.
-        if (isRadioHandshakeActive()) {
-            AppLogger.d("BLE_MESH", "Deferring outbound GATT to $peerName; another handshake owns the radio")
-            return BleConnectStartResult.DEFERRED
+    /**
+     * Rejects or defers before opening an ACL; null means go ahead. Checked in order, and the last
+     * check acquires the connect lock when it succeeds.
+     */
+    private fun preflightRejection(macAddress: String, peerName: String): BleConnectStartResult? = with(manager) {
+        when {
+            distinctLinkCount() >= BleConfig.MAX_TOTAL_CONNECTIONS -> BleConnectStartResult.REJECTED
+            isDeviceBlocked(peerName) -> {
+                AppLogger.d("BLE_MESH", "Skipping GATT connect to blocked peer $peerName")
+                BleConnectStartResult.REJECTED
+            }
+            isAlreadyLinked(peerName) -> BleConnectStartResult.REJECTED
+            // A delayed election/reversal may fire after an inbound setup has already started on a
+            // different private address. Do not create a second ACL while that handshake is alive.
+            isRadioHandshakeActive() -> {
+                AppLogger.d("BLE_MESH", "Deferring outbound GATT to $peerName; another handshake owns the radio")
+                BleConnectStartResult.DEFERRED
+            }
+            !tryAcquireConnectLock(macAddress) -> {
+                AppLogger.d("BLE_MESH", "Connect already in progress; deferring $peerName until its cooldown expires.")
+                BleConnectStartResult.DEFERRED
+            }
+            else -> null
         }
+    }
 
-        if (!tryAcquireConnectLock(macAddress)) {
-            AppLogger.d("BLE_MESH", "Connect already in progress; deferring $peerName until its cooldown expires.")
-            return BleConnectStartResult.DEFERRED
-        }
+    /**
+     * DUPLICATE LINK GUARD: resolve by identity, not by MAC. A peer already connected inbound
+     * on its Central MAC used to look absent here, so we would open a second redundant link.
+     */
+    private fun GattClientHost.isAlreadyLinked(peerName: String): Boolean {
+        val existingEndpoint = findLinkEndpointByIdentity(peerName) ?: return false
+        AppLogger.d("BLE_MESH", "Skipping connect to $peerName: already linked on $existingEndpoint.")
+        return true
+    }
 
+    // BLUETOOTH_CONNECT is checked by cannotConnect() in connectToPersistentGatt before this runs.
+    @SuppressLint("MissingPermission")
+    private fun startConnect(macAddress: String, peerName: String, epoch: Long): BleConnectStartResult = with(manager) {
         handler.post {
             if (!isTransportGenerationCurrent(epoch)) return@post
             // Force UI update to show SYNCING...
@@ -79,15 +103,10 @@ class GattClientManager(
         }
 
         val device = getRemoteDevice(macAddress)
-        val queue = store.pendingQueues.computeIfAbsent(macAddress) { ConcurrentLinkedDeque() }
-        val writing = if (!store.activeConnections.containsKey(macAddress) &&
-            !store.activeServerConnections.containsKey(macAddress)) {
-            AtomicBoolean(false).also { store.isWriting[macAddress] = it }
-        } else store.isWriting.computeIfAbsent(macAddress) { AtomicBoolean(false) }
-        val link = store.links.begin(macAddress, BleLinkRole.CLIENT, NodeIdentity.idOf(peerName), queue, writing)
+        val link = beginClientLink(macAddress, peerName)
         val payloadSetup = createGattClientPayloadSetup(manager, epoch, link, macAddress,
             readPort = { characteristic -> link.gatt?.readCharacteristic(characteristic) == true },
-            requestMtu = { link.gatt?.requestMtu(247) == true })
+            requestMtu = { link.gatt?.requestMtu(REQUESTED_MTU) == true })
         setups[macAddress] = link to payloadSetup
         val stablePeerId = link.peerNodeId ?: NodeIdentity.idOf(peerName)
         val useExplicitLeTransport = stablePeerId != null &&
@@ -100,7 +119,24 @@ class GattClientManager(
             payloadSetup, stablePeerId, useExplicitLeTransport, radioOwner,
             discoverServices = { gatt -> gatt.discoverServices() },
             retireTimedOutGatt = { link.gatt?.disconnect(); link.gatt?.close() })
+        openGatt(device, attempt)
+    }
 
+    private fun beginClientLink(macAddress: String, peerName: String): BleLink = with(manager) {
+        val queue = store.pendingQueues.computeIfAbsent(macAddress) { ConcurrentLinkedDeque() }
+        val writing = if (!store.activeConnections.containsKey(macAddress) &&
+            !store.activeServerConnections.containsKey(macAddress)) {
+            AtomicBoolean(false).also { store.isWriting[macAddress] = it }
+        } else store.isWriting.computeIfAbsent(macAddress) { AtomicBoolean(false) }
+        store.links.begin(macAddress, BleLinkRole.CLIENT, NodeIdentity.idOf(peerName), queue, writing)
+    }
+
+    /** Arms the connect timeout and calls connectGatt; a throw or null handle retires the link. */
+    // Reached only through startConnect, after the same permission check.
+    @SuppressLint("MissingPermission")
+    private fun openGatt(device: BluetoothDevice, attempt: GattClientAttempt): BleConnectStartResult {
+        val link = attempt.link
+        val peerName = attempt.peerName
         try {
             val callback = GattClientCallback(attempt)
 
@@ -109,7 +145,7 @@ class GattClientManager(
             // AUTO remains the compatibility default because explicit LE caused immediate
             // disconnects on older OEM pairs. A peer-specific retry switches to LE only after
             // AUTO connected but failed at ATT primary-service discovery.
-            link.gatt = if (useExplicitLeTransport) {
+            link.gatt = if (attempt.useExplicitLeTransport) {
                 AppLogger.d("BLE_MESH", "Connecting to $peerName with explicit LE transport after AUTO discovery timeout")
                 device.connectGatt(context, false, callback, BluetoothDevice.TRANSPORT_LE)
             } else {
@@ -119,14 +155,18 @@ class GattClientManager(
         } catch (e: Exception) {
             AppLogger.d("BLE_MESH", "Exception in connectGatt: ${e.javaClass.simpleName}")
             attempt.finishConnectPhase("connectGatt threw")
-            store.links.forget(link)
+            manager.store.links.forget(link)
             return BleConnectStartResult.REJECTED
         }
         return if (link.gatt != null) BleConnectStartResult.STARTED else {
             attempt.finishConnectPhase("connectGatt returned null")
-            store.links.forget(link)
+            manager.store.links.forget(link)
             BleConnectStartResult.REJECTED
         }
-        }
+    }
+
+    private companion object {
+        /** MTU asked for once the link is READY and the setup queue is idle. */
+        const val REQUESTED_MTU = 247
     }
 }

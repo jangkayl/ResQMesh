@@ -25,8 +25,12 @@ class ReadyPayloadSetup(
     private var readWanted = false
     private var stalled = false
 
+    /** A port read, MTU request, socket connect or scheduled retry is already in progress. */
+    private val setupInFlight: Boolean get() = connecting || waiting || readWanted || operation != null
+
     fun start() {
-        if (stalled || !isCurrentReady() || hasL2cap() || connecting || waiting || readWanted || operation != null) return
+        val blocked = stalled || !isCurrentReady()
+        if (blocked || hasL2cap() || setupInFlight) return
         cycle++
         attempts = 0
         readWanted = true
@@ -36,7 +40,7 @@ class ReadyPayloadSetup(
     fun onGattIdle() = pump()
 
     private fun pump() {
-        if (stalled || !isCurrentReady() || operation != null || !isGattIdle()) return
+        if (!canStartOperation()) return
         if (readWanted && !hasL2cap()) {
             readWanted = false
             if (!supportsPort) { optionalMtu(); return }
@@ -47,11 +51,13 @@ class ReadyPayloadSetup(
         }
     }
 
+    private fun canStartOperation(): Boolean = !stalled && isCurrentReady() && operation == null && isGattIdle()
+
     private fun begin(next: Operation) {
         operation = next
         gate(next.name)
         val token = ++operationToken
-        schedule(5_000L) {
+        schedule(OPERATION_TIMEOUT_MS) {
             if (isCurrentReady() && operationToken == token && operation == next) {
                 log("SETUP_TIMEOUT operation=$next")
                 // Android may still own this ATT operation. A local timeout cannot make it idle.
@@ -85,7 +91,7 @@ class ReadyPayloadSetup(
         if (mtuAttempted) return false
         mtuAttempted = true
         begin(Operation.REQUEST_MTU)
-        log("MTU_REQUEST requested=247")
+        log("MTU_REQUEST requested=$REQUESTED_MTU")
         if (!requestMtu()) onMtu()
         return true
     }
@@ -101,13 +107,13 @@ class ReadyPayloadSetup(
         if (waiting || !isCurrentReady()) return
         waiting = true
         val owner = cycle
-        val delay = if (attempts >= 3) 30_000L else attempts * 1_000L
+        val delay = if (attempts >= QUICK_RETRY_ATTEMPTS) SLOW_RETRY_MS else attempts * QUICK_RETRY_STEP_MS
         log("SETUP_RETRY delayMs=$delay")
         schedule(delay) {
             if (!isCurrentReady() || owner != cycle) return@schedule
             waiting = false
             if (hasL2cap()) return@schedule
-            if (attempts >= 3) { start(); return@schedule }
+            if (attempts >= QUICK_RETRY_ATTEMPTS) { start(); return@schedule }
             readWanted = true
             pump()
         }
@@ -118,13 +124,24 @@ class ReadyPayloadSetup(
             if (isCurrentReady() && !hasL2cap()) onStalled()
             return
         }
-        if (waiting || connecting || readWanted || operation != null || !isCurrentReady()) return
+        if (setupInFlight || !isCurrentReady()) return
         waiting = true
         val owner = cycle
-        schedule(30_000L) {
+        schedule(SLOW_RETRY_MS) {
             if (!isCurrentReady() || owner != cycle) return@schedule
             waiting = false
             start()
         }
+    }
+
+    private companion object {
+        /** Local watchdog for one ATT setup operation. */
+        const val OPERATION_TIMEOUT_MS = 5_000L
+        /** Attempts that back off linearly by [QUICK_RETRY_STEP_MS] before switching to [SLOW_RETRY_MS]. */
+        const val QUICK_RETRY_ATTEMPTS = 3
+        const val QUICK_RETRY_STEP_MS = 1_000L
+        const val SLOW_RETRY_MS = 30_000L
+        /** Only logged; the MTU value itself is requested by the GATT client. */
+        const val REQUESTED_MTU = 247
     }
 }

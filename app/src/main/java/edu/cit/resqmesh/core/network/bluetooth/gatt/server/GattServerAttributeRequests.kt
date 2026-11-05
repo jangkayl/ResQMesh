@@ -1,5 +1,6 @@
 package edu.cit.resqmesh.core.network.bluetooth.gatt.server
 
+import edu.cit.resqmesh.core.network.bluetooth.BleConfig
 import android.bluetooth.*
 import android.Manifest
 import android.content.pm.PackageManager
@@ -23,65 +24,25 @@ internal class GattServerAttributeRequests(
     fun onDescriptorWriteRequest(device: BluetoothDevice, requestId: Int, descriptor: BluetoothGattDescriptor, preparedWrite: Boolean, responseNeeded: Boolean, offset: Int, value: ByteArray?) {
             handler.post {
                 if (!ownsServer()) return@post
-                fun handleCallback() {
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
-                        ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED
-                    ) {
-                        AppLogger.d("BLE_MESH", "Ignoring SERVER descriptor callback: BLUETOOTH_CONNECT was revoked")
-                        return
-                    }
-                    if (responseNeeded) {
-                        try {
-                            gattServer?.sendResponse(device, requestId, BluetoothGatt.GATT_SUCCESS, offset, value)
-                        } catch (e: SecurityException) {
-                            AppLogger.d("BLE_MESH", "SERVER descriptor response skipped: BLUETOOTH_CONNECT was revoked")
-                            return
-                        }
-                    }
-                    val link = store.links.current(device.address, BleLinkRole.SERVER)
-                    if (link?.serverDevice?.address == device.address && descriptor.uuid == CCC_DESCRIPTOR_UUID &&
-                        value?.contentEquals(BluetoothGattDescriptor.ENABLE_INDICATION_VALUE) == true &&
-                        store.links.transition(link, BleLinkState.READY)) {
-                        finishRadioHandshake("server:${link.endpoint}:${link.generation}", "server ready")
-                        AppLogger.d("BLE_MESH", "Link ${link.generation} SERVER ${device.address}: READY CCCD indications enabled")
-                        handler.post {
-                            if (!ownsServer()) return@post
-                            if (store.links.isCurrent(link) && link.state == BleLinkState.READY) {
-                                val name = store.connectedEndpointNames[device.address] ?: NodeIdentity.UNKNOWN_NAME
-                                onDeviceConnected?.invoke(ConnectedDevice(
-                                    endpointId = device.address,
-                                    name = name,
-                                    isClassicConnected = true,
-                                    isProvisional = NodeIdentity.isPlaceholder(name),
-                                    nodeId = link.peerNodeId.orEmpty(),
-                                    isPayloadReady = true
-                                ))
-                            }
-                        }
-                        processNextPayload(device.address)
-                        if (NodeIdentity.isPlaceholder(store.connectedEndpointNames[device.address])) {
-                            handler.postDelayed({
-                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
-                                    ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED
-                                ) {
-                                    AppLogger.d("BLE_MESH", "SERVER identity deadline ended: BLUETOOTH_CONNECT was revoked")
-                                    return@postDelayed
-                                }
-                                if (store.links.isCurrent(link) && link.state == BleLinkState.READY &&
-                                    NodeIdentity.isPlaceholder(store.connectedEndpointNames[device.address])) {
-                                    AppLogger.d("BLE_MESH", "Server: READY link received no identity; disconnecting ${device.address}.")
-                                    try {
-                                        gattServer?.cancelConnection(device)
-                                    } catch (e: SecurityException) {
-                                        AppLogger.d("BLE_MESH", "SERVER identity timeout disconnect skipped: BLUETOOTH_CONNECT was revoked")
-                                    }
-                                }
-                            }, NAME_HANDSHAKE_TIMEOUT_MS)
-                        }
-                    }
-
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
+                    ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED
+                ) {
+                    AppLogger.d("BLE_MESH", "Ignoring SERVER descriptor callback: BLUETOOTH_CONNECT was revoked")
+                    return@post
                 }
-                handleCallback()
+                if (responseNeeded) {
+                    try {
+                        gattServer?.sendResponse(device, requestId, BluetoothGatt.GATT_SUCCESS, offset, value)
+                    } catch (e: SecurityException) {
+                        AppLogger.d("BLE_MESH", "SERVER descriptor response skipped: BLUETOOTH_CONNECT was revoked")
+                        return@post
+                    }
+                }
+                val link = store.links.current(device.address, BleLinkRole.SERVER)
+                if (link?.serverDevice?.address == device.address && enablesIndications(descriptor, value) &&
+                    store.links.transition(link, BleLinkState.READY)) {
+                    onServerLinkReady(device, link)
+                }
             }
         }
 
@@ -121,7 +82,7 @@ internal class GattServerAttributeRequests(
                         AppLogger.d("BLE_MESH", "Ignoring SERVER read request: BLUETOOTH_CONNECT was revoked")
                         return
                     }
-                    if (characteristic.uuid == L2CAP_PSM_CHARACTERISTIC_UUID) {
+                    if (characteristic.uuid == BleConfig.L2CAP_PSM_CHARACTERISTIC_UUID) {
                         val psmBytes = java.nio.ByteBuffer.allocate(4).putInt(myL2capPsm).array()
                         try {
                             gattServer?.sendResponse(device, requestId, BluetoothGatt.GATT_SUCCESS, offset, psmBytes)
@@ -172,7 +133,8 @@ internal class GattServerAttributeRequests(
         device: BluetoothDevice, characteristic: BluetoothGattCharacteristic,
         preparedWrite: Boolean, offset: Int, value: ByteArray?
     ): Int {
-        var status = GattWritePolicy.checkWrite(characteristic.uuid == RX_CHARACTERISTIC_UUID, preparedWrite, offset)
+        val isReceiveCharacteristic = characteristic.uuid == BleConfig.RX_CHARACTERISTIC_UUID
+        var status = GattWritePolicy.checkWrite(isReceiveCharacteristic, preparedWrite, offset)
         if (status == BluetoothGatt.GATT_SUCCESS && preparedWrite) {
             status = preparedWrites.add(device.address, offset, value)
         }
@@ -246,3 +208,56 @@ internal class GattServerAttributeRequests(
         }
     }
 }
+
+/** CCCD indications are enabled and [link] has just moved to READY. Runs on the BLE handler. */
+private fun GattServerRegistrationContext.onServerLinkReady(device: BluetoothDevice, link: BleLink) {
+    finishRadioHandshake("server:${link.endpoint}:${link.generation}", "server ready")
+    AppLogger.d("BLE_MESH", "Link ${link.generation} SERVER ${device.address}: READY CCCD indications enabled")
+    handler.post {
+        if (!ownsServer()) return@post
+        publishServerReady(device, link)
+    }
+    processNextPayload(device.address)
+    if (NodeIdentity.isPlaceholder(store.connectedEndpointNames[device.address])) {
+        handler.postDelayed({ enforceIdentityDeadline(device, link) }, BleConfig.NAME_HANDSHAKE_TIMEOUT_MS)
+    }
+}
+
+private fun GattServerRegistrationContext.publishServerReady(device: BluetoothDevice, link: BleLink) {
+    if (store.links.isCurrent(link) && link.state == BleLinkState.READY) {
+        val name = store.connectedEndpointNames[device.address] ?: NodeIdentity.UNKNOWN_NAME
+        onDeviceConnected?.invoke(ConnectedDevice(
+            endpointId = device.address,
+            name = name,
+            isClassicConnected = true,
+            isProvisional = NodeIdentity.isPlaceholder(name),
+            nodeId = link.peerNodeId.orEmpty(),
+            isPayloadReady = true
+        ))
+    }
+}
+
+/** Disconnects a READY server link whose peer never sent its identity. */
+private fun GattServerRegistrationContext.enforceIdentityDeadline(device: BluetoothDevice, link: BleLink) {
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
+        ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) !=
+        PackageManager.PERMISSION_GRANTED
+    ) {
+        AppLogger.d("BLE_MESH", "SERVER identity deadline ended: BLUETOOTH_CONNECT was revoked")
+        return
+    }
+    if (store.links.isCurrent(link) && link.state == BleLinkState.READY &&
+        NodeIdentity.isPlaceholder(store.connectedEndpointNames[device.address])) {
+        AppLogger.d("BLE_MESH", "Server: READY link received no identity; disconnecting ${device.address}.")
+        try {
+            gattServer?.cancelConnection(device)
+        } catch (e: SecurityException) {
+            AppLogger.d("BLE_MESH", "SERVER identity timeout disconnect skipped: BLUETOOTH_CONNECT was revoked")
+        }
+    }
+}
+
+/** A write of ENABLE_INDICATION_VALUE to the CCC descriptor: the client is ready for indications. */
+private fun enablesIndications(descriptor: BluetoothGattDescriptor, value: ByteArray?): Boolean =
+    descriptor.uuid == BleConfig.CCC_DESCRIPTOR_UUID &&
+        value?.contentEquals(BluetoothGattDescriptor.ENABLE_INDICATION_VALUE) == true

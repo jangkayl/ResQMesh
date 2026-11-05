@@ -161,7 +161,13 @@ class IncidentHelpWorkflow(
         incident.workflowVersion == HELP_WORKFLOW_VERSION &&
             IncidentOwnership.isReporter(incident, identity.getOrCreateUser().userId, signer.publicKey)
 
-    private suspend fun signApplyAndPublish(incident: IncidentEntity, type: EventType, revision: Long, payload: JSONObject, alreadyLocked: Boolean = false): Boolean {
+    private suspend fun signApplyAndPublish(
+        incident: IncidentEntity,
+        type: EventType,
+        revision: Long,
+        payload: JSONObject,
+        alreadyLocked: Boolean = false
+    ): Boolean {
         val user = identity.getOrCreateUser()
         val unsigned = DomainEventEntity(
             eventId = UUID.randomUUID().toString(), entityId = incident.incidentId,
@@ -172,7 +178,7 @@ class IncidentHelpWorkflow(
         )
         val event = unsigned.copy(signature = signer.sign(unsigned))
         val applied = if (alreadyLocked) applyEventLocked(event) else apply(event)
-        if (applied) publish(event, type == EventType.INCIDENT_LEAD_SELECTED || type == EventType.INCIDENT_CANCELLED)
+        if (applied) publish(event, type in P0_PUBLISH_TYPES)
         return applied
     }
 
@@ -183,8 +189,7 @@ class IncidentHelpWorkflow(
 
     private suspend fun applyValidated(event: DomainEventEntity): Boolean {
         val prior = events.getEventById(event.eventId)
-        if (prior != null && (IncidentSyncSnapshot.eventHash(prior) != IncidentSyncSnapshot.eventHash(event) ||
-                prior.validationStatus == EventValidationStatus.REJECTED || prior.applied)) return false
+        if (prior != null && isAlreadySettled(prior, event)) return false
         deferredDuringApply = false
         val applied = applyEventLocked(event)
         if (!applied && !deferredDuringApply && events.getEventById(event.eventId)?.applied != true) {
@@ -193,6 +198,11 @@ class IncidentHelpWorkflow(
         }
         return applied
     }
+
+    /** A stored copy that differs, was rejected or was already applied is never re-applied. */
+    private fun isAlreadySettled(prior: DomainEventEntity, event: DomainEventEntity): Boolean =
+        IncidentSyncSnapshot.eventHash(prior) != IncidentSyncSnapshot.eventHash(event) ||
+            prior.validationStatus == EventValidationStatus.REJECTED || prior.applied
 
     private suspend fun applyEventLocked(event: DomainEventEntity): Boolean {
         if (event.entityType != EntityType.INCIDENT.name) return false
@@ -207,19 +217,10 @@ class IncidentHelpWorkflow(
             return false
         }
         if (incident.workflowVersion != HELP_WORKFLOW_VERSION) return false
-        val payload = runCatching { JSONObject(event.payloadJson) }.getOrNull() ?: return false
-        val offer = payload.optString("offerId").takeIf { it.isNotBlank() }?.let { offers.getById(it) }
-        val context = HelpEventContext(event, incident, payload, offer, payload.optString("helperKey"))
-        if (event.eventType == EventType.INCIDENT_OFFER_WITHDRAWN.name && offer == null) {
-            parkWithdrawalOfUnknownOffer(context, prior)
-            return false
-        }
-        if (event.eventType in HELPER_DECISIONS && payload.optString("selectionId") != incident.selectionId) {
-            parkDecisionForOtherSelection(context, prior)
-            return false
-        }
+        val context = helpEventContext(event, incident) ?: return false
+        if (parkedOutOfOrder(context, prior)) return false
         val actorKey = rule.signerKey(context)
-        if (actorKey.isNullOrBlank() || !signer.verify(event, actorKey) || !rule.acceptsSigner(context, actorKey)) {
+        if (actorKey.isNullOrBlank() || !isAcceptedSigner(rule, context, actorKey)) {
             if (prior != null) events.setValidationStatus(event.eventId, EventValidationStatus.REJECTED)
             return false
         }
@@ -229,6 +230,33 @@ class IncidentHelpWorkflow(
         }
         return commitOutcome(event, prior, rule.evaluate(context))
     }
+
+    /** Null when the payload is not valid JSON. */
+    private suspend fun helpEventContext(event: DomainEventEntity, incident: IncidentEntity): HelpEventContext? {
+        val payload = runCatching { JSONObject(event.payloadJson) }.getOrNull() ?: return null
+        val offer = payload.optString("offerId").takeIf { it.isNotBlank() }?.let { offers.getById(it) }
+        return HelpEventContext(event, incident, payload, offer, payload.optString("helperKey"))
+    }
+
+    /** Parks events that reference an offer or selection this replica does not hold; true when parked. */
+    private suspend fun parkedOutOfOrder(context: HelpEventContext, prior: DomainEventEntity?): Boolean {
+        val eventType = context.event.eventType
+        return when {
+            eventType == EventType.INCIDENT_OFFER_WITHDRAWN.name && context.offer == null -> {
+                parkWithdrawalOfUnknownOffer(context, prior)
+                true
+            }
+            eventType in HELPER_DECISIONS &&
+                context.payload.optString("selectionId") != context.incident.selectionId -> {
+                parkDecisionForOtherSelection(context, prior)
+                true
+            }
+            else -> false
+        }
+    }
+
+    private fun isAcceptedSigner(rule: HelpEventRule, context: HelpEventContext, actorKey: String): Boolean =
+        signer.verify(context.event, actorKey) && rule.acceptsSigner(context, actorKey)
 
     private suspend fun commitOutcome(event: DomainEventEntity, prior: DomainEventEntity?,
         outcome: HelpEventOutcome): Boolean =
@@ -297,28 +325,42 @@ class IncidentHelpWorkflow(
     private suspend fun retainLateEvent(context: HelpEventContext, prior: DomainEventEntity?, actorKey: String) {
         val event = context.event
         val incident = context.incident
-        val payload = context.payload
-        val offer = context.offer
-        val frontier = events.getEventsForEntity(event.entityId).filter {
-            it.applied && it.validationStatus == EventValidationStatus.ACCEPTED && it.eventType in OFFER_TYPES &&
-                runCatching { JSONObject(it.payloadJson).optString("offerId") == payload.optString("offerId") }.getOrDefault(false)
-        }.maxOfOrNull { it.logicalVersion } ?: (offer?.revision ?: 0L)
+        val frontier = acceptedOfferFrontier(context)
         val byHelper = offers.getByHelper(event.entityId, actorKey)
-        val selection = selectionHistory.selectionEvent(incident, payload.optString("selectionId"))
+        val selection = selectionHistory.selectionEvent(incident, context.payload.optString("selectionId"))
         if (event.eventType in HELPER_DECISIONS && selection != null) {
             retainHistoricalDecision(event, incident, selection)
             return
         }
+        if (!isRetainableOfferEvent(context, byHelper, actorKey)) return
+        val nextRevision = frontier + 1L
+        if (event.logicalVersion > nextRevision) defer(event, prior, verified = true)
+        else if (event.logicalVersion == nextRevision) recordAccepted(event, prior)
+    }
+
+    /** Highest applied offer revision for the event's offer, falling back to the stored offer. */
+    private suspend fun acceptedOfferFrontier(context: HelpEventContext): Long {
+        val offerId = context.payload.optString("offerId")
+        return events.getEventsForEntity(context.event.entityId).filter {
+            it.applied && it.validationStatus == EventValidationStatus.ACCEPTED && it.eventType in OFFER_TYPES &&
+                runCatching { JSONObject(it.payloadJson).optString("offerId") == offerId }.getOrDefault(false)
+        }.maxOfOrNull { it.logicalVersion } ?: (context.offer?.revision ?: 0L)
+    }
+
+    /** A late offer event is kept only when a helper signed a well-formed event for an offer they own. */
+    private fun isRetainableOfferEvent(context: HelpEventContext, byHelper: IncidentOfferEntity?,
+        actorKey: String): Boolean {
+        val event = context.event
+        val payload = context.payload
+        val offer = context.offer
         val offerId = payload.optString("offerId")
-        val fromHelper = event.eventType in OFFER_TYPES && event.actorId != incident.creatorId
+        val fromHelper = event.eventType in OFFER_TYPES && event.actorId != context.incident.creatorId
         val wellFormed = offerId.isNotBlank() && payload.optLong("revision") == event.logicalVersion
         val noteOk = event.eventType != EventType.INCIDENT_OFFER_UPDATED.name ||
             isValidHelpNoteLength(payload.optString("note").trim().length)
         val ownedByActor = (offer == null || offer.helperKey == actorKey) &&
             (byHelper == null || byHelper.offerId == offerId)
-        if (!fromHelper || !wellFormed || !noteOk || !ownedByActor) return
-        if (event.logicalVersion > frontier + 1L) defer(event, prior, verified = true)
-        else if (event.logicalVersion == frontier + 1L) recordAccepted(event, prior)
+        return fromHelper && wellFormed && noteOk && ownedByActor
     }
 
     private suspend fun retainHistoricalDecision(event: DomainEventEntity, incident: IncidentEntity,
@@ -336,6 +378,8 @@ class IncidentHelpWorkflow(
         private val TERMINAL = setOf(IncidentState.RESOLVED.name, IncidentState.CANCELLED.name)
         internal val OFFER_TYPES = setOf(EventType.INCIDENT_OFFER_UPDATED.name, EventType.INCIDENT_OFFER_WITHDRAWN.name)
         private val HELPER_DECISIONS = setOf(EventType.INCIDENT_LEAD_CONFIRMED.name, EventType.INCIDENT_LEAD_DECLINED.name)
+        /** Event types published with P0 priority. */
+        private val P0_PUBLISH_TYPES = setOf(EventType.INCIDENT_LEAD_SELECTED, EventType.INCIDENT_CANCELLED)
         private val REPORTER_TYPES = setOf(EventType.INCIDENT_LEAD_SELECTED.name, EventType.INCIDENT_LEAD_REVOKED.name)
         val TYPES = setOf(EventType.INCIDENT_OFFER_UPDATED.name, EventType.INCIDENT_OFFER_WITHDRAWN.name,
             EventType.INCIDENT_LEAD_SELECTED.name, EventType.INCIDENT_LEAD_CONFIRMED.name,

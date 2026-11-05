@@ -1,5 +1,6 @@
 package edu.cit.resqmesh.data.repository.incident
 
+import edu.cit.resqmesh.core.network.PayloadTypes
 import edu.cit.resqmesh.core.network.MeshNetworkGateway
 import edu.cit.resqmesh.core.network.MeshPayload
 import edu.cit.resqmesh.core.logging.AppLogger
@@ -52,7 +53,7 @@ internal class LegacyIncidentSync(
 
             val payload = MeshPayload(
                 id = UUID.randomUUID().toString(),
-                type = "EVENT_SYNC_REQ",
+                type = PayloadTypes.EVENT_SYNC_REQ,
                 senderName = networkGateway.myDeviceName,
                 senderNodeId = networkGateway.myNodeId,
                 text = json
@@ -70,7 +71,7 @@ internal class LegacyIncidentSync(
                 val page = domainEventDao.getSyncPage(MAX_SYNC_EVENTS + 1, offset)
                 val events = page.take(MAX_SYNC_EVENTS)
                 val response = MeshPayload(
-                    id = UUID.randomUUID().toString(), type = "EVENT_SYNC_RESP",
+                    id = UUID.randomUUID().toString(), type = PayloadTypes.EVENT_SYNC_RESP,
                     senderName = networkGateway.myDeviceName,
                     senderNodeId = networkGateway.myNodeId,
                     text = JSONObject().put("type", "INCIDENT_EVENT_PAGE")
@@ -121,7 +122,7 @@ internal class LegacyIncidentSync(
 
                 val respPayload = MeshPayload(
                     id = UUID.randomUUID().toString(),
-                    type = "EVENT_SYNC_RESP",
+                    type = PayloadTypes.EVENT_SYNC_RESP,
                     senderName = networkGateway.myDeviceName,
                     senderNodeId = networkGateway.myNodeId,
                     text = JSONObject().apply {
@@ -163,7 +164,7 @@ internal class LegacyIncidentSync(
 
     private fun requestEventPage(endpointId: String, offset: Int) {
         val request = MeshPayload(
-            id = UUID.randomUUID().toString(), type = "EVENT_SYNC_REQ",
+            id = UUID.randomUUID().toString(), type = PayloadTypes.EVENT_SYNC_REQ,
             senderName = networkGateway.myDeviceName,
             senderNodeId = networkGateway.myNodeId,
             text = JSONObject().put("type", "INCIDENT_EVENT_PAGE")

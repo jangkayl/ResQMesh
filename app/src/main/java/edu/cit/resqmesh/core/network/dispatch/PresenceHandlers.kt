@@ -1,5 +1,6 @@
 package edu.cit.resqmesh.core.network.dispatch
 
+import edu.cit.resqmesh.core.network.PayloadTypes
 import edu.cit.resqmesh.core.network.MeshPayload
 import edu.cit.resqmesh.core.network.PayloadDispatcherCallback
 import edu.cit.resqmesh.core.model.NodeIdentity
@@ -11,7 +12,7 @@ import kotlinx.serialization.ExperimentalSerializationApi
 
 @OptIn(ExperimentalSerializationApi::class)
 class SystemPulseHandler : PayloadHandler {
-    override fun canHandle(payloadType: String) = payloadType == "SYSTEM"
+    override fun canHandle(payloadType: String) = payloadType == PayloadTypes.SYSTEM
 
     override fun handle(endpointId: String, payload: MeshPayload, payloadBytes: ByteArray, callback: PayloadDispatcherCallback) {
         val sender = payload.senderName
@@ -72,10 +73,10 @@ class SystemPulseHandler : PayloadHandler {
 
 @OptIn(ExperimentalSerializationApi::class)
 class PingHandler : PayloadHandler {
-    override fun canHandle(payloadType: String) = payloadType == "PING" || payloadType == "PONG"
+    override fun canHandle(payloadType: String) = payloadType == PayloadTypes.PING || payloadType == PayloadTypes.PONG
 
     override fun handle(endpointId: String, payload: MeshPayload, payloadBytes: ByteArray, callback: PayloadDispatcherCallback) {
-        if (payload.type == "PONG") {
+        if (payload.type == PayloadTypes.PONG) {
             callback.onHeartbeatAck(endpointId, payload.targetMessageId)
             AppLogger.event(
                 category = TerminalLogCategory.SYNC,
@@ -99,7 +100,7 @@ class PingHandler : PayloadHandler {
         if (payload.id.startsWith("HB:")) {
             val reply = MeshPayload(
                 id = "HA:${java.util.UUID.randomUUID()}",
-                type = "PONG",
+                type = PayloadTypes.PONG,
                 senderName = callback.getMyDeviceName(),
                 targetMessageId = payload.id
             )

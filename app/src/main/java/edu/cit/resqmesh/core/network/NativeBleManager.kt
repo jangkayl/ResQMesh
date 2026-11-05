@@ -1,5 +1,6 @@
 package edu.cit.resqmesh.core.network
 
+import edu.cit.resqmesh.core.network.bluetooth.BleConfig
 import edu.cit.resqmesh.core.network.bluetooth.peers.BleLinkDiagnostics
 import edu.cit.resqmesh.core.network.bluetooth.peers.BlePeerDirectory
 import edu.cit.resqmesh.core.network.bluetooth.peers.BleLinkRetirementController
@@ -106,14 +107,9 @@ class NativeBleManager(
     val bluetoothManager = context.getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
     val bluetoothAdapter = bluetoothManager.adapter
 
-    val SERVICE_UUID = UUID.fromString("B9A34F5C-7462-4C61-8935-7C2D4A15A3E4") // ResQMesh Custom Service
-    val RX_CHARACTERISTIC_UUID = UUID.fromString("6A81C2E5-309F-4D88-B270-4A9A65D8B6C7")
-    val TX_CHARACTERISTIC_UUID = UUID.fromString("1E4D9C7B-6F2A-4B9E-981D-F8A32C5B4E10")
-    val L2CAP_PSM_CHARACTERISTIC_UUID = UUID.fromString("8C91321D-4A22-4215-99A1-3E2A15C81F4B") // Exposes dynamic L2CAP Port
-    val CCC_DESCRIPTOR_UUID = UUID.fromString("00002902-0000-1000-8000-00805F9B34FB") // Standard CCCD (Required for Notifications)
     private val radioController = BleRadioController(
         context = context,
-        serviceUuid = SERVICE_UUID,
+        serviceUuid = BleConfig.SERVICE_UUID,
         isNodeActive = { store.isNodeActive.get() },
         hasReadyConnection = ::hasPayloadReadyDirectLink,
         onAdvertisement = ::handleAdvertisement,
@@ -142,35 +138,6 @@ class NativeBleManager(
     val notificationHelper = NotificationHelper(context)
     var currentTeamKey: String = ""
     var isCloaked = false
-    /** Direct radio links per phone. Larger meshes expand through routed neighbors. */
-    val MAX_TOTAL_CONNECTIONS = 3 // MUST BE 3! If set to 1, it causes an infinite eviction loop.
-
-    /**
-     * How long an inbound server link may stay nameless before it is kicked. Raised from 5s because
-     * a peer whose first inbound payload was a relayed message (non-empty routePath, so auto-rename
-     * is intentionally skipped) could be dropped despite having a perfectly healthy socket.
-     */
-    val NAME_HANDSHAKE_TIMEOUT_MS = 10_000L
-
-    /**
-     * Absolute ceiling on the post-connect handshake (discovery and descriptor write). Always
-     * fires, so a dropped OEM callback can never strand the connect lock.
-     */
-    val HANDSHAKE_WATCHDOG_MS = 5_000L
-
-    /** Bounded retry for a synchronous `discoverServices()` rejection from a busy OEM stack. */
-    val DISCOVERY_REQUEST_RETRY_MS = 300L
-    val MAX_DISCOVERY_REQUEST_ATTEMPTS = 3
-
-    /** Hard ceiling on holding the connect lock, enforced by [BleLifecycleSupervisor]. */
-    val CONNECT_LOCK_MAX_HOLD_MS = 25_000L
-
-    /**
-     * Window in which two links to the same peer are treated as a simultaneous-connect collision
-     * rather than a redundant duplicate.
-     */
-    val DUPLICATE_LINK_GRACE_MS = 5_000L
-
     val payloadDispatcherCallback: PayloadDispatcherCallback = NativePayloadCallbacks(
         events = this,
         seenIds = { store.seenMessageIds },
@@ -301,15 +268,13 @@ class NativeBleManager(
     fun showPrivateMessageNotification(sender: String, text: String) = payloadDispatcherCallback.showNotification(sender, text)
     private val transferCoordinator = GattTransferCoordinator(store)
     private val heartbeatCoordinator = HeartbeatCoordinator()
-    private val HEARTBEAT_ACK_TIMEOUT_MS = 8_000L
-    private val GATT_CHUNK_TIMEOUT_MS = 4_000L
     private val gattTransferExecutor = GattTransferExecutor(
         store = store,
         coordinator = transferCoordinator,
         handler = handler,
-        serviceUuid = SERVICE_UUID,
-        receiveCharacteristicUuid = RX_CHARACTERISTIC_UUID,
-        transmitCharacteristicUuid = TX_CHARACTERISTIC_UUID,
+        serviceUuid = BleConfig.SERVICE_UUID,
+        receiveCharacteristicUuid = BleConfig.RX_CHARACTERISTIC_UUID,
+        transmitCharacteristicUuid = BleConfig.TX_CHARACTERISTIC_UUID,
         gattServer = { gattServer },
         readyLink = ::readyGattLink,
         hasUsableL2cap = ::hasUsableL2cap,
@@ -320,7 +285,7 @@ class NativeBleManager(
         isCurrentLink = { link -> store.links.isCurrent(link) },
         disconnectClient = ::forceGattDisconnect,
         disconnectServer = ::retireServerLink,
-        chunkTimeoutMs = GATT_CHUNK_TIMEOUT_MS,
+        chunkTimeoutMs = BleConfig.GATT_CHUNK_TIMEOUT_MS,
         onGattIdle = { endpoint -> gattClientManager.onGattIdle(endpoint) },
         onFrame = { endpoint, bytes, stage -> reportFrame(endpoint, bytes, stage, "GATT") }
     )
@@ -334,7 +299,7 @@ class NativeBleManager(
         ::isControlPayload
     )
     private val lifecycleSupervisor = BleLifecycleSupervisor(
-        store, handler, heartbeatCoordinator, HEARTBEAT_ACK_TIMEOUT_MS, CONNECT_LOCK_MAX_HOLD_MS,
+        store, handler, heartbeatCoordinator, BleConfig.HEARTBEAT_ACK_TIMEOUT_MS, BleConfig.CONNECT_LOCK_MAX_HOLD_MS,
         { releaseConnectLock(null, "stuck lock backstop", force = true) }, ::startHeartbeatChallenge,
         { endpoint -> store.activeConnections[endpoint]?.let { forceGattDisconnect(endpoint, it) } },
         { endpoint -> store.links.current(endpoint, BleLinkRole.SERVER)?.let(::retireServerLink) },
@@ -345,7 +310,7 @@ class NativeBleManager(
     private val peerAdmissionController = BlePeerAdmissionController(
         store, handler, { myDeviceName }, ::isDeviceBlocked, ::hasLinkToIdentity,
         { peerName -> checkRouteExists?.invoke(peerName) == true }, ::hasPayloadReadyDirectLink, ::hasReadyLinkToIdentity, ::distinctLinkCount,
-        { MAX_TOTAL_CONNECTIONS }, ::getElectionScore, ::latestEndpointForIdentity,
+        { BleConfig.MAX_TOTAL_CONNECTIONS }, ::getElectionScore, ::latestEndpointForIdentity,
         ::connectToPersistentGatt, { event -> onDeviceScanned?.invoke(event) },
         { endpoint -> onDeviceDisconnected?.invoke(endpoint) }, ::sendSystemPulse,
         { radioController.activeHandshakeInfo() },
@@ -629,7 +594,7 @@ class NativeBleManager(
         }
 
     private val heartbeatDriver = BleHeartbeatDriver(
-        store, handler, heartbeatCoordinator, HEARTBEAT_ACK_TIMEOUT_MS, ::readyGattLink,
+        store, handler, heartbeatCoordinator, BleConfig.HEARTBEAT_ACK_TIMEOUT_MS, ::readyGattLink,
         ::enqueueGattPayload, ::forceGattDisconnect, transportResources, { myDeviceName }
     )
 
@@ -708,7 +673,7 @@ class NativeBleManager(
             AppLogger.d("BLE_MESH", "Connect Directly skipped for $endpointName; a direct link already exists")
             return
         }
-        if (distinctLinkCount() >= MAX_TOTAL_CONNECTIONS) {
+        if (distinctLinkCount() >= BleConfig.MAX_TOTAL_CONNECTIONS) {
             AppLogger.d("BLE_MESH", "Connect Directly deferred for $endpointName; direct-link capacity is full")
             return
         }

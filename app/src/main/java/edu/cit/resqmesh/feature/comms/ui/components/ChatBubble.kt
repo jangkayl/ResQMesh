@@ -26,6 +26,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -39,6 +40,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import edu.cit.resqmesh.R
@@ -55,6 +57,12 @@ import androidx.compose.material.icons.automirrored.outlined.Reply
 import androidx.compose.ui.text.font.FontFamily
 import edu.cit.resqmesh.core.ui.components.identity.UserAvatar
 import edu.cit.resqmesh.core.ui.components.location.TacticalLocationCard
+
+/** Reader initials shown before the "+N" overflow count. */
+private const val MAX_SEEN_BADGES = 3
+private const val HUE_DEGREES = 360
+private const val READER_SATURATION = 0.6f
+private const val READER_VALUE = 0.8f
 
 @Composable
 fun ChatBubble(
@@ -86,8 +94,10 @@ fun ChatBubble(
     } else {
         RoundedCornerShape(18.dp, 18.dp, 18.dp, 4.dp)
     }
-    val sender = remember(message.senderName) { NodeIdentity.displayNameOf(message.senderName).ifBlank { message.senderName } }
-    var showUserMenu by remember { mutableStateOf(false) }
+    val sender = remember(message.senderName) {
+        NodeIdentity.displayNameOf(message.senderName).ifBlank { message.senderName }
+    }
+    val showUserMenu = remember { mutableStateOf(false) }
 
     var fullScreenImage by remember { mutableStateOf<String?>(null) }
     if (fullScreenImage != null) {
@@ -99,6 +109,7 @@ fun ChatBubble(
     }
 
     val distinctReaders = remember(message.seenBy) { message.seenBy.distinct() }
+    val onSeenByClick: () -> Unit = { onShowSeenBy?.invoke(distinctReaders) }
 
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -108,47 +119,7 @@ fun ChatBubble(
         // Left Profile Avatar for other users
         if (!mine) {
             if (showAvatar) {
-                Box {
-                    UserAvatar(
-                        name = message.senderName,
-                        size = 32.dp,
-                        onClick = { showUserMenu = true },
-                        modifier = Modifier.padding(bottom = 4.dp, end = 8.dp)
-                    )
-                    DropdownMenu(
-                        expanded = showUserMenu,
-                        onDismissRequest = { showUserMenu = false }
-                    ) {
-                        DropdownMenuItem(
-                            text = { Text(stringResource(R.string.community_message_user, sender)) },
-                            leadingIcon = {
-                                Icon(
-                                    imageVector = Icons.Outlined.ChatBubbleOutline,
-                                    contentDescription = null
-                                )
-                            },
-                            onClick = {
-                                showUserMenu = false
-                                onUserClick?.invoke(message.senderName)
-                            }
-                        )
-                        if (onReplyClick != null) {
-                            DropdownMenuItem(
-                                text = { Text(stringResource(R.string.chat_reply_action)) },
-                                leadingIcon = {
-                                    Icon(
-                                        imageVector = Icons.AutoMirrored.Outlined.Reply,
-                                        contentDescription = null
-                                    )
-                                },
-                                onClick = {
-                                    showUserMenu = false
-                                    onReplyClick.invoke(message)
-                                }
-                            )
-                        }
-                    }
-                }
+                SenderAvatarMenu(message, sender, showUserMenu, onUserClick, onReplyClick)
             } else {
                 Spacer(modifier = Modifier.width(40.dp))
             }
@@ -165,13 +136,14 @@ fun ChatBubble(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier
                         .padding(start = Spacing.Small, bottom = 2.dp)
-                        .clickable { showUserMenu = true },
+                        .clickable { showUserMenu.value = true },
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
             }
+            val hasWideContent = message.locationLat != null || message.imageBase64 != null
             Surface(
-                modifier = Modifier.widthIn(max = if (message.locationLat != null || message.imageBase64 != null) 300.dp else 260.dp),
+                modifier = Modifier.widthIn(max = if (hasWideContent) 300.dp else 260.dp),
                 shape = shape,
                 color = bubbleColor,
                 contentColor = contentColor,
@@ -187,20 +159,7 @@ fun ChatBubble(
                         Spacer(Modifier.height(2.dp))
                     }
                     message.imageBase64?.let { image ->
-                        val bitmap = remember(image) { mediaHelper.decodeBase64ToBitmap(image) }
-                        if (bitmap != null) {
-                            Image(
-                                bitmap = bitmap.asImageBitmap(),
-                                contentDescription = stringResource(R.string.community_image_description),
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(180.dp)
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .clickable { fullScreenImage = image },
-                                contentScale = ContentScale.Crop
-                            )
-                            Spacer(Modifier.height(4.dp))
-                        }
+                        BubbleImage(image, mediaHelper, onOpen = { fullScreenImage = image })
                     }
                     message.audioBase64?.let { audio ->
                         ModernVoicePlayer(
@@ -222,47 +181,11 @@ fun ChatBubble(
                     val (replyQuote, actualText) = remember(message.text) { ReplyQuote.parse(message.text) }
 
                     if (replyQuote != null) {
-                        Surface(
-                            shape = RoundedCornerShape(8.dp),
-                            color = contentColor.copy(alpha = 0.12f),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(bottom = 6.dp)
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Box(
-                                    modifier = Modifier
-                                        .width(3.dp)
-                                        .height(20.dp)
-                                        .clip(RoundedCornerShape(1.5.dp))
-                                        .background(if (mine) Color.White.copy(alpha = 0.85f) else MaterialTheme.colorScheme.primary)
-                                )
-                                Spacer(Modifier.width(6.dp))
-                                Icon(
-                                    imageVector = Icons.AutoMirrored.Outlined.Reply,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(13.dp),
-                                    tint = if (mine) Color.White.copy(alpha = 0.85f) else MaterialTheme.colorScheme.primary
-                                )
-                                Spacer(Modifier.width(4.dp))
-                                Text(
-                                    text = replyQuote,
-                                    style = MaterialTheme.typography.labelSmall.copy(
-                                        fontSize = 11.sp,
-                                        fontFamily = FontFamily.Monospace
-                                    ),
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                    color = contentColor.copy(alpha = 0.9f)
-                                )
-                            }
-                        }
+                        ReplyQuoteStrip(replyQuote, mine, contentColor)
                     }
 
-                    val isDefaultLocation = message.locationLat != null && (actualText.isBlank() || actualText.contains("I am sharing my location"))
+                    val isDefaultLocation = message.locationLat != null &&
+                        (actualText.isBlank() || actualText.contains("I am sharing my location"))
 
                     if (message.locationLat != null && message.locationLng != null) {
                         TacticalLocationCard(
@@ -304,120 +227,29 @@ fun ChatBubble(
                         TransferProgressLine(stage, transferProgress, contentColor)
                     }
                     // Compact Metadata Row: Timestamp, Delivery Status, and Seen Receipts
-                    if (mine) {
-                        Row(
-                            modifier = Modifier
-                                .align(Alignment.End)
-                                .padding(top = 2.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
+                    Row(
+                        modifier = Modifier
+                            .align(Alignment.End)
+                            .padding(top = 2.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        if (mine) {
                             if (stage == null) {
-                                Text(
-                                    text = deliveryLabel(message),
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = contentColor.copy(alpha = 0.72f)
-                                )
+                                MetadataText(deliveryLabel(message), contentColor)
                                 Spacer(Modifier.width(4.dp))
                             }
-                            Text(
-                                text = messageTime(message.timestamp),
-                                style = MaterialTheme.typography.labelSmall,
-                                color = contentColor.copy(alpha = 0.72f)
-                            )
+                            MetadataText(messageTime(message.timestamp), contentColor)
                             if (distinctReaders.isNotEmpty()) {
                                 Spacer(Modifier.width(6.dp))
-                                Row(
-                                    modifier = Modifier
-                                        .clip(RoundedCornerShape(8.dp))
-                                        .clickable { onShowSeenBy?.invoke(distinctReaders) },
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    distinctReaders.take(3).forEachIndexed { index, reader ->
-                                        if (index > 0) Spacer(Modifier.width(1.dp))
-                                        Surface(
-                                            modifier = Modifier.size(14.dp),
-                                            shape = CircleShape,
-                                            color = communityReaderColor(reader)
-                                        ) {
-                                            Box(contentAlignment = Alignment.Center) {
-                                                Text(
-                                                    text = edu.cit.resqmesh.core.security.input.TextPolicy
-                                                        .firstGrapheme(reader).uppercase(),
-                                                    style = MaterialTheme.typography.labelSmall.copy(
-                                                        fontSize = 8.sp,
-                                                        lineHeight = 8.sp
-                                                    ),
-                                                    fontWeight = FontWeight.Bold,
-                                                    color = Color.White
-                                                )
-                                            }
-                                        }
-                                    }
-                                    val additionalReaders = distinctReaders.size - 3
-                                    if (additionalReaders > 0) {
-                                        Text(
-                                            text = "+$additionalReaders",
-                                            style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp),
-                                            color = contentColor.copy(alpha = 0.85f),
-                                            modifier = Modifier.padding(start = 2.dp)
-                                        )
-                                    }
-                                }
+                                SeenByBadges(distinctReaders, MINE_BADGE, contentColor, onSeenByClick)
                             }
-                        }
-                    } else {
-                        // Other user's message: Seen badges and timestamp aligned neatly
-                        Row(
-                            modifier = Modifier
-                                .align(Alignment.End)
-                                .padding(top = 2.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
+                        } else {
+                            // Other user's message: Seen badges and timestamp aligned neatly
                             if (distinctReaders.isNotEmpty()) {
-                                Row(
-                                    modifier = Modifier
-                                        .clip(RoundedCornerShape(6.dp))
-                                        .clickable { onShowSeenBy?.invoke(distinctReaders) },
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    distinctReaders.take(3).forEachIndexed { index, reader ->
-                                        if (index > 0) Spacer(Modifier.width(1.dp))
-                                        Surface(
-                                            modifier = Modifier.size(13.dp),
-                                            shape = CircleShape,
-                                            color = communityReaderColor(reader)
-                                        ) {
-                                            Box(contentAlignment = Alignment.Center) {
-                                                Text(
-                                                    text = edu.cit.resqmesh.core.security.input.TextPolicy
-                                                        .firstGrapheme(reader).uppercase(),
-                                                    style = MaterialTheme.typography.labelSmall.copy(
-                                                        fontSize = 8.sp,
-                                                        lineHeight = 8.sp
-                                                    ),
-                                                    fontWeight = FontWeight.Bold,
-                                                    color = Color.White
-                                                )
-                                            }
-                                        }
-                                    }
-                                    val additionalReaders = distinctReaders.size - 3
-                                    if (additionalReaders > 0) {
-                                        Text(
-                                            text = "+$additionalReaders",
-                                            style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp),
-                                            color = contentColor.copy(alpha = 0.85f),
-                                            modifier = Modifier.padding(start = 2.dp)
-                                        )
-                                    }
-                                }
+                                SeenByBadges(distinctReaders, OTHER_BADGE, contentColor, onSeenByClick)
                                 Spacer(Modifier.width(4.dp))
                             }
-                            Text(
-                                text = messageTime(message.timestamp),
-                                style = MaterialTheme.typography.labelSmall,
-                                color = contentColor.copy(alpha = 0.72f)
-                            )
+                            MetadataText(messageTime(message.timestamp), contentColor)
                         }
                     }
                 }
@@ -426,5 +258,178 @@ fun ChatBubble(
     }
 }
 
+@Composable
+private fun SenderAvatarMenu(
+    message: ChatMessage,
+    sender: String,
+    showUserMenu: MutableState<Boolean>,
+    onUserClick: ((String) -> Unit)?,
+    onReplyClick: ((ChatMessage) -> Unit)?
+) {
+    Box {
+        UserAvatar(
+            name = message.senderName,
+            size = 32.dp,
+            onClick = { showUserMenu.value = true },
+            modifier = Modifier.padding(bottom = 4.dp, end = 8.dp)
+        )
+        DropdownMenu(
+            expanded = showUserMenu.value,
+            onDismissRequest = { showUserMenu.value = false }
+        ) {
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.community_message_user, sender)) },
+                leadingIcon = {
+                    Icon(
+                        imageVector = Icons.Outlined.ChatBubbleOutline,
+                        contentDescription = null
+                    )
+                },
+                onClick = {
+                    showUserMenu.value = false
+                    onUserClick?.invoke(message.senderName)
+                }
+            )
+            if (onReplyClick != null) {
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.chat_reply_action)) },
+                    leadingIcon = {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Outlined.Reply,
+                            contentDescription = null
+                        )
+                    },
+                    onClick = {
+                        showUserMenu.value = false
+                        onReplyClick.invoke(message)
+                    }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun BubbleImage(image: String, mediaHelper: MediaHelper, onOpen: () -> Unit) {
+    val bitmap = remember(image) { mediaHelper.decodeBase64ToBitmap(image) }
+    if (bitmap != null) {
+        Image(
+            bitmap = bitmap.asImageBitmap(),
+            contentDescription = stringResource(R.string.community_image_description),
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(180.dp)
+                .clip(RoundedCornerShape(8.dp))
+                .clickable { onOpen() },
+            contentScale = ContentScale.Crop
+        )
+        Spacer(Modifier.height(4.dp))
+    }
+}
+
+@Composable
+private fun ReplyQuoteStrip(replyQuote: String, mine: Boolean, contentColor: Color) {
+    val accent = if (mine) Color.White.copy(alpha = 0.85f) else MaterialTheme.colorScheme.primary
+    Surface(
+        shape = RoundedCornerShape(8.dp),
+        color = contentColor.copy(alpha = 0.12f),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(bottom = 6.dp)
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .width(3.dp)
+                    .height(20.dp)
+                    .clip(RoundedCornerShape(1.5.dp))
+                    .background(accent)
+            )
+            Spacer(Modifier.width(6.dp))
+            Icon(
+                imageVector = Icons.AutoMirrored.Outlined.Reply,
+                contentDescription = null,
+                modifier = Modifier.size(13.dp),
+                tint = accent
+            )
+            Spacer(Modifier.width(4.dp))
+            Text(
+                text = replyQuote,
+                style = MaterialTheme.typography.labelSmall.copy(
+                    fontSize = 11.sp,
+                    fontFamily = FontFamily.Monospace
+                ),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                color = contentColor.copy(alpha = 0.9f)
+            )
+        }
+    }
+}
+
+@Composable
+private fun MetadataText(text: String, contentColor: Color) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.labelSmall,
+        color = contentColor.copy(alpha = 0.72f)
+    )
+}
+
+/** Badge geometry differs slightly between own and received bubbles. */
+private class SeenBadgeStyle(val badgeSize: Dp, val cornerRadius: Dp)
+
+private val MINE_BADGE = SeenBadgeStyle(badgeSize = 14.dp, cornerRadius = 8.dp)
+private val OTHER_BADGE = SeenBadgeStyle(badgeSize = 13.dp, cornerRadius = 6.dp)
+
+@Composable
+private fun SeenByBadges(
+    readers: List<String>,
+    style: SeenBadgeStyle,
+    contentColor: Color,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .clip(RoundedCornerShape(style.cornerRadius))
+            .clickable { onClick() },
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        readers.take(MAX_SEEN_BADGES).forEachIndexed { index, reader ->
+            if (index > 0) Spacer(Modifier.width(1.dp))
+            Surface(
+                modifier = Modifier.size(style.badgeSize),
+                shape = CircleShape,
+                color = communityReaderColor(reader)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Text(
+                        text = edu.cit.resqmesh.core.security.input.TextPolicy
+                            .firstGrapheme(reader).uppercase(),
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            fontSize = 8.sp,
+                            lineHeight = 8.sp
+                        ),
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
+                    )
+                }
+            }
+        }
+        val additionalReaders = readers.size - MAX_SEEN_BADGES
+        if (additionalReaders > 0) {
+            Text(
+                text = "+$additionalReaders",
+                style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp),
+                color = contentColor.copy(alpha = 0.85f),
+                modifier = Modifier.padding(start = 2.dp)
+            )
+        }
+    }
+}
+
 private fun communityReaderColor(reader: String): Color =
-    Color.hsv((reader.hashCode().absoluteValue % 360).toFloat(), 0.6f, 0.8f)
+    Color.hsv((reader.hashCode().absoluteValue % HUE_DEGREES).toFloat(), READER_SATURATION, READER_VALUE)

@@ -54,4 +54,75 @@ internal interface BleAdmissionContext {
         hasIndirectRoute: Boolean, reason: BleAdmissionReason, result: BleConnectStartResult,
         attempts: Int, candidateAgeMs: Long, now: Long) = diagnostics.recordDecision(peerName,
             endpoint, peerConnections, peerScore, hasIndirectRoute, reason, result, attempts, candidateAgeMs, now)
+
+    /** Records a decision about an advertisement that was not queued; age is time since first seen. */
+    fun recordAdvertisementDecision(
+        subject: AdmissionSubject,
+        reason: BleAdmissionReason,
+        result: BleConnectStartResult,
+        now: Long
+    ) = recordDecision(
+        peerName = subject.peerName,
+        endpoint = subject.endpoint,
+        peerConnections = subject.advertisement.directConnections,
+        peerScore = subject.advertisement.electionScore,
+        hasIndirectRoute = hasIndirectRoute(subject.peerName),
+        reason = reason,
+        result = result,
+        attempts = 0,
+        candidateAgeMs = (now - (store.endpointFirstSeen[subject.endpoint] ?: now)).coerceAtLeast(0L),
+        now = now
+    )
+
+    /** Records a decision for a candidate just queued from an advertisement. */
+    fun recordQueuedDecision(
+        subject: AdmissionSubject,
+        candidate: BootstrapCandidate,
+        reason: BleAdmissionReason,
+        now: Long
+    ) = recordDecision(
+        peerName = subject.peerName,
+        endpoint = subject.endpoint,
+        peerConnections = subject.advertisement.directConnections,
+        peerScore = subject.advertisement.electionScore,
+        hasIndirectRoute = hasIndirectRoute(subject.peerName),
+        reason = reason,
+        result = BleConnectStartResult.DEFERRED,
+        attempts = candidate.attempts,
+        candidateAgeMs = (now - candidate.enqueuedAt).coerceAtLeast(0L),
+        now = now
+    )
+
+    /** Records a bootstrap-queue decision; attempts and age are read from [candidate] at the time of the call. */
+    fun recordCandidateDecision(
+        candidate: BootstrapCandidate,
+        endpoint: String,
+        reason: BleAdmissionReason,
+        result: BleConnectStartResult,
+        now: Long
+    ) = recordDecision(
+        peerName = candidate.peerName,
+        endpoint = endpoint,
+        peerConnections = candidate.peerConnections,
+        peerScore = store.endpointLastScore[endpoint].orEmpty(),
+        hasIndirectRoute = hasIndirectRoute(candidate.peerName),
+        reason = reason,
+        result = result,
+        attempts = candidate.attempts,
+        candidateAgeMs = (now - candidate.enqueuedAt).coerceAtLeast(0L),
+        now = now
+    )
+
+    /** Disconnects [endpoint], drops its scan bookkeeping and reports it gone. */
+    fun forgetEndpoint(endpoint: String) {
+        disconnectEndpoint(endpoint)
+        store.connectedEndpointIds.remove(endpoint)
+        store.connectedEndpointNames.remove(endpoint)
+        store.endpointLastSeen.remove(endpoint)
+        store.endpointNodeIds.remove(endpoint)
+        later { onDisconnected(endpoint) }
+    }
 }
+
+/** The endpoint and peer an admission decision is about. The endpoint can differ from the advertisement's. */
+internal class AdmissionSubject(val endpoint: String, val peerName: String, val advertisement: BleAdvertisement)

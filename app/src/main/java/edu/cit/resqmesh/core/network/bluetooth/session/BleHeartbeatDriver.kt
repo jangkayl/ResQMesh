@@ -19,7 +19,7 @@ internal class BleHeartbeatDriver(
     private val store: BleStateStore,
     private val handler: Handler,
     private val heartbeatCoordinator: HeartbeatCoordinator,
-    private val HEARTBEAT_ACK_TIMEOUT_MS: Long,
+    private val heartbeatAckTimeoutMs: Long,
     private val readyGattLink: (String) -> BleLink?,
     private val enqueueGattPayload: (String, ByteArray, Boolean, String?) -> Boolean,
     private val forceGattDisconnect: (String, BluetoothGatt?) -> Unit,
@@ -61,17 +61,17 @@ internal class BleHeartbeatDriver(
             }
             if (edu.cit.resqmesh.core.network.bluetooth.state.BleLivenessPolicy.hasRecentOutboundProgress(
                     current.lastAcknowledgedWriteAt, System.currentTimeMillis())) {
-                handler.postDelayed({ checkAck() }, HEARTBEAT_ACK_TIMEOUT_MS)
+                handler.postDelayed({ checkAck() }, heartbeatAckTimeoutMs)
                 return
             }
-            if (sent.expired(System.currentTimeMillis(), HEARTBEAT_ACK_TIMEOUT_MS)) {
+            if (sent.expired(System.currentTimeMillis(), heartbeatAckTimeoutMs)) {
                 heartbeatCoordinator.remove(endpoint, sent)
                 AppLogger.d("BLE_MESH", "Link ${sent.generation} $endpoint: GATT heartbeat ACK timed out; retiring silent roles")
                 store.activeConnections[endpoint]?.let { forceGattDisconnect(endpoint, it) }
                 store.activeServerConnections[endpoint]?.let { gattServer?.cancelConnection(it) }
             }
         }
-        handler.postDelayed({ checkAck() }, HEARTBEAT_ACK_TIMEOUT_MS)
+        handler.postDelayed({ checkAck() }, heartbeatAckTimeoutMs)
     }
 
     fun onHeartbeatAck(endpoint: String, id: String) {

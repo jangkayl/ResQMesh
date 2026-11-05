@@ -47,7 +47,7 @@ Block, incident, SOS and recovery: basic user-reported successes; adversarial, l
 
 **Reconnect sync fix** (`fix/incident-reconnect-sync`): bounded sync, paced creation (D29); [card](testing/incident-reconnect-sync-card.md) pending.
 
-**Code smells refactor:** [card](testing/code-smells-refactor-card.md) pending.
+**Code smells:** [card](testing/code-smells-refactor-card.md)/[round-2-plan](plans/code-smells-round-2.md) pending.
 
 **Developer console** (branch `feat/developer-console`, [plan](plans/developer-mode.md)): Stage 1 and live follow are pushed; Stage 2 (traces, timeline) has local checks only and awaits the [phone card](testing/developer-mode-card.md). Stage 3 (signal and queue stats) is pending.
 

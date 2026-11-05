@@ -1,3 +1,8 @@
 # Overrides on top of detekt defaults (buildUponDefaultConfig = true).
 build:
   maxIssues: 0
+
+naming:
+  FunctionNaming:
+    # Compose convention: @Composable functions are PascalCase, like types.
+    ignoreAnnotated: ['Composable']
