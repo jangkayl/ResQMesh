@@ -46,11 +46,19 @@ object NavigationRequestParser {
 
     const val MAX_SOS_TEXT = 1000
     const val MAX_NAME = 128
-    const val MAX_SOS_ID = 64
+    /** SOS ids are `SOS-<24 hex>-<UUID>` (65 chars); leave headroom and never truncate them. */
+    const val MAX_SOS_ID = 128
+    const val MAX_INCIDENT_ID = 64
 
     private val NODE_ID = Regex("[A-Za-z0-9_-]{1,64}")
-    private val INCIDENT_ID = Regex("[A-Za-z0-9_.:-]{1,$MAX_SOS_ID}")
+    private val INCIDENT_ID = Regex("[A-Za-z0-9_.:-]{1,$MAX_INCIDENT_ID}")
     private val SOS_ID = Regex("[A-Za-z0-9_.:-]{1,$MAX_SOS_ID}")
+
+    /** A truncated id silently points at no SOS, so over-length ids are rejected, not cut. */
+    fun validSosId(raw: String?): String? {
+        val cleaned = raw?.filter { !it.isISOControl() }?.trim() ?: return null
+        return cleaned.takeIf { SOS_ID.matches(it) }
+    }
 
     /** Drops control characters, trims, and caps length; null when nothing remains. */
     fun sanitize(value: String?, maxLength: Int): String? {
@@ -82,10 +90,10 @@ object NavigationRequestParser {
         extras.triggerSos || extras.viewSosMap -> NavigationRequest.OpenSos(
             sender = sanitize(extras.sender, MAX_NAME),
             text = sanitize(extras.text, MAX_SOS_TEXT),
-            sosId = sanitize(extras.sosId, MAX_SOS_ID)?.takeIf { SOS_ID.matches(it) },
+            sosId = validSosId(extras.sosId),
             viewMap = true
         )
-        else -> sanitize(extras.incidentId, MAX_SOS_ID)?.takeIf { INCIDENT_ID.matches(it) }
+        else -> sanitize(extras.incidentId, MAX_INCIDENT_ID)?.takeIf { INCIDENT_ID.matches(it) }
             ?.let { NavigationRequest.OpenIncident(it) }
             ?: validChatNode(extras.chatNode)?.let { NavigationRequest.OpenChat(it) }
     }

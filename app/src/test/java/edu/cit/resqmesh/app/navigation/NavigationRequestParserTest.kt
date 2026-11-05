@@ -37,6 +37,20 @@ class NavigationRequestParserTest {
         assertTrue(r.viewMap)
     }
 
+    @Test fun realFormatSosIdIsKeptWhole() {
+        // SosProtocol.prefix (SOS- + 24 hex + -) + UUID = 65 chars; truncation broke chat taps.
+        val id = "SOS-0123456789abcdef01234567-" + "123e4567-e89b-12d3-a456-426614174000"
+        assertEquals(65, id.length)
+        val r = parse(extras(sos = true, id = id)) as NavigationRequest.OpenSos
+        assertEquals(id, r.sosId)
+    }
+
+    @Test fun overLengthSosIdIsDroppedNotTruncated() {
+        val r = parse(extras(sos = true, id = "x".repeat(NavigationRequestParser.MAX_SOS_ID + 1)))
+            as NavigationRequest.OpenSos
+        assertNull(r.sosId)
+    }
+
     @Test fun chatRequiresNodeIdSuffix() {
         assertEquals(NavigationRequest.OpenChat("Ann [R]#AB12"), parse(chat("Ann [R]#AB12")))
         assertNull(parse(chat("Ann")))
@@ -52,7 +66,7 @@ class NavigationRequestParserTest {
     @Test fun incidentRequiresSafeId() {
         assertEquals(NavigationRequest.OpenIncident("a1-B2_c.3:4"), parse(incident(" a1-B2_c.3:4 ")))
         assertNull(parse(incident("a b;<x>")))
-        val capped = NavigationRequest.OpenIncident("x".repeat(NavigationRequestParser.MAX_SOS_ID))
+        val capped = NavigationRequest.OpenIncident("x".repeat(NavigationRequestParser.MAX_INCIDENT_ID))
         assertEquals(capped, parse(incident("x".repeat(200))))
         assertNull(parse(incident("  ")))
     }

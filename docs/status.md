@@ -35,8 +35,6 @@ Block, incident, SOS and recovery: basic user-reported successes; adversarial, l
 
 **Batch C hygiene / Phase 0** (`refactor/batch-c-hygiene`): user-reported [smoke card](testing/batch-c-hygiene-smoke-card.md) pass, 2026-10-17.
 
-**Dead screens**: merged; device pending.
-
 **SOS message notifications** (`feat/sos-message-notifications`): [card](testing/sos-message-notifications-card.md) pending.
 
 **SOS banner, developer PIN crash** (`fix/dev-pin-sos-banner`): [card](testing/sos-banner-dev-pin-card.md) pending.
@@ -51,11 +49,13 @@ Block, incident, SOS and recovery: basic user-reported successes; adversarial, l
 
 **Developer console** (branch `feat/developer-console`, [plan](plans/developer-mode.md)): Stage 1 and live follow are pushed; Stage 2 (traces, timeline) has local checks only and awaits the [phone card](testing/developer-mode-card.md). Stage 3 (signal and queue stats) is pending.
 
-**Unknown duplicate row** (`fix/unknown-duplicate-row`): the peer list keeps one row per peer and follows the surviving socket. JVM tests pass; [phone card](testing/unknown-duplicate-row-card.md) pending. Second-socket cause unmeasured.
+**Unknown duplicate row** (`fix/unknown-duplicate-row`): one row per peer; JVM tests pass; [phone card](testing/unknown-duplicate-row-card.md) pending. Second-socket cause unmeasured.
 
 **Fast device install**: [card](testing/fast-device-install-card.md) pending.
 
 **Relay image delivery** (`feat/image-quality`): late public media forwarding and sender-free completion; [card](testing/relay-image-delivery-card.md) pending.
+
+**SOS notification deep link** (`fix/sos-notification-deeplink`): full SOS id kept; [card](testing/sos-notification-deeplink-card.md) pending.
 
 **Image quality** (`feat/image-quality`): user-rated quality good; [card](testing/image-quality-card.md) pending.
 
