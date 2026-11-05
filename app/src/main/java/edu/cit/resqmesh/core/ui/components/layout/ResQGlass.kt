@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -57,35 +56,6 @@ fun ResQGlassSurface(
     )
 }
 
-/**
- * A solid, high-contrast card for information that must stay readable at a glance.
- * Use this for messages, connectivity, forms, and SOS information; reserve glass for
- * navigation, overlays, and high-level summaries.
- */
-@Composable
-fun ResQContentSurface(
-    modifier: Modifier = Modifier,
-    shape: Shape = MaterialTheme.shapes.large,
-    contentPadding: PaddingValues = PaddingValues(0.dp),
-    shadowElevation: Dp = 2.dp,
-    contentAlignment: Alignment = Alignment.TopStart,
-    content: @Composable BoxScope.() -> Unit
-) {
-    Box(
-        modifier = modifier
-            .shadow(elevation = shadowElevation, shape = shape)
-            .clip(shape)
-            .background(MaterialTheme.colorScheme.surface)
-            .border(
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-                shape = shape
-            )
-            .padding(contentPadding),
-        contentAlignment = contentAlignment,
-        content = content
-    )
-}
-
 @Composable
 fun ResQAuroraBackground(
     modifier: Modifier = Modifier,
@@ -101,24 +71,6 @@ fun ResQAuroraBackground(
             drawCircle(colors.glowSecondary.copy(alpha = 0.04f), radius = size.minDimension * 0.48f, center = Offset(size.width * -0.08f, size.height * 0.72f))
         },
         contentAlignment = contentAlignment,
-        content = content
-    )
-}
-
-@Composable
-fun ResQGradientOrb(
-    modifier: Modifier = Modifier,
-    content: @Composable BoxScope.() -> Unit
-) {
-    Box(
-        modifier = modifier
-            .clip(CircleShape)
-            .background(
-                Brush.linearGradient(
-                    listOf(MaterialTheme.colorScheme.secondary, MaterialTheme.colorScheme.primary)
-                )
-            ),
-        contentAlignment = Alignment.Center,
         content = content
     )
 }

@@ -23,7 +23,6 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import edu.cit.resqmesh.core.ui.components.buttons.ButtonVariant
 import edu.cit.resqmesh.core.ui.components.buttons.ResQButton
 import edu.cit.resqmesh.core.ui.theme.ResQTheme
 import edu.cit.resqmesh.core.ui.theme.Spacing
@@ -99,55 +98,6 @@ fun ResQStatusChip(
                 style = MaterialTheme.typography.labelMedium,
                 fontWeight = FontWeight.SemiBold
             )
-        }
-    }
-}
-
-@Composable
-fun ResQStateCard(
-    title: String,
-    message: String,
-    modifier: Modifier = Modifier,
-    tone: ResQStatusTone = ResQStatusTone.Neutral,
-    icon: ImageVector = Icons.Outlined.Info,
-    actionLabel: String? = null,
-    onAction: (() -> Unit)? = null
-) {
-    val colors = tone.colors()
-    Surface(
-        modifier = modifier.fillMaxWidth(),
-        shape = MaterialTheme.shapes.large,
-        color = colors.container,
-        contentColor = colors.foreground,
-        border = BorderStroke(1.dp, colors.border)
-    ) {
-        Row(
-            modifier = Modifier.padding(Spacing.Medium),
-            horizontalArrangement = Arrangement.spacedBy(Spacing.Medium),
-            verticalAlignment = Alignment.Top
-        ) {
-            Icon(icon, contentDescription = null, modifier = Modifier.size(24.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold
-                )
-                Spacer(Modifier.height(Spacing.ExtraSmall))
-                Text(
-                    text = message,
-                    style = MaterialTheme.typography.bodyMedium
-                )
-                if (actionLabel != null && onAction != null) {
-                    Spacer(Modifier.height(Spacing.Small))
-                    ResQButton(
-                        onClick = onAction,
-                        variant = ButtonVariant.Ghost
-                    ) {
-                        Text(actionLabel)
-                    }
-                }
-            }
         }
     }
 }
