@@ -150,7 +150,7 @@ ResQMesh/
 ├── scripts/
 │   ├── ci/                             # CI checks
 │   ├── device/                         # Device tools
-│   └── map/                            # Map packaging
+│   └── map/                            # Map packaging (walkthrough.md)
 ├── captures/                           # Local evidence (ignored)
 ├── archive/                            # Historical/deferred documentation
 ├── config/detekt/                      # Static-analysis rules
@@ -190,9 +190,13 @@ cd ResQMesh
 .\gradlew.bat :app:assembleDebug --console=plain
 ```
 
-Open the repository root in Android Studio and complete Gradle/SDK setup. Local SDK configuration and the optional `resqmesh.devPin` belong in the ignored `local.properties`.
+Local SDK configuration and the optional `resqmesh.devPin` belong in the ignored `local.properties`.
 
 Output: **`app/build/outputs/apk/debug/app-debug.apk`**. `scripts/device/manage_devices.ps1` builds and installs without Android Studio.
+
+### Release build
+
+For demo phones, copy `keystore.properties.example` to `keystore.properties`, then run `:app:assembleRelease` ([card](docs/testing/pre-demo-cleanup-card.md)).
 
 ### First phone session
 
@@ -224,7 +228,7 @@ Use the [physical checklist](docs/testing/physical-reliability-tests.md) and [Va
 .\scripts\device\capture_ble_logcat.ps1 -DurationMinutes 10
 ```
 
-Report APK hash, models/API, topology, actual transport, background setting, counts, exact failure time and focused capture. Measure arrival, receipt confirmation and playback separately. Never share message/audio content, key material or ciphertext previews.
+Report APK hash, models/API, topology, transport, background setting, counts, failure time and a focused capture. Measure arrival, receipts and playback separately. Never share message content, keys or ciphertext.
 
 ## Current progress and known limitations
 

@@ -90,4 +90,4 @@ Open limits:
 - Each phase step is one Conventional Commit.
 - After each step: targeted unit tests (JVM, fake clock; Tink with cleartext test keysets). After each phase: the full D10 gate.
 - An auditor reviews dependency, manifest and crypto steps.
-- Each phase has a phone card. Phase A: [security Phase A card](../testing/security-phase-a-card.md). Phase B: [security Phase B card](../testing/security-phase-b-card.md).
+- Each phase has a phone card. Phase A: [security Phase A card](../../archive/docs-superseded-2026-11-05/testing/security-phase-a-card.md). Phase B: [security Phase B card](../testing/security-phase-b-card.md).

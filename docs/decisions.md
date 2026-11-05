@@ -106,7 +106,7 @@ The threat model is a malicious nearby phone. Rate limits charge the originating
 
 ## D25: Packages before Gradle modules
 
-Enforce layer boundaries with packages and `scripts/ci/check_boundaries.ps1` ([plan](plans/layer-boundaries.md)). It uses adapters rather than renamed repositories, String-typed models and `feature-no-data`, and adds use cases only for multi-step flows. The project stays one module; other behavior-touching refactors wait until after the demo freeze.
+Enforce layer boundaries with packages and `scripts/ci/check_boundaries.ps1` ([plan](../archive/docs-superseded-2026-11-05/plans/layer-boundaries.md)). It uses adapters rather than renamed repositories, String-typed models and `feature-no-data`, and adds use cases only for multi-step flows. The project stays one module; other behavior-touching refactors wait until after the demo freeze.
 
 ## D27: User-controlled location
 

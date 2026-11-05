@@ -26,7 +26,7 @@ The rule for the demo window is to make behavior-neutral changes now and defer b
 | Packages | `core/utils` split into `core/audio`, `core/logging`, `core/notification` and `feature/sos/alert`. Migrations moved to `data/local/migrations`. Incident presentation moved to `feature/incident/model`. |
 | CI gates | androidTest compile, detekt 1.23.8 with a baseline, and `scripts/ci/check_boundaries.ps1` with a shrink-only allowlist (4 core, 33 feature). Runs on push to `main`. |
 
-Phase 0 exits when local checks are green and the [Batch C smoke card](../testing/batch-c-hygiene-smoke-card.md) passes on phones.
+Phase 0 exits when local checks are green and the [Batch C smoke card](../../archive/docs-superseded-2026-11-05/testing/batch-c-hygiene-smoke-card.md) passes on phones.
 
 ### Scenarios from the deleted `.bak` tests
 
@@ -50,7 +50,7 @@ These had no obvious current coverage. Port them as real tests in P2:
 - Exit: golden tests updated intentionally, and a mixed-version phone card.
 - X25519/Ed25519 is the long-term direction ([D24](../decisions.md)).
 
-**P2 Data boundary.** The behavior-neutral subset (interfaces, mappers, use cases and a zero allowlist) is in [layer boundaries](layer-boundaries.md), started 2026-10-17. The gateway events and flow-sharing items stay deferred.
+**P2 Data boundary.** The behavior-neutral subset (interfaces, mappers, use cases and a zero allowlist) is in [layer boundaries](../../archive/docs-superseded-2026-11-05/plans/layer-boundaries.md), started 2026-10-17. The gateway events and flow-sharing items stay deferred.
 - Add `MeshRepository`, `IncidentRepository` and `SosRepository` interfaces, plus entity→`core/model` mappers. Shrink the boundary allowlist to zero.
 - Add a `ConversationStateStore` in place of the ViewModel DAO.
 - Replace gateway `on…` slots with `SharedFlow<GatewayEvent>`.
@@ -75,7 +75,7 @@ These had no obvious current coverage. Port them as real tests in P2:
 
 **P5 Release and dependencies.**
 - R8 with keep rules (serialization, Room, MapLibre) and release signing from environment or local properties.
-- applicationId rename: done early as `edu.cit.resqmesh` on 2026-10-17 ([card](../testing/app-id-rename-card.md)); phones reinstall clean and keys reset.
+- applicationId rename: done early as `edu.cit.resqmesh` on 2026-10-17 ([card](../../archive/docs-superseded-2026-11-05/testing/app-id-rename-card.md)); phones reinstall clean and keys reset.
 - Upgrade one library family per commit: lifecycle/activity/core, then Room 2.7+, then Koin 4.
 - Java 17.
 - Isolated ktlint formatting commit.
