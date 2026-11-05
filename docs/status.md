@@ -35,8 +35,6 @@ Block, incident, SOS and recovery: basic user-reported successes; adversarial, l
 
 **Batch C hygiene / Phase 0** (`refactor/batch-c-hygiene`): user-reported [smoke card](testing/batch-c-hygiene-smoke-card.md) pass, 2026-10-17.
 
-**Dead screens**: merged; device pending.
-
 **SOS message notifications** (`feat/sos-message-notifications`): [card](testing/sos-message-notifications-card.md) pending.
 
 **SOS banner, developer PIN crash** (`fix/dev-pin-sos-banner`): [card](testing/sos-banner-dev-pin-card.md) pending. **GATT write cap:** SM-A276B crash fix reported good.
@@ -49,7 +47,7 @@ Block, incident, SOS and recovery: basic user-reported successes; adversarial, l
 
 **Developer console** (`feat/developer-console`, [plan](plans/developer-mode.md)): Stage 1 and live follow pushed; Stage 2 (traces, timeline): local checks only, awaiting [phone card](testing/developer-mode-card.md). Stage 3 (signal/queue stats) pending.
 
-**Unknown duplicate row** (`fix/unknown-duplicate-row`): the peer list keeps one row per peer, following the surviving socket. JVM tests pass; [card](testing/unknown-duplicate-row-card.md) pending. Second-socket cause unmeasured.
+**Unknown duplicate row** (`fix/unknown-duplicate-row`): one row per peer; JVM tests pass; [phone card](testing/unknown-duplicate-row-card.md) pending. Second-socket cause unmeasured.
 
 **Fast device install**: [card](testing/fast-device-install-card.md) pending.
 
@@ -58,6 +56,8 @@ Block, incident, SOS and recovery: basic user-reported successes; adversarial, l
 **PTT half-duplex** (`fix/ptt-half-duplex`): [card](testing/ptt-half-duplex-card.md) pending.
 
 **Storage & data** (`feat/storage-data-settings`): [card](testing/storage-data-settings-card.md) pending.
+
+**SOS notification deep link** (`fix/sos-notification-deeplink`): full SOS id kept; [card](testing/sos-notification-deeplink-card.md) pending.
 
 **Image quality** (`feat/image-quality`): user-rated quality good; [card](testing/image-quality-card.md) pending.
 
