@@ -27,10 +27,10 @@ val ModernMint = Color(0xFF10B981) // Emerald Mint for Direct Peer Link
 val ModernMintLight = Color(0xFF34D399)
 val ModernMintContainer = Color(0xFFD1FAE5)
 
-// Warm Amber Gold for Relayed Mesh Nodes (NO blue)
-val ModernSky = Color(0xFFFF9500)
-val ModernSkyLight = Color(0xFFFFB340)
-val ModernSkyContainer = Color(0xFFFEF3C7)
+// Orange for relayed (multi-hop) mesh peers; distinct from ModernAmber checking/connecting
+val RelayOrange = Color(0xFFFF9500)
+val RelayOrangeLight = Color(0xFFFFB340)
+val RelayOrangeContainer = Color(0xFFFEF3C7)
 
 val ModernCoral = Color(0xFFEF4444) // Coral Red for Emergency SOS
 val ModernCoralLight = Color(0xFFF87171)
@@ -74,7 +74,7 @@ val AuroraPurple50 = Color(0xFFF7F5FF)
 
 val AuroraCyan600 = SafetyOrangeDark
 val AuroraCyan500 = SafetyOrange
-val AuroraCyan200 = ModernSkyContainer
+val AuroraCyan200 = RelayOrangeContainer
 
 val AuroraCanvasLight = Color(0xFFFAF8F5)
 val AuroraCanvasLightEnd = Color(0xFFF5EFE9)

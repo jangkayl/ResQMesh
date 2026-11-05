@@ -43,7 +43,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import edu.cit.resqmesh.R
 import edu.cit.resqmesh.core.model.NodeIdentity
-import edu.cit.resqmesh.core.ui.theme.ModernSky
+import edu.cit.resqmesh.core.ui.theme.RelayOrange
 import edu.cit.resqmesh.core.ui.theme.ResQTheme
 import edu.cit.resqmesh.feature.home.model.HomeNetworkSummary
 
@@ -78,7 +78,7 @@ internal fun ModernUserHeader(
         isMeshOffline -> MaterialTheme.colorScheme.onSurfaceVariant
         !isNodeActive -> ResQTheme.colors.warning
         summary.directPeers > 0 -> ResQTheme.colors.success
-        else -> ModernSky
+        else -> RelayOrange
     }
 
     val infiniteTransition = rememberInfiniteTransition(label = "BeaconPulse")

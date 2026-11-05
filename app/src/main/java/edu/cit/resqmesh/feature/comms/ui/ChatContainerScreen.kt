@@ -43,7 +43,7 @@ import androidx.compose.ui.unit.sp
 import edu.cit.resqmesh.R
 import edu.cit.resqmesh.core.model.ChatMessage
 import edu.cit.resqmesh.core.ui.theme.ModernMint
-import edu.cit.resqmesh.core.ui.theme.ModernSky
+import edu.cit.resqmesh.core.ui.theme.RelayOrange
 import edu.cit.resqmesh.core.ui.theme.ResQTheme
 import edu.cit.resqmesh.core.ui.theme.Spacing
 import edu.cit.resqmesh.core.ui.theme.TestResQMeshTheme
@@ -187,7 +187,7 @@ internal fun MessagesInboxContent(
                         label = "Relayed",
                         count = conversations.count { it.status == ConversationStatus.Relayed },
                         isSelected = selectedFilter == CommsFilter.RELAYS,
-                        activeColor = ModernSky,
+                        activeColor = RelayOrange,
                         onClick = { selectedFilter = CommsFilter.RELAYS }
                     )
                     val unreadTotal = conversations.count { it.unreadCount > 0 }
