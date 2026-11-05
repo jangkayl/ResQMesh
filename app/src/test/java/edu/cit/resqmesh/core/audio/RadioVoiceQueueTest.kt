@@ -42,4 +42,46 @@ class RadioVoiceQueueTest {
         assertTrue(queue.enqueue(note("new")))
         assertEquals("new", queue.currentOrNext()?.id)
     }
+
+    @Test
+    fun holdSilencesPlaybackButKeepsArrivalsInOrder() {
+        val queue = RadioVoiceQueue()
+        queue.setMonitoring(true)
+        queue.hold()
+        assertTrue(queue.enqueue(note("first")))
+        assertTrue(queue.enqueue(note("second")))
+        assertNull(queue.currentOrNext())
+
+        queue.release()
+        assertEquals("first", queue.currentOrNext()?.id)
+        queue.completeCurrent()
+        assertEquals("second", queue.currentOrNext()?.id)
+    }
+
+    @Test
+    fun holdKeepsTheInterruptedNoteForResume() {
+        val queue = RadioVoiceQueue()
+        queue.setMonitoring(true)
+        queue.enqueue(note("playing"))
+        assertEquals("playing", queue.currentOrNext()?.id)
+
+        queue.hold()
+        assertNull(queue.currentOrNext())
+        assertEquals("playing", queue.current?.id)
+
+        queue.release()
+        assertEquals("playing", queue.currentOrNext()?.id)
+    }
+
+    @Test
+    fun switchingOffClearsTheHold() {
+        val queue = RadioVoiceQueue()
+        queue.setMonitoring(true)
+        queue.hold()
+        queue.setMonitoring(false)
+
+        queue.setMonitoring(true)
+        queue.enqueue(note("new"))
+        assertEquals("new", queue.currentOrNext()?.id)
+    }
 }

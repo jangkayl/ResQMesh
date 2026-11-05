@@ -7,6 +7,8 @@ import edu.cit.resqmesh.feature.profile.ui.components.AppearanceChoice
 import edu.cit.resqmesh.feature.profile.ui.components.SettingsCard
 import edu.cit.resqmesh.feature.profile.ui.components.DividerLine
 import edu.cit.resqmesh.feature.profile.ui.components.SettingRow
+import edu.cit.resqmesh.feature.profile.ui.components.StorageDataSection
+import edu.cit.resqmesh.feature.profile.viewmodel.StorageSettingsViewModel
 import android.content.Intent
 import android.provider.Settings
 import androidx.compose.foundation.BorderStroke
@@ -62,6 +64,7 @@ fun ProfileScreen(
     onBack: () -> Unit
 ) {
     val context = LocalContext.current
+    val storageViewModel: StorageSettingsViewModel = org.koin.androidx.compose.koinViewModel()
     val state by viewModel.uiState.collectAsState()
     val isDeveloperMode by viewModel.isDeveloperModeEnabled.collectAsState()
     val isLongRangeProfile by viewModel.isLongRangeProfile.collectAsState()
@@ -388,7 +391,11 @@ fun ProfileScreen(
             }
         }
 
-        // Section 3: Help & Support
+        // Section 3: Storage & data
+        item { SettingsLabel("STORAGE & DATA") }
+        item { StorageDataSection(storageViewModel) }
+
+        // Section 4: Help & Support
         item { SettingsLabel("PRIVACY & SUPPORT") }
         item {
             SettingsCard {

@@ -37,9 +37,7 @@ Block, incident, SOS and recovery: basic user-reported successes; adversarial, l
 
 **SOS message notifications** (`feat/sos-message-notifications`): [card](testing/sos-message-notifications-card.md) pending.
 
-**SOS banner, developer PIN crash** (`fix/dev-pin-sos-banner`): [card](testing/sos-banner-dev-pin-card.md) pending.
-
-**GATT write cap:** SM-A276B crash fix; user reported good.
+**SOS banner, developer PIN crash** (`fix/dev-pin-sos-banner`): [card](testing/sos-banner-dev-pin-card.md) pending. **GATT write cap:** SM-A276B crash fix reported good.
 
 **Location controls** (`feat/location-controls`): local checks pass; [card](testing/location-controls-card.md) pending. Incident alerts: [card](testing/incident-notifications-card.md).
 
@@ -47,13 +45,17 @@ Block, incident, SOS and recovery: basic user-reported successes; adversarial, l
 
 **Code smells:** two-phone pass; [card](testing/code-smells-refactor-card.md) steps 5/6/8 open.
 
-**Developer console** (branch `feat/developer-console`, [plan](plans/developer-mode.md)): Stage 1 and live follow are pushed; Stage 2 (traces, timeline) has local checks only and awaits the [phone card](testing/developer-mode-card.md). Stage 3 (signal and queue stats) is pending.
+**Developer console** (`feat/developer-console`, [plan](plans/developer-mode.md)): Stage 1 and live follow pushed; Stage 2 (traces, timeline): local checks only, awaiting [phone card](testing/developer-mode-card.md). Stage 3 (signal/queue stats) pending.
 
 **Unknown duplicate row** (`fix/unknown-duplicate-row`): one row per peer; JVM tests pass; [phone card](testing/unknown-duplicate-row-card.md) pending. Second-socket cause unmeasured.
 
 **Fast device install**: [card](testing/fast-device-install-card.md) pending.
 
 **Relay image delivery** (`feat/image-quality`): late public media forwarding and sender-free completion; [card](testing/relay-image-delivery-card.md) pending.
+
+**PTT half-duplex** (`fix/ptt-half-duplex`): [card](testing/ptt-half-duplex-card.md) pending.
+
+**Storage & data** (`feat/storage-data-settings`): [card](testing/storage-data-settings-card.md) pending.
 
 **SOS notification deep link** (`fix/sos-notification-deeplink`): full SOS id kept; [card](testing/sos-notification-deeplink-card.md) pending.
 

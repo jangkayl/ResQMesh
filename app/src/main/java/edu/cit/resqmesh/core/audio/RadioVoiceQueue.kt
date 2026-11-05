@@ -9,6 +9,7 @@ internal class RadioVoiceQueue {
     private val pending = ArrayDeque<Note>()
     private val seenIds = LinkedHashSet<String>()
     private var monitoring = false
+    private var held = false
     var current: Note? = null
         private set
 
@@ -18,7 +19,17 @@ internal class RadioVoiceQueue {
             pending.clear()
             seenIds.clear()
             current = null
+            held = false
         }
+    }
+
+    /** Silences playback while the mic records; arrivals still queue and the current note is kept. */
+    fun hold() {
+        held = true
+    }
+
+    fun release() {
+        held = false
     }
 
     fun enqueue(note: Note): Boolean {
@@ -29,7 +40,7 @@ internal class RadioVoiceQueue {
     }
 
     fun currentOrNext(): Note? {
-        if (!monitoring) return null
+        if (!monitoring || held) return null
         if (current == null) current = pending.pollFirst()
         return current
     }

@@ -55,7 +55,7 @@ Peer text is cleaned on local copies only, never relayed, signed or hashed data;
 
 Public sends persist pending before dispatch. Per-neighbor acceptance, wholly rejected retries, partial feedback and a serialized flush avoid whole-broadcast retries after acceptance.
 
-Room 11 stores explicit Community/Radio/SOS destinations. History/drafts/unread stay scoped; off-channel Radio stores silently and monitoring plays only selected-channel notes under two minutes old. ChatSyncCoordinator silently pulls recent Community/SOS text then media from direct neighbors, never relaying it ([plan](plans/chat-sync.md)). Migration 10→11 hides legacy unscoped SOS/audio without deleting records.
+Room 11 stores explicit Community/Radio/SOS destinations. History/drafts/unread stay scoped; off-channel Radio stores silently; monitoring plays selected-channel notes under two minutes old. Half-duplex recording pauses playback, queuing arrivals. ChatSyncCoordinator pulls recent Community/SOS text then media from direct neighbors, unrelayed ([plan](plans/chat-sync.md)). Migration 10→11 hides, not deletes, legacy unscoped SOS/audio.
 
 Incidents use stable reporter/helper authority, signed prerequisites and transactional projections. Withdrawal/offline offer changes reopen selection without advancing reporter versions. IncidentSyncCoordinator (protocol 3) compares cached hashes over the requester's scope (open plus 24 h closures, max 100) on READY, changes and every 30 seconds; missing dependencies block completion. Out-of-order help events defer or become history; rejections are re-validated. IncidentEventIngestor owns projection mutex/rebuild flag.
 

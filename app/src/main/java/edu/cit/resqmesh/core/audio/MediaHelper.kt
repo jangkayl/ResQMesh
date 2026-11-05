@@ -40,6 +40,7 @@ class MediaHelper(private val context: Context) {
     // --- AUDIO LOGIC ---
     fun startRecording(): Boolean {
         _recordingLimitReached.value = false
+        beginHold()
         return try {
             audioFile = File(context.cacheDir, "temp_audio_record.amr")
             mediaRecorder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) MediaRecorder(context) else MediaRecorder()
@@ -59,8 +60,29 @@ class MediaHelper(private val context: Context) {
         } catch (e: Exception) {
             AppLogger.d("MediaHelper", "Failed to start recording: ${e.javaClass.simpleName}")
             traceVoice(TraceDir.OUT, TraceDropReason.RECORD_FAILED)
+            mediaRecorder?.release()
+            mediaRecorder = null
+            endHold()
             false
         }
+    }
+
+    /** Half-duplex: nothing plays while the mic is open, so received voices are not re-recorded. */
+    private fun beginHold() {
+        if (radioQueue.current != null && manualAudio == null) {
+            radioResumePositionMs = mediaPlayer?.currentPosition ?: radioResumePositionMs
+        }
+        releasePlayer()
+        manualAudio = null
+        radioQueue.hold()
+        recording = true
+    }
+
+    private fun endHold() {
+        if (!recording) return
+        recording = false
+        radioQueue.release()
+        playNextRadioNote()
     }
 
     /** Releases the recorder now, so stopRecording only reads the file and cannot lose the note on a second stop. */
@@ -72,6 +94,7 @@ class MediaHelper(private val context: Context) {
         recorder.release()
         mediaRecorder = null
         _recordingLimitReached.value = true
+        endHold()
     }
 
     fun stopRecording(): String? {
@@ -87,7 +110,11 @@ class MediaHelper(private val context: Context) {
         } catch (e: Exception) {
             AppLogger.d("MediaHelper", "Failed to stop recording: ${e.javaClass.simpleName}")
             traceVoice(TraceDir.OUT, TraceDropReason.RECORD_FAILED)
+            mediaRecorder?.release()
+            mediaRecorder = null
             null
+        } finally {
+            endHold()
         }
     }
 
@@ -96,6 +123,7 @@ class MediaHelper(private val context: Context) {
     private var radioResumePositionMs = 0
     private var manualAudio: String? = null
     private var playingFile: File? = null
+    private var recording = false
 
     private val _currentRadioSpeaker = MutableStateFlow<String?>(null)
     val currentRadioSpeaker: StateFlow<String?> = _currentRadioSpeaker
@@ -108,6 +136,7 @@ class MediaHelper(private val context: Context) {
     }
 
     fun togglePlayVoiceMail(base64Audio: String) {
+        if (recording) return
         if (manualAudio == base64Audio) {
             stopVoiceMail()
             return
@@ -142,8 +171,12 @@ class MediaHelper(private val context: Context) {
         playNextRadioNote()
     }
 
+    /** The mic, the siren or any other playback holds the radio queue. */
+    private val radioPlaybackBlocked: Boolean
+        get() = isSirenPlaying || recording || manualAudio != null || mediaPlayer != null
+
     private fun playNextRadioNote() {
-        if (isSirenPlaying || !radioMonitoring || manualAudio != null || mediaPlayer != null) return
+        if (!radioMonitoring || radioPlaybackBlocked) return
         val note = radioQueue.currentOrNext() ?: return
         playAudio(note.audio, isRadio = true)
     }
