@@ -44,4 +44,3 @@ val TextPrimary = Color(0xFFF8F7F5)
 val TextSecondary = Color(0xFFA09E9B)
 
 val WarningAmber = Color(0xFFF59E0B)
-
