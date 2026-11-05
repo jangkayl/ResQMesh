@@ -12,7 +12,7 @@ The current candidate is the October 6 APK `1AE82B6C...`; the user reports F1–
 
 ## Implemented
 
-Behavior and source ownership are in [architecture](architecture.md); accepted policies are in [decisions](decisions.md). The whole-app maintainability decomposition is merged (NativeBleManager keeps a reviewed 743-line facade exception); its evidence is archived in the [October 16 snapshot](../archive/README.md). Home offline grey awaits phone validation.
+Behavior and source ownership are in [architecture](architecture.md); accepted policies are in [decisions](decisions.md). The whole-app maintainability decomposition is merged (NativeBleManager keeps a reviewed 743-line facade exception); its evidence is archived in the [October 16 snapshot](../archive/README.md).
 
 ## Open issues
 
@@ -58,6 +58,8 @@ Block, incident, SOS and recovery: basic user-reported successes; adversarial, l
 **Storage & data** (`feat/storage-data-settings`): [card](testing/storage-data-settings-card.md) pending.
 
 **SOS notification deep link** (`fix/sos-notification-deeplink`): full SOS id kept; [card](testing/sos-notification-deeplink-card.md) pending.
+
+**Home ring colors** (`fix/stale-relay-offline`): [card](testing/home-peer-ring-colors-card.md) pending.
 
 **Image quality** (`feat/image-quality`): user-rated quality good; [card](testing/image-quality-card.md) pending.
 

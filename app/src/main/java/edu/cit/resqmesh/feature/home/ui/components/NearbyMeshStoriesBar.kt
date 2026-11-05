@@ -36,7 +36,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import edu.cit.resqmesh.core.ui.theme.ModernMint
-import edu.cit.resqmesh.core.ui.theme.ModernSky
+import edu.cit.resqmesh.core.ui.theme.RelayOrange
 import edu.cit.resqmesh.core.ui.theme.ResQTheme
 import edu.cit.resqmesh.core.ui.model.NodeItemData
 import edu.cit.resqmesh.core.ui.model.NodeKind
@@ -53,6 +53,34 @@ internal fun homeStoryPeers(nodes: List<NodeItemData>): List<NodeItemData> =
             else -> 0
         }
     }
+
+/** Ring tone for a Home peer, matching the Network screen's link states. */
+internal enum class HomeRingTone { Blocked, Direct, Relayed, Checking, Nearby, Offline }
+
+/**
+ * Only a live direct link is green and only a routed multi-hop peer is orange. Checking/connecting
+ * links are amber, and a peer that is merely visible or has dropped off the mesh is gray, so a
+ * relayed peer that goes offline never keeps the relay color.
+ */
+internal fun homeRingTone(peer: NodeItemData): HomeRingTone = when {
+    peer.isBlocked -> HomeRingTone.Blocked
+    else -> when (peer.kind) {
+        NodeKind.DIRECT -> HomeRingTone.Direct
+        NodeKind.RELAY, NodeKind.HOPPED -> HomeRingTone.Relayed
+        NodeKind.UNRESPONSIVE, NodeKind.HANDSHAKING, NodeKind.SYNCING -> HomeRingTone.Checking
+        NodeKind.DISCOVERED -> HomeRingTone.Nearby
+        NodeKind.OFFLINE, NodeKind.BLOCKED_OFFLINE -> HomeRingTone.Offline
+    }
+}
+
+@Composable
+private fun homeRingColor(tone: HomeRingTone) = when (tone) {
+    HomeRingTone.Blocked -> ResQTheme.colors.sos
+    HomeRingTone.Direct -> ModernMint
+    HomeRingTone.Relayed -> RelayOrange
+    HomeRingTone.Checking -> ResQTheme.colors.warning
+    HomeRingTone.Nearby, HomeRingTone.Offline -> MaterialTheme.colorScheme.onSurfaceVariant
+}
 
 @Composable
 internal fun NearbyMeshStoriesBar(
@@ -173,13 +201,9 @@ internal fun NearbyMeshStoriesBar(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 storyPeers.forEach { peer ->
-                    val isOffline = peer.kind == NodeKind.OFFLINE
-                    val ringColor = when {
-                        peer.isBlocked -> ResQTheme.colors.sos
-                        isOffline -> MaterialTheme.colorScheme.onSurfaceVariant
-                        peer.kind == NodeKind.DIRECT -> ModernMint
-                        else -> ModernSky
-                    }
+                    val tone = homeRingTone(peer)
+                    val isOffline = tone == HomeRingTone.Offline
+                    val ringColor = homeRingColor(tone)
                     val initial = peer.name.firstOrNull()?.uppercase() ?: "P"
 
                     Column(

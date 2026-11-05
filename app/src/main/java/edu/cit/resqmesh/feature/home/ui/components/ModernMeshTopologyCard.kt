@@ -34,7 +34,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import edu.cit.resqmesh.R
 import edu.cit.resqmesh.core.ui.theme.ModernMint
-import edu.cit.resqmesh.core.ui.theme.ModernSky
+import edu.cit.resqmesh.core.ui.theme.RelayOrange
 import edu.cit.resqmesh.core.ui.components.peers.NetworkGraphVisualizer
 import edu.cit.resqmesh.core.ui.peers.classifyRadarNodes
 import edu.cit.resqmesh.core.ui.model.RadarUiState
@@ -133,7 +133,7 @@ internal fun ModernMeshTopologyCard(
                     modifier = Modifier.weight(1f),
                     label = "Relayed",
                     value = "${summary.relayedPeers}",
-                    color = ModernSky
+                    color = RelayOrange
                 )
                 NetworkMetricChip(
                     modifier = Modifier.weight(1f),

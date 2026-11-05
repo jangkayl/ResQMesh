@@ -9,7 +9,7 @@ import edu.cit.resqmesh.R
 import edu.cit.resqmesh.core.model.ChatMessage
 import edu.cit.resqmesh.core.model.NodeIdentity
 import edu.cit.resqmesh.core.ui.theme.ModernMint
-import edu.cit.resqmesh.core.ui.theme.ModernSky
+import edu.cit.resqmesh.core.ui.theme.RelayOrange
 import edu.cit.resqmesh.core.ui.theme.ResQTheme
 import edu.cit.resqmesh.feature.comms.model.ChatUiState
 
@@ -33,7 +33,7 @@ enum class ConversationStatus {
     fun color() = when (this) {
         Direct -> ModernMint
         Checking -> ResQTheme.colors.warning
-        Relayed -> ModernSky
+        Relayed -> RelayOrange
         Offline -> MaterialTheme.colorScheme.onSurfaceVariant
     }
 }
