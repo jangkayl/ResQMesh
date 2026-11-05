@@ -80,4 +80,3 @@ internal class TransferWorld(private val temporary: TemporaryFolder) {
         MeshPayload(id = id, type = "CONVERSATION", conversationKind = "RADIO",
             audioBytes = ByteArray(size) { (it % 251).toByte() }))
 }
-
