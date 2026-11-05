@@ -171,8 +171,12 @@ class MediaHelper(private val context: Context) {
         playNextRadioNote()
     }
 
+    /** The mic, the siren or any other playback holds the radio queue. */
+    private val radioPlaybackBlocked: Boolean
+        get() = isSirenPlaying || recording || manualAudio != null || mediaPlayer != null
+
     private fun playNextRadioNote() {
-        if (isSirenPlaying || recording || !radioMonitoring || manualAudio != null || mediaPlayer != null) return
+        if (!radioMonitoring || radioPlaybackBlocked) return
         val note = radioQueue.currentOrNext() ?: return
         playAudio(note.audio, isRadio = true)
     }
