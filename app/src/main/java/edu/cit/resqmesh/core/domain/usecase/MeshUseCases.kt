@@ -27,6 +27,7 @@ data class MeshUseCases(
     val acceptPendingPublicKeyChange: AcceptPendingPublicKeyChangeUseCase,
     val rejectPendingPublicKeyChange: RejectPendingPublicKeyChangeUseCase,
     val deleteConversationWith: DeleteConversationWithUseCase,
+    val managePrivateSend: ManagePrivateSendUseCase,
     val broadcastSeenReceipt: BroadcastSeenReceiptUseCase,
     val clearSosAlert: ClearSosAlertUseCase,
 
@@ -128,6 +129,12 @@ class DeleteConversationWithUseCase(private val repository: MeshNodeRepository) 
     operator fun invoke(peerName: String) {
         repository.deleteConversationWith(peerName)
     }
+}
+
+/** Local cancel and manual retry of our own unreceipted private sends. */
+class ManagePrivateSendUseCase(private val repository: MeshNodeRepository) {
+    fun cancel(messageId: String) = repository.cancelPrivateSend(messageId)
+    fun retry(messageId: String) = repository.retryPrivateSend(messageId)
 }
 
 class BroadcastSeenReceiptUseCase(private val repository: MeshNodeRepository) {

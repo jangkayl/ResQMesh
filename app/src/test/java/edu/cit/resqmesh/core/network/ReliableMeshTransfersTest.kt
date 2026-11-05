@@ -9,102 +9,35 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
 
+private typealias World = TransferWorld
+private typealias Wire = TransferWire
+
 @OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
 class ReliableMeshTransfersTest {
     @get:Rule val temporary = TemporaryFolder()
-    private data class Wire(val from: String, val to: String, val payload: MeshPayload, val priority: Boolean)
-    private inner class World {
-        var time = 1_000_000L
-        val queue = ArrayDeque<Wire>()
-        val scheduled = mutableListOf<Pair<Long, () -> Unit>>()
-        val nodes = mutableMapOf<String, Node>()
-        val sentPieces = mutableListOf<Pair<String, Int>>()
-        val sent = mutableListOf<Wire>()
-        var completeFrames: (Wire) -> Boolean = { true }
-        var drop: (Wire) -> Boolean = { false }
-        inner class Node(val name: String, val root: File = temporary.newFolder(), var online: Boolean = true) {
-            val arrived = mutableListOf<MeshPayload>()
-            val events = mutableListOf<OutboundFrameEvent.Stage>()
-            val logs = mutableListOf<String>()
-            val progress = mutableListOf<SendProgress>()
-            var autoStore = true
-            var onward: ((ByteArray) -> Unit)? = null
-            var neighbors = setOf<String>()
-            val blockedPeers = mutableSetOf<String>()
-            lateinit var engine: ReliableMeshTransfers
-            init {
-                nodes[name] = this
-                val boot = mutableListOf<() -> Unit>()
-                var starting = true
-                engine = ReliableMeshTransfers(root, { online }, { nodes[it]?.online == true },
-                    execute = { if (starting) boot.add(it) else it() }, schedule = { delay, action -> scheduled.add(time + delay to action) },
-                    send = { peer, bytes, priority, callback ->
-                        val payload = ProtoBuf.decodeFromByteArray<MeshPayload>(bytes).copy(targetNodeId = peer)
-                        if (payload.type == ReliableMeshTransfers.PIECE) {
-                            val piece = ProtoBuf.decodeFromByteArray<TransferPiece>(payload.liveAudioChunk!!)
-                            if (!piece.status) sentPieces.add(name to piece.index)
-                        }
-                        val wire = Wire(name, peer, payload, priority)
-                        queue.add(wire); sent.add(wire)
-                        if (completeFrames(wire)) {
-                            engine.frame(payload, OutboundFrameEvent.Stage.STARTED)
-                            engine.frame(payload, OutboundFrameEvent.Stage.COMPLETED)
-                        }
-                        callback(TransportDispatchResult.ACCEPTED)
-                    }, received = { _, bytes ->
-                        val payload = ProtoBuf.decodeFromByteArray<MeshPayload>(bytes)
-                        arrived.add(payload)
-                        onward?.invoke(bytes)
-                        if (autoStore) engine.stored(payload.targetMessageId.ifBlank { payload.id })
-                    }, response = { _, _ -> logs.add("RECEIPT_REPLAY") },
-                    event = { _, stage, _, _ -> events.add(stage) }, now = { time }, log = { logs.add(it) },
-                    blocked = { it in blockedPeers }, relayPeers = { neighbors },
-                    progress = { _, _, p -> progress.add(p) })
-                starting = false
-                boot.forEach { it() }
-            }
-        }
-        fun pump(limit: Int = 10_000) {
-            var count = 0
-            while (queue.isNotEmpty()) {
-                check(++count <= limit) { "Unbounded transfer loop" }
-                val wire = queue.removeFirst()
-                if (!drop(wire)) nodes[wire.to]?.takeIf { it.online }?.engine?.receive(wire.from, wire.payload)
-            }
-        }
-        fun advance(ms: Long) {
-            time += ms
-            val due = scheduled.filter { it.first <= time }
-            scheduled.removeAll(due.toSet())
-            due.forEach { it.second() }
-        }
-        fun payload(id: String = "note", size: Int = 8192) = ProtoBuf.encodeToByteArray(
-            MeshPayload(id = id, type = "CONVERSATION", conversationKind = "RADIO",
-                audioBytes = ByteArray(size) { (it % 251).toByte() }))
-    }
-
+    private fun world() = World(temporary)
     private val relayMark = "RELAY_ROSTER"
     private fun imageFrame(route: List<String> = listOf("B#B"), id: String = "note") =
         ProtoBuf.encodeToByteArray(MeshPayload(id = id, type = "MESSAGE", senderName = "Origin#A",
             routePath = route, imageBytes = ByteArray(8192)))
-    private fun World.relayed(a: World.Node, b: World.Node) {
+    private fun World.relayed(a: TransferWorld.Node, b: TransferWorld.Node) {
         a.engine.offer("B", imageFrame(emptyList()), false); pump()
         assertEquals(1, b.arrived.size)
     }
     /** B meets C now, and C finishes settling; moving the clock alone leaves held copies for the next wake. */
-    private fun World.settle(b: World.Node, c: World.Node) {
+    private fun World.settle(b: TransferWorld.Node, c: TransferWorld.Node) {
         c.online = true; b.neighbors = setOf("C")
         b.engine.wake("C", reconcile = false)
         time += ReliableMeshTransfers.LATE_RELAY_SETTLE_MS
     }
-    private fun World.holdNotes(a: World.Node, b: World.Node, vararg ids: String) = ids.forEach { id ->
+    private fun World.holdNotes(a: TransferWorld.Node, b: TransferWorld.Node, vararg ids: String) = ids.forEach { id ->
         a.engine.offer("B", imageFrame(emptyList(), id), false); pump()
         b.engine.relayTargets(id, emptySet(), imageFrame(id = id))
         advance(1_000)
     }
 
     @Test fun newNeighborWaitsToSettleBeforeLateForwardingStarts() {
-        val w = World(); val a = w.Node("A"); val b = w.Node("B"); val c = w.Node("C", online = false)
+        val w = world(); val a = w.Node("A"); val b = w.Node("B"); val c = w.Node("C", online = false)
         w.relayed(a, b)
         b.engine.relayTargets("note", emptySet(), imageFrame())
         w.settle(b, c)
@@ -118,7 +51,7 @@ class ReliableMeshTransfersTest {
     }
 
     @Test fun neighborThatDropsSettlesAgain() {
-        val w = World(); val a = w.Node("A"); val b = w.Node("B"); val c = w.Node("C", online = false)
+        val w = world(); val a = w.Node("A"); val b = w.Node("B"); val c = w.Node("C", online = false)
         w.relayed(a, b)
         b.engine.relayTargets("note", emptySet(), imageFrame())
         w.settle(b, c)
@@ -128,7 +61,7 @@ class ReliableMeshTransfersTest {
     }
 
     @Test fun heldCopiesGoOneAtATimeNewestFirst() {
-        val w = World(); val a = w.Node("A"); val b = w.Node("B"); val c = w.Node("C", online = false)
+        val w = world(); val a = w.Node("A"); val b = w.Node("B"); val c = w.Node("C", online = false)
         w.holdNotes(a, b, "oldest", "middle", "newest")
         w.settle(b, c)
         repeat(3) { b.engine.wake("C", reconcile = false); w.pump() }
@@ -136,7 +69,7 @@ class ReliableMeshTransfersTest {
     }
 
     @Test fun onlyOneHeldCopyIsOfferedWhileThePeerIsBusy() {
-        val w = World(); val a = w.Node("A"); val b = w.Node("B"); val c = w.Node("C", online = false)
+        val w = world(); val a = w.Node("A"); val b = w.Node("B"); val c = w.Node("C", online = false)
         w.holdNotes(a, b, "first", "second")
         w.settle(b, c)
         b.engine.wake("C", reconcile = false)
@@ -145,7 +78,7 @@ class ReliableMeshTransfersTest {
     }
 
     @Test fun liveTransferFinishesBeforeARunningLateCopyContinues() {
-        val w = World(); val a = w.Node("A"); val b = w.Node("B"); val c = w.Node("C", online = false)
+        val w = world(); val a = w.Node("A"); val b = w.Node("B"); val c = w.Node("C", online = false)
         w.relayed(a, b)
         b.engine.relayTargets("note", emptySet(), imageFrame())
         w.settle(b, c)
@@ -155,7 +88,7 @@ class ReliableMeshTransfersTest {
     }
 
     @Test fun peerReadyOnlyAfterFirstRelayStillGetsTheImage() {
-        val w = World(); val a = w.Node("A"); val b = w.Node("B"); val c = w.Node("C", online = false)
+        val w = world(); val a = w.Node("A"); val b = w.Node("B"); val c = w.Node("C", online = false)
         w.relayed(a, b)
         assertEquals(emptySet<String>(), b.engine.relayTargets("note", emptySet(), imageFrame()))
         assertFalse(b.engine.hasPendingCustody("note"))
@@ -167,7 +100,7 @@ class ReliableMeshTransfersTest {
     }
 
     @Test fun emptyRosterKeepsTheCopyUntilTheWindowEndsThenReleasesIt() {
-        val w = World(); val a = w.Node("A"); val b = w.Node("B"); val c = w.Node("C", online = false)
+        val w = world(); val a = w.Node("A"); val b = w.Node("B"); val c = w.Node("C", online = false)
         w.relayed(a, b)
         b.engine.relayTargets("note", emptySet(), imageFrame())
         w.advance(ReliableMeshTransfers.RELAY_HOLD_MS - 10_000)
@@ -181,7 +114,7 @@ class ReliableMeshTransfersTest {
     }
 
     @Test fun acceptedPeerSenderAndVisitedPeersAreNeverForwardedAgain() {
-        val w = World(); val a = w.Node("A"); val b = w.Node("B"); val c = w.Node("C"); val d = w.Node("D")
+        val w = world(); val a = w.Node("A"); val b = w.Node("B"); val c = w.Node("C"); val d = w.Node("D")
         c.onward = { c.engine.relayTargets("note", emptySet()) }
         w.relayed(a, b)
         b.engine.relayTargets("note", setOf("C"), imageFrame(listOf("D#D", "B#B")))
@@ -195,14 +128,14 @@ class ReliableMeshTransfersTest {
     }
 
     @Test fun rosterLogRepeatsOnlyWhenTheDecisionChanges() {
-        val w = World(); val a = w.Node("A")
+        val w = world(); val a = w.Node("A")
         repeat(5) { a.engine.logRoster("note", "first", setOf("B"), mapOf("C" to "not_ready")) }
         a.engine.logRoster("note", "first", setOf("B", "C"), emptyMap())
         assertEquals(2, a.logs.count { it.startsWith(relayMark) })
     }
 
     @Test fun senderDisconnectAfterCompletionStillDeliversAndForwards() {
-        val w = World(); val a = w.Node("A"); val b = w.Node("B"); val c = w.Node("C")
+        val w = world(); val a = w.Node("A"); val b = w.Node("B"); val c = w.Node("C")
         b.onward = { bytes -> b.engine.relayTargets("note", setOf("C"), bytes)
             b.engine.offer("C", bytes, false, durableRelay = true) }
         b.autoStore = false
@@ -220,7 +153,7 @@ class ReliableMeshTransfersTest {
     }
 
     @Test fun blockedSenderStaysRefusedUntilTheBlockEnds() {
-        val w = World(); val a = w.Node("A"); val b = w.Node("B")
+        val w = world(); val a = w.Node("A"); val b = w.Node("B")
         b.blockedPeers += "A"
         a.engine.offer("B", imageFrame(emptyList()), false); w.pump()
         a.online = false
@@ -232,7 +165,7 @@ class ReliableMeshTransfersTest {
     }
 
     @Test fun restartKeepsTheLateForwardWindowAndAcceptedPeers() {
-        val w = World(); val a = w.Node("A"); val b = w.Node("B"); val c = w.Node("C")
+        val w = world(); val a = w.Node("A"); val b = w.Node("B"); val c = w.Node("C")
         val d = w.Node("D", online = false)
         w.relayed(a, b)
         b.engine.relayTargets("note", setOf("C"), imageFrame())
@@ -250,7 +183,7 @@ class ReliableMeshTransfersTest {
     }
 
     @Test fun piecesReassembleExactlyAndCustodyDoesNotInventDeliveryReceipt() {
-        val w = World(); val a = w.Node("A"); val b = w.Node("B")
+        val w = world(); val a = w.Node("A"); val b = w.Node("B")
         assertTrue(a.engine.offer("B", w.payload(), false).accepted)
         w.pump()
         assertEquals(1, b.arrived.size)
@@ -260,7 +193,7 @@ class ReliableMeshTransfersTest {
     }
 
     @Test fun trackedMessageStateStaysBoundedUnderPayloadIdChurn() {
-        val w = World(); val a = w.Node("A")
+        val w = world(); val a = w.Node("A")
         repeat(3000) { a.engine.relayTargets("payload$it", setOf("B")) }
         // The oldest rosters were evicted, so the first id is recomputed from the current roster.
         assertEquals(setOf("C"), a.engine.relayTargets("payload0", setOf("C")))
@@ -268,7 +201,7 @@ class ReliableMeshTransfersTest {
     }
 
     @Test fun flooderCannotOpenMoreInboundTransfersThanItsShare() {
-        val w = World(); val b = w.Node("B")
+        val w = world(); val b = w.Node("B")
         repeat(40) { n ->
             val id = n.toString(16).padStart(64, '0')
             val piece = TransferPiece(id, id, 2048, 0, ByteArray(1024))
@@ -281,7 +214,7 @@ class ReliableMeshTransfersTest {
     }
 
     @Test fun freshTransferAndFirstReadinessSendDataWithoutAStatusRoundTrip() {
-        val w = World(); val a = w.Node("A"); val b = w.Node("B", online = false)
+        val w = world(); val a = w.Node("A"); val b = w.Node("B", online = false)
         a.engine.offer("B", w.payload(), false)
         assertTrue(w.queue.isEmpty())
         b.online = true
@@ -292,7 +225,7 @@ class ReliableMeshTransfersTest {
     }
 
     @Test fun queuedProbeDoesNotRetryEarlyAndDelayedReplySurvivesRetry() {
-        val w = World(); val a = w.Node("A"); val b = w.Node("B")
+        val w = world(); val a = w.Node("A"); val b = w.Node("B")
         a.engine.offer("B", w.payload(), false)
         w.queue.clear()
         w.completeFrames = { false }
@@ -316,7 +249,7 @@ class ReliableMeshTransfersTest {
     }
 
     @Test fun missingProbeCallbacksStillHaveABoundedQueueWait() {
-        val w = World(); val a = w.Node("A"); w.Node("B")
+        val w = world(); val a = w.Node("A"); w.Node("B")
         a.engine.offer("B", w.payload(), false, durableRelay = true)
         w.queue.clear(); w.sent.clear()
         w.completeFrames = { false }
@@ -330,7 +263,7 @@ class ReliableMeshTransfersTest {
     }
 
     @Test fun lateCompletionOfAnOlderProbeDoesNotShortenTheRetryQueueDeadline() {
-        val w = World(); val a = w.Node("A"); w.Node("B")
+        val w = world(); val a = w.Node("A"); w.Node("B")
         a.engine.offer("B", w.payload(), false, durableRelay = true)
         w.queue.clear()
         w.completeFrames = { false }
@@ -349,7 +282,7 @@ class ReliableMeshTransfersTest {
     }
 
     @Test fun aSecondNoteGetsAFreedSlotBeforeTheOlderNoteCompletes() {
-        val w = World(); val a = w.Node("A"); val b = w.Node("B")
+        val w = world(); val a = w.Node("A"); val b = w.Node("B")
         val held = mutableListOf<Wire>()
         w.drop = { wire -> (wire.payload.type == ReliableMeshTransfers.ACK).also { if (it) held.add(wire) } }
         a.engine.offer("B", w.payload("long", 32_000), false); w.pump()
@@ -365,7 +298,7 @@ class ReliableMeshTransfersTest {
     }
 
     @Test fun staleStatusResponseCannotReplaceTheCurrentReconnectQuery() {
-        val w = World(); val a = w.Node("A"); val b = w.Node("B")
+        val w = world(); val a = w.Node("A"); val b = w.Node("B")
         a.engine.offer("B", w.payload(), false)
         w.queue.clear()
         a.engine.wake("B")
@@ -382,7 +315,7 @@ class ReliableMeshTransfersTest {
     }
 
     @Test fun latePieceFailureDoesNotExtendTheNewRetryDeadline() {
-        val w = World(); val a = w.Node("A"); w.Node("B")
+        val w = world(); val a = w.Node("A"); w.Node("B")
         a.engine.offer("B", w.payload(size = 500), false)
         val old = w.queue.removeFirst()
         w.advance(3_300)
@@ -396,7 +329,7 @@ class ReliableMeshTransfersTest {
     }
 
     @Test fun noMoreThanFourPiecesAreOutstandingToOneNeighbor() {
-        val w = World(); val a = w.Node("A"); w.Node("B")
+        val w = world(); val a = w.Node("A"); w.Node("B")
         a.engine.offer("B", w.payload(size = 16_000), false)
         w.pump()
         // Start another note, drop all data ACKs, and allow the timer to fill the window.
@@ -410,7 +343,7 @@ class ReliableMeshTransfersTest {
     }
 
     @Test fun silentPeerOnReadyLinkIsReprobedWithoutReconnect() {
-        val w = World(); val a = w.Node("A"); val b = w.Node("B")
+        val w = world(); val a = w.Node("A"); val b = w.Node("B")
         fun isStatus(wire: Wire) = wire.payload.type == ReliableMeshTransfers.PIECE &&
             ProtoBuf.decodeFromByteArray<TransferPiece>(wire.payload.liveAudioChunk!!).status
         // Pieces reach B, but every data ACK back to A is lost while the link stays ready.
@@ -430,7 +363,7 @@ class ReliableMeshTransfersTest {
     }
 
     @Test fun senderProgressCountsAcknowledgedPiecesUpToHopCustody() {
-        val w = World(); val a = w.Node("A"); val b = w.Node("B", online = false)
+        val w = world(); val a = w.Node("A"); val b = w.Node("B", online = false)
         a.engine.offer("B", w.payload(size = 8192), false)
         assertEquals(SendProgress.State.QUEUED, a.progress.single().state)
         b.online = true
@@ -446,14 +379,14 @@ class ReliableMeshTransfersTest {
     }
 
     @Test fun answeringPeerIsNotReprobed() {
-        val w = World(); val a = w.Node("A"); w.Node("B")
+        val w = world(); val a = w.Node("A"); w.Node("B")
         a.engine.offer("B", w.payload(size = 64_000), false)
         repeat(200) { w.advance(100); w.pump() }
         assertTrue(a.logs.none { it.startsWith("TRANSFER_REPROBE") })
     }
 
     @Test fun receiverRestartKeepsPiecesAndReconnectSendsOnlyMissingIndices() {
-        val w = World(); val a = w.Node("A"); val b = w.Node("B")
+        val w = world(); val a = w.Node("A"); val b = w.Node("B")
         val held = mutableListOf<Wire>()
         w.drop = { wire ->
             if (wire.payload.type != ReliableMeshTransfers.PIECE) false else {
@@ -472,7 +405,7 @@ class ReliableMeshTransfersTest {
     }
 
     @Test fun senderRestartQueriesReceiverInsteadOfResendingAcknowledgedPieces() {
-        val w = World(); val a = w.Node("A"); w.Node("B")
+        val w = world(); val a = w.Node("A"); w.Node("B")
         w.drop = { wire -> wire.payload.type == ReliableMeshTransfers.PIECE &&
             ProtoBuf.decodeFromByteArray<TransferPiece>(wire.payload.liveAudioChunk!!).let { !it.status && it.index >= 2 } }
         a.engine.offer("B", w.payload(), false, durableRelay = true); w.pump()
@@ -485,7 +418,7 @@ class ReliableMeshTransfersTest {
     }
 
     @Test fun relayCustodySurvivesLongOutageAndManagerRestart() {
-        val w = World(); val a = w.Node("A"); val b = w.Node("B", online = false)
+        val w = world(); val a = w.Node("A"); val b = w.Node("B", online = false)
         a.engine.offer("B", w.payload(), false, durableRelay = true)
         w.advance(120_000); w.pump()
         assertFalse(a.events.contains(OutboundFrameEvent.Stage.FAILED))
@@ -496,14 +429,14 @@ class ReliableMeshTransfersTest {
     }
 
     @Test fun ordinaryQueueStillExpiresWhenNoWireStarts() {
-        val w = World(); val a = w.Node("A"); w.Node("B", online = false)
+        val w = world(); val a = w.Node("A"); w.Node("B", online = false)
         a.engine.offer("B", w.payload(), false)
         w.advance(30_000); w.pump()
         assertEquals(OutboundFrameEvent.Stage.FAILED, a.events.last())
     }
 
     @Test fun custodyExpiresExplicitlyAfterTwentyFourHours() {
-        val w = World(); val a = w.Node("A"); w.Node("B", online = false)
+        val w = world(); val a = w.Node("A"); w.Node("B", online = false)
         a.engine.offer("B", w.payload(), false, durableRelay = true)
         w.advance(ReliableMeshTransfers.RETENTION_MS); w.pump()
         assertEquals(OutboundFrameEvent.Stage.FAILED, a.events.last())
@@ -511,7 +444,7 @@ class ReliableMeshTransfersTest {
     }
 
     @Test fun corruptPieceCannotCompleteAudioAndResetCanRepairIt() {
-        val w = World(); val a = w.Node("A"); val b = w.Node("B")
+        val w = world(); val a = w.Node("A"); val b = w.Node("B")
         var corrupted = false
         w.drop = { wire ->
             if (!corrupted && wire.payload.type == ReliableMeshTransfers.PIECE) {
@@ -528,10 +461,15 @@ class ReliableMeshTransfersTest {
         assertTrue(b.logs.contains("TRANSFER_HASH_FAILED"))
         assertEquals(1, b.arrived.size)
         assertTrue(a.events.contains(OutboundFrameEvent.Stage.COMPLETED))
+        // Only this explicit reset may lower the shown count, and it is flagged as a restart.
+        val shown = a.progress.map { it.acked }
+        val drop = shown.zipWithNext().indexOfFirst { (before, after) -> after < before }
+        assertTrue(drop < 0 || a.progress[drop + 1].restarted)
+        assertTrue(a.progress.last().restarted)
     }
 
     @Test fun duplicateCommittedTransferDoesNotPresentSecondNote() {
-        val w = World(); val a = w.Node("A"); val b = w.Node("B")
+        val w = world(); val a = w.Node("A"); val b = w.Node("B")
         val bytes = w.payload()
         a.engine.offer("B", bytes, false); w.pump()
         a.engine.offer("B", bytes, false); w.pump()
@@ -540,7 +478,7 @@ class ReliableMeshTransfersTest {
     }
 
     @Test fun incompleteApplicationCommitIsReplayedAfterReceiverRestart() {
-        val w = World(); val a = w.Node("A"); val b = w.Node("B")
+        val w = world(); val a = w.Node("A"); val b = w.Node("B")
         b.autoStore = false
         a.engine.offer("B", w.payload(), false); w.pump()
         assertEquals(1, b.arrived.size)
@@ -551,7 +489,7 @@ class ReliableMeshTransfersTest {
     }
 
     @Test fun storedPrivateReceiptCanBeReplayedOnDuplicateTransfer() {
-        val w = World(); val a = w.Node("A"); val b = w.Node("B")
+        val w = world(); val a = w.Node("A"); val b = w.Node("B")
         val bytes = w.payload()
         a.engine.offer("B", bytes, false); w.pump()
         b.engine.stored("note", ProtoBuf.encodeToByteArray(MeshPayload(id = "receipt", type = "DELIVERED")))
@@ -560,7 +498,7 @@ class ReliableMeshTransfersTest {
     }
 
     @Test fun wrongPeerAckCannotReleaseCustody() {
-        val w = World(); val a = w.Node("A"); w.Node("B")
+        val w = world(); val a = w.Node("A"); w.Node("B")
         val bytes = w.payload()
         val id = TransferJournal.hash(bytes)
         w.drop = { true }
@@ -571,7 +509,7 @@ class ReliableMeshTransfersTest {
     }
 
     @Test fun publicForwardingRosterAndAcceptedPeersSurviveRelayRestart() {
-        val w = World(); val a = w.Node("A"); val b = w.Node("B")
+        val w = world(); val a = w.Node("A"); val b = w.Node("B")
         w.Node("C", online = false); w.Node("D", online = false)
         b.autoStore = false
         val bytes = w.payload()
@@ -591,7 +529,7 @@ class ReliableMeshTransfersTest {
     }
 
     @Test fun twoRelayPathCompletesWithoutSkippingCustody() {
-        val w = World(); val a = w.Node("A"); val b = w.Node("B"); val c = w.Node("C"); val d = w.Node("D")
+        val w = world(); val a = w.Node("A"); val b = w.Node("B"); val c = w.Node("C"); val d = w.Node("D")
         b.autoStore = false; c.autoStore = false
         b.onward = { b.engine.offer("C", it, false, durableRelay = true) }
         c.onward = { c.engine.offer("D", it, false, durableRelay = true) }
@@ -603,7 +541,7 @@ class ReliableMeshTransfersTest {
     }
 
     @Test fun receiverStorageFailureNeverAcknowledgesCompleteCustody() {
-        val w = World(); val a = w.Node("A"); val b = w.Node("B", temporary.newFile())
+        val w = world(); val a = w.Node("A"); val b = w.Node("B", temporary.newFile())
         a.engine.offer("B", w.payload(), false); w.pump()
         assertTrue(b.logs.any { it == "TRANSFER_STORAGE_FAILED direction=inbound" })
         assertTrue(b.arrived.isEmpty())
@@ -611,7 +549,7 @@ class ReliableMeshTransfersTest {
     }
 
     @Test fun applicationCommitBeforeLastRelayCommitReleasesCustodyWhenThatRelayCommits() {
-        val w = World(); val a = w.Node("A"); val b = w.Node("B")
+        val w = world(); val a = w.Node("A"); val b = w.Node("B")
         w.Node("C", online = false); b.autoStore = false
         val bytes = w.payload()
         a.engine.offer("B", bytes, false); w.pump()
@@ -624,7 +562,7 @@ class ReliableMeshTransfersTest {
     }
 
     @Test fun legacyRelayCompletionReleasesStoredNoteWithoutInventingRecipientReceipt() {
-        val w = World(); val a = w.Node("A"); val b = w.Node("B")
+        val w = world(); val a = w.Node("A"); val b = w.Node("B")
         b.autoStore = false
         val bytes = w.payload()
         a.engine.offer("B", bytes, false); w.pump()
@@ -637,7 +575,7 @@ class ReliableMeshTransfersTest {
     }
 
     @Test fun retainedTransferExpiresWhileNodeRemainsOffline() {
-        val w = World(); val a = w.Node("A"); w.Node("B", online = false)
+        val w = world(); val a = w.Node("A"); w.Node("B", online = false)
         a.engine.offer("B", w.payload(), false, durableRelay = true)
         a.online = false; a.engine.pause()
         w.advance(100); w.advance(ReliableMeshTransfers.RETENTION_MS)
@@ -647,7 +585,7 @@ class ReliableMeshTransfersTest {
     }
 
     @Test fun fastRoomCommitCannotReleasePublicCustodyBeforeRelayRosterExists() {
-        val w = World(); val a = w.Node("A"); val b = w.Node("B")
+        val w = world(); val a = w.Node("A"); val b = w.Node("B")
         w.Node("C", online = false)
         val bytes = ProtoBuf.encodeToByteArray(MeshPayload(id = "note", type = "MESSAGE", imageBytes = ByteArray(8192)))
         a.engine.offer("B", bytes, false); w.pump()
@@ -661,7 +599,7 @@ class ReliableMeshTransfersTest {
     }
 
     @Test fun duplicateBroadcastFromDifferentPathReusesCommittedOnwardRoster() {
-        val w = World(); val a = w.Node("A"); val b = w.Node("B")
+        val w = world(); val a = w.Node("A"); val b = w.Node("B")
         w.Node("C", online = false)
         val payload = MeshPayload(id = "note", type = "MESSAGE", imageBytes = ByteArray(8192))
         val bytes = ProtoBuf.encodeToByteArray(payload)

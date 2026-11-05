@@ -7,6 +7,9 @@ class NativeBleGateway(private val manager: NativeBleManager) : MeshNetworkGatew
     override val reportsOutboundProgress = true
     override var onOutboundFrame by manager::onOutboundFrame
     override fun hasPendingTransfer(messageId: String) = manager.hasPendingTransfer(messageId)
+    override fun releaseStrandedTransfer(messageId: String, minAwayMs: Long) =
+        manager.releaseStrandedTransfer(messageId, minAwayMs)
+    override fun cancelOutboundTransfer(messageId: String) = manager.cancelOutboundTransfer(messageId)
     override fun hasPendingCustody(payloadId: String) = manager.hasPendingCustody(payloadId)
     override fun markPayloadStored(messageId: String) = manager.markPayloadStored(messageId)
     override fun preferredEndpointForPeer(nodeId: String) = manager.preferredEndpointForPeer(nodeId)

@@ -110,4 +110,28 @@ class TransferJournalTest {
         assertEquals(1, reopened.recoveryFailures)
         assertTrue(reopened.snapshot(false).isEmpty())
     }
+
+    /** The record layout before the origin flag; protobuf field numbers follow declaration order. */
+    @kotlinx.serialization.Serializable
+    private data class LegacyRecord(
+        val peer: String, val id: String, val digest: String, val size: Int,
+        val outgoing: Boolean, val payloadId: String, val messageId: String,
+        val priority: Boolean, val expiresAt: Long, val durableRelay: Boolean = false
+    )
+
+    @OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
+    @Test fun recordWrittenBeforeTheOriginFlagStillLoadsAsNonOrigin() {
+        val root = temporary.newFolder()
+        val legacy = LegacyRecord("peer", "legacy", "digest", 1024, true, "message", "message", false, 100_000, true)
+        val directory = java.io.File(root, TransferJournal.hash("true|peer|legacy".toByteArray())).apply { mkdirs() }
+        java.io.File(directory, "record").writeBytes(
+            kotlinx.serialization.protobuf.ProtoBuf.encodeToByteArray(LegacyRecord.serializer(), legacy))
+        val journal = TransferJournal(root) { 1000 }
+        assertEquals(0, journal.recoveryFailures)
+        val loaded = journal.snapshot(true).single()
+        assertTrue(loaded.durableRelay)
+        assertFalse(loaded.origin)
+        journal.create(record(id = "mine", outgoing = true).copy(origin = true))
+        assertTrue(TransferJournal(root) { 1000 }.find("peer", "mine", true)!!.origin)
+    }
 }

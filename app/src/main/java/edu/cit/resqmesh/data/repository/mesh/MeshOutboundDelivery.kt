@@ -9,6 +9,7 @@ import edu.cit.resqmesh.core.network.BroadcastDispatchResult
 import edu.cit.resqmesh.core.network.OutboundFrameEvent
 import edu.cit.resqmesh.core.network.TransportDispatchResult
 import edu.cit.resqmesh.core.network.MeshNetworkGateway
+import edu.cit.resqmesh.core.network.SendProgressBoard
 import edu.cit.resqmesh.core.logging.AppLogger
 import edu.cit.resqmesh.core.logging.trace.TraceDir
 import edu.cit.resqmesh.core.logging.trace.TraceDropReason
@@ -36,6 +37,7 @@ import edu.cit.resqmesh.data.repository.PrivateDeliveryPlanner
 import edu.cit.resqmesh.data.repository.mesh.MeshDeliveryConstants.OUTBOX_RETRY_BACKOFF_MS
 import edu.cit.resqmesh.data.repository.mesh.MeshDeliveryConstants.OUTBOX_EXPIRY_MS
 import edu.cit.resqmesh.data.repository.mesh.MeshDeliveryConstants.MIN_BUDGET_RETRY_MS
+import edu.cit.resqmesh.data.repository.mesh.MeshDeliveryConstants.STRANDED_ORIGIN_MS
 
 /** The user-authored part of an outgoing chat message. */
 internal data class OutgoingContent(
@@ -81,7 +83,15 @@ internal class MeshOutboundDelivery(
     // First sends were already charged by the ViewModel gate, so their first dispatch is exempt even when it
     // happens later from the outbox. Everything else (receipt retries, recovered rows) is charged per dispatch.
     private val prepaid = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
-    private val receipts = PrivateReceiptWatch(networkManager, messageStore, repositoryScope, ::scheduleOutboxFlush)
+    private val receipts = PrivateReceiptWatch(networkManager, messageStore, repositoryScope, ::scheduleOutboxFlush,
+        routeNow = ::currentPrivateRoute)
+
+    /** The route a fresh transmission of [messageId] would take now, from its stored recipient. */
+    private suspend fun currentPrivateRoute(messageId: String): List<String>? {
+        val target = messageStore.privateTargetOf(messageId)?.let(::currentPeerName) ?: return null
+        val ready = readyConnectedDevices()
+        return if (ready.isEmpty()) emptyList() else meshRouter.findShortestPath(myNodeName, target, ready)
+    }
 
     /** What one outbox pass decided about retrying. */
     private class OutboxPass {
@@ -180,10 +190,11 @@ internal class MeshOutboundDelivery(
     }
 
     private suspend fun retryPrivate(message: ChatMessage, targetName: String, readyDevices: List<ConnectedDevice>, pass: OutboxPass) {
+        val currentTarget = currentPeerName(targetName)
+        releaseIfStranded(message.id, currentTarget, readyDevices)
         // The transport journal already owns this note; do not create a fresh competing
         // transmission simply because a peer disappeared during its chunk transfer.
         if (networkManager.hasPendingTransfer(message.id)) return
-        val currentTarget = currentPeerName(targetName)
         // A saved pending row must not bypass the same key-change refusal as a new send.
         if (publicKeys.hasPendingChange(currentTarget)) return
         val targetPubKey = publicKeys.trustedKey(currentTarget) ?: return
@@ -208,7 +219,9 @@ internal class MeshOutboundDelivery(
 
         val delivery = PrivateDeliveryPlanner.select(currentTarget, directedRouteList, readyDevices)
         val transmission = runCatching { ProtoBuf.decodeFromByteArray<MeshPayload>(payloadBytes).id }.getOrNull()
-        if (transmission != null) receipts.beginTransfer(message.id, transmission, directedRouteList.size - 1)
+        if (transmission != null) {
+            receipts.beginTransfer(message.id, transmission, directedRouteList, message.hasMedia())
+        }
         val dispatchResult = when (delivery) {
             is PrivateDeliveryPlanner.Target.Endpoint -> {
                 if (admitDispatch(message.id)) {
@@ -227,6 +240,50 @@ internal class MeshOutboundDelivery(
         } else {
             receipts.abandonTransfer(message.id)
             if (dispatchResult != null) pass.retryRejectedDispatch = true
+        }
+    }
+
+    /**
+     * An origin flight pinned to a first hop that has been gone for [STRANDED_ORIGIN_MS] only blocks the message
+     * when a different usable route exists now; then the transport retires it so a fresh copy can take that route.
+     */
+    private fun releaseIfStranded(messageId: String, target: String, readyDevices: List<ConnectedDevice>) {
+        if (!networkManager.hasPendingTransfer(messageId)) return
+        val sent = receipts.sentRoute(messageId)
+        val route = meshRouter.findShortestPath(myNodeName, target, readyDevices)
+        if (route.isEmpty() || route == sent) return
+        if (networkManager.releaseStrandedTransfer(messageId, STRANDED_ORIGIN_MS)) {
+            AppLogger.d("MeshNetwork_E2EE", "PRIVATE_REROUTE message=$messageId stranded first hop released")
+        }
+    }
+
+    private fun ChatMessage.hasMedia() = imageBase64 != null || audioBase64 != null
+
+    /**
+     * Local cancel of our own unreceipted private message: stops our first-hop upload and removes the bubble.
+     * There is no wire recall, so a copy already in a relay's custody may still arrive.
+     */
+    fun cancelPrivate(messageId: String) {
+        repositoryScope.launch {
+            outboxMutex.withLock {
+                if (!messageStore.deleteOwnUnreceiptedPrivate(messageId)) return@withLock
+                networkManager.cancelOutboundTransfer(messageId)
+                receipts.forget(messageId)
+                prepaid.remove(messageId)
+                SendProgressBoard.remove(messageId)
+                AppLogger.d("MeshNetwork_E2EE", "PRIVATE_CANCELLED message=$messageId")
+            }
+        }
+    }
+
+    /** Puts a FAILED private message back in the outbox with a fresh attempt budget. */
+    fun retryFailed(messageId: String) {
+        repositoryScope.launch {
+            outboxMutex.withLock {
+                messageStore.markPending(messageId)
+                receipts.resetAttempts(messageId)
+            }
+            scheduleOutboxFlush()
         }
     }
 
@@ -417,7 +474,7 @@ internal class MeshOutboundDelivery(
         messageStore.save(message, targetName = currentTarget)
         messageStore.markPending(msgId)
         AppLogger.d("MeshNetwork_E2EE", "PRIVATE_PERSISTED message=$msgId elapsedMs=${android.os.SystemClock.elapsedRealtime()}")
-        receipts.beginTransfer(msgId, msgId, hops)
+        receipts.beginTransfer(msgId, msgId, message.outboundRoute, message.hasMedia())
         val dispatchResult = when (delivery) {
             is PrivateDeliveryPlanner.Target.Endpoint -> {
                 AppLogger.d("MeshNetwork_E2EE", "Private route selected with $hops hop(s)")

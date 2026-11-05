@@ -24,7 +24,11 @@ internal data class TransferRecord(
     val relayHoldUntil: Long = 0L, val relayHoldBytes: Int = 0,
     val relayVisited: List<String> = emptyList(),
     /** An outgoing copy sent from a late-forward hold; it yields the link to live transfers. */
-    val lateRelay: Boolean = false
+    val lateRelay: Boolean = false,
+    /** Our own first-hop send (not relay custody); defaulted so older journal records still decode. */
+    val origin: Boolean = false,
+    /** When this record was first created; zero in records written before it existed. */
+    val createdAt: Long = 0L
 )
 
 /** App-private, backup-excluded custody. Caller serializes IO on one worker, never the UI thread. */

@@ -81,6 +81,7 @@ class KoinModulesVerifyTest {
                 AcceptPendingPublicKeyChangeUseCase::class,
                 RejectPendingPublicKeyChangeUseCase::class,
                 DeleteConversationWithUseCase::class,
+                ManagePrivateSendUseCase::class,
                 BroadcastSeenReceiptUseCase::class,
                 ClearSosAlertUseCase::class,
                 ObserveConnectionStatusUseCase::class,

@@ -62,6 +62,8 @@ class MeshNodeRepositoryAdapter(private val repository: MeshRepository) : MeshNo
     override fun acceptPendingPublicKeyChange(peerName: String) = repository.acceptPendingPublicKeyChange(peerName)
     override fun rejectPendingPublicKeyChange(peerName: String) = repository.rejectPendingPublicKeyChange(peerName)
     override fun deleteConversationWith(peerName: String) = repository.deleteConversationWith(peerName)
+    override fun cancelPrivateSend(messageId: String) = repository.cancelPrivateSend(messageId)
+    override fun retryPrivateSend(messageId: String) = repository.retryPrivateSend(messageId)
     override fun broadcastSeenReceipt(messageId: String, isPrivate: Boolean, targetName: String?) =
         repository.broadcastSeenReceipt(messageId, isPrivate, targetName)
     override fun clearSosAlert() = repository.clearSosAlert()

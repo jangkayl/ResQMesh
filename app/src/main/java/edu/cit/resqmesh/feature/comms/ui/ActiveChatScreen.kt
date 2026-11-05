@@ -2,11 +2,13 @@ package edu.cit.resqmesh.feature.comms.ui
 
 import edu.cit.resqmesh.feature.comms.ui.privatechat.PrivateChatHeader as PrivateChatHeaderSection
 import edu.cit.resqmesh.feature.comms.ui.privatechat.PrivateMessageBubble
+import edu.cit.resqmesh.feature.comms.ui.privatechat.PrivateSendActions
 import edu.cit.resqmesh.feature.comms.ui.privatechat.deliveryFeedback as deliveryFeedbackSection
 import edu.cit.resqmesh.feature.comms.ui.privatechat.deliveryLabel as deliveryLabelSection
 import edu.cit.resqmesh.feature.comms.ui.privatechat.messageTime as messageTimeSection
 import edu.cit.resqmesh.feature.comms.ui.privatechat.DeleteConversationDialog
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -237,15 +239,23 @@ fun ActiveChatScreen(
                                 viewModel.markMessageAsSeen(message.id, isPrivate = true, targetId = name)
                             }
                         }
-                        PrivateMessageBubble(
-                            message = message,
-                            mediaHelper = mediaHelper,
-                            onViewMap = { latitude, longitude ->
-                                onViewMap(latitude, longitude, message.senderName, message.text)
-                            },
-                            onReplyClick = { replyingToMessage = it },
-                            transferProgress = transfers[message.id]
-                        )
+                        Column {
+                            PrivateMessageBubble(
+                                message = message,
+                                mediaHelper = mediaHelper,
+                                onViewMap = { latitude, longitude ->
+                                    onViewMap(latitude, longitude, message.senderName, message.text)
+                                },
+                                onReplyClick = { replyingToMessage = it },
+                                transferProgress = transfers[message.id]
+                            )
+                            if (message.isMine) PrivateSendActions(
+                                message = message,
+                                progress = transfers[message.id],
+                                onCancel = { viewModel.cancelPrivateSend(it.id) },
+                                onRetry = { viewModel.retryPrivateSend(it.id) }
+                            )
+                        }
                     }
                 }
             }

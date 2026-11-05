@@ -27,7 +27,8 @@ internal fun MeshPayload.relayVisited(): Set<String> =
 
 /** Hop custody is separate from recipient delivery. All state and disk work run on one IO worker. */
 @OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
-@Suppress("LongParameterList")
+// LargeClass: custody, scheduling and journal recovery share worker-owned state; a split is follow-up work.
+@Suppress("LongParameterList", "LargeClass")
 internal class ReliableMeshTransfers(
     root: File,
     private val active: () -> Boolean,
@@ -60,6 +61,7 @@ internal class ReliableMeshTransfers(
     private val lateRelayPeersSince = mutableMapOf<String, Long>()
     private var lastRelayPass = 0L
     private val outgoingMessages = BoundedLruMap<String, String>(MAX_TRACKED_MESSAGES)
+    private val origins = OriginRegistry()
     private var timer = false
     @Volatile var busy = false
         private set
@@ -83,6 +85,37 @@ internal class ReliableMeshTransfers(
     fun hasOutboundTo(peer: String) = outgoingMessages.keys().any { it.startsWith("$peer:") }
     fun hasRelayHold(payloadId: String) = payloadId in relayHolds
     fun alreadyForwarded(payloadId: String, peer: String) = forwardedPeers[payloadId]?.contains(peer) == true
+
+    /**
+     * Retires our own first-hop flight of [messageId] whose peer has been not-ready for [minAwayMs], so the
+     * sender may route a fresh copy elsewhere. Relay custody is never touched. The decision and reservation
+     * release are synchronous (so [hasOutbound] turns false at once); the journal work follows on the worker.
+     */
+    @Synchronized fun releaseStranded(messageId: String, minAwayMs: Long): Boolean =
+        retireOrigins("TRANSFER_STRANDED", origins.strandedKeys(messageId, now(), minAwayMs))
+
+    /** Retires our own first-hop flights of [messageId] and their journal records; relay custody stays. */
+    @Synchronized fun cancelOutbound(messageId: String): Boolean =
+        retireOrigins("TRANSFER_CANCELLED", origins.keysOf(messageId))
+
+    private fun retireOrigins(marker: String, keys: Set<String>): Boolean {
+        if (keys.isEmpty()) return false
+        keys.forEach(::releaseReservation)
+        execute { keys.forEach { key ->
+            val flight = flights[key] ?: return@forEach
+            log("$marker transfer=${flight.record.id.take(12)} peer=${flight.record.peer}")
+            finishFlight(flight, false)
+        } }
+        return true
+    }
+
+    /** Tracks how long the peer of a flight has been away; origin entries are mirrored for synchronous callers. */
+    private fun markReadiness(flight: TransferFlight, at: Long, ready: Boolean) {
+        val since = if (ready) 0L else flight.notReadySince.takeIf { it > 0 } ?: at
+        if (since == flight.notReadySince) return
+        flight.notReadySince = since
+        origins.awaySince(flight.key, since)
+    }
 
     /** Emits only when the decision changes, so custody redelivery cannot flood the log. */
     fun logRoster(payloadId: String, event: String, chosen: Set<String>, skipped: Map<String, String>) {
@@ -175,7 +208,7 @@ internal class ReliableMeshTransfers(
     private fun logRelayEvent(payloadId: String, event: String) =
         log("RELAY_ROSTER payload=${payloadId.take(MAX_LOG_ID)} event=$event")
 
-    @Synchronized fun offer(peer: String, bytes: ByteArray, priority: Boolean, durableRelay: Boolean = false, lateRelay: Boolean = false): TransportDispatchResult {
+    @Synchronized fun offer(peer: String, bytes: ByteArray, priority: Boolean, durableRelay: Boolean = false, lateRelay: Boolean = false, origin: Boolean = false): TransportDispatchResult {
         if (peer.isBlank() || bytes.size !in 1..TransferJournal.MAX_BYTES) return TransportDispatchResult.REJECTED_INVALID_FRAME
         val payload = runCatching { ProtoBuf.decodeFromByteArray<MeshPayload>(bytes) }.getOrNull()
             ?: return TransportDispatchResult.REJECTED_INVALID_FRAME
@@ -192,13 +225,14 @@ internal class ReliableMeshTransfers(
         }
         reserved[key] = bytes.size
         outgoingMessages[key] = payload.targetMessageId.ifBlank { payload.id }
+        if (origin) origins.register(key, payload.targetMessageId.ifBlank { payload.id })
         execute {
             var committed = false
             try {
                 val record = TransferRecord(peer, id, id, bytes.size, true, payload.id,
                     payload.targetMessageId.ifBlank { payload.id }, priority,
                     now() + if (durableRelay) RETENTION_MS else NON_DURABLE_RETENTION_MS, durableRelay,
-                    lateRelay = lateRelay)
+                    lateRelay = lateRelay, origin = origin, createdAt = now())
                 val existing = journal.find(peer, id, true)
                 if (!journal.create(record, bytes)) {
                     if (durableRelay) relayFailures.add(peer to payload.id)
@@ -207,8 +241,11 @@ internal class ReliableMeshTransfers(
                     traceFailure(peer, id, TraceDir.OUT, bytes.size, TraceDropReason.TRANSFER_OVERFLOW)
                     return@execute
                 }
-                flights.putIfAbsent(key, TransferFlight(journal.find(peer, id, true)!!, bytes,
-                    queuedAt = now(), queried = existing == null))
+                val committedRecord = journal.find(peer, id, true)!!
+                flights.putIfAbsent(key, TransferFlight(committedRecord, bytes, queuedAt = now(),
+                    queried = existing == null, createdAt = committedRecord.creationOrder()))
+                // Only a committed replacement retires the older copy; a late catch-up copy never displaces live work.
+                if (!lateRelay) supersede(peer, id, record.messageId)
                 flights[key]?.let { report(it, SendProgress.State.QUEUED) }
                 committed = true
                 relayFailures.remove(peer to payload.id)
@@ -290,6 +327,8 @@ internal class ReliableMeshTransfers(
         flight.progressAt = now()
         if (packet.reset) {
             flight.queried = true; flight.waitingStatus = false
+            // Only an explicit receiver reset may move the shown bar back, and the bubble says it restarted.
+            flight.restarted = true; flight.shownAcked = 0
             flight.clearProgress(); runTransferCycle()
             return
         }
@@ -415,14 +454,16 @@ internal class ReliableMeshTransfers(
     }
 
     private fun restoreOutboundFlights() {
-        journal.snapshot(true).forEach { record ->
+        // Creation order, so per-peer media keeps its oldest-first turn after a restart.
+        journal.snapshot(true).sortedBy { it.creationOrder() }.forEach { record ->
             runCatching {
                 val bytes = journal.payload(record)
                 require(bytes.size == record.size && TransferJournal.hash(bytes) == record.digest)
                 val key = "${record.peer}:${record.id}"
                 synchronized(this) { reserved[key] = bytes.size }
                 outgoingMessages[key] = record.messageId
-                flights[key] = TransferFlight(record, bytes, queuedAt = now())
+                if (record.origin) origins.register(key, record.messageId)
+                flights[key] = TransferFlight(record, bytes, queuedAt = now(), createdAt = record.creationOrder())
                     .also { report(it, SendProgress.State.QUEUED) }
                 if (record.durableRelay) runCatching {
                     commitOnwardCustody(record.peer, ProtoBuf.decodeFromByteArray<MeshPayload>(bytes))
@@ -469,7 +510,13 @@ internal class ReliableMeshTransfers(
         val perPeer = countInFlightByPeer(at)
         lastTurn.keys.retainAll(flights.values.map { it.record.peer }.toSet())
         // Rotate each peer's next turn before dispatch; an ACK must not always refill the oldest flight.
-        rotatedTurns().forEach { dispatchTurn(it, perPeer, at) }
+        val held = MediaFifo.held(flights.values, at, STALL_REPROBE_MS, STATUS_QUERY_MS)
+        rotatedTurns().forEach { flight ->
+            if (flight.key !in held) dispatchTurn(flight, perPeer, at)
+            else {
+                hold(flight, at)
+            }
+        }
         busy = flights.values.any { ready(it.record.peer) && (it.pending.isNotEmpty() || it.waitingStatus) }
         if (!timer) nextTickDelay()?.let(::scheduleTick)
     }
@@ -507,6 +554,23 @@ internal class ReliableMeshTransfers(
         return perPeer
     }
 
+    /** A held flight gives back its window slots and asks for custody status again once released. */
+    private fun hold(flight: TransferFlight, at: Long) {
+        if (flight.pending.isNotEmpty() || flight.waitingStatus) flight.resetProbe()
+        markReadiness(flight, at, ready(flight.record.peer))
+        report(flight, SendProgress.State.QUEUED, heldBehind = true)
+    }
+
+    /** Legacy records have no creation time; their expiry minus the retention they were given stands in. */
+    private fun TransferRecord.creationOrder() = createdAt.takeIf { it > 0 }
+        ?: (expiresAt - if (durableRelay) RETENTION_MS else NON_DURABLE_RETENTION_MS)
+
+    /** One live copy per message per next hop: a newer transmission replaces the older one to that peer. */
+    private fun supersede(peer: String, id: String, messageId: String) {
+        flights.values.filter { it.record.peer == peer && it.record.messageId == messageId && it.record.id != id }
+            .forEach { finishFlight(it, false, supersededBy = id) }
+    }
+
     private fun rotatedTurns(): List<TransferFlight> = flights.values.groupBy { it.record.peer }
         .flatMap { (peer, entries) ->
             val previous = entries.indexOfFirst { it.record.id == lastTurn[peer] }
@@ -516,7 +580,11 @@ internal class ReliableMeshTransfers(
 
     private fun dispatchTurn(flight: TransferFlight, perPeer: MutableMap<String, Int>, at: Long) {
         val peer = flight.record.peer
-        if (!ready(peer)) { report(flight, SendProgress.State.QUEUED); return }
+        if (!ready(peer)) {
+            markReadiness(flight, at, ready = false)
+            report(flight, SendProgress.State.QUEUED); return
+        }
+        markReadiness(flight, at, ready = true)
         if (yieldsToLive(flight)) return
         if (flight.isStalled(at, STALL_REPROBE_MS)) reprobe(flight, perPeer, at)
         if (!flight.queried || (flight.waitingStatus && flight.queryUntil <= at)) {
@@ -541,9 +609,14 @@ internal class ReliableMeshTransfers(
         report(flight, SendProgress.State.STALLED)
     }
 
-    /** Publishes sender progress only when it changes; the board is in memory and never a receipt. */
-    private fun report(flight: TransferFlight, state: SendProgress.State) {
-        val snapshot = SendProgress(flight.acknowledged.size, flight.pieceCount, state, flight.resent, flight.reprobes)
+    /**
+     * Publishes sender progress only when it changes; the board is in memory and never a receipt. Within one
+     * flight the shown count never falls, so a status bitmap or re-probe cannot make the bar jump back.
+     */
+    private fun report(flight: TransferFlight, state: SendProgress.State, heldBehind: Boolean = false) {
+        flight.shownAcked = maxOf(flight.shownAcked, flight.acknowledged.size)
+        val snapshot = SendProgress(flight.shownAcked, flight.pieceCount, state, flight.resent, flight.reprobes,
+            heldBehind = heldBehind, transferId = flight.record.id, restarted = flight.restarted)
         if (snapshot == flight.reported) return
         flight.reported = snapshot
         progress(flight.record.messageId, flight.record.peer, snapshot.copy(updatedAt = now()))
@@ -557,6 +630,7 @@ internal class ReliableMeshTransfers(
         if ((perPeer[peer] ?: 0) >= WINDOW && !flight.waitingStatus) return
         if (!flight.waitingStatus) {
             flight.queryNonce = UUID.randomUUID().toString()
+            flight.queryStartedAt = at
             perPeer[peer] = (perPeer[peer] ?: 0) + 1
         }
         flight.queried = true; flight.waitingStatus = true; flight.queryUntil = at + STATUS_QUERY_MS
@@ -620,14 +694,21 @@ internal class ReliableMeshTransfers(
         if (TraceGate.enabled) trace(TransferTrace(peer, id, dir, TraceStage.FAILED, size, 0, 0, reason))
     }
 
-    private fun finishFlight(flight: TransferFlight, success: Boolean) {
+    /** A [supersededBy] flight shares the board entry of its replacement, so it reports nothing. */
+    private fun finishFlight(flight: TransferFlight, success: Boolean, supersededBy: String? = null) {
         val key = flight.key
         if (success) flight.acknowledged.addAll(0 until flight.pieceCount)
-        report(flight, if (success) SendProgress.State.HOP_COMPLETE else SendProgress.State.FAILED)
+        val outcome = if (success) SendProgress.State.HOP_COMPLETE else SendProgress.State.FAILED
+        if (supersededBy == null) report(flight, outcome)
         flights.remove(key); releaseReservation(key); journal.delete(flight.record)
         event(flight.bytes, if (success) OutboundFrameEvent.Stage.COMPLETED else OutboundFrameEvent.Stage.FAILED,
             flight.queuedAt, flight.startedAt)
-        log("${if (success) "TRANSFER_CUSTODY_ACK" else "TRANSFER_EXPIRED"} transfer=${flight.record.id.take(12)} transmission=${flight.record.payloadId} peer=${flight.record.peer} bytes=${flight.record.size}")
+        if (supersededBy != null) {
+            log("TRANSFER_SUPERSEDED transfer=${flight.record.id.take(12)} " +
+                "by=${supersededBy.take(12)} peer=${flight.record.peer}")
+        } else {
+            log("${if (success) "TRANSFER_CUSTODY_ACK" else "TRANSFER_EXPIRED"} transfer=${flight.record.id.take(12)} transmission=${flight.record.payloadId} peer=${flight.record.peer} bytes=${flight.record.size}")
+        }
         if (TraceGate.enabled) trace(TransferTrace(flight.record.peer, flight.record.id, TraceDir.OUT,
             if (success) TraceStage.COMPLETED else TraceStage.FAILED, flight.record.size,
             if (success) TransferJournal.pieceCount(flight.record.size) else flight.acknowledged.size,
@@ -635,7 +716,9 @@ internal class ReliableMeshTransfers(
             if (success) TraceDropReason.NONE else TraceDropReason.TRANSFER_EXPIRED,
             flight.record.messageId))
     }
-    @Synchronized private fun releaseReservation(key: String) { reserved.remove(key); outgoingMessages.remove(key) }
+    @Synchronized private fun releaseReservation(key: String) {
+        reserved.remove(key); outgoingMessages.remove(key); origins.remove(key)
+    }
     private fun isValidPiece(piece: TransferPiece) = piece.size in 1..TransferJournal.MAX_BYTES &&
         piece.index in 0 until TransferJournal.pieceCount(piece.size) &&
         piece.transferId.matches(TRANSFER_ID_FORMAT) && piece.digest == piece.transferId

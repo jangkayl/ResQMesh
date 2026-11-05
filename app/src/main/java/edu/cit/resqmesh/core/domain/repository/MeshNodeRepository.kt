@@ -64,6 +64,8 @@ interface MeshNodeRepository {
     fun acceptPendingPublicKeyChange(peerName: String): Boolean
     fun rejectPendingPublicKeyChange(peerName: String): Boolean
     fun deleteConversationWith(peerName: String)
+    fun cancelPrivateSend(messageId: String)
+    fun retryPrivateSend(messageId: String)
     fun broadcastSeenReceipt(messageId: String, isPrivate: Boolean, targetName: String? = null)
     fun clearSosAlert()
 }

@@ -201,7 +201,7 @@ internal class NativeOutboundDispatcher(
         }
         cacheOutgoingMessageId(bytes)
         return if (peer != null && peerTransferVersions[peer] == ReliableMeshTransfers.VERSION && DirectSendPolicy.usesPieces(payload.type, bytes.size)) {
-            reliableTransfers.offer(peer, bytes, priority, durableRelay = true)
+            reliableTransfers.offer(peer, bytes, priority, durableRelay = true, origin = true)
         } else sendRawPayload(selected, bytes, priority)
     }
 

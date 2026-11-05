@@ -293,6 +293,10 @@ class MeshRepository(
 
     fun deleteConversationWith(peerName: String) = inbound.deleteConversationWith(peerName)
 
+    fun cancelPrivateSend(messageId: String) = outbound.cancelPrivate(messageId)
+
+    fun retryPrivateSend(messageId: String) = outbound.retryFailed(messageId)
+
     fun hasPendingPublicKeyChange(peerName: String): Boolean = inbound.hasPendingPublicKeyChange(peerName)
 
     fun acceptPendingPublicKeyChange(peerName: String): Boolean = inbound.acceptPendingPublicKeyChange(peerName)
