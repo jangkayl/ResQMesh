@@ -17,7 +17,9 @@ All features use offline identity without mandatory online login.
 
 **Project stage:** working prototype with reported phone successes. Intermittent far-end delivery loss remains open; operational reliability is unproven.
 
-[Features](#features) · [How it works](#how-the-system-works) · [Structure](#project-structure) · [Stack](#technology-stack) · [Setup](#getting-started) · [Testing](#testing-and-diagnostics) · [Progress](#current-progress-and-known-limitations) · [Docs](#documentation) · [Contributing](#contributing)
+**Download:** [v1.0.1 release APK](https://github.com/jangkayl/ResQMesh/releases/tag/v1.0.1) (Android 7.0+).
+
+[Features](#features) · [How it works](#how-the-system-works) · [Structure](#project-structure) · [Stack](#technology-stack) · [Setup](#getting-started) · [Configuration](#environment-and-configuration) · [Testing](#testing-and-diagnostics) · [Progress](#current-progress-and-known-limitations) · [Docs](#documentation) · [Contributing](#contributing)
 
 ## Features
 
@@ -137,20 +139,8 @@ ResQMesh/
 │       │           └── sos/            # Alerts, threads and maps
 │       ├── test/                       # JVM unit tests
 │       └── androidTest/                # Instrumentation/UI/migration tests
-├── docs/
-│   ├── architecture.md                 # Implemented system
-│   ├── status.md                       # Current progress and open issues
-│   ├── validation.md                   # Procedures and bounded evidence
-│   ├── decisions.md                    # Accepted engineering policies
-│   ├── research.md                     # Evaluation and claim limits
-│   ├── ui.md                           # Stable presentation rules
-│   ├── demo/                           # Guide and limitations
-│   ├── plans/                          # Active preparation plans
-│   └── testing/                        # Physical-phone test cards
-├── scripts/
-│   ├── ci/                             # CI checks
-│   ├── device/                         # Device tools
-│   └── map/                            # Map packaging (walkthrough.md)
+├── docs/                               # See Documentation below
+├── scripts/                            # ci/, device/ and map/ tools
 ├── captures/                           # Local evidence (ignored)
 ├── archive/                            # Historical/deferred documentation
 ├── config/detekt/                      # Static-analysis rules
@@ -197,6 +187,16 @@ Output: **`app/build/outputs/apk/debug/app-debug.apk`**. `scripts/device/manage_
 ### Release build
 
 For demo phones, copy `keystore.properties.example` to `keystore.properties`, then run `:app:assembleRelease` ([card](docs/testing/pre-demo-cleanup-card.md)).
+
+### Environment and configuration
+
+No API keys or `.env`. Local settings (names only, git-ignored):
+
+| Setting | File | Purpose |
+| --- | --- | --- |
+| `storeFile`, `storePassword`, `keyAlias`, `keyPassword` | `keystore.properties` | Release signing |
+| `sdk.dir`, `resqmesh.devPin` (optional) | `local.properties` | SDK path; developer PIN |
+| `bleL2cap`, `devAbi` (optional) | Gradle `-P` properties | L2CAP toggle; ABI filter |
 
 ### First phone session
 
