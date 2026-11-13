@@ -51,6 +51,13 @@ object BleConfig {
     const val DUPLICATE_LINK_GRACE_MS = 5_000L
 
     const val HEARTBEAT_ACK_TIMEOUT_MS = 8_000L
+
+    /**
+     * Consecutive unanswered heartbeat challenges before a silent link is retired. One miss used to
+     * retire the link, which dropped edge-of-range links during brief blackouts. Each challenge
+     * waits [HEARTBEAT_ACK_TIMEOUT_MS], so three misses cost about 24 s after silence is noticed.
+     */
+    const val HEARTBEAT_MAX_MISSES = 3
     const val GATT_CHUNK_TIMEOUT_MS = 4_000L
 
     /** Payload bytes per write on the default 23-byte ATT MTU, used until a larger MTU is negotiated. */

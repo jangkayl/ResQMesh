@@ -6,6 +6,9 @@ import java.util.concurrent.ConcurrentHashMap
 class HeartbeatCoordinator(private val now: () -> Long = System::currentTimeMillis) {
     private val challenges = ConcurrentHashMap<String, HeartbeatChallenge>()
 
+    /** Consecutive unanswered challenges per endpoint, bound to the link generation they were counted on. */
+    private val misses = ConcurrentHashMap<String, MissCount>()
+
     fun contains(endpoint: String): Boolean = challenges.containsKey(endpoint)
 
     fun pending(endpoint: String): HeartbeatChallenge? = challenges[endpoint]
@@ -24,12 +27,40 @@ class HeartbeatCoordinator(private val now: () -> Long = System::currentTimeMill
 
     fun acknowledge(endpoint: String, id: String, generation: Long): Boolean {
         val pending = challenges[endpoint] ?: return false
-        return pending.accepts(endpoint, id, generation) && challenges.remove(endpoint, pending)
+        val accepted = pending.accepts(endpoint, id, generation) && challenges.remove(endpoint, pending)
+        if (accepted) misses.remove(endpoint)
+        return accepted
+    }
+
+    /**
+     * Counts one unanswered challenge on [generation] and returns the consecutive total. A miss on a
+     * newer generation restarts the count, so a replacement link never inherits an old link's misses.
+     */
+    fun recordMiss(endpoint: String, generation: Long): Int =
+        misses.compute(endpoint) { _, previous ->
+            if (previous == null || previous.generation != generation) MissCount(generation, 1)
+            else previous.copy(count = previous.count + 1)
+        }!!.count
+
+    /** Inbound traffic proves the link is alive again. */
+    fun resetMisses(endpoint: String) {
+        misses.remove(endpoint)
     }
 
     fun remove(endpoint: String, expected: HeartbeatChallenge? = null): Boolean =
         if (expected == null) challenges.remove(endpoint) != null
         else challenges.remove(endpoint, expected)
 
-    fun clear() = challenges.clear()
+    /** Drops every heartbeat record for a retired endpoint. */
+    fun forget(endpoint: String) {
+        challenges.remove(endpoint)
+        misses.remove(endpoint)
+    }
+
+    fun clear() {
+        challenges.clear()
+        misses.clear()
+    }
+
+    private data class MissCount(val generation: Long, val count: Int)
 }

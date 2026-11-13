@@ -11,6 +11,8 @@ Build identity: record the branch head commit, the debug APK hash and each phone
 
 Range Boost changes only the scan mode. Advertising, GATT, routing and delivery are unchanged, and connection range itself is not extended.
 
+On `feat/ble-coded-phy` and later builds, a free direct-link slot keeps LOW_LATENCY (`reason=free_slots`), and BALANCED appears only as `reason=links_full`. S2, E1 and E10 expectations apply to the original `fix/ble-range-probe-scan` build only; use the [Coded PHY card](ble-coded-phy-range-card.md) for later builds.
+
 ## Setup
 
 Two to three phones with the debug build. Start `scripts\device\capture_ble_logcat.ps1` on phone A. Range Boost is on by default (Profile, Bluetooth Range Boost).

@@ -1,10 +1,14 @@
 package edu.cit.resqmesh.core.network.bluetooth
 
 import android.annotation.SuppressLint
+import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothManager
 import android.bluetooth.le.AdvertiseCallback
 import android.bluetooth.le.AdvertiseData
 import android.bluetooth.le.AdvertiseSettings
+import android.bluetooth.le.AdvertisingSet
+import android.bluetooth.le.AdvertisingSetCallback
+import android.bluetooth.le.AdvertisingSetParameters
 import android.bluetooth.le.ScanCallback
 import android.bluetooth.le.ScanFilter
 import android.bluetooth.le.ScanResult
@@ -15,9 +19,11 @@ import android.content.Context
 import android.os.Handler
 import android.os.Looper
 import android.os.ParcelUuid
+import androidx.annotation.RequiresApi
 import edu.cit.resqmesh.core.model.NodeIdentity
 import edu.cit.resqmesh.core.network.bluetooth.state.HandshakeRadioGate
 import edu.cit.resqmesh.core.logging.AppLogger
+import edu.cit.resqmesh.core.utils.collections.BoundedLruMap
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.random.Random
@@ -41,7 +47,9 @@ class BleRadioController(
     private val onAdvertisement: (BleAdvertisement) -> Unit,
     private val onAdvertisingFailure: () -> Unit = {},
     private val isRangeBoostEnabled: () -> Boolean = { true },
-    private val isLocalSosActive: () -> Boolean = { false }
+    private val isLocalSosActive: () -> Boolean = { false },
+    private val hasFreeLinkSlot: () -> Boolean = { true },
+    private val onCodedSighting: (String) -> Unit = {}
 ) {
     private val appContext = context.applicationContext
     private val adapter =
@@ -64,6 +72,9 @@ class BleRadioController(
     private var advertiserOwner: BluetoothLeAdvertiser? = null
     private var scanCallback: ScanCallback? = null
     private var advertiseCallback: AdvertiseCallback? = null
+    private var codedAdvertiseCallback: AdvertisingSetCallback? = null
+    /** Node ID to when its 1M advertisement was last heard; suppresses duplicate Coded sightings. */
+    private val legacySeenByNode = BoundedLruMap<String, Long>(MAX_TRACKED_NODES)
     private val scanBudget = BleScanStartBudget()
 
     private fun parseAdvertisement(result: ScanResult) {
@@ -73,10 +84,22 @@ class BleRadioController(
             AppLogger.d("BLE_MESH", "Scanner: Ignored malformed advertisement from ${result.device.address}")
             return
         }
-        lastValidAdvertisementAt = System.currentTimeMillis()
+        val now = System.currentTimeMillis()
+        lastValidAdvertisementAt = now
         recoveryAttempts = 0
         scheduleRecoveryCheck()
-        onAdvertisement(advertisement)
+        if (admitPhySighting(result, advertisement, now)) onAdvertisement(advertisement)
+    }
+
+    /** Records which PHY carried this sighting; false drops a Coded duplicate of a peer still heard on 1M. */
+    private fun admitPhySighting(result: ScanResult, advertisement: BleAdvertisement, now: Long): Boolean {
+        if (!isCodedSighting(result)) {
+            if (advertisement.nodeId.isNotEmpty()) legacySeenByNode[advertisement.nodeId] = now
+            return true
+        }
+        val accepted = PhyPolicy.acceptCodedSighting(legacySeenByNode[advertisement.nodeId], now)
+        if (accepted) onCodedSighting(advertisement.endpointId)
+        return accepted
     }
 
     fun startAdvertising(
@@ -133,9 +156,82 @@ class BleRadioController(
             .setIncludeDeviceName(false)
             .addManufacturerData(MANUFACTURER_ID, manufacturerData)
             .build()
-        try { advertiser.startAdvertising(settings, data, scanResponse, callback) }
-        catch (_: Exception) { onAdvertisingFailure() }
+        val started = try {
+            advertiser.startAdvertising(settings, data, scanResponse, callback)
+            true
+        } catch (_: Exception) {
+            onAdvertisingFailure()
+            false
+        }
+        if (started && android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+            startCodedAdvertising(advertiser, generation, manufacturerData)
+        } else if (started) {
+            AppLogger.d("BLE_PHY", "adv=legacy-only reason=coded_unsupported")
+        }
     }
+
+    /**
+     * Adds a connectable LE Coded (long range) advertisement beside the legacy 1M one on phones whose
+     * controller supports it. Identity travels in the same packet, so one received packet is enough.
+     * Failure leaves legacy advertising running and is only logged.
+     */
+    @RequiresApi(android.os.Build.VERSION_CODES.O)
+    private fun startCodedAdvertising(
+        advertiser: BluetoothLeAdvertiser,
+        generation: Long,
+        manufacturerData: ByteArray
+    ) {
+        if (!PhyPolicy.supportsCodedAdvertising(android.os.Build.VERSION.SDK_INT, PhyPolicy.capabilities(appContext))) {
+            AppLogger.d("BLE_PHY", "adv=legacy-only reason=coded_unsupported")
+            return
+        }
+        val callback = object : AdvertisingSetCallback() {
+            override fun onAdvertisingSetStarted(set: AdvertisingSet?, txPower: Int, status: Int) {
+                handler.post {
+                    if (generation != advertiseGeneration || !isNodeActive()) return@post
+                    if (status == AdvertisingSetCallback.ADVERTISE_SUCCESS) {
+                        AppLogger.d("BLE_PHY", "adv=coded txPower=$txPower")
+                    } else {
+                        AppLogger.d("BLE_PHY", "adv=legacy-only reason=status_$status")
+                    }
+                }
+            }
+        }
+        val parameters = AdvertisingSetParameters.Builder()
+            .setLegacyMode(false)
+            .setConnectable(true)
+            .setScannable(false)
+            .setPrimaryPhy(BluetoothDevice.PHY_LE_CODED)
+            .setSecondaryPhy(BluetoothDevice.PHY_LE_CODED)
+            .setInterval(AdvertisingSetParameters.INTERVAL_LOW)
+            .setTxPowerLevel(AdvertisingSetParameters.TX_POWER_MAX)
+            .build()
+        val data = AdvertiseData.Builder()
+            .setIncludeDeviceName(false)
+            .addServiceUuid(ParcelUuid(serviceUuid))
+            .addManufacturerData(MANUFACTURER_ID, manufacturerData)
+            .build()
+        codedAdvertiseCallback = callback
+        try {
+            advertiser.startAdvertisingSet(parameters, data, null, null, null, callback)
+        } catch (error: Exception) {
+            codedAdvertiseCallback = null
+            AppLogger.d("BLE_PHY", "adv=legacy-only reason=${error.javaClass.simpleName}")
+        }
+    }
+
+    /** On Coded-capable phones, listens on every supported PHY; legacy 1M advertisements are still reported. */
+    private fun scanSettings(mode: Int): ScanSettings = ScanSettings.Builder().setScanMode(mode).apply {
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O &&
+            PhyPolicy.supportsCodedLinks(android.os.Build.VERSION.SDK_INT, PhyPolicy.capabilities(appContext))) {
+            setLegacy(false)
+            setPhy(ScanSettings.PHY_LE_ALL_SUPPORTED)
+        }
+    }.build()
+
+    private fun isCodedSighting(result: ScanResult): Boolean =
+        android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O &&
+            result.primaryPhy == BluetoothDevice.PHY_LE_CODED
 
     fun startScanning() {
         if (!isNodeActive()) return
@@ -176,13 +272,14 @@ class BleRadioController(
             hasReadyConnection = hasReadyConnection(),
             recentlySawPeer = lastValidAdvertisementAt > 0L &&
                 nowMs - lastValidAdvertisementAt < ScanModePolicy.RECENT_PEER_WINDOW_MS,
-            localSosActive = isLocalSosActive()
+            localSosActive = isLocalSosActive(),
+            hasFreeLinkSlot = hasFreeLinkSlot()
         )
         if (choice != lastScanModeChoice) {
             lastScanModeChoice = choice
             AppLogger.d("BLE_MESH", "Scan mode=${choice.label} reason=${choice.reason}")
         }
-        val settings = ScanSettings.Builder().setScanMode(choice.mode).build()
+        val settings = scanSettings(choice.mode)
         try {
             scanBudget.recordStart(android.os.SystemClock.elapsedRealtime())
             scanner.startScan(filters, settings, callback)
@@ -234,6 +331,7 @@ class BleRadioController(
         lastScanStartAt = 0L
         lastValidAdvertisementAt = 0L
         recoveryAttempts = 0
+        legacySeenByNode.clear()
     }
 
     private fun runScanRecoveryCheck() {
@@ -305,6 +403,11 @@ class BleRadioController(
         val callback = advertiseCallback
         advertiseCallback = null
         try { if (callback != null) advertiserOwner?.stopAdvertising(callback) } catch (_: Exception) {}
+        val codedCallback = codedAdvertiseCallback
+        codedAdvertiseCallback = null
+        if (codedCallback != null && android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+            try { advertiserOwner?.stopAdvertisingSet(codedCallback) } catch (_: Exception) {}
+        }
         advertiserOwner = null
     }
 
@@ -332,7 +435,7 @@ class BleRadioController(
             AppLogger.d("BLE_PHY", "codedPhy=unavailable(api=$api) model=${android.os.Build.MODEL}")
             return
         }
-        val caps = BleCapabilities.read(appContext)
+        val caps = PhyPolicy.capabilities(appContext)
         AppLogger.d(
             "BLE_PHY",
             "codedPhy=${caps.codedPhy ?: "unknown"}, phy2M=${caps.phy2M ?: "unknown"}, " +
@@ -346,5 +449,6 @@ class BleRadioController(
         val phyLogged = AtomicBoolean(false)
         const val MANUFACTURER_ID = 0xFFFF
         const val MAX_ADVERT_PAYLOAD_BYTES = 26
+        const val MAX_TRACKED_NODES = 128
     }
 }

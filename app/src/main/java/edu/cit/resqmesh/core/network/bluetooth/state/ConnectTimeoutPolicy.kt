@@ -26,11 +26,12 @@ class ConnectTimeoutPolicy(maxPeers: Int = MAX_PEERS) {
     fun clear() = consecutiveTimeouts.clear()
 
     companion object {
-        const val BASE_MS = 5_000L
+        const val BASE_MS = 8_000L
         const val STEP_MS = 5_000L
         /** Stays below the 25 s connect-lock backstop so one slow peer cannot strand the lane. */
         const val MAX_MS = 15_000L
-        private const val MAX_STEPS = ((MAX_MS - BASE_MS) / STEP_MS).toInt()
+        /** Rounded up so the last step still reaches [MAX_MS] when the range is not a multiple of [STEP_MS]. */
+        private const val MAX_STEPS = ((MAX_MS - BASE_MS + STEP_MS - 1) / STEP_MS).toInt()
         private const val MAX_PEERS = 256
     }
 }

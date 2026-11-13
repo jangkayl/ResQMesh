@@ -15,6 +15,7 @@ import androidx.core.content.ContextCompat
 import edu.cit.resqmesh.core.model.NodeIdentity
 import edu.cit.resqmesh.core.network.NativeBleManager
 import edu.cit.resqmesh.core.network.bluetooth.BleConnectStartResult
+import edu.cit.resqmesh.core.network.bluetooth.PhyPolicy
 import edu.cit.resqmesh.core.network.bluetooth.ReadyPayloadSetup
 import edu.cit.resqmesh.core.network.bluetooth.state.BleLink
 import edu.cit.resqmesh.core.network.bluetooth.state.BleLinkRole
@@ -145,7 +146,18 @@ class GattClientManager(
             // AUTO remains the compatibility default because explicit LE caused immediate
             // disconnects on older OEM pairs. A peer-specific retry switches to LE only after
             // AUTO connected but failed at ATT primary-service discovery.
-            link.gatt = if (attempt.useExplicitLeTransport) {
+            // A peer found only on Coded advertises from a Coded-only address, so the initiator must
+            // be allowed to connect on Coded. The transport choice below is kept unchanged.
+            val codedPeer = Build.VERSION.SDK_INT >= Build.VERSION_CODES.O &&
+                manager.store.codedPhyEndpoints.containsKey(device.address) &&
+                PhyPolicy.supportsCodedLinks(Build.VERSION.SDK_INT, PhyPolicy.capabilities(context))
+            link.gatt = if (codedPeer) {
+                val transport = if (attempt.useExplicitLeTransport) BluetoothDevice.TRANSPORT_LE
+                    else BluetoothDevice.TRANSPORT_AUTO
+                AppLogger.d("BLE_PHY", "Connecting to $peerName with 1M|CODED initiator phys")
+                device.connectGatt(context, false, callback, transport,
+                    BluetoothDevice.PHY_LE_1M_MASK or BluetoothDevice.PHY_LE_CODED_MASK)
+            } else if (attempt.useExplicitLeTransport) {
                 AppLogger.d("BLE_MESH", "Connecting to $peerName with explicit LE transport after AUTO discovery timeout")
                 device.connectGatt(context, false, callback, BluetoothDevice.TRANSPORT_LE)
             } else {

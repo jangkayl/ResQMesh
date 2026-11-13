@@ -15,7 +15,7 @@ class ScanModePolicyTest {
     }
 
     @Test fun sosForcesLowLatencyEvenWithPeers() {
-        val c = ScanModePolicy.choose(true, true, true, true)
+        val c = ScanModePolicy.choose(true, true, true, true, hasFreeLinkSlot = false)
         assertEquals(lowLatency, c.mode)
         assertEquals("sos", c.reason)
     }
@@ -26,10 +26,16 @@ class ScanModePolicyTest {
         assertEquals("no_peers", c.reason)
     }
 
-    @Test fun readyConnectionOrRecentPeerStaysBalanced() {
-        assertEquals("peers_present", ScanModePolicy.choose(true, true, false, false).reason)
-        val c = ScanModePolicy.choose(true, false, true, false)
+    @Test fun peersWithFreeSlotStayLowLatency() {
+        val c = ScanModePolicy.choose(true, true, true, false, hasFreeLinkSlot = true)
+        assertEquals(lowLatency, c.mode)
+        assertEquals("free_slots", c.reason)
+    }
+
+    @Test fun fullLinkSlotsUseBalanced() {
+        assertEquals("links_full", ScanModePolicy.choose(true, true, false, false, hasFreeLinkSlot = false).reason)
+        val c = ScanModePolicy.choose(true, false, true, false, hasFreeLinkSlot = false)
         assertEquals(balanced, c.mode)
-        assertEquals("peers_present", c.reason)
+        assertEquals("links_full", c.reason)
     }
 }

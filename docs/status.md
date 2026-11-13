@@ -65,7 +65,7 @@ Block, incident, SOS and recovery: basic user-reported successes; adversarial, l
 
 **BLE fixes**: [header](testing/l2cap-single-write-header-card.md), [timeout](testing/adaptive-connect-timeout-card.md), [indication](testing/indication-tombstone-expiry-card.md) cards pending.
 
-**BLE range** (`fix/ble-range-probe-scan`, D1): [card](testing/ble-range-probe-test-card.md) pending.
+**BLE range** (D1): user-reported working; [probe](testing/ble-range-probe-test-card.md)/[long-range](testing/ble-coded-phy-range-card.md).
 
 **Map download** (`fix/map-download-reliability`): user-reported slowness; speed unmeasured; [card](testing/map-download-reliability-card.md) pending.
 

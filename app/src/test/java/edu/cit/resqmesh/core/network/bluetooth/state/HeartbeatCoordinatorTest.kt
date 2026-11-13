@@ -1,5 +1,6 @@
 package edu.cit.resqmesh.core.network.bluetooth.state
 
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
@@ -25,6 +26,34 @@ class HeartbeatCoordinatorTest {
         assertFalse(coordinator.acknowledge("peer", "challenge", 5L))
         assertTrue(coordinator.acknowledge("peer", "challenge", 4L))
         assertFalse(coordinator.contains("peer"))
+    }
+
+    @Test fun missesAccumulateOnOneGenerationAndResetOnAck() {
+        val coordinator = HeartbeatCoordinator { 100L }
+        assertEquals(1, coordinator.recordMiss("peer", 3L))
+        assertEquals(2, coordinator.recordMiss("peer", 3L))
+        coordinator.begin("peer", BleLinkRole.CLIENT, 3L, "hb")
+        coordinator.markSent("peer", 3L, "hb")
+        assertTrue(coordinator.acknowledge("peer", "hb", 3L))
+        assertEquals(1, coordinator.recordMiss("peer", 3L))
+    }
+
+    @Test fun replacementLinkDoesNotInheritMisses() {
+        val coordinator = HeartbeatCoordinator { 100L }
+        coordinator.recordMiss("peer", 1L)
+        coordinator.recordMiss("peer", 1L)
+        assertEquals(1, coordinator.recordMiss("peer", 2L))
+    }
+
+    @Test fun forgetAndResetClearMisses() {
+        val coordinator = HeartbeatCoordinator { 100L }
+        coordinator.recordMiss("peer", 1L)
+        coordinator.resetMisses("peer")
+        assertEquals(1, coordinator.recordMiss("peer", 1L))
+        coordinator.begin("peer", BleLinkRole.CLIENT, 1L, "hb")
+        coordinator.forget("peer")
+        assertFalse(coordinator.contains("peer"))
+        assertEquals(1, coordinator.recordMiss("peer", 1L))
     }
 
     @Test fun expectedRemovalCannotDeleteAReplacementChallenge() {

@@ -1,6 +1,8 @@
 package edu.cit.resqmesh.core.network.bluetooth.gatt.client
 
 import edu.cit.resqmesh.core.network.bluetooth.BleConfig
+import edu.cit.resqmesh.core.network.bluetooth.BlePhyRequests
+import edu.cit.resqmesh.core.network.bluetooth.PhyPolicy
 import android.bluetooth.*
 import edu.cit.resqmesh.core.model.ConnectedDevice
 import edu.cit.resqmesh.core.network.bluetooth.state.BleLinkRole
@@ -17,6 +19,8 @@ private const val CLIENT_CHUNK_BUFFER_TIMEOUT_MS = 5000
 /** The L2CAP PSM characteristic carries one big-endian Int. */
 private const val PSM_VALUE_BYTES = 4
 
+// Each override is a platform BluetoothGattCallback entry point; the logic lives in the helpers below.
+@Suppress("TooManyFunctions")
 internal class GattClientCallback(
     override val attempt: GattClientAttempt
 ) : BluetoothGattCallback(), GattClientHost by attempt, GattClientAttemptContext {
@@ -77,6 +81,19 @@ internal class GattClientCallback(
             if (!owns(gatt, "characteristic write $status")) return@post
             completeGattChunk(macAddress, BleLinkRole.CLIENT, status, gatt)
         }
+    }
+
+    override fun onReadRemoteRssi(gatt: BluetoothGatt, rssi: Int, status: Int) {
+        handler.post {
+            if (!isTransportGenerationCurrent(epoch)) return@post
+            if (!owns(gatt, "rssi $status") || status != BluetoothGatt.GATT_SUCCESS) return@post
+            AppLogger.d("BLE_PHY", "link=CLIENT endpoint=$macAddress rssi=$rssi")
+            if (PhyPolicy.isWeak(rssi)) BlePhyRequests.requestCoded(context, gatt, macAddress, "weak_rssi")
+        }
+    }
+
+    override fun onPhyUpdate(gatt: BluetoothGatt, txPhy: Int, rxPhy: Int, status: Int) {
+        BlePhyRequests.logUpdate("CLIENT", macAddress, txPhy, rxPhy, status)
     }
 
     /** Enables TX notifications locally; false after tearing the link down on a revoked permission. */
@@ -219,6 +236,12 @@ private fun GattClientAttemptContext.markClientReady() {
 
     finishConnectPhase("descriptor written")
     payloadSetup.start()
+    // One link-layer RSSI read decides whether this link should trade throughput for Coded range.
+    try {
+        link.gatt?.readRemoteRssi()
+    } catch (_: SecurityException) {
+        AppLogger.d("BLE_PHY", "link=CLIENT endpoint=$macAddress rssi skipped: BLUETOOTH_CONNECT was revoked")
+    }
     sendSystemPulse(forceFull = true)
     processNextPayload(macAddress)
 }
