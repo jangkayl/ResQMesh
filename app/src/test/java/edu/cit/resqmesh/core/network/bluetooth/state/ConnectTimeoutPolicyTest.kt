@@ -11,9 +11,9 @@ class ConnectTimeoutPolicyTest {
     @Test fun consecutiveTimeoutsEscalateAndCap() {
         val policy = ConnectTimeoutPolicy()
         policy.onTimedOut("peer")
-        assertEquals(10_000L, policy.timeoutMs("peer"))
+        assertEquals(ConnectTimeoutPolicy.BASE_MS + ConnectTimeoutPolicy.STEP_MS, policy.timeoutMs("peer"))
         policy.onTimedOut("peer")
-        assertEquals(15_000L, policy.timeoutMs("peer"))
+        assertEquals(ConnectTimeoutPolicy.MAX_MS, policy.timeoutMs("peer"))
         repeat(5) { policy.onTimedOut("peer") }
         assertEquals(ConnectTimeoutPolicy.MAX_MS, policy.timeoutMs("peer"))
     }
@@ -24,7 +24,7 @@ class ConnectTimeoutPolicyTest {
         policy.onTimedOut("other")
         policy.onConnected("slow")
         assertEquals(ConnectTimeoutPolicy.BASE_MS, policy.timeoutMs("slow"))
-        assertEquals(10_000L, policy.timeoutMs("other"))
+        assertEquals(ConnectTimeoutPolicy.BASE_MS + ConnectTimeoutPolicy.STEP_MS, policy.timeoutMs("other"))
     }
 
     @Test fun capStaysBelowConnectLockBackstop() {
@@ -37,6 +37,6 @@ class ConnectTimeoutPolicyTest {
         policy.onTimedOut("b")
         policy.onTimedOut("c")
         assertEquals(ConnectTimeoutPolicy.BASE_MS, policy.timeoutMs("a"))
-        assertEquals(10_000L, policy.timeoutMs("c"))
+        assertEquals(ConnectTimeoutPolicy.BASE_MS + ConnectTimeoutPolicy.STEP_MS, policy.timeoutMs("c"))
     }
 }

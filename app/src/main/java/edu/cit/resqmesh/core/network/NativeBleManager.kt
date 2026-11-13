@@ -1,6 +1,7 @@
 package edu.cit.resqmesh.core.network
 
 import edu.cit.resqmesh.core.network.bluetooth.BleConfig
+import edu.cit.resqmesh.core.network.bluetooth.BlePhyRequests
 import edu.cit.resqmesh.core.network.bluetooth.peers.BleLinkDiagnostics
 import edu.cit.resqmesh.core.network.bluetooth.peers.BlePeerDirectory
 import edu.cit.resqmesh.core.network.bluetooth.peers.BleLinkRetirementController
@@ -118,7 +119,9 @@ class NativeBleManager(
             context.getSharedPreferences("resqmesh_prefs", Context.MODE_PRIVATE)
                 .getBoolean("ble_range_boost_enabled", true)
         },
-        isLocalSosActive = { localSosActive }
+        isLocalSosActive = { localSosActive },
+        hasFreeLinkSlot = { distinctReadyLinkCount() < BleConfig.MAX_TOTAL_CONNECTIONS },
+        onCodedSighting = { endpoint -> store.codedPhyEndpoints[endpoint] = System.currentTimeMillis() }
     )
 
     private val transportResources = BleTransportResources()
@@ -599,7 +602,18 @@ class NativeBleManager(
     private val heartbeatDriver = BleHeartbeatDriver(
         store, handler, heartbeatCoordinator, BleConfig.HEARTBEAT_ACK_TIMEOUT_MS, ::readyGattLink,
         ::enqueueGattPayload, ::forceGattDisconnect, transportResources, { myDeviceName }
-    )
+    ).also { it.onLinkStruggling = ::requestCodedPhyForStrugglingLink }
+
+    /** A missed heartbeat suggests a weak edge link; ask for Coded PHY on whichever role owns it. */
+    private fun requestCodedPhyForStrugglingLink(endpoint: String) {
+        val client = store.activeConnections[endpoint]
+        val requested = client != null && BlePhyRequests.requestCoded(context, client, endpoint, "heartbeat_miss")
+        val device = store.activeServerConnections[endpoint]
+        val server = gattServer
+        if (!requested && device != null && server != null) {
+            BlePhyRequests.requestCoded(context, server, device, "heartbeat_miss")
+        }
+    }
 
     private fun startHeartbeatChallenge(endpoint: String) = heartbeatDriver.startHeartbeatChallenge(endpoint)
 

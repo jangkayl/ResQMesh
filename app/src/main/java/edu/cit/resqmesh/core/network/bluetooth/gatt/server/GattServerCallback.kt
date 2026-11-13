@@ -1,6 +1,7 @@
 package edu.cit.resqmesh.core.network.bluetooth.gatt.server
 
 import android.bluetooth.*
+import edu.cit.resqmesh.core.network.bluetooth.BlePhyRequests
 import edu.cit.resqmesh.core.network.bluetooth.gatt.GattServerHost
 
 internal class GattServerCallback(
@@ -22,6 +23,10 @@ internal class GattServerCallback(
     }
     override fun onDescriptorWriteRequest(device: BluetoothDevice, requestId: Int, descriptor: BluetoothGattDescriptor, preparedWrite: Boolean, responseNeeded: Boolean, offset: Int, value: ByteArray?) {
         attributes.onDescriptorWriteRequest(device, requestId, descriptor, preparedWrite, responseNeeded, offset, value)
+    }
+
+    override fun onPhyUpdate(device: BluetoothDevice, txPhy: Int, rxPhy: Int, status: Int) {
+        BlePhyRequests.logUpdate("SERVER", device.address, txPhy, rxPhy, status)
     }
 
     override fun onMtuChanged(device: BluetoothDevice, mtu: Int) {

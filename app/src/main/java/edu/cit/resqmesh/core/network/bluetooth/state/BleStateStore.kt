@@ -30,6 +30,9 @@ class BleStateStore(val guards: InboundGuards = InboundGuards()) {
     val isNodeActive = AtomicBoolean(false)
     val isConnecting = AtomicBoolean(false)
     
+    /** Endpoint addresses last discovered on LE Coded PHY; connects to them must allow Coded. */
+    val codedPhyEndpoints = BoundedLruMap<String, Long>(MAX_CODED_PHY_ENDPOINTS)
+
     val activeConnections = ConcurrentHashMap<String, BluetoothGatt>()
     val activeServerConnections = ConcurrentHashMap<String, BluetoothDevice>()
     val activeL2capSockets = ConcurrentHashMap<String, BluetoothSocket>()
@@ -75,5 +78,6 @@ class BleStateStore(val guards: InboundGuards = InboundGuards()) {
         // Scan-fed tables see every advertising MAC in range, so they cannot grow without bound.
         const val MAX_SCANNED_ENDPOINTS = 256
         const val MAX_PEER_TRANSFER_VERSIONS = 512
+        const val MAX_CODED_PHY_ENDPOINTS = 64
     }
 }

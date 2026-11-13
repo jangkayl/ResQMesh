@@ -4,7 +4,7 @@ Last reviewed: 2026-10-17. Baseline: see [status](status.md). These describe acc
 
 ## D1: Reliability before transport expansion
 
-Prioritize BLE text/SOS, recovery and honest delivery state. Wi-Fi Direct, SoftAP, RFCOMM replacement, advertisement flooding and protocol migration remain deferred. Coded PHY waits for probe evidence, then adapts over 1M.
+Prioritize BLE text/SOS, recovery, honest delivery state. Wi-Fi Direct, SoftAP, RFCOMM replacement, advertisement flooding and protocol migration remain deferred. Coded-capable phones move weak links to Coded; legacy wire format unchanged.
 
 ## D2: GATT remains the control path
 
